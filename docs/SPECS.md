@@ -245,3 +245,25 @@ Series planner editing, chapter character toggles, status picker. `tsc -b` clean
 Known cosmetic limitation: the toolbar is dense and clips on the right below
 ~1100px viewport width; fine at desktop widths. Candidate for a future overflow
 menu.
+
+### 2026-06-27 — Series story-map + single toolbar (Session 4)
+
+- Consolidated to a single toolbar (removed the BoardActions strip): New chapter
+  and Auto-arrange now live on the bar; the canvas hint moved to the footer. The
+  bar is `overflow-x-auto` so nothing is ever unreachable; theme is icon-only;
+  the series/book control is hidden until the project is a series.
+- **Series story-map** (schema v3). BookMeta gained `x`, `y`, `notes`; new
+  `bookLinks: BookLink[]` (plain connectors, multiple per pair, optional labels).
+  `SeriesMap.tsx` is a pan/zoom canvas of draggable book cards (inline title/
+  synopsis/status, chapter & word counts, Open). Connect mode draws labeled
+  multi-connectors between books; labels are editable and deletable.
+- **Hierarchy + navigation**: `level: 'series' | 'book'` UI state. Toolbar shows a
+  `Series ▸ Book One` breadcrumb when seriesMode is on; double-click / Open a book
+  to drill into its chapter board, click `Series` to zoom back out. The old
+  Series planner *modal* was removed in favor of the map (SeriesModal.tsx deleted);
+  "+ New" now offers "Make this a series" / "Open series map".
+- Defensive: SeriesMap and the book-link store actions tolerate a missing
+  `bookLinks` array (older/partial persisted docs).
+- Verified in-browser: enabling series mode, the map with sample book links,
+  drill-in to a book board, breadcrumb back to the map. `tsc -b` + `vite build`
+  clean.

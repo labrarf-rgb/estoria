@@ -130,6 +130,9 @@ export const sampleStory: StoryDoc = {
       status: "drafting",
       premise: "A cartographer chasing her dead mother's impossible map down a coast that rewrites itself.",
       arc: "Wren learns the map is real, and that she drew the parts that hurt most.",
+      notes: "Establishes the living-maps rule and the False Harbor.",
+      x: 80,
+      y: 90,
     },
     {
       id: "b2",
@@ -138,6 +141,9 @@ export const sampleStory: StoryDoc = {
       status: "planned",
       premise: "With the harbor found, Wren must chart a route no one is meant to survive twice.",
       arc: "The cost of the first map comes due; Bram's secret reshapes the crew.",
+      notes: "Pays off Bram's guilt from Book One.",
+      x: 470,
+      y: 300,
     },
     {
       id: "b3",
@@ -146,7 +152,15 @@ export const sampleStory: StoryDoc = {
       status: "idea",
       premise: "The last coastline. The last lie. Wren decides what home is worth keeping.",
       arc: "Resolution of the mother thread; Pip inherits the trade.",
+      notes: "Closes the mother thread opened in Book One.",
+      x: 860,
+      y: 90,
     },
+  ],
+  bookLinks: [
+    { id: "bl1", fromId: "b1", toId: "b2", label: "Harbor found" },
+    { id: "bl2", fromId: "b2", toId: "b3", label: "The cost comes due" },
+    { id: "bl3", fromId: "b1", toId: "b3", label: "Mother thread" },
   ],
   activeBookId: "b1",
 

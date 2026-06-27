@@ -26,9 +26,13 @@ import { zustandStorage } from "@/store/persistence";
 export type View = "board" | "timeline";
 export type Theme = "light" | "dark";
 
+/** Which level of the hierarchy is on screen: the series map or a book's board. */
+export type Level = "series" | "book";
+
 interface UiState {
   theme: Theme;
   view: View;
+  level: Level;
   timelineOrient: TimelineOrient;
   zoom: number;
   panX: number;
@@ -98,9 +102,16 @@ interface StoreState extends UiState {
   // ---- books / series ----
   toggleSeriesMode: () => void;
   switchBook: (id: string) => void;
+  enterBook: (id: string) => void;
+  goToSeries: () => void;
+  setLevel: (level: Level) => void;
   addBook: () => void;
   updateBook: (id: string, patch: Partial<StoryDoc["books"][number]>) => void;
   deleteBook: (id: string) => void;
+  moveBook: (id: string, x: number, y: number) => void;
+  addBookLink: (fromId: string, toId: string) => void;
+  updateBookLink: (id: string, label: string) => void;
+  deleteBookLink: (id: string) => void;
 
   // ---- characters ----
   addCharacter: () => void;
@@ -174,6 +185,7 @@ const renumber = (chapters: Chapter[]): Chapter[] =>
 const initialUi: UiState = {
   theme: "light",
   view: "board",
+  level: "book",
   timelineOrient: "vertical",
   zoom: 0.66,
   panX: 34,
@@ -567,10 +579,18 @@ export const useStore = create<StoreState>()(
             },
             openCh: null,
             view: "board",
+            level: "book",
             arrangeN: 0,
             showSeries: false,
           };
         }),
+
+      enterBook: (id) => {
+        useStore.getState().switchBook(id);
+        set({ level: "book" });
+      },
+      goToSeries: () => set({ level: "series", openCh: null }),
+      setLevel: (level) => set({ level }),
 
       addBook: () =>
         set((s) => {
@@ -583,6 +603,7 @@ export const useStore = create<StoreState>()(
               storyNotes: s.doc.storyNotes,
             },
           };
+          const lastX = Math.max(80, ...s.doc.books.map((b) => b.x ?? 80));
           return {
             doc: {
               ...s.doc,
@@ -594,6 +615,9 @@ export const useStore = create<StoreState>()(
                 status: "idea",
                 premise: "",
                 arc: "",
+                notes: "",
+                x: lastX + 380,
+                y: 90,
               }),
               activeBookId: id,
               chapters: [],
@@ -603,6 +627,7 @@ export const useStore = create<StoreState>()(
             },
             openCh: null,
             view: "board",
+            level: "book",
             newMenu: false,
             showSeries: false,
           };
@@ -619,9 +644,43 @@ export const useStore = create<StoreState>()(
           const rest = { ...s.doc.bookData };
           delete rest[id];
           return {
-            doc: { ...s.doc, books: s.doc.books.filter((b) => b.id !== id), bookData: rest },
+            doc: {
+              ...s.doc,
+              books: s.doc.books.filter((b) => b.id !== id),
+              bookLinks: (s.doc.bookLinks ?? []).filter((l) => l.fromId !== id && l.toId !== id),
+              bookData: rest,
+            },
           };
         }),
+
+      moveBook: (id, x, y) =>
+        set((s) => ({
+          doc: { ...s.doc, books: s.doc.books.map((b) => (b.id === id ? { ...b, x, y } : b)) },
+        })),
+
+      addBookLink: (fromId, toId) =>
+        set((s) => {
+          if (fromId === toId) return s;
+          return {
+            doc: {
+              ...s.doc,
+              bookLinks: (s.doc.bookLinks ?? []).concat({ id: uid("bl"), fromId, toId }),
+            },
+          };
+        }),
+
+      updateBookLink: (id, label) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            bookLinks: (s.doc.bookLinks ?? []).map((l) => (l.id === id ? { ...l, label } : l)),
+          },
+        })),
+
+      deleteBookLink: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, bookLinks: (s.doc.bookLinks ?? []).filter((l) => l.id !== id) },
+        })),
 
       // ---- characters ----
       addCharacter: () =>

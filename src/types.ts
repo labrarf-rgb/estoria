@@ -10,7 +10,7 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
@@ -82,8 +82,26 @@ export interface BookMeta {
   title: string;
   subtitle: string;
   status: BookStatus;
+  /** One-paragraph synopsis. */
   premise: string;
+  /** The arc this book carries. */
   arc: string;
+  /** Free-form notes shown on the series map card. */
+  notes?: string;
+  /** Position on the series map canvas. */
+  x: number;
+  y: number;
+}
+
+/**
+ * A connector between two books on the series map. Plain (not therefore/but/and);
+ * multiple links between the same pair are allowed, each with an optional label.
+ */
+export interface BookLink {
+  id: string;
+  fromId: string;
+  toId: string;
+  label?: string;
 }
 
 /** The editable board contents of a single book. */
@@ -151,6 +169,7 @@ export interface StoryDoc {
 
   // Books.
   books: BookMeta[];
+  bookLinks: BookLink[];
   activeBookId: string;
 
   // Active book working set (top-level for simple canvas components).

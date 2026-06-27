@@ -4,6 +4,9 @@ import { useStore } from "@/store/useStore";
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
   const view = useStore((s) => s.view);
+  const level = useStore((s) => s.level);
+  const goToSeries = useStore((s) => s.goToSeries);
+  const setLevel = useStore((s) => s.setLevel);
   const orient = useStore((s) => s.timelineOrient);
   const zoom = useStore((s) => s.zoom);
   const theme = useStore((s) => s.theme);
@@ -20,6 +23,7 @@ export function Toolbar() {
   const addChapter = useStore((s) => s.addChapter);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const addBook = useStore((s) => s.addBook);
+  const toggleSeriesMode = useStore((s) => s.toggleSeriesMode);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
   const addDraft = useStore((s) => s.addDraft);
@@ -30,6 +34,7 @@ export function Toolbar() {
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
   const activeDraft = doc.drafts.find((d) => d.id === doc.activeDraftId);
+  const onSeriesMap = doc.seriesMode && level === "series";
   const bookStat = `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words · ${doc.chapters.length} chapters`;
 
   const seg = "px-3 py-[6px] rounded-[7px] text-[12px] font-medium cursor-pointer whitespace-nowrap";
@@ -114,53 +119,80 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
-      {/* Board actions */}
-      <button onClick={addChapter} className={action}>
-        <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
-      </button>
-      <button onClick={autoArrangeBoard} className={action}>
-        Auto-arrange
-      </button>
-
-      <span className="h-[22px] w-px shrink-0 bg-rule" />
-
-      {/* View toggle with always-visible orientation arrows */}
-      <div className="flex shrink-0 items-center gap-[6px]">
-        <div className="flex rounded-[9px] bg-chip p-[3px]">
-          <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
-            Board
-          </button>
-          <button className={view === "timeline" ? segOn : segOff} onClick={() => setView("timeline")}>
-            Timeline
-          </button>
-        </div>
-        <div className="flex rounded-[9px] bg-chip p-[3px]">
+      {/* Series breadcrumb (only once the project is a series) */}
+      {doc.seriesMode && (
+        <div className="flex shrink-0 items-center gap-[5px] text-[12px] font-medium">
           <button
-            title="Vertical timeline"
-            onClick={() => {
-              setOrient("vertical");
-              setView("timeline");
-            }}
-            className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-              view === "timeline" && orient === "vertical" ? "bg-card text-ink" : "text-soft hover:bg-card"
+            onClick={goToSeries}
+            className={`rounded-md px-[8px] py-[5px] ${
+              onSeriesMap ? "bg-chip text-ink" : "text-soft hover:bg-chip"
             }`}
           >
-            ↓
+            Series
           </button>
+          <span className="text-faint">▸</span>
           <button
-            title="Horizontal timeline"
-            onClick={() => {
-              setOrient("horizontal");
-              setView("timeline");
-            }}
-            className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-              view === "timeline" && orient === "horizontal" ? "bg-card text-ink" : "text-soft hover:bg-card"
+            onClick={() => setLevel("book")}
+            className={`rounded-md px-[8px] py-[5px] ${
+              !onSeriesMap ? "bg-chip text-ink" : "text-soft hover:bg-chip"
             }`}
           >
-            →
+            {activeBook ? activeBook.subtitle || activeBook.title : "Book"}
           </button>
+          <span className="mx-[2px] h-[22px] w-px shrink-0 bg-rule" />
         </div>
-      </div>
+      )}
+
+      {/* Board actions + view toggle (book level only) */}
+      {!onSeriesMap && (
+        <>
+          <button onClick={addChapter} className={action}>
+            <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
+          </button>
+          <button onClick={autoArrangeBoard} className={action}>
+            Auto-arrange
+          </button>
+
+          <span className="h-[22px] w-px shrink-0 bg-rule" />
+
+          <div className="flex shrink-0 items-center gap-[6px]">
+            <div className="flex rounded-[9px] bg-chip p-[3px]">
+              <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
+                Board
+              </button>
+              <button className={view === "timeline" ? segOn : segOff} onClick={() => setView("timeline")}>
+                Timeline
+              </button>
+            </div>
+            <div className="flex rounded-[9px] bg-chip p-[3px]">
+              <button
+                title="Vertical timeline"
+                onClick={() => {
+                  setOrient("vertical");
+                  setView("timeline");
+                }}
+                className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
+                  view === "timeline" && orient === "vertical" ? "bg-card text-ink" : "text-soft hover:bg-card"
+                }`}
+              >
+                ↓
+              </button>
+              <button
+                title="Horizontal timeline"
+                onClick={() => {
+                  setOrient("horizontal");
+                  setView("timeline");
+                }}
+                className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
+                  view === "timeline" && orient === "horizontal" ? "bg-card text-ink" : "text-soft hover:bg-card"
+                }`}
+              >
+                →
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Side panels */}
       <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
@@ -174,22 +206,6 @@ export function Toolbar() {
           Notes
         </button>
       </div>
-
-      {/* Series / multi-book — only shown once the project is a series */}
-      {doc.seriesMode && (
-        <button
-          onClick={() => setPanel("showSeries", true)}
-          className={action}
-          title="Zoom out to the series view"
-        >
-          <span className="flex gap-[2px]">
-            <span className="h-[13px] w-[5px] rounded-[1px] bg-but" />
-            <span className="h-[13px] w-[5px] rounded-[1px] bg-and" />
-            <span className="h-[13px] w-[5px] rounded-[1px] bg-faint" />
-          </span>
-          {activeBook ? activeBook.subtitle || activeBook.title : "Series"}
-        </button>
-      )}
 
       {/* New menu */}
       <div className="relative shrink-0">
@@ -224,9 +240,13 @@ export function Toolbar() {
               />
               <div className="mx-[6px] my-1 h-px bg-rule" />
               <MenuItem
-                title="Series planner..."
-                sub="Plan multiple books"
-                onClick={() => setPanel("showSeries", true)}
+                title={doc.seriesMode ? "Open series map" : "Make this a series"}
+                sub="Map and connect multiple books"
+                onClick={() => {
+                  if (!doc.seriesMode) toggleSeriesMode();
+                  goToSeries();
+                  closeNewMenu();
+                }}
               />
             </div>
           </>
@@ -240,24 +260,26 @@ export function Toolbar() {
         Export <span className="text-faint">↓</span>
       </button>
 
-      {/* Zoom */}
-      <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
-        <button
-          onClick={zoomOut}
-          className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
-        >
-          −
-        </button>
-        <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          onClick={zoomIn}
-          className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-        >
-          +
-        </button>
-      </div>
+      {/* Zoom (board level only; the series map has its own zoom) */}
+      {!onSeriesMap && (
+        <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+          <button
+            onClick={zoomOut}
+            className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
+          >
+            −
+          </button>
+          <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={zoomIn}
+            className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+          >
+            +
+          </button>
+        </div>
+      )}
 
       {/* Theme (icon only to save space) */}
       <button
