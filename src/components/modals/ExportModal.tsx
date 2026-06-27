@@ -7,13 +7,12 @@ import { downloadProjectFile, slugify } from "@/store/persistence";
 export function ExportModal() {
   const show = useStore((s) => s.showExport);
   const doc = useStore((s) => s.doc);
-  const draft = useStore((s) => s.draft);
   const setPanel = useStore((s) => s.setPanel);
   const [copied, setCopied] = useState(false);
   if (!show) return null;
   const close = () => setPanel("showExport", false);
 
-  const md = buildMarkdown(doc, draft);
+  const md = buildMarkdown(doc);
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
 
   const copy = () => {
@@ -43,7 +42,7 @@ export function ExportModal() {
           <div className="flex-1">
             <div className="font-serif text-[18px] font-semibold text-ink">Export to Markdown</div>
             <div className="mt-[3px] text-[12px] font-medium text-soft">
-              Vault-ready — chapters become notes, characters become{" "}
+              Vault-ready: chapters become notes, characters become{" "}
               <span className="font-mono">[[wikilinks]]</span> for Obsidian.
             </div>
           </div>

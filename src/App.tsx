@@ -1,8 +1,11 @@
 import { useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { Toolbar } from "@/components/Toolbar";
+import { BoardActions } from "@/components/BoardActions";
 import { Board } from "@/components/Board";
+import { Footer } from "@/components/Footer";
 import { ChapterDetail } from "@/components/ChapterDetail";
+import { Lightbox } from "@/components/Lightbox";
 import { CharactersPanel } from "@/components/panels/CharactersPanel";
 import { WorldPanel } from "@/components/panels/WorldPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
@@ -26,7 +29,9 @@ export function App() {
       className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
     >
       <Toolbar />
+      <BoardActions />
       <Board />
+      <Footer />
 
       {openCh && <ChapterDetail />}
       <CharactersPanel />
@@ -36,6 +41,7 @@ export function App() {
       <TemplatesModal />
       <ImportModal />
       <SeriesModal />
+      <Lightbox />
     </div>
   );
 }

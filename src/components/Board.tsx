@@ -6,6 +6,7 @@ import {
   layoutPositions,
   type Camera,
 } from "@/lib/layout";
+import { displaySummary, resolveTitle } from "@/lib/drafts";
 import type { Chapter, ConnType } from "@/types";
 
 const CONN_COLOR: Record<ConnType, string> = {
@@ -31,7 +32,7 @@ export function Board() {
   const doc = useStore((s) => s.doc);
   const view = useStore((s) => s.view);
   const orient = useStore((s) => s.timelineOrient);
-  const draft = useStore((s) => s.draft);
+  const draftId = useStore((s) => s.doc.activeDraftId);
   const zoom = useStore((s) => s.zoom);
   const panX = useStore((s) => s.panX);
   const panY = useStore((s) => s.panY);
@@ -41,8 +42,6 @@ export function Board() {
   const moveChapter = useStore((s) => s.moveChapter);
   const setDragId = useStore((s) => s.setDragId);
   const openChapter = useStore((s) => s.openChapter);
-  const addChapter = useStore((s) => s.addChapter);
-  const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   // Live interaction state kept in refs to avoid stale closures in listeners.
@@ -119,11 +118,8 @@ export function Board() {
   };
 
   const charById = (id: string) => doc.characters.find((c) => c.id === id);
-  const titleOf = (c: Chapter) => (draft === "alt" && c.altTitle ? c.altTitle : c.title);
-  const summaryOf = (c: Chapter) =>
-    draft === "alt" && c.altSummaryFlag
-      ? "Wren reaches the harbor only to choose the sea over the shore."
-      : c.summary || c.scenes[0] || "";
+  const titleOf = (c: Chapter) => resolveTitle(c, draftId);
+  const summaryOf = (c: Chapter) => displaySummary(c, draftId);
 
   return (
     <div
@@ -154,7 +150,7 @@ export function Board() {
             const a = posById[l.fromId];
             const b = posById[l.toId];
             if (!a || !b) return null;
-            const type = draft === "alt" && l.alt ? l.alt : l.type;
+            const type = l.type;
             return (
               <path
                 key={i}
@@ -236,25 +232,6 @@ export function Board() {
             </div>
           );
         })}
-      </div>
-
-      {/* Floating actions */}
-      <div className="absolute bottom-4 left-4 flex gap-[9px]">
-        <button
-          onClick={addChapter}
-          className="flex items-center gap-2 rounded-[11px] border border-rule bg-panel px-[15px] py-[10px] text-[12.5px] font-semibold text-ink shadow-[var(--shadow)] hover:border-faint"
-        >
-          <span className="-mt-px text-[17px] font-normal leading-none">+</span> New chapter
-        </button>
-        <button
-          onClick={autoArrangeBoard}
-          className="flex items-center gap-2 rounded-[11px] border border-rule bg-panel px-[15px] py-[10px] text-[12.5px] font-semibold text-ink shadow-[var(--shadow)] hover:border-faint"
-        >
-          Auto-arrange
-        </button>
-      </div>
-      <div className="pointer-events-none absolute bottom-4 right-4 text-[11px] font-medium text-faint">
-        Double-click a chapter to map its scenes · drag to rearrange · scroll to zoom
       </div>
     </div>
   );

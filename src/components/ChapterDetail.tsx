@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
+import { RefList } from "@/components/ui/RefList";
 import { SCENE_W, SCENE_H } from "@/lib/layout";
-import type { ChapterStatus, ConnType } from "@/types";
+import { resolveSummary, resolveTitle } from "@/lib/drafts";
+import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
@@ -23,6 +25,9 @@ export function ChapterDetail() {
   const bumpAct = useStore((s) => s.bumpChapterAct);
   const setAct = useStore((s) => s.setChapterAct);
   const patchChapter = useStore((s) => s.patchChapter);
+  const editChapterText = useStore((s) => s.editChapterText);
+  const toggleChapterChar = useStore((s) => s.toggleChapterChar);
+  const deleteChapter = useStore((s) => s.deleteChapter);
   const addScene = useStore((s) => s.addScene);
   const updateScene = useStore((s) => s.updateScene);
   const deleteScene = useStore((s) => s.deleteScene);
@@ -30,12 +35,17 @@ export function ChapterDetail() {
   const cycleSceneLink = useStore((s) => s.cycleSceneLink);
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
+  const updateChapterRef = useStore((s) => s.updateChapterRef);
+  const deleteChapterRef = useStore((s) => s.deleteChapterRef);
+  const linkAssetToChapter = useStore((s) => s.linkAssetToChapter);
 
   const ch = doc.chapters.find((c) => c.id === openCh);
   const chIdRef = useRef<string | null>(null);
   chIdRef.current = ch?.id ?? null;
 
-  // Scene-node drag, via window listeners (canvas isn't zoomed → 1:1 deltas).
+  const [linkOpen, setLinkOpen] = useState(false);
+
+  // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
   const sdrag = useRef<{ idx: number; mx: number; my: number; ox: number; oy: number } | null>(null);
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -58,7 +68,8 @@ export function ChapterDetail() {
 
   if (!ch) return null;
 
-  const chars = ch.chars.map((id) => doc.characters.find((c) => c.id === id)).filter(Boolean);
+  const draftId = doc.activeDraftId;
+  const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
   const positions = ch.scenePos ?? [];
   const canvasW = Math.max(640, ...positions.map((p) => p.x + SCENE_W)) + 24;
   const canvasH = Math.max(260, ...positions.map((p) => p.y + SCENE_H)) + 24;
@@ -89,30 +100,25 @@ export function ChapterDetail() {
           </span>
           <div className="min-w-0 flex-1">
             <input
-              value={ch.title}
-              onChange={(e) => patchChapter(ch.id, { title: e.target.value })}
+              value={resolveTitle(ch, draftId)}
+              onChange={(e) => editChapterText(ch.id, { title: e.target.value })}
               placeholder="Chapter title"
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
             />
             <textarea
-              value={ch.summary ?? ""}
-              onChange={(e) => patchChapter(ch.id, { summary: e.target.value })}
-              placeholder="One-line chapter summary…"
+              value={resolveSummary(ch, draftId)}
+              onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
+              placeholder="One-line chapter summary..."
               rows={1}
               className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
             />
-            <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
-              <div className="flex gap-1">
-                {chars.map((c) => (
-                  <span
-                    key={c!.id}
-                    className="flex h-[24px] w-[24px] items-center justify-center rounded-full text-[9.5px] font-semibold text-white"
-                    style={{ background: c!.color }}
-                  >
-                    {c!.initials}
-                  </span>
-                ))}
+            {draftId !== MAIN_DRAFT_ID && (
+              <div className="mt-[4px] text-[10.5px] font-semibold uppercase tracking-wide text-but">
+                Editing {draftName} · title &amp; summary differ from main
               </div>
+            )}
+
+            <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
               <span className="font-mono text-[11.5px] font-medium text-soft">
                 {ch.words.toLocaleString()} words
               </span>
@@ -120,8 +126,7 @@ export function ChapterDetail() {
                 · {ch.scenes.length} scenes
               </span>
 
-              {/* Status picker */}
-              <div className="flex shrink-0 rounded-lg bg-chip p-[3px]">
+              <div className="flex rounded-lg bg-chip p-[3px]">
                 {STATUSES.map((st) => (
                   <button
                     key={st.value}
@@ -139,7 +144,7 @@ export function ChapterDetail() {
               <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
                 Act
               </span>
-              <div className="flex shrink-0 items-center rounded-lg bg-chip p-[3px]">
+              <div className="flex items-center rounded-lg bg-chip p-[3px]">
                 <button
                   onClick={() => bumpAct(ch.id, -1)}
                   className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
@@ -165,21 +170,54 @@ export function ChapterDetail() {
           <CloseButton onClick={closeChapter} />
         </div>
 
+        {/* Characters in this chapter */}
+        <div className="border-b border-rule px-[26px] py-[14px]">
+          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+            Characters in this chapter
+          </div>
+          <div className="flex flex-wrap gap-[7px]">
+            {doc.characters.map((c) => {
+              const on = ch.chars.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggleChapterChar(ch.id, c.id)}
+                  className={`flex items-center gap-[7px] rounded-full border px-[10px] py-[5px] text-[12px] font-medium ${
+                    on ? "border-transparent text-white" : "border-rule bg-card text-soft hover:border-faint"
+                  }`}
+                  style={on ? { background: c.color } : undefined}
+                >
+                  <span
+                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8.5px] font-semibold text-white"
+                    style={{ background: on ? "rgba(0,0,0,.22)" : c.color }}
+                  >
+                    {c.initials}
+                  </span>
+                  {c.name}
+                </button>
+              );
+            })}
+            {doc.characters.length === 0 && (
+              <span className="text-[12px] text-faint">Add characters from the Characters panel.</span>
+            )}
+          </div>
+        </div>
+
         {/* Scene flow toolbar */}
         <div className="flex items-center gap-[9px] px-[26px] pb-[12px] pt-[16px]">
           <span className="text-[11px] font-semibold uppercase tracking-widest text-soft">
             Scene flow
           </span>
-          <div className="ml-auto flex shrink-0 items-center gap-[9px]">
+          <div className="ml-auto flex items-center gap-[9px]">
             <button
               onClick={() => arrangeScenes(ch.id, false)}
-              className="whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+              className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
             >
               Auto-arrange
             </button>
             <button
               onClick={() => addScene(ch.id)}
-              className="whitespace-nowrap rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
+              className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
             >
               + Add scene
             </button>
@@ -188,7 +226,7 @@ export function ChapterDetail() {
 
         {/* Scene canvas */}
         <div
-          className="mx-[22px] max-h-[44vh] overflow-auto rounded-xl border border-rule bg-bg"
+          className="mx-[22px] max-h-[40vh] overflow-auto rounded-xl border border-rule bg-bg"
           style={{
             backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
             backgroundSize: "22px 22px",
@@ -204,20 +242,11 @@ export function ChapterDetail() {
                 const a = sceneCenter(i);
                 const b = sceneCenter(i + 1);
                 return (
-                  <line
-                    key={i}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke="var(--line)"
-                    strokeWidth={1.75}
-                  />
+                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--line)" strokeWidth={1.75} />
                 );
               })}
             </svg>
 
-            {/* Connector pills (clickable to cycle therefore/but/and) */}
             {ch.scenes.slice(0, -1).map((_, i) => {
               const a = sceneCenter(i);
               const b = sceneCenter(i + 1);
@@ -240,7 +269,6 @@ export function ChapterDetail() {
               );
             })}
 
-            {/* Scene nodes */}
             {ch.scenes.map((s, i) => {
               const p = positions[i] ?? { x: 0, y: 0 };
               return (
@@ -259,7 +287,7 @@ export function ChapterDetail() {
                       {ch.scenes.length > 1 && (
                         <button
                           onClick={() => deleteScene(ch.id, i)}
-                          className="opacity-0 transition-opacity hover:text-but group-hover:opacity-100 text-faint text-[12px] leading-none"
+                          className="text-[12px] leading-none text-faint opacity-0 transition-opacity hover:text-but group-hover:opacity-100"
                           title="Delete scene"
                         >
                           ✕
@@ -283,36 +311,71 @@ export function ChapterDetail() {
           Drag scenes to rearrange · click a connector to toggle Therefore / But / And
         </div>
 
+        {/* Chapter notes */}
+        <div className="px-[26px] pt-[18px]">
+          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+            Chapter notes
+          </div>
+          <textarea
+            value={ch.notes ?? ""}
+            onChange={(e) => patchChapter(ch.id, { notes: e.target.value })}
+            placeholder="Reminders, revision ideas, continuity flags for this chapter..."
+            rows={2}
+            className="w-full resize-none rounded-xl border border-rule bg-card p-[12px] text-[13px] leading-[1.55] text-ink outline-none"
+          />
+        </div>
+
         {/* Pinned refs */}
         <div className="px-[26px] py-[18px]">
           <div className="mb-[13px] text-[11px] font-semibold uppercase tracking-widest text-soft">
             Pinned references
           </div>
-          <div className="flex flex-wrap items-stretch gap-3">
-            {ch.refs.map((r, i) => (
-              <div
-                key={i}
-                className="flex min-h-[92px] w-[150px] flex-col gap-[6px] rounded-[11px] border border-rule bg-card p-[11px] shadow-[var(--shadow)]"
-              >
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-wide opacity-75">
-                  {r.kind}
-                </span>
-                <span className="text-[12.5px] font-medium leading-[1.4] text-ink">{r.label}</span>
+          <RefList
+            refs={ch.refs}
+            onAdd={(kind) => addChapterRef(ch.id, kind)}
+            onUpdate={(refId, patch) => updateChapterRef(ch.id, refId, patch)}
+            onDelete={(refId) => deleteChapterRef(ch.id, refId)}
+            onLink={() => setLinkOpen((v) => !v)}
+            linkLabel="Link book asset"
+          />
+          {linkOpen && (
+            <div className="mt-3 rounded-xl border border-rule bg-card p-3">
+              <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-wide text-faint">
+                Link from the shared library
               </div>
-            ))}
-            <button
-              onClick={() => addChapterRef(ch.id, "NOTE")}
-              className="min-h-[92px] w-[72px] rounded-[11px] border-[1.5px] border-dashed border-line text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
-            >
-              + Note
-            </button>
-            <button
-              onClick={() => addChapterRef(ch.id, "IMAGE")}
-              className="min-h-[92px] w-[72px] rounded-[11px] border-[1.5px] border-dashed border-line text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
-            >
-              + Image
-            </button>
-          </div>
+              {doc.assets.length === 0 ? (
+                <div className="text-[12px] text-faint">
+                  No book assets yet. Add notes or images in the Notes panel&apos;s shared library.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-[7px]">
+                  {doc.assets.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => {
+                        linkAssetToChapter(ch.id, a.id);
+                        setLinkOpen(false);
+                      }}
+                      className="rounded-lg border border-rule bg-panel px-[10px] py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                    >
+                      {a.kind === "IMAGE" ? "🖼 " : "📝 "}
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Danger zone */}
+        <div className="flex items-center justify-end border-t border-rule px-[26px] py-[14px]">
+          <button
+            onClick={() => deleteChapter(ch.id)}
+            className="rounded-lg border border-rule px-[12px] py-[7px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
+          >
+            Delete chapter
+          </button>
         </div>
       </div>
     </Scrim>

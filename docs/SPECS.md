@@ -199,3 +199,49 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
   re-add an unlayered universal reset — see the note in `src/index.css`.
 - Verified in-browser: connector cycling, add scene, inline edits, drag, and
   right-aligned toolbar all work; `npm run build` passes.
+
+### 2026-06-27 — Multi-book, versions, editing everywhere (Session 3)
+
+Large milestone + fix batch. **Schema bumped to v2** (persist `migrate` discards
+older persisted docs and reloads the sample, so no broken shapes on upgrade).
+
+Data model (`src/types.ts`):
+- **Multi-book** via an "active-set + stash" design: the active book's board lives
+  top-level (`chapters`, `links`, `storyNotes`) so canvas components stay simple;
+  inactive books are stashed in `bookData[bookId]` and swapped in by `switchBook`.
+  `books: BookMeta[]` replaces the old `series` array.
+- **Draft versions**: `drafts: DraftVersion[]` + `activeDraftId`. Per-chapter
+  `overrides[draftId] = {title?, summary?}`. The "main" draft is the base text;
+  editing under any other draft writes overrides. Helpers in `src/lib/drafts.ts`
+  (`resolveTitle`, `resolveSummary`, `displaySummary`). Replaces the hardcoded
+  main/alt flags + `altTitle`/`altSummaryFlag`.
+- **Shared assets** (`assets: Asset[]`): book-level notes/images that can be linked
+  into any chapter (`linkAssetToChapter`). Managed in the Notes panel library.
+- **Richer refs**: `PinnedRef` now has `id`, `body` (note text), `src` (image data
+  URL), and optional `assetId`. Chapter `notes` field added.
+
+UI work:
+- Editable everywhere: project title (toolbar), characters & world (all fields,
+  add/delete), world/chapter refs (add/edit/delete), chapter character membership
+  (toggle chips), chapter notes, scenes (already), book meta (Series planner).
+- **Image upload + lightbox**: `RefList` (`src/components/ui/RefList.tsx`) handles
+  note/image refs with file upload (stored as data URLs); images open in
+  `Lightbox.tsx` with click-to-zoom. Reused by chapter detail, World, and Notes.
+- Toolbar: editable title; **version dropdown** (select/add/delete versions);
+  **Series button** to zoom out to the multi-book view; **orientation as always-
+  visible ↓/→ arrow buttons** next to Board/Timeline (fixes the layout shift from
+  the old appearing/disappearing segmented control); **New menu now leads with
+  "New book"**. New chapter / Auto-arrange and the canvas hint moved to a top
+  strip (`BoardActions.tsx`). Footer (`Footer.tsx`) shows the autosave stamp and
+  "Built by Ray Labra" → labrarf.com.
+- Autosave already happened via zustand `persist`; the footer now surfaces it.
+- Em dashes removed from UI chrome / labels / template blurbs. (Sample-novel prose
+  in `sampleStory.ts` keeps its dashes — it's example content, not UI.)
+
+Verified in-browser: version override (ch8 → "The Drowned Return" under Alt),
+book switching (Book Two empty board ↔ Book One's 8 chapters restored from stash),
+Series planner editing, chapter character toggles, status picker. `tsc -b` clean.
+
+Known cosmetic limitation: the toolbar is dense and clips on the right below
+~1100px viewport width; fine at desktop widths. Candidate for a future overflow
+menu.

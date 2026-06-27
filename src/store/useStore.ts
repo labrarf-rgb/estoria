@@ -1,11 +1,16 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import {
+  MAIN_DRAFT_ID,
   SCHEMA_VERSION,
+  type Asset,
   type Chapter,
+  type Character,
   type ConnType,
+  type PinnedRef,
   type RefKind,
   type StoryDoc,
+  type WorldEntry,
 } from "@/types";
 import { sampleStory } from "@/data/sampleStory";
 import {
@@ -20,14 +25,11 @@ import { zustandStorage } from "@/store/persistence";
 
 export type View = "board" | "timeline";
 export type Theme = "light" | "dark";
-export type Draft = "main" | "alt";
 
-/** Modal / panel surfaces, mutually exclusive enough to track as a set of flags. */
 interface UiState {
   theme: Theme;
   view: View;
   timelineOrient: TimelineOrient;
-  draft: Draft;
   zoom: number;
   panX: number;
   panY: number;
@@ -46,6 +48,8 @@ interface UiState {
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
+  /** Image data URL currently shown full-screen, or null. */
+  lightbox: string | null;
 }
 
 interface StoreState extends UiState {
@@ -56,14 +60,20 @@ interface StoreState extends UiState {
   zoomIn: () => void;
   zoomOut: () => void;
 
-  // ---- doc mutations ----
+  // ---- project ----
   setProjectTitle: (title: string) => void;
+
+  // ---- chapters ----
   moveChapter: (id: string, x: number, y: number) => void;
   addChapter: () => void;
+  deleteChapter: (id: string) => void;
   autoArrangeBoard: () => void;
   setChapterAct: (id: string, act: number) => void;
   bumpChapterAct: (id: string, delta: number) => void;
   patchChapter: (id: string, patch: Partial<Chapter>) => void;
+  editChapterText: (id: string, patch: { title?: string; summary?: string }) => void;
+  toggleChapterChar: (id: string, charId: string) => void;
+
   // ---- scenes ----
   addScene: (chId: string) => void;
   updateScene: (chId: string, idx: number, text: string) => void;
@@ -71,19 +81,55 @@ interface StoreState extends UiState {
   moveScene: (chId: string, idx: number, x: number, y: number) => void;
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean) => void;
+
+  // ---- chapter refs ----
   addChapterRef: (chId: string, kind: RefKind) => void;
+  updateChapterRef: (chId: string, refId: string, patch: Partial<PinnedRef>) => void;
+  deleteChapterRef: (chId: string, refId: string) => void;
+  linkAssetToChapter: (chId: string, assetId: string) => void;
+
+  // ---- notes ----
   setStoryNotes: (notes: string) => void;
+
+  // ---- templates / import ----
   applyTemplate: (tplId: string, mode: "insert" | "replace") => void;
   replaceDoc: (doc: StoryDoc) => void;
+
+  // ---- books / series ----
   toggleSeriesMode: () => void;
+  switchBook: (id: string) => void;
+  addBook: () => void;
+  updateBook: (id: string, patch: Partial<StoryDoc["books"][number]>) => void;
+  deleteBook: (id: string) => void;
+
+  // ---- characters ----
   addCharacter: () => void;
+  updateCharacter: (id: string, patch: Partial<Character>) => void;
+  deleteCharacter: (id: string) => void;
+
+  // ---- world ----
   addWorldEntry: () => void;
+  updateWorldEntry: (id: string, patch: Partial<WorldEntry>) => void;
+  deleteWorldEntry: (id: string) => void;
+  addWorldRef: (wId: string, kind: RefKind) => void;
+  updateWorldRef: (wId: string, refId: string, patch: Partial<PinnedRef>) => void;
+  deleteWorldRef: (wId: string, refId: string) => void;
+
+  // ---- shared assets ----
+  addAsset: (kind: RefKind) => string;
+  updateAsset: (id: string, patch: Partial<Asset>) => void;
+  deleteAsset: (id: string) => void;
+
+  // ---- drafts / versions ----
+  addDraft: (name?: string) => void;
+  setActiveDraft: (id: string) => void;
+  renameDraft: (id: string, name: string) => void;
+  deleteDraft: (id: string) => void;
 
   // ---- ui ----
   toggleTheme: () => void;
   setView: (v: View) => void;
   setOrient: (o: TimelineOrient) => void;
-  toggleDraft: () => void;
   setDragId: (id: string | null) => void;
   openChapter: (id: string) => void;
   closeChapter: () => void;
@@ -93,6 +139,8 @@ interface StoreState extends UiState {
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
   selectBook: (id: string | null) => void;
+  openLightbox: (src: string) => void;
+  closeLightbox: () => void;
 }
 
 export type PanelKey =
@@ -119,11 +167,14 @@ const CHAR_PALETTE = [
 const uid = (prefix: string) =>
   `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
+/** Renumber chapters sequentially (1..n) after add/delete. */
+const renumber = (chapters: Chapter[]): Chapter[] =>
+  chapters.map((c, i) => ({ ...c, num: i + 1 }));
+
 const initialUi: UiState = {
   theme: "light",
   view: "board",
   timelineOrient: "vertical",
-  draft: "main",
   zoom: 0.66,
   panX: 34,
   panY: 28,
@@ -142,6 +193,7 @@ const initialUi: UiState = {
   selChar: null,
   selWorld: null,
   selBook: null,
+  lightbox: null,
 };
 
 export const useStore = create<StoreState>()(
@@ -155,10 +207,10 @@ export const useStore = create<StoreState>()(
       zoomIn: () => set((s) => ({ zoom: clampZoom(s.zoom * 1.15) })),
       zoomOut: () => set((s) => ({ zoom: clampZoom(s.zoom / 1.15) })),
 
-      // ---- doc mutations ----
-      setProjectTitle: (title) =>
-        set((s) => ({ doc: { ...s.doc, projectTitle: title } })),
+      // ---- project ----
+      setProjectTitle: (title) => set((s) => ({ doc: { ...s.doc, projectTitle: title } })),
 
+      // ---- chapters ----
       moveChapter: (id, x, y) =>
         set((s) => ({
           doc: {
@@ -177,7 +229,7 @@ export const useStore = create<StoreState>()(
             act: last ? last.act : 1,
             status: "idea",
             title: "Untitled Chapter",
-            summary: "A new chapter — double-click to map its scenes.",
+            summary: "A new chapter. Double-click to map its scenes.",
             words: 0,
             x: last ? last.x + CARD_W + 72 : 60,
             y: last ? last.y : 90,
@@ -189,10 +241,16 @@ export const useStore = create<StoreState>()(
           const links = last
             ? s.doc.links.concat({ fromId: last.id, toId: nc.id, type: "therefore" })
             : s.doc.links;
+          return { doc: { ...s.doc, chapters: list.concat(nc), links }, view: "board", arrangeN: 0 };
+        }),
+
+      deleteChapter: (id) =>
+        set((s) => {
+          const chapters = renumber(s.doc.chapters.filter((c) => c.id !== id));
+          const links = s.doc.links.filter((l) => l.fromId !== id && l.toId !== id);
           return {
-            doc: { ...s.doc, chapters: list.concat(nc), links },
-            view: "board",
-            arrangeN: 0,
+            doc: { ...s.doc, chapters, links },
+            openCh: s.openCh === id ? null : s.openCh,
           };
         }),
 
@@ -227,6 +285,40 @@ export const useStore = create<StoreState>()(
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          },
+        })),
+
+      // Draft-aware: edits to the main draft change the base; edits to any other
+      // draft are stored as per-chapter overrides.
+      editChapterText: (id, patch) =>
+        set((s) => {
+          const d = s.doc.activeDraftId;
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) => {
+                if (c.id !== id) return c;
+                if (d === MAIN_DRAFT_ID) return { ...c, ...patch };
+                const overrides = { ...(c.overrides || {}) };
+                overrides[d] = { ...(overrides[d] || {}), ...patch };
+                return { ...c, overrides };
+              }),
+            },
+          };
+        }),
+
+      toggleChapterChar: (id, charId) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) => {
+              if (c.id !== id) return c;
+              const has = c.chars.includes(charId);
+              return {
+                ...c,
+                chars: has ? c.chars.filter((x) => x !== charId) : c.chars.concat(charId),
+              };
+            }),
           },
         })),
 
@@ -271,7 +363,6 @@ export const useStore = create<StoreState>()(
               if (c.id !== chId) return c;
               const scenes = c.scenes.filter((_, i) => i !== idx);
               const scenePos = (c.scenePos || []).filter((_, i) => i !== idx);
-              // Keep links length === scenes.length - 1.
               const links = c.sceneLinks.slice();
               if (links.length) links.splice(Math.min(idx, links.length - 1), 1);
               return { ...c, scenes, scenePos, sceneLinks: links };
@@ -322,6 +413,7 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      // ---- chapter refs ----
       addChapterRef: (chId, kind) =>
         set((s) => ({
           doc: {
@@ -330,15 +422,70 @@ export const useStore = create<StoreState>()(
               c.id === chId
                 ? {
                     ...c,
-                    refs: c.refs.concat({ kind, label: kind === "IMAGE" ? "New image" : "New note" }),
+                    refs: c.refs.concat({
+                      id: uid("r"),
+                      kind,
+                      label: kind === "IMAGE" ? "New image" : "New note",
+                      body: kind === "NOTE" ? "" : undefined,
+                    }),
                   }
                 : c
             ),
           },
         })),
 
+      updateChapterRef: (chId, refId, patch) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) =>
+              c.id === chId
+                ? { ...c, refs: c.refs.map((r) => (r.id === refId ? { ...r, ...patch } : r)) }
+                : c
+            ),
+          },
+        })),
+
+      deleteChapterRef: (chId, refId) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) =>
+              c.id === chId ? { ...c, refs: c.refs.filter((r) => r.id !== refId) } : c
+            ),
+          },
+        })),
+
+      linkAssetToChapter: (chId, assetId) =>
+        set((s) => {
+          const asset = s.doc.assets.find((a) => a.id === assetId);
+          if (!asset) return s;
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id === chId
+                  ? {
+                      ...c,
+                      refs: c.refs.concat({
+                        id: uid("r"),
+                        kind: asset.kind,
+                        label: asset.label,
+                        body: asset.body,
+                        src: asset.src,
+                        assetId: asset.id,
+                      }),
+                    }
+                  : c
+              ),
+            },
+          };
+        }),
+
+      // ---- notes ----
       setStoryNotes: (notes) => set((s) => ({ doc: { ...s.doc, storyNotes: notes } })),
 
+      // ---- templates / import ----
       applyTemplate: (tplId, mode) =>
         set((s) => {
           const tpl = TEMPLATES.find((t) => t.id === tplId);
@@ -359,7 +506,7 @@ export const useStore = create<StoreState>()(
               act,
               status: "idea",
               title,
-              summary: "—",
+              summary: "",
               words: 0,
               x: m + col * (CARD_W + gapX),
               y: m + row * (142 + gapY),
@@ -392,13 +539,95 @@ export const useStore = create<StoreState>()(
           showSeries: false,
         }),
 
-      toggleSeriesMode: () =>
-        set((s) => ({ doc: { ...s.doc, seriesMode: !s.doc.seriesMode } })),
+      // ---- books / series ----
+      toggleSeriesMode: () => set((s) => ({ doc: { ...s.doc, seriesMode: !s.doc.seriesMode } })),
 
+      switchBook: (id) =>
+        set((s) => {
+          if (id === s.doc.activeBookId) return { showSeries: false };
+          const stash = {
+            ...s.doc.bookData,
+            [s.doc.activeBookId]: {
+              chapters: s.doc.chapters,
+              links: s.doc.links,
+              storyNotes: s.doc.storyNotes,
+            },
+          };
+          const load = stash[id] ?? { chapters: [], links: [], storyNotes: "" };
+          const rest = { ...stash };
+          delete rest[id];
+          return {
+            doc: {
+              ...s.doc,
+              activeBookId: id,
+              chapters: load.chapters,
+              links: load.links,
+              storyNotes: load.storyNotes,
+              bookData: rest,
+            },
+            openCh: null,
+            view: "board",
+            arrangeN: 0,
+            showSeries: false,
+          };
+        }),
+
+      addBook: () =>
+        set((s) => {
+          const id = uid("b");
+          const stash = {
+            ...s.doc.bookData,
+            [s.doc.activeBookId]: {
+              chapters: s.doc.chapters,
+              links: s.doc.links,
+              storyNotes: s.doc.storyNotes,
+            },
+          };
+          return {
+            doc: {
+              ...s.doc,
+              seriesMode: true,
+              books: s.doc.books.concat({
+                id,
+                title: "Untitled Book",
+                subtitle: `Book ${s.doc.books.length + 1}`,
+                status: "idea",
+                premise: "",
+                arc: "",
+              }),
+              activeBookId: id,
+              chapters: [],
+              links: [],
+              storyNotes: "",
+              bookData: stash,
+            },
+            openCh: null,
+            view: "board",
+            newMenu: false,
+            showSeries: false,
+          };
+        }),
+
+      updateBook: (id, patch) =>
+        set((s) => ({
+          doc: { ...s.doc, books: s.doc.books.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
+        })),
+
+      deleteBook: (id) =>
+        set((s) => {
+          if (s.doc.books.length <= 1 || id === s.doc.activeBookId) return s;
+          const rest = { ...s.doc.bookData };
+          delete rest[id];
+          return {
+            doc: { ...s.doc, books: s.doc.books.filter((b) => b.id !== id), bookData: rest },
+          };
+        }),
+
+      // ---- characters ----
       addCharacter: () =>
         set((s) => {
           const id = uid("p");
-          const next = {
+          const next: Character = {
             id,
             name: "New Character",
             role: "Supporting",
@@ -421,6 +650,29 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      updateCharacter: (id, patch) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            characters: s.doc.characters.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          },
+        })),
+
+      deleteCharacter: (id) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            characters: s.doc.characters.filter((c) => c.id !== id),
+            // Also drop the character from any chapter it appears in.
+            chapters: s.doc.chapters.map((c) => ({
+              ...c,
+              chars: c.chars.filter((x) => x !== id),
+            })),
+          },
+          selChar: s.selChar === id ? null : s.selChar,
+        })),
+
+      // ---- world ----
       addWorldEntry: () =>
         set((s) => {
           const id = uid("w");
@@ -441,18 +693,134 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      updateWorldEntry: (id, patch) =>
+        set((s) => ({
+          doc: { ...s.doc, world: s.doc.world.map((w) => (w.id === id ? { ...w, ...patch } : w)) },
+        })),
+
+      deleteWorldEntry: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, world: s.doc.world.filter((w) => w.id !== id) },
+          selWorld: s.selWorld === id ? null : s.selWorld,
+        })),
+
+      addWorldRef: (wId, kind) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            world: s.doc.world.map((w) =>
+              w.id === wId
+                ? {
+                    ...w,
+                    refs: w.refs.concat({
+                      id: uid("r"),
+                      kind,
+                      label: kind === "IMAGE" ? "New image" : "New note",
+                      body: kind === "NOTE" ? "" : undefined,
+                    }),
+                  }
+                : w
+            ),
+          },
+        })),
+
+      updateWorldRef: (wId, refId, patch) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            world: s.doc.world.map((w) =>
+              w.id === wId
+                ? { ...w, refs: w.refs.map((r) => (r.id === refId ? { ...r, ...patch } : r)) }
+                : w
+            ),
+          },
+        })),
+
+      deleteWorldRef: (wId, refId) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            world: s.doc.world.map((w) =>
+              w.id === wId ? { ...w, refs: w.refs.filter((r) => r.id !== refId) } : w
+            ),
+          },
+        })),
+
+      // ---- shared assets ----
+      addAsset: (kind) => {
+        const id = uid("a");
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            assets: s.doc.assets.concat({
+              id,
+              kind,
+              label: kind === "IMAGE" ? "New image" : "New note",
+              body: kind === "NOTE" ? "" : undefined,
+            }),
+          },
+        }));
+        return id;
+      },
+
+      updateAsset: (id, patch) =>
+        set((s) => ({
+          doc: { ...s.doc, assets: s.doc.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)) },
+        })),
+
+      deleteAsset: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, assets: s.doc.assets.filter((a) => a.id !== id) },
+        })),
+
+      // ---- drafts / versions ----
+      addDraft: (name) =>
+        set((s) => {
+          const id = uid("d");
+          const n = s.doc.drafts.length;
+          return {
+            doc: {
+              ...s.doc,
+              drafts: s.doc.drafts.concat({ id, name: name || `Version ${n}` }),
+              activeDraftId: id,
+            },
+          };
+        }),
+
+      setActiveDraft: (id) => set((s) => ({ doc: { ...s.doc, activeDraftId: id } })),
+
+      renameDraft: (id, name) =>
+        set((s) => ({
+          doc: { ...s.doc, drafts: s.doc.drafts.map((d) => (d.id === id ? { ...d, name } : d)) },
+        })),
+
+      deleteDraft: (id) =>
+        set((s) => {
+          if (id === MAIN_DRAFT_ID) return s;
+          return {
+            doc: {
+              ...s.doc,
+              drafts: s.doc.drafts.filter((d) => d.id !== id),
+              activeDraftId: s.doc.activeDraftId === id ? MAIN_DRAFT_ID : s.doc.activeDraftId,
+              chapters: s.doc.chapters.map((c) => {
+                if (!c.overrides || !c.overrides[id]) return c;
+                const overrides = { ...c.overrides };
+                delete overrides[id];
+                return { ...c, overrides };
+              }),
+            },
+          };
+        }),
+
       // ---- ui ----
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setView: (v) => set({ view: v }),
       setOrient: (o) => set({ timelineOrient: o }),
-      toggleDraft: () => set((s) => ({ draft: s.draft === "main" ? "alt" : "main" })),
       setDragId: (id) => set({ dragId: id }),
       openChapter: (id) =>
         set((s) => ({
           openCh: id,
           sceneArrangeN: 0,
-          // Lay out scene nodes on first open (or after scene count changed),
-          // preserving any manual positions otherwise.
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) =>
@@ -470,18 +838,28 @@ export const useStore = create<StoreState>()(
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
       selectBook: (id) => set((s) => ({ selBook: s.selBook === id ? null : id })),
+      openLightbox: (src) => set({ lightbox: src }),
+      closeLightbox: () => set({ lightbox: null }),
     }),
     {
       name: "estoria:store:v1",
+      version: SCHEMA_VERSION,
       storage: createJSONStorage(() => zustandStorage),
-      // Persist the document and durable preferences only — not transient UI.
       partialize: (s) => ({
         doc: s.doc,
         theme: s.theme,
         view: s.view,
         timelineOrient: s.timelineOrient,
-        draft: s.draft,
       }),
+      // On a schema bump, discard the old persisted document rather than risk
+      // reading a shape that no longer matches the model.
+      migrate: (persisted: unknown, version: number) => {
+        const p = (persisted as { theme?: Theme }) ?? {};
+        if (version < SCHEMA_VERSION) {
+          return { doc: sampleStory, theme: p.theme ?? "light", view: "board" as View };
+        }
+        return persisted as never;
+      },
     }
   )
 );

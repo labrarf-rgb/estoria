@@ -1,4 +1,5 @@
 import type { ConnType, StoryDoc } from "@/types";
+import { displaySummary, resolveTitle } from "@/lib/drafts";
 
 const CONN_LABEL: Record<ConnType, string> = {
   therefore: "Therefore",
@@ -10,32 +11,23 @@ export function roman(a: number): string {
   return ({ 1: "I", 2: "II", 3: "III" } as Record<number, string>)[a] || String(a);
 }
 
-function titleOf(c: StoryDoc["chapters"][number], draft: "main" | "alt"): string {
-  return draft === "alt" && c.altTitle ? c.altTitle : c.title;
-}
-
-function summaryOf(c: StoryDoc["chapters"][number], draft: "main" | "alt"): string {
-  if (draft === "alt" && c.altSummaryFlag) {
-    return "Wren reaches the harbor only to choose the sea over the shore.";
-  }
-  return c.summary || c.scenes[0] || "";
-}
-
 /**
  * Build Obsidian-vault-ready markdown: characters become [[wikilinks]],
  * chapters are grouped under Act headings, scenes carry their but/therefore tags.
  */
-export function buildMarkdown(doc: StoryDoc, draft: "main" | "alt" = "main"): string {
+export function buildMarkdown(doc: StoryDoc, draftId: string = doc.activeDraftId): string {
   const title = doc.projectTitle || "Untitled Voyage";
   const total = doc.chapters.reduce((a, c) => a + c.words, 0);
   const charName = (id: string) => doc.characters.find((c) => c.id === id)?.name ?? id;
+  const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
+  const bookTitle = activeBook ? activeBook.title : title;
 
-  let md = `# ${title}\n\nMapped in Estoria — ${total.toLocaleString()} words across ${doc.chapters.length} chapters.\n`;
+  let md = `# ${bookTitle}\n\nMapped in Estoria. ${total.toLocaleString()} words across ${doc.chapters.length} chapters.\n`;
 
   if (doc.seriesMode) {
-    md += "\n## Series\n\n";
-    doc.series.forEach((b, i) => {
-      md += `${i + 1}. **${b.title}** (${b.status}) — ${b.premise}\n`;
+    md += `\n## Series: ${title}\n\n`;
+    doc.books.forEach((b, i) => {
+      md += `${i + 1}. **${b.title}** (${b.status}). ${b.premise}\n`;
     });
   }
 
@@ -54,7 +46,7 @@ export function buildMarkdown(doc: StoryDoc, draft: "main" | "alt" = "main"): st
     doc.chapters
       .filter((c) => c.act === a)
       .forEach((c) => {
-        md += `\n### ${c.num}. ${titleOf(c, draft)}  ·  ${c.words.toLocaleString()} words\n> ${summaryOf(c, draft)}\n\n**Scenes**\n`;
+        md += `\n### ${c.num}. ${resolveTitle(c, draftId)}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c, draftId)}\n\n**Scenes**\n`;
         c.scenes.forEach((s, j) => {
           const conn =
             j < c.scenes.length - 1 && c.sceneLinks[j]

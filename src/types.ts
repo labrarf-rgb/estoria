@@ -1,21 +1,48 @@
 /**
  * Estoria document model.
  *
- * The entire story is one serializable JSON object (`StoryDoc`). It is what we
+ * The entire project is one serializable JSON object (`StoryDoc`). It is what we
  * auto-save to browser storage, what the user exports as a project file, and
  * what a future cloud backend would persist. Keep it plain-data and versioned.
+ *
+ * Multi-book: the active book's board lives at the top level (`chapters`,
+ * `links`, `storyNotes`) so the canvas components stay simple; inactive books
+ * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-/** Story-causality link type — the "but / therefore / and" method. */
+/** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
 
-/** A pinned reference on a chapter or world entry. */
 export type RefKind = "IMAGE" | "NOTE";
+
+/** A pinned reference on a chapter or world entry. */
 export interface PinnedRef {
+  id: string;
   kind: RefKind;
   label: string;
+  /** Note text (for NOTE refs). */
+  body?: string;
+  /** Image data URL (for IMAGE refs uploaded by the user). */
+  src?: string;
+  /** When set, this ref mirrors a shared book-level asset. */
+  assetId?: string;
+}
+
+/** A shared, book-level note or image that can be linked into many chapters. */
+export interface Asset {
+  id: string;
+  kind: RefKind;
+  label: string;
+  body?: string;
+  src?: string;
+}
+
+/** A named draft / version of the story. The "main" draft is the base text. */
+export interface DraftVersion {
+  id: string;
+  name: string;
 }
 
 export type ChapterStatus = "done" | "draft" | "idea";
@@ -48,15 +75,22 @@ export interface WorldEntry {
 }
 
 export type BookStatus = "drafting" | "planned" | "idea";
-export interface SeriesBook {
+
+/** Series-level metadata for a book. The board itself lives in BookData. */
+export interface BookMeta {
   id: string;
   title: string;
   subtitle: string;
   status: BookStatus;
-  live: boolean;
   premise: string;
   arc: string;
-  outline: string[];
+}
+
+/** The editable board contents of a single book. */
+export interface BookData {
+  chapters: Chapter[];
+  links: ChapterLink[];
+  storyNotes: string;
 }
 
 /** A free position on a canvas. */
@@ -72,6 +106,8 @@ export interface Chapter {
   status: ChapterStatus;
   title: string;
   summary?: string;
+  /** Chapter-level notes (separate from pinned references). */
+  notes?: string;
   words: number;
   /** Board position. */
   x: number;
@@ -87,9 +123,8 @@ export interface Chapter {
   /** Free positions of scene nodes inside the detail canvas. */
   scenePos?: Vec2[];
   refs: PinnedRef[];
-  /** Alternate-draft overrides. */
-  altTitle?: string;
-  altSummaryFlag?: boolean;
+  /** Per-draft text overrides, keyed by draft id (title/summary only). */
+  overrides?: Record<string, { title?: string; summary?: string }>;
 }
 
 /** A connector between two chapters on the board. */
@@ -97,20 +132,34 @@ export interface ChapterLink {
   fromId: string;
   toId: string;
   type: ConnType;
-  /** Optional alternate-draft type. */
-  alt?: ConnType;
 }
 
 export interface StoryDoc {
   schemaVersion: number;
   id: string;
   projectTitle: string;
-  storyNotes: string;
   seriesMode: boolean;
-  activeBook: string;
+
+  // Drafts / versions.
+  drafts: DraftVersion[];
+  activeDraftId: string;
+
+  // Series bible, shared across all books.
   characters: Character[];
   world: WorldEntry[];
-  series: SeriesBook[];
+  assets: Asset[];
+
+  // Books.
+  books: BookMeta[];
+  activeBookId: string;
+
+  // Active book working set (top-level for simple canvas components).
   chapters: Chapter[];
   links: ChapterLink[];
+  storyNotes: string;
+
+  // Stashed boards for inactive books, keyed by book id.
+  bookData: Record<string, BookData>;
 }
+
+export const MAIN_DRAFT_ID = "main";

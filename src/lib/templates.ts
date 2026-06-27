@@ -16,7 +16,7 @@ export const TEMPLATES: StoryTemplate[] = [
     id: "three-act",
     name: "Three-Act Structure",
     tag: "Classic",
-    blurb: "Setup, confrontation, resolution — the bones of most stories.",
+    blurb: "Setup, confrontation, resolution: the bones of most stories.",
     beats: [
       ["Opening Image", 1],
       ["Inciting Incident", 1],
@@ -32,7 +32,7 @@ export const TEMPLATES: StoryTemplate[] = [
     id: "hero",
     name: "Hero's Journey",
     tag: "12 stages",
-    blurb: "Campbell’s monomyth — call, threshold, ordeal, return.",
+    blurb: "Campbell’s monomyth: call, threshold, ordeal, return.",
     beats: [
       ["Ordinary World", 1],
       ["Call to Adventure", 1],
@@ -52,7 +52,7 @@ export const TEMPLATES: StoryTemplate[] = [
     id: "stc",
     name: "Save the Cat",
     tag: "15 beats",
-    blurb: "Snyder’s beat sheet — tight, commercial pacing.",
+    blurb: "Snyder’s beat sheet: tight, commercial pacing.",
     beats: [
       ["Opening Image", 1],
       ["Theme Stated", 1],
