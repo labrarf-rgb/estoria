@@ -18,6 +18,7 @@ export function Toolbar() {
   const toggleNewMenu = useStore((s) => s.toggleNewMenu);
   const closeNewMenu = useStore((s) => s.closeNewMenu);
   const addChapter = useStore((s) => s.addChapter);
+  const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const addBook = useStore((s) => s.addBook);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
@@ -34,9 +35,11 @@ export function Toolbar() {
   const seg = "px-3 py-[6px] rounded-[7px] text-[12px] font-medium cursor-pointer whitespace-nowrap";
   const segOn = `${seg} bg-card text-ink`;
   const segOff = `${seg} bg-transparent text-soft hover:bg-card`;
+  const action =
+    "flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[11px] py-[7px] text-[12px] font-semibold text-ink hover:border-faint";
 
   return (
-    <div className="relative z-30 flex items-center gap-3 border-b border-rule bg-panel px-4 py-[9px]">
+    <div className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[9px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* Brand + editable title */}
       <div className="flex flex-shrink-0 items-center gap-[9px]">
         <div className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-ink font-serif text-[14px] font-semibold text-bg">
@@ -47,14 +50,14 @@ export function Toolbar() {
             value={doc.projectTitle}
             onChange={(e) => setProjectTitle(e.target.value)}
             placeholder="Project name"
-            className="w-[170px] bg-transparent text-[13.5px] font-semibold text-ink outline-none placeholder:text-faint"
+            className="w-[150px] bg-transparent text-[13.5px] font-semibold text-ink outline-none placeholder:text-faint"
             title="Click to rename project"
           />
           <span className="text-[10.5px] font-medium tracking-wide text-soft">{bookStat}</span>
         </div>
 
         {/* Version / draft dropdown */}
-        <div className="relative ml-[6px]">
+        <div className="relative ml-[4px]">
           <button
             onClick={() => setVersionMenu((v) => !v)}
             className="flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[9px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
@@ -111,8 +114,18 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
+      {/* Board actions */}
+      <button onClick={addChapter} className={action}>
+        <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
+      </button>
+      <button onClick={autoArrangeBoard} className={action}>
+        Auto-arrange
+      </button>
+
+      <span className="h-[22px] w-px shrink-0 bg-rule" />
+
       {/* View toggle with always-visible orientation arrows */}
-      <div className="flex items-center gap-[6px]">
+      <div className="flex shrink-0 items-center gap-[6px]">
         <div className="flex rounded-[9px] bg-chip p-[3px]">
           <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
             Board
@@ -121,7 +134,6 @@ export function Toolbar() {
             Timeline
           </button>
         </div>
-        {/* Orientation: down = vertical, right = horizontal. Always shown, obvious. */}
         <div className="flex rounded-[9px] bg-chip p-[3px]">
           <button
             title="Vertical timeline"
@@ -130,9 +142,7 @@ export function Toolbar() {
               setView("timeline");
             }}
             className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-              view === "timeline" && orient === "vertical"
-                ? "bg-card text-ink"
-                : "text-soft hover:bg-card"
+              view === "timeline" && orient === "vertical" ? "bg-card text-ink" : "text-soft hover:bg-card"
             }`}
           >
             ↓
@@ -144,9 +154,7 @@ export function Toolbar() {
               setView("timeline");
             }}
             className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-              view === "timeline" && orient === "horizontal"
-                ? "bg-card text-ink"
-                : "text-soft hover:bg-card"
+              view === "timeline" && orient === "horizontal" ? "bg-card text-ink" : "text-soft hover:bg-card"
             }`}
           >
             →
@@ -155,7 +163,7 @@ export function Toolbar() {
       </div>
 
       {/* Side panels */}
-      <div className="flex gap-[2px] rounded-[9px] bg-chip p-[3px]">
+      <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
         <button className={segOff} onClick={() => setPanel("showChars", true)}>
           Characters
         </button>
@@ -167,22 +175,24 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Series / multi-book */}
-      <button
-        onClick={() => setPanel("showSeries", true)}
-        className="flex items-center gap-[7px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-semibold text-ink hover:border-faint"
-        title="Zoom out to the series view"
-      >
-        <span className="flex gap-[2px]">
-          <span className="h-[13px] w-[5px] rounded-[1px] bg-but" />
-          <span className="h-[13px] w-[5px] rounded-[1px] bg-and" />
-          <span className="h-[13px] w-[5px] rounded-[1px] bg-faint" />
-        </span>
-        {activeBook ? activeBook.subtitle || activeBook.title : "Series"}
-      </button>
+      {/* Series / multi-book — only shown once the project is a series */}
+      {doc.seriesMode && (
+        <button
+          onClick={() => setPanel("showSeries", true)}
+          className={action}
+          title="Zoom out to the series view"
+        >
+          <span className="flex gap-[2px]">
+            <span className="h-[13px] w-[5px] rounded-[1px] bg-but" />
+            <span className="h-[13px] w-[5px] rounded-[1px] bg-and" />
+            <span className="h-[13px] w-[5px] rounded-[1px] bg-faint" />
+          </span>
+          {activeBook ? activeBook.subtitle || activeBook.title : "Series"}
+        </button>
+      )}
 
       {/* New menu */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           onClick={toggleNewMenu}
           className="flex items-center gap-[6px] whitespace-nowrap rounded-lg bg-ink px-3 py-[7px] text-[12px] font-semibold text-bg"
@@ -193,11 +203,7 @@ export function Toolbar() {
           <>
             <div className="fixed inset-0 z-[39]" onMouseDown={closeNewMenu} />
             <div className="absolute right-0 top-[40px] z-40 flex w-[236px] flex-col gap-[2px] rounded-[11px] border border-rule bg-card p-[7px] shadow-[0_16px_44px_rgba(0,0,0,0.32)]">
-              <MenuItem
-                title="New book"
-                sub="Start another volume in the series"
-                onClick={addBook}
-              />
+              <MenuItem title="New book" sub="Start another volume in the series" onClick={addBook} />
               <MenuItem
                 title="New chapter"
                 sub="A single empty chapter"
@@ -229,13 +235,13 @@ export function Toolbar() {
 
       <button
         onClick={() => setPanel("showExport", true)}
-        className="flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-medium text-ink hover:border-faint"
+        className="flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-medium text-ink hover:border-faint"
       >
         Export <span className="text-faint">↓</span>
       </button>
 
       {/* Zoom */}
-      <div className="flex items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+      <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
         <button
           onClick={zoomOut}
           className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
@@ -253,15 +259,16 @@ export function Toolbar() {
         </button>
       </div>
 
+      {/* Theme (icon only to save space) */}
       <button
         onClick={toggleTheme}
-        className="flex items-center gap-[7px] rounded-lg border border-rule bg-card px-[11px] py-[7px] text-[12px] font-medium text-ink hover:border-faint"
+        title={theme === "dark" ? "Dark theme" : "Light theme"}
+        className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-rule bg-card text-ink hover:border-faint"
       >
         <span
-          className="h-[13px] w-[13px] rounded-full border-[1.5px] border-ink"
+          className="h-[14px] w-[14px] rounded-full border-[1.5px] border-ink"
           style={{ background: "linear-gradient(90deg,var(--ink) 50%,transparent 50%)" }}
         />
-        {theme === "dark" ? "Dark" : "Light"}
       </button>
     </div>
   );

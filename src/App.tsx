@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { Toolbar } from "@/components/Toolbar";
-import { BoardActions } from "@/components/BoardActions";
 import { Board } from "@/components/Board";
 import { Footer } from "@/components/Footer";
 import { ChapterDetail } from "@/components/ChapterDetail";
@@ -29,7 +28,6 @@ export function App() {
       className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
     >
       <Toolbar />
-      <BoardActions />
       <Board />
       <Footer />
 
