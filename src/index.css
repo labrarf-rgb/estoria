@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Estoria design tokens.
+ * Lifted verbatim from the original design prototype. Theming is driven by the
+ * `data-theme` attribute on the app root, which swaps the CSS custom properties
+ * below. Tailwind v4 reads these via @theme so utilities like `bg-bg`,
+ * `text-ink`, `text-therefore` map onto the same variables.
+ */
+
+:root,
+[data-theme="light"] {
+  --bg: #e9e0cd;
+  --panel: #f6f0e2;
+  --card: #fffdf6;
+  --ink: #2b2620;
+  --soft: #7a6f5c;
+  --faint: #a99c84;
+  --line: #cdbfa2;
+  --rule: #e1d6bf;
+  --chip: #ece3d0;
+  --shadow: 0 1px 2px rgba(70, 52, 20, 0.1), 0 6px 16px rgba(70, 52, 20, 0.08);
+  --therefore: oklch(0.54 0.1 152);
+  --but: oklch(0.55 0.15 33);
+  --and: oklch(0.55 0.04 70);
+}
+
+[data-theme="dark"] {
+  --bg: #15130e;
+  --panel: #1d1a14;
+  --card: #26221a;
+  --ink: #ece4d3;
+  --soft: #a89c86;
+  --faint: #6c6353;
+  --line: #39342a;
+  --rule: #2d2920;
+  --chip: #252119;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 26px rgba(0, 0, 0, 0.5);
+  --therefore: oklch(0.7 0.12 156);
+  --but: oklch(0.68 0.15 36);
+  --and: oklch(0.66 0.04 75);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-rule: var(--rule);
+  --color-chip: var(--chip);
+  --color-therefore: var(--therefore);
+  --color-but: var(--but);
+  --color-and: var(--and);
+
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  --font-serif: "Spectral", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/*
+ * NOTE: do not add an unlayered `* { margin:0; padding:0 }` reset here.
+ * Tailwind v4 emits utilities inside `@layer`, and unlayered rules beat layered
+ * ones regardless of specificity — such a reset would silently override every
+ * Tailwind margin/padding utility (mx-*, p-*, ml-auto, …). Preflight (pulled in
+ * by `@import "tailwindcss"`) already provides box-sizing + margin resets.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}

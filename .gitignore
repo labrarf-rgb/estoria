@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# build artifacts
+*.tsbuildinfo
+
+# local agent settings
+.claude/settings.local.json
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

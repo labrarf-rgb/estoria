@@ -1,0 +1,261 @@
+import { useEffect, useRef } from "react";
+import { useStore } from "@/store/useStore";
+import {
+  CARD_W,
+  CARD_H,
+  layoutPositions,
+  type Camera,
+} from "@/lib/layout";
+import type { Chapter, ConnType } from "@/types";
+
+const CONN_COLOR: Record<ConnType, string> = {
+  therefore: "var(--therefore)",
+  but: "var(--but)",
+  and: "var(--and)",
+};
+
+const statusColor = (s: Chapter["status"]) =>
+  s === "done" ? "var(--therefore)" : s === "draft" ? "var(--but)" : "var(--faint)";
+
+/** Cubic curve from one card's right edge to another's left edge. */
+function connectorPath(a: { x: number; y: number }, b: { x: number; y: number }): string {
+  const x1 = a.x + CARD_W;
+  const y1 = a.y + CARD_H / 2;
+  const x2 = b.x;
+  const y2 = b.y + CARD_H / 2;
+  const dx = Math.max(40, Math.abs(x2 - x1) * 0.5);
+  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+export function Board() {
+  const doc = useStore((s) => s.doc);
+  const view = useStore((s) => s.view);
+  const orient = useStore((s) => s.timelineOrient);
+  const draft = useStore((s) => s.draft);
+  const zoom = useStore((s) => s.zoom);
+  const panX = useStore((s) => s.panX);
+  const panY = useStore((s) => s.panY);
+  const dragId = useStore((s) => s.dragId);
+
+  const setCamera = useStore((s) => s.setCamera);
+  const moveChapter = useStore((s) => s.moveChapter);
+  const setDragId = useStore((s) => s.setDragId);
+  const openChapter = useStore((s) => s.openChapter);
+  const addChapter = useStore((s) => s.addChapter);
+  const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  // Live interaction state kept in refs to avoid stale closures in listeners.
+  const drag = useRef<{ id: string; mx: number; my: number; ox: number; oy: number } | null>(null);
+  const pan = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
+  const cam = useRef<Camera>({ zoom, panX, panY });
+  cam.current = { zoom, panX, panY };
+
+  const isTimeline = view === "timeline";
+
+  // Pointer drag (chapters) and background pan, via window listeners.
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (drag.current) {
+        const z = cam.current.zoom;
+        const nx = drag.current.ox + (e.clientX - drag.current.mx) / z;
+        const ny = drag.current.oy + (e.clientY - drag.current.my) / z;
+        moveChapter(drag.current.id, nx, ny);
+      } else if (pan.current) {
+        setCamera({
+          panX: pan.current.px + (e.clientX - pan.current.mx),
+          panY: pan.current.py + (e.clientY - pan.current.my),
+        });
+      }
+    };
+    const onUp = () => {
+      if (drag.current) {
+        drag.current = null;
+        setDragId(null);
+      }
+      pan.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [moveChapter, setCamera, setDragId]);
+
+  // Wheel: zoom on the board, scroll-pan on the timeline.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const c = cam.current;
+      if (isTimeline) {
+        if (orient === "vertical") setCamera({ panY: c.panY - e.deltaY });
+        else setCamera({ panX: c.panX - (e.deltaY + e.deltaX) });
+      } else {
+        const f = e.deltaY < 0 ? 1.08 : 0.925;
+        setCamera({ zoom: Math.min(1.8, Math.max(0.34, c.zoom * f)) });
+      }
+    };
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, [isTimeline, orient, setCamera]);
+
+  const pos = layoutPositions(doc, view, orient);
+  const posById: Record<string, { x: number; y: number }> = {};
+  pos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
+
+  const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
+    if (isTimeline) return;
+    e.stopPropagation();
+    e.preventDefault();
+    drag.current = { id: ch.id, mx: e.clientX, my: e.clientY, ox: ch.x, oy: ch.y };
+    setDragId(ch.id);
+  };
+  const onCanvasDown = (e: React.MouseEvent) => {
+    pan.current = { mx: e.clientX, my: e.clientY, px: panX, py: panY };
+    void e;
+  };
+
+  const charById = (id: string) => doc.characters.find((c) => c.id === id);
+  const titleOf = (c: Chapter) => (draft === "alt" && c.altTitle ? c.altTitle : c.title);
+  const summaryOf = (c: Chapter) =>
+    draft === "alt" && c.altSummaryFlag
+      ? "Wren reaches the harbor only to choose the sea over the shore."
+      : c.summary || c.scenes[0] || "";
+
+  return (
+    <div
+      ref={viewportRef}
+      onMouseDown={onCanvasDown}
+      className="relative flex-1 overflow-hidden"
+      style={{
+        backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
+        backgroundSize: "24px 24px",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+          transformOrigin: "0 0",
+        }}
+      >
+        {/* Connectors */}
+        <svg
+          width={6000}
+          height={4000}
+          style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}
+        >
+          {doc.links.map((l, i) => {
+            const a = posById[l.fromId];
+            const b = posById[l.toId];
+            if (!a || !b) return null;
+            const type = draft === "alt" && l.alt ? l.alt : l.type;
+            return (
+              <path
+                key={i}
+                d={connectorPath(a, b)}
+                fill="none"
+                stroke={CONN_COLOR[type]}
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            );
+          })}
+        </svg>
+
+        {/* Chapter cards */}
+        {doc.chapters.map((c) => {
+          const p = posById[c.id];
+          if (!p) return null;
+          return (
+            <div
+              key={c.id}
+              onMouseDown={(e) => onCardDown(e, c)}
+              onDoubleClick={() => openChapter(c.id)}
+              style={{
+                position: "absolute",
+                left: p.x,
+                top: p.y,
+                width: CARD_W,
+                minHeight: CARD_H,
+                cursor: isTimeline ? "pointer" : dragId === c.id ? "grabbing" : "grab",
+                zIndex: dragId === c.id ? 20 : 5,
+                transform: !isTimeline && c.rot ? `rotate(${c.rot}deg)` : "none",
+                transformOrigin: "center center",
+              }}
+            >
+              <div className="flex h-full flex-col gap-[7px] rounded-xl border border-rule bg-card p-[12px_14px] shadow-[var(--shadow)] hover:border-faint">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-ink px-[7px] py-[2px] font-mono text-[11px] font-semibold text-bg">
+                    {String(c.num).padStart(2, "0")}
+                  </span>
+                  <span
+                    className="inline-block h-[7px] w-[7px] rounded-full"
+                    style={{ background: statusColor(c.status) }}
+                  />
+                  <div className="flex-1" />
+                  <span className="font-mono text-[10.5px] font-medium text-soft">
+                    {(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words
+                  </span>
+                </div>
+                <div className="font-serif text-[16px] font-semibold leading-tight text-ink">
+                  {titleOf(c)}
+                </div>
+                <div className="line-clamp-2 text-[12.5px] leading-[1.45] text-soft">
+                  {summaryOf(c)}
+                </div>
+                <div className="flex-1" />
+                <div className="flex items-center gap-1">
+                  {c.chars.map((id) => {
+                    const k = charById(id);
+                    if (!k) return null;
+                    return (
+                      <span
+                        key={id}
+                        className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
+                        style={{ background: k.color }}
+                      >
+                        {k.initials}
+                      </span>
+                    );
+                  })}
+                  <div className="flex-1" />
+                  {c.refs.length > 0 && (
+                    <span className="flex items-center gap-[5px] font-mono text-[10.5px] font-medium text-faint">
+                      <span className="inline-block h-[6px] w-[6px] rotate-45 rounded-[1px] bg-faint" />
+                      {c.refs.length}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Floating actions */}
+      <div className="absolute bottom-4 left-4 flex gap-[9px]">
+        <button
+          onClick={addChapter}
+          className="flex items-center gap-2 rounded-[11px] border border-rule bg-panel px-[15px] py-[10px] text-[12.5px] font-semibold text-ink shadow-[var(--shadow)] hover:border-faint"
+        >
+          <span className="-mt-px text-[17px] font-normal leading-none">+</span> New chapter
+        </button>
+        <button
+          onClick={autoArrangeBoard}
+          className="flex items-center gap-2 rounded-[11px] border border-rule bg-panel px-[15px] py-[10px] text-[12.5px] font-semibold text-ink shadow-[var(--shadow)] hover:border-faint"
+        >
+          Auto-arrange
+        </button>
+      </div>
+      <div className="pointer-events-none absolute bottom-4 right-4 text-[11px] font-medium text-faint">
+        Double-click a chapter to map its scenes · drag to rearrange · scroll to zoom
+      </div>
+    </div>
+  );
+}

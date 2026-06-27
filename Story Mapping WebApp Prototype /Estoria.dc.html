@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Hanken Grotesk',sans-serif;-webkit-font-smoothing:antialiased}
+  :root,[data-theme="light"]{
+    --bg:#e9e0cd;--panel:#f6f0e2;--card:#fffdf6;--ink:#2b2620;--soft:#7a6f5c;--faint:#a99c84;
+    --line:#cdbfa2;--rule:#e1d6bf;--chip:#ece3d0;
+    --shadow:0 1px 2px rgba(70,52,20,.10),0 6px 16px rgba(70,52,20,.08);
+    --therefore:oklch(0.54 0.10 152);--but:oklch(0.55 0.15 33);--and:oklch(0.55 0.04 70);
+  }
+  [data-theme="dark"]{
+    --bg:#15130e;--panel:#1d1a14;--card:#26221a;--ink:#ece4d3;--soft:#a89c86;--faint:#6c6353;
+    --line:#39342a;--rule:#2d2920;--chip:#252119;
+    --shadow:0 1px 2px rgba(0,0,0,.45),0 10px 26px rgba(0,0,0,.5);
+    --therefore:oklch(0.70 0.12 156);--but:oklch(0.68 0.15 36);--and:oklch(0.66 0.04 75);
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" data-screen-label="Storyboard" style="position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);overflow:hidden">
+
+  <div style="display:flex;align-items:center;gap:12px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--rule);position:relative;z-index:30">
+    <div style="display:flex;align-items:center;gap:9px;flex-shrink:0">
+      <div style="width:26px;height:26px;border-radius:7px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font:600 14px Spectral,serif;flex-shrink:0">E</div>
+      <div style="display:flex;flex-direction:column;line-height:1.15;min-width:0">
+        <span style="font:600 13.5px 'Hanken Grotesk';color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ projectTitle }}</span>
+        <span style="font:500 10.5px 'Hanken Grotesk';color:var(--soft);letter-spacing:.02em">{{ bookStat }}</span>
+      </div>
+      <button onClick="{{ toggleDraft }}" style="margin-left:6px;display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--rule);background:var(--card);border-radius:8px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="border-color:var(--faint)">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--but)"></span>{{ draftLabel }} <span style="color:var(--faint)">▾</span>
+      </button>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="display:flex;background:var(--chip);border-radius:9px;padding:3px">
+      <button onClick="{{ viewBoard }}" style="{{ boardBtnStyle }}">Board</button>
+      <button onClick="{{ viewTimeline }}" style="{{ timelineBtnStyle }}">Timeline</button>
+    </div>
+    <sc-if value="{{ isTimeline }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;background:var(--chip);border-radius:9px;padding:3px">
+        <button onClick="{{ orientVert }}" style="{{ vertBtnStyle }}">Vertical</button>
+        <button onClick="{{ orientHoriz }}" style="{{ horizBtnStyle }}">Horizontal</button>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;background:var(--chip);border-radius:9px;padding:3px;gap:2px">
+      <button onClick="{{ openChars }}" style="padding:6px 12px;border:none;background:transparent;border-radius:7px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="background:var(--card)">Characters</button>
+      <button onClick="{{ openWorld }}" style="padding:6px 12px;border:none;background:transparent;border-radius:7px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="background:var(--card)">World</button>
+      <button onClick="{{ openNotes }}" style="padding:6px 12px;border:none;background:transparent;border-radius:7px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="background:var(--card)">Notes</button>
+    </div>
+
+    <sc-if value="{{ seriesMode }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ openSeries }}" style="display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule);background:var(--card);border-radius:8px;color:var(--ink);font:600 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="border-color:var(--faint)"><span style="display:flex;gap:2px"><span style="width:5px;height:13px;background:var(--but);border-radius:1px"></span><span style="width:5px;height:13px;background:var(--and);border-radius:1px"></span><span style="width:5px;height:13px;background:var(--faint);border-radius:1px"></span></span>{{ bookPill }}</button>
+    </sc-if>
+
+    <div style="position:relative">
+      <button onClick="{{ toggleNewMenu }}" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border:none;background:var(--ink);color:var(--bg);border-radius:8px;font:600 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap">+ New <span style="opacity:.7">▾</span></button>
+      <sc-if value="{{ newMenu }}" hint-placeholder-val="{{ false }}">
+        <div onMouseDown="{{ closeNewMenu }}" style="position:fixed;inset:0;z-index:39"></div>
+        <div style="position:absolute;right:0;top:40px;width:228px;background:var(--card);border:1px solid var(--rule);border-radius:11px;box-shadow:0 16px 44px rgba(0,0,0,.32);padding:7px;z-index:40;display:flex;flex-direction:column;gap:2px">
+          <button onClick="{{ addChapter }}" style="text-align:left;padding:9px 11px;border:none;background:transparent;border-radius:8px;color:var(--ink);font:600 12.5px 'Hanken Grotesk';cursor:pointer;display:flex;flex-direction:column;gap:2px" style-hover="background:var(--chip)">New chapter <span style="font:400 11px 'Hanken Grotesk';color:var(--soft)">A single empty chapter</span></button>
+          <button onClick="{{ openTemplates }}" style="text-align:left;padding:9px 11px;border:none;background:transparent;border-radius:8px;color:var(--ink);font:600 12.5px 'Hanken Grotesk';cursor:pointer;display:flex;flex-direction:column;gap:2px" style-hover="background:var(--chip)">Use a template… <span style="font:400 11px 'Hanken Grotesk';color:var(--soft)">Three-act, Hero\u2019s Journey, Save the Cat…</span></button>
+          <button onClick="{{ openImport }}" style="text-align:left;padding:9px 11px;border:none;background:transparent;border-radius:8px;color:var(--ink);font:600 12.5px 'Hanken Grotesk';cursor:pointer;display:flex;flex-direction:column;gap:2px" style-hover="background:var(--chip)">Import markdown… <span style="font:400 11px 'Hanken Grotesk';color:var(--soft)">Bring an existing draft via AI</span></button>
+          <div style="height:1px;background:var(--rule);margin:4px 6px"></div>
+          <button onClick="{{ openSeries }}" style="text-align:left;padding:9px 11px;border:none;background:transparent;border-radius:8px;color:var(--ink);font:600 12.5px 'Hanken Grotesk';cursor:pointer;display:flex;flex-direction:column;gap:2px" style-hover="background:var(--chip)">Series planner… <span style="font:400 11px 'Hanken Grotesk';color:var(--soft)">Plan multiple books</span></button>
+        </div>
+      </sc-if>
+    </div>
+
+    <button onClick="{{ openExport }}" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--rule);background:var(--card);border-radius:8px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="border-color:var(--faint)">Export <span style="color:var(--faint)">↓</span></button>
+
+    <div style="display:flex;align-items:center;gap:2px;background:var(--chip);border-radius:9px;padding:3px">
+      <button onClick="{{ zoomOut }}" style="width:26px;height:24px;border:none;background:transparent;color:var(--ink);font:600 16px 'Hanken Grotesk';cursor:pointer;border-radius:6px" style-hover="background:var(--card)">−</button>
+      <span style="font:500 11px 'JetBrains Mono';color:var(--soft);min-width:40px;text-align:center">{{ zoomPct }}%</span>
+      <button onClick="{{ zoomIn }}" style="width:26px;height:24px;border:none;background:transparent;color:var(--ink);font:600 15px 'Hanken Grotesk';cursor:pointer;border-radius:6px" style-hover="background:var(--card)">+</button>
+    </div>
+
+    <button onClick="{{ toggleTheme }}" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid var(--rule);background:var(--card);border-radius:8px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">
+      <span style="width:13px;height:13px;border-radius:50%;background:linear-gradient(90deg,var(--ink) 50%,transparent 50%);border:1.5px solid var(--ink)"></span>{{ themeLabel }}
+    </button>
+  </div>
+
+  <div ref="{{ viewportRef }}" onMouseDown="{{ canvasDown }}" style="flex:1;position:relative;overflow:hidden;cursor:default;background-image:radial-gradient(var(--rule) 1px,transparent 1px);background-size:24px 24px">
+    <div style="{{ canvasStyle }}">
+      <sc-for list="{{ actBands }}" as="b" hint-placeholder-count="0">
+        <div style="{{ b.style }}"></div>
+        <div style="{{ b.labelStyle }}">{{ b.label }}</div>
+      </sc-for>
+
+      <svg width="{{ canvasW }}" height="{{ canvasH }}" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none">
+        <sc-for list="{{ connectors }}" as="c" hint-placeholder-count="7">
+          <path d="{{ c.path }}" fill="none" stroke="{{ c.color }}" stroke-width="{{ c.width }}" stroke-linecap="round"></path>
+        </sc-for>
+      </svg>
+
+      <sc-for list="{{ dispChapters }}" as="ch" hint-placeholder-count="8">
+        <div style="{{ ch.outerStyle }}" onMouseDown="{{ ch.onDown }}" onDoubleClick="{{ ch.onOpen }}">
+          <div style="background:var(--card);border:1px solid var(--rule);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;height:100%;display:flex;flex-direction:column;gap:7px" style-hover="border-color:var(--faint)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font:600 11px 'JetBrains Mono';color:var(--bg);background:var(--ink);padding:2px 7px;border-radius:6px">{{ ch.num }}</span>
+              <span style="{{ ch.statusStyle }}"></span>
+              <div style="flex:1"></div>
+              <span style="font:500 10.5px 'JetBrains Mono';color:var(--soft)">{{ ch.wordsFmt }}</span>
+            </div>
+            <div style="font:600 16px/1.2 Spectral,serif;color:var(--ink)">{{ ch.title }}</div>
+            <div style="font:400 12.5px/1.45 'Hanken Grotesk';color:var(--soft);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ ch.summary }}</div>
+            <sc-if value="{{ isTimeline }}" hint-placeholder-val="{{ false }}">
+              <div style="height:5px;border-radius:3px;background:var(--rule);margin-top:1px;overflow:hidden"><div style="{{ ch.barStyle }}"></div></div>
+            </sc-if>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <sc-for list="{{ ch.charChips }}" as="cc" hint-placeholder-count="2">
+                <span style="{{ cc.style }}">{{ cc.initials }}</span>
+              </sc-for>
+              <div style="flex:1"></div>
+              <sc-if value="{{ ch.hasRefs }}" hint-placeholder-val="{{ false }}">
+                <span style="display:flex;align-items:center;gap:5px;font:500 10.5px 'JetBrains Mono';color:var(--faint)"><span style="width:6px;height:6px;background:var(--faint);transform:rotate(45deg);border-radius:1px;display:inline-block"></span>{{ ch.refCount }}</span>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="position:absolute;left:16px;bottom:16px;display:flex;gap:9px">
+      <button onClick="{{ addChapter }}" style="display:flex;align-items:center;gap:8px;padding:10px 15px;border:1px solid var(--rule);background:var(--panel);border-radius:11px;box-shadow:var(--shadow);font:600 12.5px 'Hanken Grotesk';color:var(--ink);cursor:pointer" style-hover="border-color:var(--faint)"><span style="font:400 17px/1 'Hanken Grotesk';margin-top:-1px">+</span> New chapter</button>
+      <button onClick="{{ autoArrange }}" style="display:flex;align-items:center;gap:8px;padding:10px 15px;border:1px solid var(--rule);background:var(--panel);border-radius:11px;box-shadow:var(--shadow);font:600 12.5px 'Hanken Grotesk';color:var(--ink);cursor:pointer" style-hover="border-color:var(--faint)">Auto-arrange</button>
+    </div>
+    <div style="position:absolute;right:16px;bottom:16px;font:500 11px 'Hanken Grotesk';color:var(--faint);pointer-events:none">Double-click a chapter to map its scenes · drag to rearrange · scroll to zoom</div>
+  </div>
+
+  <sc-if value="{{ detail }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeChapter }}" data-screen-label="Chapter detail" style="position:fixed;inset:0;background:rgba(20,14,6,.46);backdrop-filter:blur(2px);z-index:50;display:flex;align-items:center;justify-content:center;padding:30px">
+      <div onMouseDown="{{ stop }}" style="width:min(980px,100%);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 30px 90px rgba(0,0,0,.5)">
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:22px 26px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--panel);z-index:2">
+          <span style="font:600 13px 'JetBrains Mono';color:var(--bg);background:var(--ink);padding:4px 9px;border-radius:7px;margin-top:3px">{{ detail.num }}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font:600 24px/1.15 Spectral,serif;color:var(--ink)">{{ detail.title }}</div>
+            <div style="font:400 14px/1.5 'Hanken Grotesk';color:var(--soft);margin-top:5px">{{ detail.summary }}</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap">
+              <div style="display:flex;gap:4px">
+                <sc-for list="{{ detail.charChips }}" as="cc" hint-placeholder-count="2"><span style="{{ cc.style }}">{{ cc.initials }}</span></sc-for>
+              </div>
+              <span style="font:500 11.5px 'JetBrains Mono';color:var(--soft)">{{ detail.wordsFmt }}</span>
+              <span style="font:500 11.5px 'JetBrains Mono';color:var(--faint)">· {{ detail.sceneCount }} scenes</span>
+              <div style="flex:1"></div>
+              <span style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Act</span>
+              <div style="display:flex;align-items:center;background:var(--chip);border-radius:8px;padding:3px">
+                <button onClick="{{ detail.actDown }}" style="width:24px;height:24px;border:none;background:transparent;border-radius:6px;color:var(--ink);font:600 15px 'Hanken Grotesk';cursor:pointer" style-hover="background:var(--card)">−</button>
+                <input type="number" min="1" value="{{ detail.actValue }}" onChange="{{ detail.setActField }}" style="width:38px;height:24px;border:none;background:transparent;text-align:center;color:var(--ink);font:600 13px 'JetBrains Mono';-moz-appearance:textfield" />
+                <button onClick="{{ detail.actUp }}" style="width:24px;height:24px;border:none;background:transparent;border-radius:6px;color:var(--ink);font:600 15px 'Hanken Grotesk';cursor:pointer" style-hover="background:var(--card)">+</button>
+              </div>
+            </div>
+          </div>
+          <button onClick="{{ closeChapter }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:9px;padding:16px 26px 12px;flex-wrap:wrap">
+          <span style="font:600 11px 'Hanken Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--soft)">Scene flow</span>
+          <div style="flex:1"></div>
+          <div style="display:flex;background:var(--chip);border-radius:8px;padding:3px">
+            <button onClick="{{ detail.setSceneBoard }}" style="{{ detail.sboardStyle }}">Board</button>
+            <button onClick="{{ detail.setSceneTimeline }}" style="{{ detail.stimelineStyle }}">Timeline</button>
+          </div>
+          <sc-if value="{{ detail.isSceneTimeline }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;background:var(--chip);border-radius:8px;padding:3px">
+              <button onClick="{{ detail.orientSV }}" style="{{ detail.svertStyle }}">Vertical</button>
+              <button onClick="{{ detail.orientSH }}" style="{{ detail.shorizStyle }}">Horizontal</button>
+            </div>
+          </sc-if>
+          <button onClick="{{ detail.sceneArrange }}" style="padding:6px 12px;border:1px solid var(--rule);background:var(--card);border-radius:8px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">Auto-arrange</button>
+          <button onClick="{{ detail.addScene }}" style="padding:6px 12px;border:none;background:var(--ink);color:var(--bg);border-radius:8px;font:600 12px 'Hanken Grotesk';cursor:pointer">+ Add scene</button>
+        </div>
+
+        <div style="margin:0 22px;max-height:44vh;overflow:auto;background:var(--bg);border:1px solid var(--rule);border-radius:12px;background-image:radial-gradient(var(--rule) 1px,transparent 1px);background-size:22px 22px">
+          <div style="{{ detail.sceneCanvasStyle }}">
+            <svg width="{{ detail.sceneCanvasW }}" height="{{ detail.sceneCanvasH }}" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none">
+              <sc-for list="{{ detail.sceneEdges }}" as="e" hint-placeholder-count="2"><line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="var(--line)" stroke-width="1.75"></line></sc-for>
+            </svg>
+            <sc-for list="{{ detail.sceneNodes }}" as="sn" hint-placeholder-count="3">
+              <div style="{{ sn.style }}" onMouseDown="{{ sn.onDown }}">
+                <div style="background:var(--card);border:1px solid var(--rule);border-radius:11px;box-shadow:var(--shadow);padding:12px 13px;height:100%;display:flex;flex-direction:column;gap:7px" style-hover="border-color:var(--faint)">
+                  <span style="font:600 10px 'JetBrains Mono';color:var(--faint);letter-spacing:.06em">SCENE {{ sn.no }}</span>
+                  <span style="font:400 13px/1.5 'Hanken Grotesk';color:var(--ink)">{{ sn.text }}</span>
+                </div>
+              </div>
+            </sc-for>
+            <sc-for list="{{ detail.sceneLabels }}" as="sl" hint-placeholder-count="2"><button onClick="{{ sl.onClick }}" style="{{ sl.style }}">{{ sl.label }}</button></sc-for>
+          </div>
+        </div>
+        <div style="font:500 11px 'Hanken Grotesk';color:var(--faint);padding:8px 26px 0">Drag scenes to rearrange · click a connector to toggle Therefore / But / And</div>
+
+        <div style="padding:18px 26px 26px">
+          <div style="font:600 11px 'Hanken Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--soft);margin-bottom:13px">Pinned references</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
+            <sc-for list="{{ detail.refs }}" as="r" hint-placeholder-count="2"><div style="{{ r.style }}"><span style="font:600 9px 'JetBrains Mono';letter-spacing:.08em;opacity:.75">{{ r.kind }}</span>{{ r.label }}</div></sc-for>
+            <sc-if value="{{ detail.pinClosed }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ detail.togglePin }}" style="width:150px;min-height:92px;border-radius:11px;border:1.5px dashed var(--line);background:transparent;display:flex;align-items:center;justify-content:center;text-align:center;font:500 12px 'Hanken Grotesk';color:var(--faint);cursor:pointer" style-hover="border-color:var(--faint);color:var(--soft)">+ Pin note or image</button>
+            </sc-if>
+            <sc-if value="{{ detail.pinMenu }}" hint-placeholder-val="{{ false }}">
+              <div style="width:150px;min-height:92px;border-radius:11px;border:1.5px solid var(--faint);background:var(--card);display:flex;flex-direction:column;gap:7px;padding:11px;justify-content:center">
+                <button onClick="{{ detail.addNote }}" style="padding:8px;border:1px solid var(--rule);background:var(--panel);border-radius:8px;color:var(--ink);font:600 12px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">+ Add note</button>
+                <button onClick="{{ detail.addImage }}" style="padding:8px;border:1px solid var(--rule);background:var(--panel);border-radius:8px;color:var(--ink);font:600 12px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">+ Add image</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showChars }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeChars }}" data-screen-label="Characters" style="position:fixed;inset:0;background:rgba(20,14,6,.42);backdrop-filter:blur(2px);z-index:55">
+      <div onMouseDown="{{ stop }}" style="position:absolute;right:0;top:0;bottom:0;width:400px;background:var(--panel);border-left:1px solid var(--rule);overflow:auto;box-shadow:-20px 0 60px rgba(0,0,0,.3)">
+        <div style="display:flex;align-items:center;padding:20px 22px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--panel);z-index:2">
+          <div style="font:600 18px Spectral,serif;color:var(--ink)">Characters</div>
+          <div style="flex:1"></div>
+          <button onClick="{{ closeChars }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <div style="padding:14px 18px;display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ charList }}" as="p" hint-placeholder-count="4">
+            <div onClick="{{ p.onClick }}" style="{{ p.cardStyle }}">
+              <div style="display:flex;align-items:center;gap:11px">
+                <span style="{{ p.avatarStyle }}">{{ p.initials }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px"><span style="font:600 15px Spectral,serif;color:var(--ink)">{{ p.name }}</span><span style="{{ p.typeStyle }}">{{ p.type }}</span></div>
+                  <div style="font:500 11.5px 'Hanken Grotesk';color:var(--soft)">{{ p.role }} · in {{ p.appearsCount }} chapters</div>
+                </div>
+                <span style="color:var(--faint);font:500 13px 'Hanken Grotesk';transition:transform .15s;transform:{{ p.caret }}">▾</span>
+              </div>
+              <sc-if value="{{ p.open }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:13px">
+                  <div style="font:400 13px/1.55 'Hanken Grotesk';color:var(--ink)">{{ p.desc }}</div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px">Bio</div><div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--ink)">{{ p.bio }}</div></div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px">Traits</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ p.traits }}" as="t" hint-placeholder-count="3"><span style="font:500 11px 'Hanken Grotesk';color:var(--soft);background:var(--chip);padding:3px 9px;border-radius:20px">{{ t }}</span></sc-for></div>
+                  </div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px">Goals</div>
+                    <div style="display:flex;flex-direction:column;gap:4px"><sc-for list="{{ p.goals }}" as="g" hint-placeholder-count="2"><div style="font:400 12.5px/1.4 'Hanken Grotesk';color:var(--ink);display:flex;gap:7px"><span style="color:var(--faint)">→</span>{{ g }}</div></sc-for></div>
+                  </div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px">Motivations</div><div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--ink)">{{ p.motivations }}</div></div>
+                  <div style="display:flex;gap:14px">
+                    <div style="flex:1"><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px">Wants</div><div style="font:400 12.5px/1.45 'Hanken Grotesk';color:var(--ink)">{{ p.want }}</div></div>
+                    <div style="flex:1"><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px">Needs</div><div style="font:400 12.5px/1.45 'Hanken Grotesk';color:var(--ink)">{{ p.need }}</div></div>
+                  </div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px">Appears in</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ p.appears }}" as="a" hint-placeholder-count="3"><span style="font:500 11px 'JetBrains Mono';color:var(--soft);border:1px solid var(--rule);padding:2px 8px;border-radius:6px">{{ a }}</span></sc-for></div>
+                  </div>
+                  <div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px">Notes</div><div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--ink)">{{ p.notes }}</div></div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <button onClick="{{ addCharacter }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border:1.5px dashed var(--line);border-radius:13px;background:transparent;color:var(--soft);font:600 13px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint);color:var(--ink)">+ Add character</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showWorld }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeWorld }}" data-screen-label="World" style="position:fixed;inset:0;background:rgba(20,14,6,.42);backdrop-filter:blur(2px);z-index:55">
+      <div onMouseDown="{{ stop }}" style="position:absolute;right:0;top:0;bottom:0;width:400px;background:var(--panel);border-left:1px solid var(--rule);overflow:auto;box-shadow:-20px 0 60px rgba(0,0,0,.3)">
+        <div style="display:flex;align-items:center;padding:20px 22px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--panel);z-index:2">
+          <div>
+            <div style="font:600 18px Spectral,serif;color:var(--ink)">World</div>
+            <div style="font:500 11.5px 'Hanken Grotesk';color:var(--soft);margin-top:2px">Places, factions, lore &amp; references</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ closeWorld }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <div style="padding:14px 18px;display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ worldList }}" as="w" hint-placeholder-count="4">
+            <div onClick="{{ w.onClick }}" style="{{ w.cardStyle }}">
+              <div style="display:flex;align-items:center;gap:11px">
+                <span style="{{ w.dotStyle }}"></span>
+                <div style="flex:1;min-width:0">
+                  <div style="font:600 15px Spectral,serif;color:var(--ink)">{{ w.name }}</div>
+                  <div style="{{ w.catStyle }}">{{ w.cat }}</div>
+                </div>
+                <span style="color:var(--faint);font:500 13px 'Hanken Grotesk';transition:transform .15s;transform:{{ w.caret }}">▾</span>
+              </div>
+              <sc-if value="{{ w.open }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:12px">
+                  <div style="font:400 13px/1.55 'Hanken Grotesk';color:var(--ink)">{{ w.desc }}</div>
+                  <sc-if value="{{ w.hasNotes }}" hint-placeholder-val="{{ false }}"><div><div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px">Notes</div><div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--ink)">{{ w.notes }}</div></div></sc-if>
+                  <div>
+                    <div style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">References</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch">
+                      <sc-for list="{{ w.refs }}" as="r" hint-placeholder-count="1"><div style="{{ r.style }}"><span style="font:600 9px 'JetBrains Mono';letter-spacing:.08em;opacity:.75">{{ r.kind }}</span>{{ r.label }}</div></sc-for>
+                      <button onClick="{{ w.addNote }}" style="width:72px;min-height:92px;border-radius:11px;border:1.5px dashed var(--line);background:transparent;color:var(--faint);font:600 11.5px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint);color:var(--ink)">+ Note</button>
+                      <button onClick="{{ w.addImage }}" style="width:72px;min-height:92px;border-radius:11px;border:1.5px dashed var(--line);background:transparent;color:var(--faint);font:600 11.5px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint);color:var(--ink)">+ Image</button>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <button onClick="{{ addWorldEntry }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border:1.5px dashed var(--line);border-radius:13px;background:transparent;color:var(--soft);font:600 13px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint);color:var(--ink)">+ Add world entry</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeNotes }}" data-screen-label="Story notes" style="position:fixed;inset:0;background:rgba(20,14,6,.42);backdrop-filter:blur(2px);z-index:55">
+      <div onMouseDown="{{ stop }}" style="position:absolute;right:0;top:0;bottom:0;width:440px;background:var(--panel);border-left:1px solid var(--rule);display:flex;flex-direction:column;box-shadow:-20px 0 60px rgba(0,0,0,.3)">
+        <div style="display:flex;align-items:center;padding:20px 22px;border-bottom:1px solid var(--rule)">
+          <div>
+            <div style="font:600 18px Spectral,serif;color:var(--ink)">Story notes</div>
+            <div style="font:500 11.5px 'Hanken Grotesk';color:var(--soft);margin-top:2px">Themes, questions &amp; reminders for the whole book</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ closeNotes }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <textarea value="{{ storyNotes }}" onChange="{{ setStoryNotes }}" placeholder="Jot themes, throughlines, open questions, pacing notes…" style="flex:1;margin:18px;padding:16px;border:1px solid var(--rule);border-radius:12px;background:var(--card);color:var(--ink);font:400 13.5px/1.65 'Spectral',serif;resize:none;outline:none"></textarea>
+        <div style="padding:0 22px 18px;font:500 11px 'Hanken Grotesk';color:var(--faint)">Saved to your story · included in markdown export</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showImport }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeImport }}" data-screen-label="Import" style="position:fixed;inset:0;background:rgba(20,14,6,.46);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:30px">
+      <div onMouseDown="{{ stop }}" style="width:min(820px,100%);max-height:88vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 30px 90px rgba(0,0,0,.5);overflow:hidden">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:20px 24px;border-bottom:1px solid var(--rule)">
+          <div style="flex:1">
+            <div style="font:600 19px Spectral,serif;color:var(--ink)">Import an existing draft</div>
+            <div style="font:500 12.5px/1.5 'Hanken Grotesk';color:var(--soft);margin-top:4px">Already have a manuscript in Word, Google Docs, or scattered notes? Let an AI turn it into an Estoria-ready markdown file, then drop it in below.</div>
+          </div>
+          <button onClick="{{ closeImport }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <div style="flex:1;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;gap:14px">
+            <span style="width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font:600 13px 'Hanken Grotesk';flex-shrink:0">1</span>
+            <div style="flex:1">
+              <div style="font:600 14px 'Hanken Grotesk';color:var(--ink);margin-bottom:4px">Copy this prompt into ChatGPT, Claude, or Gemini</div>
+              <div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--soft);margin-bottom:11px">Paste it along with your manuscript. The AI returns a markdown file that breaks your story into chapters and scenes, sets up characters, and maps the world.</div>
+              <div style="position:relative;border:1px solid var(--rule);border-radius:11px;background:var(--card);overflow:hidden">
+                <pre style="margin:0;max-height:200px;overflow:auto;padding:15px 16px;font:400 11.5px/1.6 'JetBrains Mono';color:var(--ink);white-space:pre-wrap">{{ importPromptText }}</pre>
+                <button onClick="{{ copyImportPrompt }}" style="position:absolute;right:11px;top:11px;padding:7px 13px;border:none;background:var(--ink);color:var(--bg);border-radius:8px;font:600 12px 'Hanken Grotesk';cursor:pointer">{{ importCopyLabel }}</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px">
+            <span style="width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font:600 13px 'Hanken Grotesk';flex-shrink:0">2</span>
+            <div style="flex:1">
+              <div style="font:600 14px 'Hanken Grotesk';color:var(--ink);margin-bottom:4px">Upload the markdown file it gives you</div>
+              <div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--soft);margin-bottom:11px">Estoria reads the chapters, scenes, characters and world straight off the file.</div>
+              <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:26px;border:1.5px dashed var(--line);border-radius:12px;background:var(--card);cursor:pointer;text-align:center" style-hover="border-color:var(--faint)">
+                <span style="font:600 13px 'Hanken Grotesk';color:var(--ink)">Drop a .md file here, or click to browse</span>
+                <span style="font:400 11.5px 'Hanken Grotesk';color:var(--faint)">Accepts Markdown (.md, .markdown, .txt)</span>
+                <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange="{{ onImportFile }}" style="display:none" />
+              </label>
+              <sc-if value="{{ importResult }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;padding:13px 15px;border:1px solid var(--therefore);border-radius:11px;background:var(--card);display:flex;align-items:center;gap:12px">
+                  <span style="width:30px;height:30px;border-radius:8px;background:var(--therefore);color:#fff;display:flex;align-items:center;justify-content:center;font:600 15px 'Hanken Grotesk'">✓</span>
+                  <div>
+                    <div style="font:600 13px 'Hanken Grotesk';color:var(--ink)">{{ importResult.name }}</div>
+                    <div style="font:500 11.5px 'JetBrains Mono';color:var(--soft);margin-top:2px">{{ importResult.chapters }} chapters · {{ importResult.scenes }} scenes · {{ importResult.characters }} characters detected</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showTemplates }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeTemplates }}" data-screen-label="Templates" style="position:fixed;inset:0;background:rgba(20,14,6,.46);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:30px">
+      <div onMouseDown="{{ stop }}" style="width:min(880px,100%);max-height:88vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 30px 90px rgba(0,0,0,.5);overflow:hidden">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:20px 24px;border-bottom:1px solid var(--rule)">
+          <div style="flex:1">
+            <div style="font:600 19px Spectral,serif;color:var(--ink)">Start from a structure</div>
+            <div style="font:500 12.5px/1.5 'Hanken Grotesk';color:var(--soft);margin-top:4px">Insert a proven story skeleton as chapters, pre-sorted into acts. Insert adds to your board; Replace starts fresh.</div>
+          </div>
+          <button onClick="{{ closeTemplates }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <div style="flex:1;overflow:auto;padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <sc-for list="{{ templateList }}" as="t" hint-placeholder-count="6">
+            <div style="border:1px solid var(--rule);border-radius:13px;background:var(--card);padding:16px 17px;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font:600 16px Spectral,serif;color:var(--ink)">{{ t.name }}</span>
+                <span style="font:600 9.5px 'Hanken Grotesk';letter-spacing:.07em;text-transform:uppercase;color:var(--soft);background:var(--chip);padding:3px 8px;border-radius:20px">{{ t.tag }}</span>
+              </div>
+              <div style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--soft);flex:1">{{ t.blurb }}</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+                <span style="font:500 11px 'JetBrains Mono';color:var(--faint);flex:1">{{ t.count }} beats</span>
+                <button onClick="{{ t.replace }}" style="padding:7px 12px;border:1px solid var(--rule);background:var(--panel);border-radius:8px;color:var(--ink);font:500 12px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">Replace</button>
+                <button onClick="{{ t.insert }}" style="padding:7px 14px;border:none;background:var(--ink);color:var(--bg);border-radius:8px;font:600 12px 'Hanken Grotesk';cursor:pointer">Insert</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showSeries }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeSeries }}" data-screen-label="Series" style="position:fixed;inset:0;background:rgba(20,14,6,.5);backdrop-filter:blur(3px);z-index:60;display:flex;align-items:center;justify-content:center;padding:30px">
+      <div onMouseDown="{{ stop }}" style="width:min(940px,100%);max-height:90vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--rule);border-radius:18px;box-shadow:0 30px 90px rgba(0,0,0,.55);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:14px;padding:22px 26px;border-bottom:1px solid var(--rule)">
+          <div style="flex:1">
+            <div style="font:600 21px Spectral,serif;color:var(--ink)">Series planner</div>
+            <div style="font:500 12.5px 'Hanken Grotesk';color:var(--soft);margin-top:3px">The view above your books — premise, status and arc for each volume in order.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;background:var(--chip);border-radius:10px;padding:6px 8px 6px 13px">
+            <span style="font:600 12px 'Hanken Grotesk';color:var(--ink)">Series mode</span>
+            <button onClick="{{ toggleSeriesMode }}" style="{{ seriesToggleStyle }}"><span style="{{ seriesKnobStyle }}"></span></button>
+            <span style="font:600 11px 'JetBrains Mono';color:var(--soft);min-width:22px">{{ seriesToggleLabel }}</span>
+          </div>
+          <button onClick="{{ closeSeries }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <div style="flex:1;overflow:auto;padding:22px 26px;display:flex;flex-direction:column;gap:14px">
+          <sc-for list="{{ seriesList }}" as="b" hint-placeholder-count="3">
+            <div style="{{ b.cardStyle }}">
+              <div style="display:flex;align-items:center;gap:14px">
+                <span style="{{ b.spineStyle }}">{{ b.idx }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                    <span style="font:600 17px Spectral,serif;color:var(--ink)">{{ b.title }}</span>
+                    <span style="{{ b.statusStyle }}">{{ b.statusLabel }}</span>
+                    <sc-if value="{{ b.isActive }}" hint-placeholder-val="{{ false }}"><span style="font:600 10px 'Hanken Grotesk';letter-spacing:.05em;text-transform:uppercase;color:var(--bg);background:var(--ink);padding:3px 9px;border-radius:20px">{{ b.editingBadge }}</span></sc-if>
+                  </div>
+                  <div style="font:500 11.5px 'Hanken Grotesk';color:var(--soft);margin-top:3px">{{ b.subtitle }} · {{ b.statBadge }}</div>
+                </div>
+                <button onClick="{{ b.onClick }}" style="padding:8px 15px;border:1px solid var(--rule);background:var(--panel);border-radius:9px;color:var(--ink);font:600 12px 'Hanken Grotesk';cursor:pointer;white-space:nowrap" style-hover="border-color:var(--faint)">{{ b.openLabel }}</button>
+              </div>
+              <div style="font:400 13px/1.55 'Hanken Grotesk';color:var(--ink)">{{ b.premise }}</div>
+              <div style="display:flex;gap:8px;align-items:baseline"><span style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint);flex-shrink:0">Arc</span><span style="font:400 12.5px/1.5 'Hanken Grotesk';color:var(--soft)">{{ b.arc }}</span></div>
+              <sc-if value="{{ b.open }}" hint-placeholder-val="{{ false }}">
+                <sc-if value="{{ b.hasOutline }}" hint-placeholder-val="{{ true }}">
+                  <div style="border-top:1px solid var(--rule);padding-top:12px;display:flex;flex-direction:column;gap:6px">
+                    <span style="font:600 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Outline</span>
+                    <sc-for list="{{ b.outline }}" as="o" hint-placeholder-count="4"><div style="font:400 12.5px/1.4 'Hanken Grotesk';color:var(--ink);display:flex;gap:8px"><span style="color:var(--faint)">·</span>{{ o }}</div></sc-for>
+                  </div>
+                </sc-if>
+              </sc-if>
+            </div>
+          </sc-for>
+          <button onClick="{{ addBook }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:15px;border:1.5px dashed var(--line);border-radius:14px;background:transparent;color:var(--soft);font:600 13px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint);color:var(--ink)">+ Add book to series</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showExport }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ closeExport }}" data-screen-label="Export" style="position:fixed;inset:0;background:rgba(20,14,6,.46);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:30px">
+      <div onMouseDown="{{ stop }}" style="width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 30px 90px rgba(0,0,0,.5);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--rule)">
+          <div style="flex:1">
+            <div style="font:600 18px Spectral,serif;color:var(--ink)">Export to Markdown</div>
+            <div style="font:500 12px 'Hanken Grotesk';color:var(--soft);margin-top:3px">Vault-ready — chapters become notes, characters become <span style="font-family:'JetBrains Mono'">[[wikilinks]]</span> for Obsidian.</div>
+          </div>
+          <button onClick="{{ closeExport }}" style="border:1px solid var(--rule);background:var(--card);color:var(--ink);width:30px;height:30px;border-radius:8px;cursor:pointer;font:500 14px 'Hanken Grotesk'" style-hover="border-color:var(--faint)">✕</button>
+        </div>
+        <pre style="margin:0;flex:1;overflow:auto;padding:20px 24px;background:var(--card);font:400 12.5px/1.7 'JetBrains Mono';color:var(--ink);white-space:pre-wrap">{{ exportText }}</pre>
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 24px;border-top:1px solid var(--rule)">
+          <button onClick="{{ copyMd }}" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border:none;background:var(--ink);color:var(--bg);border-radius:9px;font:600 13px 'Hanken Grotesk';cursor:pointer">{{ copyLabel }}</button>
+          <button onClick="{{ downloadMd }}" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border:1px solid var(--rule);background:var(--card);color:var(--ink);border-radius:9px;font:500 13px 'Hanken Grotesk';cursor:pointer" style-hover="border-color:var(--faint)">Download .md</button>
+          <div style="flex:1"></div>
+          <span style="font:500 11.5px 'Hanken Grotesk';color:var(--faint)">{{ wordTotal }} words · {{ chapterCount }} chapters</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;projectTitle&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Untitled Voyage&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;board&quot;,&quot;timeline&quot;],&quot;default&quot;:&quot;board&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.viewportRef = React.createRef();
+    this.typeMeta = {
+      therefore:{label:'Therefore', color:'var(--therefore)'},
+      but:{label:'But', color:'var(--but)'},
+      and:{label:'And', color:'var(--and)'}
+    };
+    this.CW = 244; this.CH = 142;
+    this.SW = 208; this.SH = 124;
+    this._drag = null; this._pan = null;
+    this.state = {
+      theme:'light',
+      view: (props.startView==='timeline') ? 'timeline' : 'board',
+      draft:'main',
+      zoom:0.66, panX:34, panY:28, arrangeN:0, timelineOrient:'vertical',
+      openCh:null, showChars:false, selChar:null, showExport:false, copied:false,
+      dragId:null,
+      sceneView:'board', sceneOrient:'vertical', sceneArrangeN:0,
+      showWorld:false, selWorld:null, pinMenu:false,
+      showNotes:false, storyNotes:'Working themes\n\u2014 home is a thing you make, not a place you find.\n\u2014 every map is a kind of lie you agree to believe.\n\nOpen questions\n\u2014 Does Wren\u2019s mother appear, or only her hand on the charts?\n\u2014 How much of the False Harbor is real?\n\nPacing note\nAct II sags around Ch 5 \u2014 consider moving Pip\u2019s confession earlier.',
+      showImport:false, importCopied:false, importResult:null,
+      showTemplates:false,
+      newMenu:false,
+      seriesMode:false, showSeries:false, activeBook:'b1', selBook:null,
+      characters:[
+        {id:'wren',name:'Wren Calloway',role:'Protagonist',type:'Hero',initials:'WC',color:'oklch(0.60 0.10 215)',
+          desc:'A cartographer who can chart any coast but her own way home.',
+          bio:'Raised in the lamp-lit map shops of the lower city; learned to read water before she could read words.',
+          traits:['Stubborn','Precise','Haunted'],
+          goals:['Reach the harbor on her mother\u2019s map','Keep Bram and Pip alive'],
+          motivations:'Grief she has never named \u2014 and the suspicion her mother is still out there.',
+          want:'To reach the harbor from her mother\u2019s last map.',need:'To stop running from the people who love her.',
+          notes:'Left-handed; signs every chart with a tiny anchor.'},
+        {id:'sela',name:'Sela Voss',role:'Antagonist',type:'Shadow',initials:'SV',color:'oklch(0.58 0.15 30)',
+          desc:'Wren\u2019s former mentor, now harbormaster of a city that forgives no debts.',
+          bio:'Rose from dockhand to harbormaster by knowing exactly which debts to forgive.',
+          traits:['Patient','Ruthless','Wounded'],
+          goals:['Recover the map','Bring Wren back into the fold'],
+          motivations:'Believes the map is the only thing Wren\u2019s mother left for HER.',
+          want:'To reclaim the map she believes is hers.',need:'To admit she drove Wren away.',
+          notes:'Keeps Wren\u2019s old apprentice mug on her desk.'},
+        {id:'bram',name:'Bram Okonkwo',role:'Ally',type:'Companion',initials:'BO',color:'oklch(0.62 0.12 85)',
+          desc:'A navigator who has sailed everywhere except toward the truth.',
+          bio:'Knows every route on the eastern charts; never speaks of the False Harbor run.',
+          traits:['Loyal','Evasive','Brave'],
+          goals:['Protect Wren','Outrun his past'],
+          motivations:'Guilt \u2014 he piloted the ship that doomed the last expedition.',
+          want:'To keep Wren safe.',need:'To confess what he did at the False Harbor.',
+          notes:'Hums when he lies.'},
+        {id:'pip',name:'Pip',role:'Catalyst',type:'Trickster',initials:'P',color:'oklch(0.56 0.12 305)',
+          desc:'A dock-rat who trades in secrets and stolen tide-charts.',
+          bio:'Grew up fencing tide-charts in the gull markets; no one knows her real name.',
+          traits:['Quick','Guarded','Kind'],
+          goals:['Earn passage out','Be believed'],
+          motivations:'Wants, for once, to be on the right side of a secret.',
+          want:'A way off the docks.',need:'To trust one adult.',
+          notes:'Counts the exits in every room.'}
+      ],
+      world:[
+        {id:'w1',cat:'Place',name:'The Lower City',desc:'A tide-flooded port built on the drowned bones of an older one.',notes:'Streets renumber themselves at high water; locals navigate by smell and habit.',refs:[{kind:'IMAGE',label:'City skyline'},{kind:'NOTE',label:'Tide schedule'}]},
+        {id:'w2',cat:'Place',name:'The False Harbor',desc:'A sheltered harbor that appears only on Wren\u2019s mother\u2019s map.',notes:'Safe \u2014 until it isn\u2019t. The walls remember who enters.',refs:[{kind:'NOTE',label:'Rules of the harbor'}]},
+        {id:'w3',cat:'Faction',name:'Harbormasters\u2019 Guild',desc:'Keepers of every debt, dock, and departure in the city.',notes:'Sela\u2019s power base. Nothing leaves port without their mark.',refs:[]},
+        {id:'w4',cat:'Lore',name:'Living Maps',desc:'Charts inked with tide-salt that quietly redraw themselves.',notes:'Only a handful of cartographers can still read them; fewer can draw one.',refs:[{kind:'IMAGE',label:'Salt-ink sample'}]}
+      ],
+      series:[
+        {id:'b1', title:'The Drowned Map', subtitle:'Book One', status:'drafting', live:true,
+          premise:'A cartographer chasing her dead mother\u2019s impossible map down a coast that rewrites itself.',
+          arc:'Wren learns the map is real \u2014 and that she drew the parts that hurt most.', outline:[]},
+        {id:'b2', title:'The Salt Road', subtitle:'Book Two', status:'planned', live:false,
+          premise:'With the harbor found, Wren must chart a route no one is meant to survive twice.',
+          arc:'The cost of the first map comes due; Bram\u2019s secret reshapes the crew.',
+          outline:['The harbor that remembers','Sela\u2019s debt collected','The road that drinks','What Bram drowned','A map drawn in two hands']},
+        {id:'b3', title:'True North', subtitle:'Book Three', status:'idea', live:false,
+          premise:'The last coastline. The last lie. Wren decides what \u201chome\u201d is worth keeping.',
+          arc:'Resolution of the mother thread; Pip inherits the trade.',
+          outline:['The unmappable sea','Mother\u2019s hand','The final quay','Redrawing the coast']}
+      ],
+      chapters:[
+        {id:'c1',num:1,act:1,status:'done',title:'The Drowned Map',words:3200,x:60,y:70,chars:['wren','pip'],
+          scenes:['Wren haggles for a water-ruined chart at the night market.','She recognizes her mother\u2019s hand inking the margins.','The coastline rearranges itself when the paper gets wet.'],sceneLinks:['but','therefore'],
+          refs:[{kind:'IMAGE',label:'Tide-chart sketch'},{kind:'NOTE',label:'Map symbology key'}]},
+        {id:'c2',num:2,act:1,status:'done',title:'A Door in the Floor',words:2800,x:360,y:252,chars:['wren','bram'],
+          scenes:['Wren follows the chart down to a flooded cellar.','A trapdoor opens onto water that flows uphill.','Bram drags her out before the tide takes the shop.'],sceneLinks:['therefore','but'],
+          refs:[{kind:'NOTE',label:'Cellar floorplan'}]},
+        {id:'c3',num:3,act:1,status:'draft',title:'The Mentor\u2019s Shadow',words:3100,x:660,y:70,chars:['wren','sela'],
+          scenes:['Sela is waiting in the ruins of Wren\u2019s shop.','She offers protection in exchange for the map.','Wren refuses and burns the only copy she\u2019ll admit to.'],sceneLinks:['therefore','but'],
+          refs:[{kind:'IMAGE',label:'Sela reference'}]},
+        {id:'c4',num:4,act:2,status:'draft',title:'Crossing the Salt',words:3600,x:960,y:252,chars:['wren','bram','pip'],
+          scenes:['The three flee the city by salt-barge.','Pip stows away and reveals she\u2019s hunted too.','A storm strands them on an uncharted bar.'],sceneLinks:['and','therefore'],
+          refs:[{kind:'NOTE',label:'Barge crew notes'}]},
+        {id:'c5',num:5,act:2,status:'idea',title:'The False Harbor',words:4100,x:1260,y:70,chars:['wren','sela','bram'],
+          scenes:['A welcoming harbor takes them in.','Wren realizes it only exists on her mother\u2019s map.','Sela\u2019s agents are already inside the walls.'],sceneLinks:['but','therefore'],
+          refs:[{kind:'IMAGE',label:'Harbor matte'},{kind:'NOTE',label:'Who betrays whom'}]},
+        {id:'c6',num:6,act:2,status:'idea',title:'What Pip Knew',words:2400,x:1560,y:252,chars:['wren','pip'],
+          scenes:['Pip confesses she sold Wren\u2019s route once before.','It explains how Sela always arrives first.','Wren forgives her, and means it.'],sceneLinks:['therefore','therefore'],
+          refs:[]},
+        {id:'c7',num:7,act:3,status:'idea',title:'The Long Dark',words:3900,x:1860,y:70,chars:['wren','bram','sela'],
+          scenes:['Bram\u2019s secret at the False Harbor breaks open.','The group fractures on the open water.','Wren is left alone with the map and a choice.'],sceneLinks:['but','but'],
+          refs:[{kind:'NOTE',label:'Bram backstory'}]},
+        {id:'c8',num:8,act:3,status:'idea',title:'The True North',words:4500,x:2160,y:252,chars:['wren','sela','pip','bram'],
+          altTitle:'The Drowned Return',altSummaryFlag:true,
+          summary:'Wren reaches the harbor and decides what home is worth.',
+          scenes:['Wren sails into the harbor that shouldn\u2019t exist.','She faces Sela on the impossible quay.','She redraws the map \u2014 and the coastline with it.'],sceneLinks:['therefore','therefore'],
+          refs:[{kind:'IMAGE',label:'Final harbor'}]}
+      ],
+      links:[
+        {from:0,to:1,type:'therefore'},
+        {from:1,to:2,type:'but'},
+        {from:2,to:3,type:'therefore'},
+        {from:3,to:4,type:'and'},
+        {from:4,to:5,type:'but'},
+        {from:5,to:6,type:'therefore'},
+        {from:6,to:7,type:'therefore',alt:'but'}
+      ]
+    };
+  }
+
+  componentDidMount(){
+    this._onMove = (e)=>this.onMove(e);
+    this._onUp = ()=>this.onUp();
+    window.addEventListener('mousemove', this._onMove);
+    window.addEventListener('mouseup', this._onUp);
+    if(this.viewportRef.current){
+      this._onWheel = (e)=>{ e.preventDefault();
+        const s=this.state;
+        if(s.view==='timeline'){
+          if(s.timelineOrient==='vertical') this.setState(st=>({panY: st.panY - e.deltaY}));
+          else this.setState(st=>({panX: st.panX - (e.deltaY + e.deltaX)}));
+        } else {
+          const f = e.deltaY<0 ? 1.08 : 0.925;
+          this.setState(st=>({zoom: Math.min(1.8, Math.max(0.34, st.zoom*f))}));
+        }
+      };
+      this.viewportRef.current.addEventListener('wheel', this._onWheel, {passive:false});
+    }
+  }
+  componentWillUnmount(){
+    window.removeEventListener('mousemove', this._onMove);
+    window.removeEventListener('mouseup', this._onUp);
+    if(this.viewportRef.current) this.viewportRef.current.removeEventListener('wheel', this._onWheel);
+  }
+
+  charById(id){ return this.state.characters.find(c=>c.id===id); }
+  chapterNumsFor(id){ return this.state.chapters.filter(c=>c.chars.includes(id)).map(c=>'Ch '+c.num); }
+  roman(a){ return ({1:'I',2:'II',3:'III'})[a]||String(a); }
+  summaryOf(c){ if(this.state.draft==='alt' && c.altSummaryFlag) return 'Wren reaches the harbor only to choose the sea over the shore.'; return c.summary || c.scenes[0]; }
+  titleOf(c){ return (this.state.draft==='alt' && c.altTitle) ? c.altTitle : c.title; }
+
+  cardDown = (e, id) => {
+    if(this.state.view==='timeline') return;
+    e.stopPropagation(); e.preventDefault();
+    const c = this.state.chapters.find(x=>x.id===id);
+    this._drag = {id, mx:e.clientX, my:e.clientY, ox:c.x, oy:c.y};
+    this.setState({dragId:id});
+  };
+  canvasDown = (e) => {
+    this._pan = {mx:e.clientX, my:e.clientY, px:this.state.panX, py:this.state.panY};
+  };
+  onMove = (e) => {
+    if(this._sdrag){
+      const {chId, idx, mx, my, ox, oy} = this._sdrag;
+      const nx = ox + (e.clientX-mx), ny = oy + (e.clientY-my);
+      this.setState(s=>({chapters: s.chapters.map(c=>{
+        if(c.id!==chId) return c;
+        const pos=(c.scenePos||[]).slice(); pos[idx]={x:nx, y:ny};
+        return {...c, scenePos:pos};
+      })}));
+    } else if(this._drag){
+      const z = this.state.zoom;
+      const dx = (e.clientX - this._drag.mx)/z, dy = (e.clientY - this._drag.my)/z;
+      const id = this._drag.id, nx = this._drag.ox+dx, ny = this._drag.oy+dy;
+      this.setState(s=>({chapters: s.chapters.map(c=> c.id===id ? {...c, x:nx, y:ny} : c)}));
+    } else if(this._pan){
+      this.setState({panX:this._pan.px + (e.clientX-this._pan.mx), panY:this._pan.py + (e.clientY-this._pan.my)});
+    }
+  };
+  onUp = () => {
+    if(this._sdrag){ this._sdrag=null; this.setState({sdragKey:null}); }
+    if(this._drag){ this._drag=null; this.setState({dragId:null}); }
+    this._pan=null;
+  };
+
+  openChapter = (id) => {
+    this._drag=null;
+    this.setState({openCh:id, dragId:null, sceneView:'board', sceneArrangeN:0, pinMenu:false}, ()=>this.sceneAutoArrange(id, true));
+  };
+  closeChapter = () => this.setState({openCh:null, pinMenu:false});
+
+  setAct = (chId, act) => { const v=Math.max(1, parseInt(act,10)||1); this.setState(s=>({chapters:s.chapters.map(c=> c.id===chId ? {...c, act:v} : c)})); };
+  bumpAct = (chId, d) => this.setState(s=>({chapters:s.chapters.map(c=> c.id===chId ? {...c, act:Math.max(1,(c.act||1)+d)} : c)}));
+
+  sceneCols(n){ return n<=1 ? 1 : (n<=4 ? 2 : 3); }
+  sceneAutoArrange = (chId, reset) => {
+    const SW=this.SW, SH=this.SH, gx=44, gy=40, m=18;
+    const prand=(k)=>{ const r=Math.sin(k*127.1+0.5)*43758.5453; return r-Math.floor(r); };
+    this.setState(s=>({chapters:s.chapters.map(c=>{
+      if(c.id!==chId) return c;
+      const cols=this.sceneCols(c.scenes.length);
+      const n = reset ? 0 : (c.sceneArrangeN||0);
+      const amp = Math.pow(0.6, n);
+      const pos = c.scenes.map((_,i)=>{
+        const col=i%cols, row=Math.floor(i/cols);
+        const jx=(prand(i+1)*2-1)*18*amp;
+        const jy=((prand(i+9)*2-1)*18 + (col%2===0?12:-10))*amp;
+        return {x:m+col*(SW+gx)+jx, y:m+row*(SH+gy)+jy};
+      });
+      return {...c, scenePos:pos, sceneArrangeN:n+1};
+    })}));
+  };
+  sceneArrangeBtn = () => { if(this.state.openCh) this.sceneAutoArrange(this.state.openCh, false); };
+  setSceneView = (v) => this.setState({sceneView:v});
+  setSceneOrient = (o) => this.setState({sceneOrient:o});
+  sceneDown = (e, chId, idx) => {
+    if(this.state.sceneView!=='board') return;
+    e.stopPropagation(); e.preventDefault();
+    const c=this.state.chapters.find(x=>x.id===chId); const p=(c.scenePos&&c.scenePos[idx])||{x:0,y:0};
+    this._sdrag={chId, idx, mx:e.clientX, my:e.clientY, ox:p.x, oy:p.y};
+    this.setState({sdragKey:chId+':'+idx});
+  };
+
+  togglePinMenu = () => this.setState(s=>({pinMenu:!s.pinMenu}));
+  addChapterRef = (chId, kind) => this.setState(s=>({pinMenu:false, chapters:s.chapters.map(c=>
+    c.id===chId ? {...c, refs:c.refs.concat({kind, label: kind==='IMAGE'?'New image':'New note'})} : c)}));
+
+  openWorld = () => this.setState({showWorld:true});
+  closeWorld = () => this.setState({showWorld:false, selWorld:null});
+  selectWorld = (id) => this.setState(s=>({selWorld: s.selWorld===id?null:id}));
+  addWorldEntry = () => this.setState(s=>{
+    const id='w'+Date.now();
+    return {world:s.world.concat({id, cat:'Lore', name:'New entry', desc:'Describe this piece of the world.', notes:'', refs:[]}), selWorld:id, showWorld:true};
+  });
+  addWorldRef = (id, kind) => this.setState(s=>({world:s.world.map(w=>
+    w.id===id ? {...w, refs:w.refs.concat({kind, label: kind==='IMAGE'?'New image':'New note'})} : w)}));
+  stop = (e) => e.stopPropagation();
+
+  toggleTheme = () => this.setState(s=>({theme: s.theme==='light'?'dark':'light'}));
+  viewBoard = () => this.setState({view:'board'});
+  viewTimeline = () => this.setState({view:'timeline'}, ()=>this.fitTimeline());
+  orientVert = () => this.setState({timelineOrient:'vertical'}, ()=>this.fitTimeline());
+  orientHoriz = () => this.setState({timelineOrient:'horizontal'}, ()=>this.fitTimeline());
+  layoutPositions(S){
+    const CW=this.CW, CH=this.CH;
+    if(S.view!=='timeline') return S.chapters.map(c=>({id:c.id, x:c.x, y:c.y}));
+    const out=[];
+    if(S.timelineOrient==='vertical'){
+      let y=64; const colX=300;
+      S.chapters.forEach((c,i)=>{ if(i>0 && c.act!==S.chapters[i-1].act) y+=54; out.push({id:c.id, x:colX, y}); y+=CH+72; });
+    } else {
+      const y=214; let x=60;
+      S.chapters.forEach((c,i)=>{ if(i>0 && c.act!==S.chapters[i-1].act) x+=46; out.push({id:c.id, x, y}); x+=286; });
+    }
+    return out;
+  }
+  fitTimeline = () => {
+    const vp=this.viewportRef.current; if(!vp) return;
+    const CW=this.CW, CH=this.CH, pad=58;
+    const pos=this.layoutPositions(this.state);
+    const xs=pos.map(p=>p.x), ys=pos.map(p=>p.y);
+    const minX=Math.min(...xs)-20, maxX=Math.max(...xs)+CW+20, minY=Math.min(...ys)-44, maxY=Math.max(...ys)+CH+20;
+    const cw=maxX-minX, ch=maxY-minY, W=vp.clientWidth, H=vp.clientHeight;
+    const vert=this.state.timelineOrient==='vertical';
+    const zoom=vert ? Math.min((W-pad*2)/cw, 1.0) : Math.min((H-pad*2)/ch, 1.05);
+    const panX=(W-cw*zoom)/2 - minX*zoom;
+    const panY=vert ? (pad - minY*zoom) : (H-ch*zoom)/2 - minY*zoom;
+    this.setState({zoom, panX, panY});
+  };
+  toggleDraft = () => this.setState(s=>({draft: s.draft==='main'?'alt':'main'}));
+  openChars = () => this.setState({showChars:true});
+  closeChars = () => this.setState({showChars:false, selChar:null});
+  selectChar = (id) => this.setState(s=>({selChar: s.selChar===id?null:id}));
+  openExport = () => this.setState({showExport:true, copied:false, newMenu:false});
+  closeExport = () => this.setState({showExport:false});
+
+  toggleNewMenu = () => this.setState(s=>({newMenu:!s.newMenu}));
+  closeNewMenu = () => this.setState({newMenu:false});
+
+  openNotes = () => this.setState({showNotes:true});
+  closeNotes = () => this.setState({showNotes:false});
+  setStoryNotes = (e) => { const v=e.target.value; this.setState({storyNotes:v}); };
+
+  openImport = () => this.setState({showImport:true, importCopied:false, newMenu:false});
+  closeImport = () => this.setState({showImport:false});
+  importPrompt(){
+    return [
+"You are helping me prepare a manuscript for an app called Estoria, a visual story-mapping tool.",
+"I will paste my draft / outline / notes below. Read everything, then output ONLY a Markdown file in EXACTLY this schema (no commentary):",
+"",
+"# <Story Title>",
+"<one-paragraph premise>",
+"",
+"## Characters",
+"- **<Name>** — <role: Protagonist/Antagonist/Ally/etc> | <archetype>",
+"  - Bio: <2 sentences>",
+"  - Traits: <comma list>",
+"  - Goals: <comma list>",
+"  - Motivations: <1 sentence>",
+"  - Wants: <1 line>  | Needs: <1 line>",
+"",
+"## World",
+"- **<Name>** [<Place|Faction|Lore|Event>] — <description> // Notes: <optional>",
+"",
+"## Act 1",
+"### 1. <Chapter Title> · <approx word count> words",
+"> <one-line chapter summary>",
+"Scenes:",
+"1. <scene> (therefore)",
+"2. <scene> (but)",
+"3. <scene>",
+"Characters: <names in this chapter>",
+"",
+"Rules: number chapters sequentially across acts; after each scene except the last, tag the link to the next scene as (therefore) for causal, (but) for conflict, or (and) for parallel. Group chapters under ## Act 1 / ## Act 2 / ## Act 3. Keep it faithful to my material; infer only what's needed to fill the schema.",
+"",
+"--- MY MATERIAL BELOW ---",
+"<paste your Word doc / Google Doc / notes here>"
+    ].join("\n");
+  }
+  copyImportPrompt = () => {
+    if(navigator.clipboard) navigator.clipboard.writeText(this.importPrompt()).catch(()=>{});
+    this.setState({importCopied:true});
+    clearTimeout(this._ipT); this._ipT=setTimeout(()=>this.setState({importCopied:false}),1600);
+  };
+  onImportFile = (e) => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result||'');
+      const chapHeads = (text.match(/^###\s+/gm)||[]).length;
+      const chars = (text.match(/^##\s+Characters/im)) ? (text.split(/^##\s+Characters/im)[1]||'').split(/^##\s/m)[0].match(/^[-*]\s+\*\*/gm) : null;
+      const wikis = new Set((text.match(/\[\[([^\]]+)\]\]/g)||[]).map(s=>s.slice(2,-2)));
+      const scenes = (text.match(/^\d+\.\s+/gm)||[]).length;
+      this.setState({importResult:{name:f.name, chapters:chapHeads, characters:(chars?chars.length:wikis.size), scenes}});
+    };
+    reader.readAsText(f);
+    e.target.value='';
+  };
+
+  openTemplates = () => this.setState({showTemplates:true, newMenu:false});
+  closeTemplates = () => this.setState({showTemplates:false});
+  templates(){
+    return [
+      {id:'three-act', name:'Three-Act Structure', tag:'Classic', blurb:'Setup, confrontation, resolution \u2014 the bones of most stories.',
+        beats:[['Opening Image',1],['Inciting Incident',1],['Plot Point I',1],['Rising Action',2],['Midpoint',2],['Plot Point II',2],['Climax',3],['Resolution',3]]},
+      {id:'hero', name:"Hero's Journey", tag:'12 stages', blurb:'Campbell\u2019s monomyth \u2014 call, threshold, ordeal, return.',
+        beats:[['Ordinary World',1],['Call to Adventure',1],['Refusal of the Call',1],['Meeting the Mentor',1],['Crossing the Threshold',2],['Tests, Allies, Enemies',2],['Approach',2],['The Ordeal',2],['Reward',2],['The Road Back',3],['Resurrection',3],['Return with the Elixir',3]]},
+      {id:'stc', name:'Save the Cat', tag:'15 beats', blurb:'Snyder\u2019s beat sheet \u2014 tight, commercial pacing.',
+        beats:[['Opening Image',1],['Theme Stated',1],['Setup',1],['Catalyst',1],['Debate',1],['Break into Two',2],['B Story',2],['Fun and Games',2],['Midpoint',2],['Bad Guys Close In',2],['All Is Lost',2],['Dark Night of the Soul',2],['Break into Three',3],['Finale',3],['Final Image',3]]},
+      {id:'romance', name:'Romance Beat Sheet', tag:'Genre', blurb:'Meet, spark, rupture, grand gesture, HEA.',
+        beats:[['Meet Cute',1],['No Way / Adhesion',1],['Falling in Love',2],['Midpoint of Love',2],['The Rupture',2],['Dark Moment',2],['Grovel / Grand Gesture',3],['Happily Ever After',3]]},
+      {id:'mystery', name:'Mystery / Whodunit', tag:'Genre', blurb:'Crime, clues, red herrings, reveal.',
+        beats:[['The Crime',1],['Detective Enters',1],['First Clues',1],['Red Herring',2],['Complication',2],['Midpoint Twist',2],['The Breakthrough',2],['Confrontation',3],['The Reveal',3]]},
+      {id:'blank', name:'Single Blank Chapter', tag:'Minimal', blurb:'Just one empty chapter to start from scratch.',
+        beats:[['Untitled Chapter',1]]}
+    ];
+  }
+  applyTemplate = (tplId, mode) => {
+    const tpl = this.templates().find(t=>t.id===tplId); if(!tpl) return;
+    const CW=this.CW, CH=this.CH, cols=4, gapX=72, gapY=82, m=46;
+    this.setState(s=>{
+      const base = mode==='replace' ? [] : s.chapters.slice();
+      const startNum = base.length;
+      const made = tpl.beats.map((b,i)=>{
+        const idx=startNum+i, col=idx%cols, row=Math.floor(idx/cols);
+        return {id:'c'+Date.now()+'_'+i, num:idx+1, act:b[1], status:'idea',
+          title:b[0], summary:'\u2014', words:0,
+          x:m+col*(CW+gapX), y:m+row*(CH+gapY), chars:[], scenes:['New scene.'], sceneLinks:[], refs:[]};
+      });
+      const chapters = base.concat(made);
+      const links=[]; for(let i=0;i<chapters.length-1;i++) links.push({from:i,to:i+1,type:'therefore'});
+      return {chapters, links, view:'board', arrangeN:0, showTemplates:false};
+    }, ()=>this.fitToContent());
+  };
+
+  openSeries = () => this.setState({showSeries:true, newMenu:false});
+  closeSeries = () => this.setState({showSeries:false, selBook:null});
+  toggleSeriesMode = () => this.setState(s=>({seriesMode:!s.seriesMode}));
+  selectBook = (id) => this.setState(s=>({selBook: s.selBook===id?null:id}));
+  openBook = (id) => {
+    const b = this.state.series.find(x=>x.id===id);
+    if(b && b.live){ this.setState({activeBook:id, showSeries:false, selBook:null}); }
+    else { this.setState(s=>({selBook: s.selBook===id?null:id})); }
+  };
+  addBook = () => this.setState(s=>{
+    const n=s.series.length;
+    return {series:s.series.concat({id:'b'+Date.now(), title:'Untitled Book', subtitle:'Book '+this.roman(n+1), status:'idea', live:false,
+      premise:'Premise for this book.', arc:'The arc this book carries.', outline:[]})};
+  });
+  zoomIn = () => this.setState(s=>({zoom:Math.min(1.8, s.zoom*1.15)}));
+  zoomOut = () => this.setState(s=>({zoom:Math.max(0.34, s.zoom/1.15)}));
+  autoArrange = () => {
+    const CW=this.CW, CH=this.CH;
+    const cols=4, gapX=72, gapY=82, m=46;
+    const prand=(n)=>{ const r=Math.sin(n*127.1+0.5)*43758.5453; return r-Math.floor(r); };
+    const n=this.state.arrangeN||0;
+    const amp=Math.pow(0.6, n); // each press eases toward a straight grid, never reaching it
+    const chapters = this.state.chapters.map((c,i)=>{
+      const col=i%cols, row=Math.floor(i/cols);
+      const jx=(prand(i+1)*2-1)*30*amp;
+      const jy=((prand(i+9)*2-1)*34 + (col%2===0 ? 26 : -22))*amp;
+      return {...c,
+        x: m + col*(CW+gapX) + jx,
+        y: m + row*(CH+gapY) + jy,
+        rot:(prand(i+5)*2-1)*3.4*amp };
+    });
+    this.setState({view:'board', chapters, arrangeN:n+1}, ()=>this.fitToContent());
+  };
+  fitToContent = () => {
+    const vp=this.viewportRef.current; if(!vp) return;
+    const CW=this.CW, CH=this.CH, pad=72;
+    const xs=this.state.chapters.map(c=>c.x), ys=this.state.chapters.map(c=>c.y);
+    const minX=Math.min(...xs), maxX=Math.max(...xs)+CW;
+    const minY=Math.min(...ys), maxY=Math.max(...ys)+CH;
+    const cw=maxX-minX, ch=maxY-minY, W=vp.clientWidth, H=vp.clientHeight;
+    const zoom=Math.min((W-pad*2)/cw, (H-pad*2)/ch, 1.05);
+    this.setState({zoom, panX:(W-cw*zoom)/2 - minX*zoom, panY:(H-ch*zoom)/2 - minY*zoom});
+  };
+  addChapter = () => {
+    this.setState(s=>{
+      const n=s.chapters.length, last=s.chapters[n-1];
+      const nc={id:'c'+Date.now(), num:n+1, act:last?last.act:1, status:'idea',
+        title:'Untitled Chapter', summary:'A new chapter \u2014 double-click to map its scenes.', words:0,
+        x:(last?last.x+this.CW+72:60), y:(last?last.y:90), chars:[], scenes:['New scene.'], sceneLinks:[], refs:[]};
+      const links=s.links.concat(n>0?[{from:n-1,to:n,type:'therefore'}]:[]);
+      return {chapters:s.chapters.concat(nc), links, view:'board', arrangeN:0};
+    }, ()=>this.fitToContent());
+  };
+  addCharacter = () => {
+    this.setState(s=>{
+      const palette=['oklch(0.60 0.12 145)','oklch(0.58 0.13 255)','oklch(0.62 0.13 20)','oklch(0.60 0.12 325)','oklch(0.60 0.11 100)'];
+      const nc={id:'p'+Date.now(), name:'New Character', role:'Supporting', type:'Archetype', initials:'NC',
+        color:palette[s.characters.length%palette.length],
+        desc:'A one-line description of this character.',
+        bio:'Backstory and background.',
+        traits:['Trait'],
+        goals:['A concrete goal'],
+        motivations:'What drives them beneath the surface.',
+        want:'What they want.', need:'What they need.',
+        notes:'Other notes about this character.'};
+      return {characters:s.characters.concat(nc), selChar:nc.id, showChars:true};
+    });
+  };
+  addScene = (chId) => {
+    this.setState(s=>({chapters:s.chapters.map(c=>{
+      if(c.id!==chId) return c;
+      return {...c, scenes:c.scenes.concat('New scene.'),
+        sceneLinks:c.scenes.length>0 ? c.sceneLinks.concat('therefore') : c.sceneLinks};
+    })}), ()=>this.sceneAutoArrange(chId, false));
+  };
+  cycleScene = (chId, idx) => {
+    const order = ['therefore','but','and'];
+    this.setState(s=>({chapters: s.chapters.map(c=>{
+      if(c.id!==chId) return c;
+      const links = c.sceneLinks.slice();
+      links[idx] = order[(order.indexOf(links[idx])+1)%3];
+      return {...c, sceneLinks:links};
+    })}));
+  };
+
+  buildMarkdown(){
+    const S = this.state;
+    const title = this.props.projectTitle || 'Untitled Voyage';
+    const total = S.chapters.reduce((a,c)=>a+c.words,0);
+    let md = '# '+title+'\n\nMapped in Estoria \u2014 '+total.toLocaleString()+' words across '+S.chapters.length+' chapters.\n';
+    if(S.seriesMode){
+      md += '\n## Series\n\n';
+      S.series.forEach((b,i)=>{ md += (i+1)+'. **'+b.title+'** ('+b.status+') \u2014 '+b.premise+'\n'; });
+    }
+    if(S.storyNotes && S.storyNotes.trim()){
+      md += '\n## Story Notes\n\n'+S.storyNotes.trim()+'\n';
+    }
+    md += '\n## Characters\n\n';
+    S.characters.forEach(c=>{ md += '- **[['+c.name+']]** \u2014 '+c.role+'. '+c.desc+'\n'; });
+    const acts = [...new Set(S.chapters.map(c=>c.act))];
+    acts.forEach(a=>{
+      md += '\n## Act '+this.roman(a)+'\n';
+      S.chapters.filter(c=>c.act===a).forEach(c=>{
+        md += '\n### '+c.num+'. '+this.titleOf(c)+'  \u00b7  '+c.words.toLocaleString()+' words\n> '+this.summaryOf(c)+'\n\n**Scenes**\n';
+        c.scenes.forEach((s,j)=>{ const conn = j<c.scenes.length-1 ? '  _('+this.typeMeta[c.sceneLinks[j]].label.toLowerCase()+')_' : ''; md += (j+1)+'. '+s+conn+'\n'; });
+        if(c.refs.length) md += '\n**Pinned:** '+c.refs.map(r=>'[['+r.label+']]').join(', ')+'\n';
+        md += '**Characters:** '+c.chars.map(id=>'[['+this.charById(id).name+']]').join(', ')+'\n';
+      });
+    });
+    return md;
+  }
+  copyMd = () => {
+    const t = this.buildMarkdown();
+    if(navigator.clipboard) navigator.clipboard.writeText(t).catch(()=>{});
+    this.setState({copied:true});
+    clearTimeout(this._cpT); this._cpT = setTimeout(()=>this.setState({copied:false}), 1600);
+  };
+  downloadMd = () => {
+    const blob = new Blob([this.buildMarkdown()], {type:'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = (this.props.projectTitle||'storyboard').replace(/\s+/g,'-').toLowerCase()+'.md';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  };
+
+  renderVals(){
+    const S = this.state, CW = this.CW, CH = this.CH;
+    const isTimeline = S.view==='timeline';
+    const isVert = isTimeline && S.timelineOrient==='vertical';
+    const pos = this.layoutPositions(S);
+    const posById = {}; pos.forEach(p=> posById[p.id] = {x:p.x, y:p.y});
+    const disp = S.chapters.map((c,i)=>({c, i, dx:posById[c.id].x, dy:posById[c.id].y }));
+    const maxWords = Math.max(...S.chapters.map(c=>c.words));
+
+    const chipStyle = (color)=>({width:'22px',height:'22px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:"600 9.5px 'Hanken Grotesk'",color:'#fff',background:color,border:'1.5px solid var(--card)',marginRight:'-6px'});
+    const statusColor = (s)=> s==='done'?'var(--therefore)': s==='draft'?'var(--but)':'var(--faint)';
+    const refStyle = (kind)=> kind==='IMAGE'
+      ? {width:'150px',height:'92px',borderRadius:'11px',border:'1px solid var(--rule)',background:'repeating-linear-gradient(45deg,var(--rule),var(--rule) 6px,transparent 6px,transparent 13px),var(--card)',display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:'3px',padding:'10px',font:"500 12px 'Hanken Grotesk'",color:'var(--ink)'}
+      : {width:'150px',minHeight:'92px',borderRadius:'11px',border:'1px solid var(--rule)',background:'var(--card)',boxShadow:'var(--shadow)',display:'flex',flexDirection:'column',gap:'6px',padding:'11px',font:"500 12.5px/1.4 'Hanken Grotesk'",color:'var(--ink)'};
+
+    const dispChapters = disp.map(d=>{
+      const c = d.c;
+      return {
+        id:c.id, num:String(c.num).padStart(2,'0'),
+        title:this.titleOf(c), summary:this.summaryOf(c),
+        wordsFmt:(c.words/1000).toFixed(1).replace(/\.0$/,'')+'k words',
+        outerStyle:{position:'absolute', left:d.dx+'px', top:d.dy+'px', width:CW+'px', minHeight:CH+'px', cursor:isTimeline?'pointer':'grab', zIndex:S.dragId===c.id?20:5, transform:(isTimeline||!c.rot)?'none':('rotate('+c.rot+'deg)'), transformOrigin:'center center'},
+        onDown:(e)=>this.cardDown(e,c.id),
+        onOpen:()=>this.openChapter(c.id),
+        statusStyle:{width:'7px',height:'7px',borderRadius:'50%',background:statusColor(c.status),display:'inline-block'},
+        charChips:c.chars.map(id=>{ const k=this.charById(id); return {initials:k.initials, style:chipStyle(k.color)}; }),
+        refCount:c.refs.length, hasRefs:c.refs.length>0,
+        barStyle:{height:'100%',width:Math.round(c.words/maxWords*100)+'%',background:'var(--soft)',borderRadius:'3px'}
+      };
+    });
+
+    const connectors = S.links.map(l=>{
+      const f = posById[S.chapters[l.from].id], t = posById[S.chapters[l.to].id];
+      let path;
+      if(isVert){
+        const x1=f.x+CW/2, y1=f.y+CH, x2=t.x+CW/2, y2=t.y;
+        path='M '+x1+' '+y1+' C '+x1+' '+(y1+54)+', '+x2+' '+(y2-54)+', '+x2+' '+y2;
+      } else {
+        const x1=f.x+CW, y1=f.y+CH/2, x2=t.x, y2=t.y+CH/2;
+        path='M '+x1+' '+y1+' C '+(x1+72)+' '+y1+', '+(x2-72)+' '+y2+', '+x2+' '+y2;
+      }
+      return { path, color:'var(--line)', width:1.5, showLabel:false };
+    });
+
+    const actBands = [];
+    if(isTimeline){
+      [...new Set(S.chapters.map(c=>c.act))].forEach(a=>{
+        const ds = disp.filter(d=>d.c.act===a);
+        if(isVert){
+          const top = Math.min(...ds.map(d=>d.dy))-16, bot = Math.max(...ds.map(d=>d.dy))+CH+16, left = ds[0].dx-20;
+          actBands.push({
+            style:{position:'absolute', left:left+'px', top:top+'px', width:(CW+40)+'px', height:(bot-top)+'px', background:'var(--rule)', opacity:0.4, borderRadius:'18px'},
+            labelStyle:{position:'absolute', left:(ds[0].dx-2)+'px', top:(top-24)+'px', font:"600 12px 'Hanken Grotesk'", letterSpacing:'.14em', textTransform:'uppercase', color:'var(--soft)'},
+            label:'Act '+this.roman(a)
+          });
+        } else {
+          const minx = Math.min(...ds.map(d=>d.dx))-18, maxx = Math.max(...ds.map(d=>d.dx))+CW+18;
+          actBands.push({
+            style:{position:'absolute', left:minx+'px', top:(214-30)+'px', width:(maxx-minx)+'px', height:(CH+70)+'px', background:'var(--rule)', opacity:0.4, borderRadius:'16px'},
+            labelStyle:{position:'absolute', left:minx+'px', top:(214-58)+'px', font:"600 12px 'Hanken Grotesk'", letterSpacing:'.14em', textTransform:'uppercase', color:'var(--soft)'},
+            label:'Act '+this.roman(a)
+          });
+        }
+      });
+    }
+
+    let canvasW, canvasH;
+    if(!isTimeline){ canvasW=2500; canvasH=480; }
+    else if(isVert){ canvasW = pos[0].x + CW + 60; canvasH = Math.max(...pos.map(p=>p.y)) + CH + 80; }
+    else { canvasW = Math.max(...pos.map(p=>p.x)) + CW + 60; canvasH = 214 + CH + 90; }
+
+    // chapter detail
+    let detail = null;
+    if(S.openCh){
+      const c = S.chapters.find(x=>x.id===S.openCh);
+      const SW=this.SW, SH=this.SH, sv=S.sceneView, so=S.sceneOrient;
+      const n=c.scenes.length;
+      let spos;
+      if(sv==='timeline'){
+        spos = so==='vertical'
+          ? c.scenes.map((_,i)=>({x:26, y:18+i*(SH+40)}))
+          : c.scenes.map((_,i)=>({x:18+i*(SW+46), y:18}));
+      } else {
+        spos = (c.scenePos && c.scenePos.length===n) ? c.scenePos
+          : c.scenes.map((_,i)=>({x:18+(i%3)*(SW+44), y:18+Math.floor(i/3)*(SH+40)}));
+      }
+      const sCanvasW = Math.max(...spos.map(p=>p.x), 0)+SW+26;
+      const sCanvasH = Math.max(...spos.map(p=>p.y), 0)+SH+24;
+      const sseg = (active)=> active
+        ? {padding:'5px 13px',borderRadius:'7px',border:'none',cursor:'pointer',font:"600 11.5px 'Hanken Grotesk'",background:'var(--card)',color:'var(--ink)',boxShadow:'0 1px 2px rgba(0,0,0,.14)'}
+        : {padding:'5px 13px',borderRadius:'7px',border:'none',cursor:'pointer',font:"500 11.5px 'Hanken Grotesk'",background:'transparent',color:'var(--soft)'};
+      const sceneEdges=[], sceneLabels=[];
+      for(let i=0;i<n-1;i++){
+        const a=spos[i], b=spos[i+1];
+        const x1=a.x+SW/2, y1=a.y+SH/2, x2=b.x+SW/2, y2=b.y+SH/2;
+        sceneEdges.push({x1,y1,x2,y2});
+        const m=this.typeMeta[c.sceneLinks[i]];
+        sceneLabels.push({label:m.label, onClick:()=>this.cycleScene(c.id,i),
+          style:{position:'absolute', left:((x1+x2)/2)+'px', top:((y1+y2)/2)+'px', transform:'translate(-50%,-50%)', background:'var(--panel)', color:m.color, border:'1px solid '+m.color, padding:'4px 10px', borderRadius:'20px', font:"600 10px 'Hanken Grotesk'", letterSpacing:'.05em', textTransform:'uppercase', cursor:'pointer', whiteSpace:'nowrap', zIndex:6, boxShadow:'var(--shadow)'}});
+      }
+      detail = {
+        id:c.id, addScene:()=>this.addScene(c.id),
+        num:String(c.num).padStart(2,'0'), title:this.titleOf(c), summary:this.summaryOf(c),
+        wordsFmt:c.words.toLocaleString()+' words', sceneCount:n,
+        charChips:c.chars.map(id=>{ const k=this.charById(id); return {initials:k.initials, style:chipStyle(k.color)}; }),
+        actButtons:[1,2,3].map(a=>({label:'Act '+this.roman(a), onClick:()=>this.setAct(c.id,a),
+          style:{padding:'5px 13px', borderRadius:'7px', border:'none', cursor:'pointer', font:(c.act===a?'600':'500')+" 11.5px 'Hanken Grotesk'", background:c.act===a?'var(--ink)':'transparent', color:c.act===a?'var(--bg)':'var(--soft)'}})),
+        actValue:c.act, setActField:(e)=>this.setAct(c.id, e.target.value),
+        actDown:()=>this.bumpAct(c.id,-1), actUp:()=>this.bumpAct(c.id,1),
+        sboardStyle:sseg(sv==='board'), stimelineStyle:sseg(sv==='timeline'),
+        svertStyle:sseg(so==='vertical'), shorizStyle:sseg(so==='horizontal'),
+        isSceneTimeline: sv==='timeline',
+        setSceneBoard:()=>this.setSceneView('board'), setSceneTimeline:()=>this.setSceneView('timeline'),
+        orientSV:()=>this.setSceneOrient('vertical'), orientSH:()=>this.setSceneOrient('horizontal'),
+        sceneArrange:this.sceneArrangeBtn,
+        sceneCanvasStyle:{position:'relative', width:sCanvasW+'px', height:sCanvasH+'px', margin:'0 auto'},
+        sceneCanvasW:sCanvasW, sceneCanvasH:sCanvasH, sceneEdges, sceneLabels,
+        sceneNodes:c.scenes.map((txt,i)=>({no:i+1, text:txt,
+          style:{position:'absolute', left:spos[i].x+'px', top:spos[i].y+'px', width:SW+'px', minHeight:SH+'px', cursor:sv==='board'?'grab':'default', zIndex:S.sdragKey===(c.id+':'+i)?12:3},
+          onDown:(e)=>this.sceneDown(e, c.id, i)})),
+        pinMenu:S.pinMenu, pinClosed:!S.pinMenu, togglePin:this.togglePinMenu,
+        addNote:()=>this.addChapterRef(c.id,'NOTE'), addImage:()=>this.addChapterRef(c.id,'IMAGE'),
+        refs:c.refs.map(r=>({ kind:r.kind, label:r.label, style:refStyle(r.kind) }))
+      };
+    }
+
+    const charList = S.characters.map(c=>{
+      const open = S.selChar===c.id;
+      const nums = this.chapterNumsFor(c.id);
+      return {
+        name:c.name, role:c.role, type:c.type||'\u2014', initials:c.initials, desc:c.desc,
+        bio:c.bio||'', traits:c.traits||[], goals:c.goals||[], motivations:c.motivations||'',
+        want:c.want, need:c.need, notes:c.notes||'',
+        appears:nums, appearsCount:nums.length, open, caret: open?'rotate(180deg)':'rotate(0deg)',
+        onClick:()=>this.selectChar(c.id),
+        cardStyle:{background:'var(--card)', border:'1px solid '+(open?'var(--faint)':'var(--rule)'), borderRadius:'13px', padding:'13px 15px', cursor:'pointer', boxShadow:open?'var(--shadow)':'none'},
+        avatarStyle:{width:'40px',height:'40px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:"600 14px 'Hanken Grotesk'",color:'#fff',background:c.color,flexShrink:0},
+        typeStyle:{font:"600 10px 'Hanken Grotesk'",letterSpacing:'.08em',textTransform:'uppercase',color:'var(--soft)',background:'var(--chip)',padding:'3px 9px',borderRadius:'20px'}
+      };
+    });
+
+    const catColor = {Place:'var(--therefore)', Faction:'var(--but)', Lore:'var(--and)', Event:'oklch(0.6 0.1 260)'};
+    const worldList = S.world.map(w=>{
+      const open = S.selWorld===w.id;
+      const col = catColor[w.cat]||'var(--soft)';
+      return {
+        name:w.name, cat:w.cat, desc:w.desc, notes:w.notes, hasNotes:!!w.notes, open, caret: open?'rotate(180deg)':'rotate(0deg)',
+        onClick:()=>this.selectWorld(w.id),
+        cardStyle:{background:'var(--card)', border:'1px solid '+(open?'var(--faint)':'var(--rule)'), borderRadius:'13px', padding:'13px 15px', cursor:'pointer', boxShadow:open?'var(--shadow)':'none'},
+        dotStyle:{width:'10px',height:'10px',borderRadius:'3px',background:col,flexShrink:0,transform:'rotate(45deg)'},
+        catStyle:{font:"600 10px 'Hanken Grotesk'",letterSpacing:'.08em',textTransform:'uppercase',color:col},
+        refs:w.refs.map(r=>({kind:r.kind, label:r.label, style:refStyle(r.kind)})),
+        addNote:()=>this.addWorldRef(w.id,'NOTE'), addImage:()=>this.addWorldRef(w.id,'IMAGE')
+      };
+    });
+
+    const seg = (active)=> active
+      ? {padding:'6px 15px',borderRadius:'7px',border:'none',cursor:'pointer',font:"600 12px 'Hanken Grotesk'",background:'var(--card)',color:'var(--ink)',boxShadow:'0 1px 2px rgba(0,0,0,.14)'}
+      : {padding:'6px 15px',borderRadius:'7px',border:'none',cursor:'pointer',font:"500 12px 'Hanken Grotesk'",background:'transparent',color:'var(--soft)'};
+
+    // series
+    const statusMeta = {drafting:{label:'Drafting', color:'var(--but)'}, planned:{label:'Planned', color:'var(--and)'}, idea:{label:'Idea', color:'var(--faint)'}, done:{label:'Done', color:'var(--therefore)'}};
+    const liveWords = S.chapters.reduce((a,c)=>a+c.words,0);
+    const seriesList = S.series.map((b,i)=>{
+      const sm = statusMeta[b.status]||statusMeta.idea;
+      const open = S.selBook===b.id;
+      const isActive = b.id===S.activeBook;
+      return {
+        id:b.id, idx:i+1, title:b.title, subtitle:b.subtitle, premise:b.premise, arc:b.arc,
+        live:b.live, isActive, open, outline:b.outline, hasOutline:(b.outline&&b.outline.length>0),
+        statusLabel:sm.label,
+        statBadge: b.live ? (S.chapters.length+' ch \u00b7 '+(liveWords/1000).toFixed(1).replace(/\.0$/,'')+'k words') : (b.outline&&b.outline.length? b.outline.length+' beats outlined' : 'Not started'),
+        editingBadge: isActive ? 'Editing now' : '',
+        onClick:()=>this.openBook(b.id),
+        openLabel: b.live ? (isActive?'Open board':'Open board') : (open?'Hide outline':'View outline'),
+        statusStyle:{font:"600 10px 'Hanken Grotesk'",letterSpacing:'.07em',textTransform:'uppercase',color:sm.color,border:'1px solid '+sm.color,padding:'2px 8px',borderRadius:'20px'},
+        cardStyle:{position:'relative',background:'var(--card)',border:'1px solid '+(isActive?'var(--faint)':'var(--rule)'),borderRadius:'15px',padding:'18px 20px',boxShadow:isActive?'var(--shadow)':'none',display:'flex',flexDirection:'column',gap:'12px'},
+        spineStyle:{width:'40px',height:'56px',borderRadius:'4px 7px 7px 4px',background:sm.color,display:'flex',alignItems:'center',justifyContent:'center',font:"600 16px Spectral,serif",color:'#fff',flexShrink:0,boxShadow:'inset 3px 0 0 rgba(255,255,255,.25)'}
+      };
+    });
+    const activeIdx = S.series.findIndex(b=>b.id===S.activeBook);
+    const bookPill = (activeIdx>=0 ? 'Book '+(activeIdx+1)+'/'+S.series.length : 'Series') ;
+
+    return {
+      theme:S.theme, isTimeline,
+      projectTitle:this.props.projectTitle || 'Untitled Voyage',
+      draftLabel: S.draft==='main' ? 'Main draft' : 'Alt: darker ending',
+      themeLabel: S.theme==='light' ? 'Dark' : 'Light',
+      zoomPct: Math.round(S.zoom*100),
+      boardBtnStyle:seg(!isTimeline), timelineBtnStyle:seg(isTimeline),
+      vertBtnStyle:seg(S.timelineOrient==='vertical'), horizBtnStyle:seg(S.timelineOrient==='horizontal'),
+      orientVert:this.orientVert, orientHoriz:this.orientHoriz,
+      bookStat: S.chapters.reduce((a,c)=>a+c.words,0).toLocaleString()+' words \u00b7 '+S.chapters.length+' chapters',
+      canvasStyle:{position:'absolute',left:0,top:0,width:canvasW+'px',height:canvasH+'px',transformOrigin:'0 0',transform:'translate('+S.panX+'px,'+S.panY+'px) scale('+S.zoom+')'},
+      canvasW, canvasH, dispChapters, connectors, actBands,
+      viewportRef:this.viewportRef, canvasDown:this.canvasDown,
+      detail, charList, worldList,
+      showChars:S.showChars, showWorld:S.showWorld, showExport:S.showExport,
+      openWorld:this.openWorld, closeWorld:this.closeWorld, addWorldEntry:this.addWorldEntry,
+      showNotes:S.showNotes, openNotes:this.openNotes, closeNotes:this.closeNotes,
+      storyNotes:S.storyNotes, setStoryNotes:this.setStoryNotes,
+      newMenu:S.newMenu, toggleNewMenu:this.toggleNewMenu, closeNewMenu:this.closeNewMenu,
+      showImport:S.showImport, openImport:this.openImport, closeImport:this.closeImport,
+      importPromptText:this.importPrompt(),
+      importCopyLabel: S.importCopied ? 'Copied \u2713' : 'Copy prompt',
+      copyImportPrompt:this.copyImportPrompt, onImportFile:this.onImportFile,
+      importResult:S.importResult,
+      showTemplates:S.showTemplates, openTemplates:this.openTemplates, closeTemplates:this.closeTemplates,
+      templateList:this.templates().map(t=>({id:t.id, name:t.name, tag:t.tag, blurb:t.blurb, count:t.beats.length,
+        insert:()=>this.applyTemplate(t.id,'append'), replace:()=>this.applyTemplate(t.id,'replace')})),
+      seriesMode:S.seriesMode, showSeries:S.showSeries, openSeries:this.openSeries, closeSeries:this.closeSeries,
+      toggleSeriesMode:this.toggleSeriesMode, seriesList, addBook:this.addBook,
+      seriesToggleLabel: S.seriesMode ? 'On' : 'Off',
+      seriesToggleStyle:{position:'relative',width:'40px',height:'23px',borderRadius:'20px',border:'none',cursor:'pointer',background:S.seriesMode?'var(--therefore)':'var(--line)',transition:'background .15s',flexShrink:0},
+      seriesKnobStyle:{position:'absolute',top:'3px',left:S.seriesMode?'20px':'3px',width:'17px',height:'17px',borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 2px rgba(0,0,0,.3)'},
+      bookPill,
+      exportText:this.buildMarkdown(),
+      copyLabel: S.copied ? 'Copied \u2713' : 'Copy markdown',
+      wordTotal: S.chapters.reduce((a,c)=>a+c.words,0).toLocaleString(),
+      chapterCount: S.chapters.length,
+      toggleTheme:this.toggleTheme, viewBoard:this.viewBoard, viewTimeline:this.viewTimeline,
+      toggleDraft:this.toggleDraft,
+      openChars:this.openChars, closeChars:this.closeChars,
+      autoArrange:this.autoArrange, openExport:this.openExport, closeExport:this.closeExport,
+      zoomIn:this.zoomIn, zoomOut:this.zoomOut,
+      closeChapter:this.closeChapter, stop:this.stop,
+      copyMd:this.copyMd, downloadMd:this.downloadMd,
+      addChapter:this.addChapter, addCharacter:this.addCharacter
+    };
+  }
+}
+</script>
+</body>
+</html>
