@@ -267,3 +267,26 @@ menu.
 - Verified in-browser: enabling series mode, the map with sample book links,
   drill-in to a book board, breadcrumb back to the map. `tsc -b` + `vite build`
   clean.
+
+### 2026-06-27 — Fixes + onboarding + series timeline (Session 5)
+
+- **Dropdown bug fix**: the toolbar's `overflow-x-auto` was clipping the version
+  and "+ New" menus (overflow-x:auto forces overflow-y:auto). New
+  `components/ui/Popover.tsx` renders menus into a `createPortal` with `fixed`
+  positioning anchored to the trigger, so they escape any ancestor clipping.
+- **Board auto-fit** (`Board.tsx`): fit-to-content on first load and on book
+  switch (keyed on `activeBookId`); when a newly added chapter lands off-screen,
+  auto fit-to-screen (visibility check against the current camera).
+- **First-launch welcome** (`Welcome.tsx`): persisted `onboarded` flag; on first
+  run the user picks "Explore the sample" (`useSample`) or "Start fresh"
+  (`startFresh` → `emptyStory()` + opens Templates for creation options).
+  `data/emptyStory.ts` is the blank-project factory.
+- **Series-level timeline**: the Board/Timeline + ↓→ controls now show at the
+  series level too; `SeriesMap` lays books in reading order (vertical/horizontal)
+  when `view === 'timeline'`, free canvas positions otherwise. Drag is disabled in
+  timeline mode. Toolbar labels the spatial view "Map" at series level.
+- **Book cover images**: `BookMeta.coverSrc?`; series cards show an upload "+ Add
+  cover" affordance, render the cover as a banner, and open it in the lightbox on
+  click.
+- Verified in-browser: welcome flow, auto-fit on load + on add, portal dropdowns,
+  series timeline layout, delete-chapter cleanup. `tsc -b` + `vite build` clean.

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { Popover } from "@/components/ui/Popover";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -30,6 +31,8 @@ export function Toolbar() {
   const deleteDraft = useStore((s) => s.deleteDraft);
 
   const [versionMenu, setVersionMenu] = useState(false);
+  const versionBtnRef = useRef<HTMLButtonElement>(null);
+  const newBtnRef = useRef<HTMLButtonElement>(null);
 
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
@@ -62,58 +65,59 @@ export function Toolbar() {
         </div>
 
         {/* Version / draft dropdown */}
-        <div className="relative ml-[4px]">
+        <div className="ml-[4px]">
           <button
+            ref={versionBtnRef}
             onClick={() => setVersionMenu((v) => !v)}
             className="flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[9px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
           >
             <span className="h-[7px] w-[7px] rounded-full bg-but" />
             {activeDraft?.name ?? "Main draft"} <span className="text-faint">▾</span>
           </button>
-          {versionMenu && (
-            <>
-              <div className="fixed inset-0 z-[39]" onMouseDown={() => setVersionMenu(false)} />
-              <div className="absolute left-0 top-[38px] z-40 flex w-[220px] flex-col gap-[2px] rounded-[11px] border border-rule bg-card p-[7px] shadow-[0_16px_44px_rgba(0,0,0,0.32)]">
-                {doc.drafts.map((d) => (
-                  <div
-                    key={d.id}
-                    className={`flex items-center gap-1 rounded-lg px-[6px] ${
-                      d.id === doc.activeDraftId ? "bg-chip" : ""
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        setActiveDraft(d.id);
-                        setVersionMenu(false);
-                      }}
-                      className="flex-1 py-[8px] text-left text-[12.5px] font-medium text-ink"
-                    >
-                      {d.name}
-                    </button>
-                    {d.id !== "main" && (
-                      <button
-                        onClick={() => deleteDraft(d.id)}
-                        className="px-[6px] text-[12px] text-faint hover:text-but"
-                        title="Delete version"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="mx-[6px] my-1 h-px bg-rule" />
+          <Popover
+            anchorRef={versionBtnRef}
+            open={versionMenu}
+            onClose={() => setVersionMenu(false)}
+            width={220}
+          >
+            {doc.drafts.map((d) => (
+              <div
+                key={d.id}
+                className={`flex items-center gap-1 rounded-lg px-[6px] ${
+                  d.id === doc.activeDraftId ? "bg-chip" : ""
+                }`}
+              >
                 <button
                   onClick={() => {
-                    addDraft();
+                    setActiveDraft(d.id);
                     setVersionMenu(false);
                   }}
-                  className="rounded-lg px-[11px] py-[8px] text-left text-[12.5px] font-semibold text-ink hover:bg-chip"
+                  className="flex-1 py-[8px] text-left text-[12.5px] font-medium text-ink"
                 >
-                  + Add version
+                  {d.name}
                 </button>
+                {d.id !== "main" && (
+                  <button
+                    onClick={() => deleteDraft(d.id)}
+                    className="px-[6px] text-[12px] text-faint hover:text-but"
+                    title="Delete version"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-            </>
-          )}
+            ))}
+            <div className="mx-[6px] my-1 h-px bg-rule" />
+            <button
+              onClick={() => {
+                addDraft();
+                setVersionMenu(false);
+              }}
+              className="rounded-lg px-[11px] py-[8px] text-left text-[12.5px] font-semibold text-ink hover:bg-chip"
+            >
+              + Add version
+            </button>
+          </Popover>
         </div>
       </div>
 
@@ -143,7 +147,7 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* Board actions + view toggle (book level only) */}
+      {/* New chapter / Auto-arrange (book level only) */}
       {!onSeriesMap && (
         <>
           <button onClick={addChapter} className={action}>
@@ -154,11 +158,15 @@ export function Toolbar() {
           </button>
 
           <span className="h-[22px] w-px shrink-0 bg-rule" />
+        </>
+      )}
 
+      {/* View toggle: Board/Map vs Timeline (both levels) */}
+      {
           <div className="flex shrink-0 items-center gap-[6px]">
             <div className="flex rounded-[9px] bg-chip p-[3px]">
               <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
-                Board
+                {onSeriesMap ? "Map" : "Board"}
               </button>
               <button className={view === "timeline" ? segOn : segOff} onClick={() => setView("timeline")}>
                 Timeline
@@ -191,8 +199,7 @@ export function Toolbar() {
               </button>
             </div>
           </div>
-        </>
-      )}
+      }
 
       {/* Side panels */}
       <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
@@ -208,49 +215,45 @@ export function Toolbar() {
       </div>
 
       {/* New menu */}
-      <div className="relative shrink-0">
+      <div className="shrink-0">
         <button
+          ref={newBtnRef}
           onClick={toggleNewMenu}
           className="flex items-center gap-[6px] whitespace-nowrap rounded-lg bg-ink px-3 py-[7px] text-[12px] font-semibold text-bg"
         >
           + New <span className="opacity-70">▾</span>
         </button>
-        {newMenu && (
-          <>
-            <div className="fixed inset-0 z-[39]" onMouseDown={closeNewMenu} />
-            <div className="absolute right-0 top-[40px] z-40 flex w-[236px] flex-col gap-[2px] rounded-[11px] border border-rule bg-card p-[7px] shadow-[0_16px_44px_rgba(0,0,0,0.32)]">
-              <MenuItem title="New book" sub="Start another volume in the series" onClick={addBook} />
-              <MenuItem
-                title="New chapter"
-                sub="A single empty chapter"
-                onClick={() => {
-                  addChapter();
-                  closeNewMenu();
-                }}
-              />
-              <MenuItem
-                title="Use a template..."
-                sub="Three-act, Hero's Journey, Save the Cat..."
-                onClick={() => setPanel("showTemplates", true)}
-              />
-              <MenuItem
-                title="Import markdown..."
-                sub="Bring an existing draft via AI"
-                onClick={() => setPanel("showImport", true)}
-              />
-              <div className="mx-[6px] my-1 h-px bg-rule" />
-              <MenuItem
-                title={doc.seriesMode ? "Open series map" : "Make this a series"}
-                sub="Map and connect multiple books"
-                onClick={() => {
-                  if (!doc.seriesMode) toggleSeriesMode();
-                  goToSeries();
-                  closeNewMenu();
-                }}
-              />
-            </div>
-          </>
-        )}
+        <Popover anchorRef={newBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={236}>
+          <MenuItem title="New book" sub="Start another volume in the series" onClick={addBook} />
+          <MenuItem
+            title="New chapter"
+            sub="A single empty chapter"
+            onClick={() => {
+              addChapter();
+              closeNewMenu();
+            }}
+          />
+          <MenuItem
+            title="Use a template..."
+            sub="Three-act, Hero's Journey, Save the Cat..."
+            onClick={() => setPanel("showTemplates", true)}
+          />
+          <MenuItem
+            title="Import markdown..."
+            sub="Bring an existing draft via AI"
+            onClick={() => setPanel("showImport", true)}
+          />
+          <div className="mx-[6px] my-1 h-px bg-rule" />
+          <MenuItem
+            title={doc.seriesMode ? "Open series map" : "Make this a series"}
+            sub="Map and connect multiple books"
+            onClick={() => {
+              if (!doc.seriesMode) toggleSeriesMode();
+              goToSeries();
+              closeNewMenu();
+            }}
+          />
+        </Popover>
       </div>
 
       <button

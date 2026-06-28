@@ -6,6 +6,7 @@ import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
 import { ChapterDetail } from "@/components/ChapterDetail";
 import { Lightbox } from "@/components/Lightbox";
+import { Welcome } from "@/components/Welcome";
 import { CharactersPanel } from "@/components/panels/CharactersPanel";
 import { WorldPanel } from "@/components/panels/WorldPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
@@ -42,6 +43,7 @@ export function App() {
       <TemplatesModal />
       <ImportModal />
       <Lightbox />
+      <Welcome />
     </div>
   );
 }

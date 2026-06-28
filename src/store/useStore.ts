@@ -13,6 +13,7 @@ import {
   type WorldEntry,
 } from "@/types";
 import { sampleStory } from "@/data/sampleStory";
+import { emptyStory } from "@/data/emptyStory";
 import {
   autoArrange,
   CARD_W,
@@ -54,6 +55,8 @@ interface UiState {
   selBook: string | null;
   /** Image data URL currently shown full-screen, or null. */
   lightbox: string | null;
+  /** False until the user has chosen sample-vs-fresh on first launch. */
+  onboarded: boolean;
 }
 
 interface StoreState extends UiState {
@@ -152,6 +155,10 @@ interface StoreState extends UiState {
   selectBook: (id: string | null) => void;
   openLightbox: (src: string) => void;
   closeLightbox: () => void;
+
+  // ---- onboarding ----
+  useSample: () => void;
+  startFresh: () => void;
 }
 
 export type PanelKey =
@@ -206,6 +213,7 @@ const initialUi: UiState = {
   selWorld: null,
   selBook: null,
   lightbox: null,
+  onboarded: false,
 };
 
 export const useStore = create<StoreState>()(
@@ -899,6 +907,19 @@ export const useStore = create<StoreState>()(
       selectBook: (id) => set((s) => ({ selBook: s.selBook === id ? null : id })),
       openLightbox: (src) => set({ lightbox: src }),
       closeLightbox: () => set({ lightbox: null }),
+
+      // ---- onboarding ----
+      useSample: () => set({ doc: sampleStory, onboarded: true, level: "book", view: "board" }),
+      startFresh: () =>
+        set({
+          doc: emptyStory(),
+          onboarded: true,
+          level: "book",
+          view: "board",
+          openCh: null,
+          // Offer creation options right away.
+          showTemplates: true,
+        }),
     }),
     {
       name: "estoria:store:v1",
@@ -909,6 +930,7 @@ export const useStore = create<StoreState>()(
         theme: s.theme,
         view: s.view,
         timelineOrient: s.timelineOrient,
+        onboarded: s.onboarded,
       }),
       // On a schema bump, discard the old persisted document rather than risk
       // reading a shape that no longer matches the model.

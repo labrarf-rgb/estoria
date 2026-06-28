@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import {
   CARD_W,
   CARD_H,
+  fitToContent,
   layoutPositions,
   type Camera,
 } from "@/lib/layout";
@@ -100,6 +101,36 @@ export function Board() {
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
   }, [isTimeline, orient, setCamera]);
+
+  // Fit all cards to the screen on first load and whenever we switch books.
+  const activeBookId = doc.activeBookId;
+  const prevCount = useRef(doc.chapters.length);
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || view !== "board") return;
+    setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
+    prevCount.current = doc.chapters.length;
+    // Re-fit on mount and on book change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBookId]);
+
+  // When a newly added chapter lands off-screen, auto fit-to-screen.
+  useEffect(() => {
+    const n = doc.chapters.length;
+    const grew = n > prevCount.current;
+    prevCount.current = n;
+    if (!grew || view !== "board") return;
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const last = doc.chapters[n - 1];
+    const c = cam.current;
+    const sx = c.panX + last.x * c.zoom;
+    const sy = c.panY + last.y * c.zoom;
+    const visible =
+      sx >= 0 && sy >= 0 && sx + CARD_W * c.zoom <= vp.clientWidth && sy + CARD_H * c.zoom <= vp.clientHeight;
+    if (!visible) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.chapters.length]);
 
   const pos = layoutPositions(doc, view, orient);
   const posById: Record<string, { x: number; y: number }> = {};

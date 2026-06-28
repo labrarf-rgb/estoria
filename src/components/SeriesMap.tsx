@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { readFileAsDataURL } from "@/lib/files";
 import type { BookStatus } from "@/types";
 
 const BOOK_W = 290;
@@ -24,12 +25,32 @@ export function SeriesMap() {
   const addBookLink = useStore((s) => s.addBookLink);
   const updateBookLink = useStore((s) => s.updateBookLink);
   const deleteBookLink = useStore((s) => s.deleteBookLink);
+  const view = useStore((s) => s.view);
+  const orient = useStore((s) => s.timelineOrient);
+  const openLightbox = useStore((s) => s.openLightbox);
 
   const [cam, setCam] = useState({ zoom: 0.85, panX: 40, panY: 30 });
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
 
   // Tolerate older/partial docs that predate book positions and links.
   const bookLinks = doc.bookLinks ?? [];
+
+  // In timeline mode books are laid out in reading order; in map mode they use
+  // their free canvas positions.
+  const timeline = view === "timeline";
+  const posById: Record<string, { x: number; y: number }> = {};
+  doc.books.forEach((b, i) => {
+    posById[b.id] = timeline
+      ? orient === "vertical"
+        ? { x: 320, y: 50 + i * (BOOK_H + 70) }
+        : { x: 60 + i * (BOOK_W + 90), y: 170 }
+      : { x: b.x ?? 0, y: b.y ?? 0 };
+  });
+
+  const uploadCover = async (id: string, file: File | undefined) => {
+    if (!file) return;
+    updateBook(id, { coverSrc: await readFileAsDataURL(file) });
+  };
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const camRef = useRef(cam);
@@ -85,11 +106,12 @@ export function SeriesMap() {
     return chs.reduce((a, c) => a + c.words, 0);
   };
   const center = (bookId: string) => {
-    const b = doc.books.find((x) => x.id === bookId);
-    return { x: (b?.x ?? 0) + BOOK_W / 2, y: (b?.y ?? 0) + BOOK_H / 2 };
+    const p = posById[bookId] ?? { x: 0, y: 0 };
+    return { x: p.x + BOOK_W / 2, y: p.y + BOOK_H / 2 };
   };
 
   const onCardDown = (e: React.MouseEvent, id: string, x: number, y: number) => {
+    if (timeline) return; // positions are computed in timeline mode
     const t = e.target as HTMLElement;
     if (t.closest("input") || t.closest("textarea") || t.closest("select") || t.closest("button")) return;
     e.stopPropagation();
@@ -175,19 +197,44 @@ export function SeriesMap() {
         {doc.books.map((b, i) => {
           const isActive = b.id === doc.activeBookId;
           const isConnectSource = connectFrom === b.id;
+          const p = posById[b.id] ?? { x: 0, y: 0 };
           return (
             <div
               key={b.id}
-              onMouseDown={(e) => onCardDown(e, b.id, b.x ?? 0, b.y ?? 0)}
+              onMouseDown={(e) => onCardDown(e, b.id, p.x, p.y)}
               onClick={() => onCardClick(b.id)}
               onDoubleClick={() => enterBook(b.id)}
-              className="group absolute cursor-grab active:cursor-grabbing"
-              style={{ left: b.x ?? 0, top: b.y ?? 0, width: BOOK_W, minHeight: BOOK_H, zIndex: 5 }}
+              className={`group absolute ${timeline ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
+              style={{ left: p.x, top: p.y, width: BOOK_W, minHeight: BOOK_H, zIndex: 5 }}
             >
               <div
                 className="flex h-full flex-col gap-[8px] rounded-2xl border bg-card p-[15px] shadow-[var(--shadow)]"
                 style={{ borderColor: isConnectSource ? "var(--but)" : "var(--rule)" }}
               >
+                {/* Cover */}
+                {b.coverSrc ? (
+                  <button
+                    onClick={() => openLightbox(b.coverSrc!)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="-mx-[15px] -mt-[15px] mb-[2px] block h-[70px] overflow-hidden rounded-t-2xl border-b border-rule"
+                  >
+                    <img src={b.coverSrc} alt="" className="h-full w-full object-cover" />
+                  </button>
+                ) : (
+                  <label
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="-mx-[15px] -mt-[15px] mb-[2px] flex h-[34px] cursor-pointer items-center justify-center gap-1 rounded-t-2xl border-b border-dashed border-line text-[10.5px] font-medium text-faint hover:text-ink"
+                  >
+                    + Add cover
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => uploadCover(b.id, e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+
                 <div className="flex items-center gap-[9px]">
                   <span className="flex h-[30px] w-[28px] flex-shrink-0 items-center justify-center rounded-md bg-but font-serif text-[15px] font-semibold text-white">
                     {i + 1}

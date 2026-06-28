@@ -88,6 +88,8 @@ export interface BookMeta {
   arc: string;
   /** Free-form notes shown on the series map card. */
   notes?: string;
+  /** Optional cover image (data URL). */
+  coverSrc?: string;
   /** Position on the series map canvas. */
   x: number;
   y: number;
