@@ -28,8 +28,14 @@ running app.
   **connector** typed `therefore` (causal), `but` (conflict), or `and` (parallel).
 - **Chapter link** — a connector between two chapters on the board, same 3 types.
 - **Character / World entry** — rich reference records.
-- **Series** — optional multi-book planning layer above the current book.
-- **Draft** — `main` vs `alt`; chapters can carry alternate titles/summaries.
+- **Series** — optional multi-book planning layer above the current book, with its
+  own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
+- **Draft / version** — **per book**: each book has its own named versions; a
+  chapter carries per-version `title`/`summary` overrides (the `main` version is
+  the base text). The version selector is hidden on the series map.
+- **Project** — an independent `StoryDoc` (a standalone book or a whole series).
+  Multiple projects live side by side in a library; you switch, create, delete,
+  and merge them.
 
 ---
 
@@ -153,12 +159,14 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 ## 6. Roadmap (suggested order)
 
 1. ~~**Full chapter-detail editing**~~ — ✅ done (Session 2).
-2. **Inline editing for Characters & World** — turn the read views into editable
-   forms; wire ref add (note/image).
-3. **Open project file** — file picker → `replaceDoc`, plus drag-drop onto the board.
-4. **Markdown import parser** — turn the scanned `.md` into a real `StoryDoc`.
-5. **Timeline polish** — fit-to-view on switch, act band labels.
-6. **Project rename**, multi-document picker (the adapter already allows `list()`).
+2. ~~**Inline editing for Characters & World**~~ — ✅ done (Session 3).
+3. ~~**Project rename + multi-document picker**~~ — ✅ done (Session 6, Projects modal).
+4. ~~**Timeline act band labels**~~ — ✅ done (Session 8). Fit-to-view on timeline
+   switch still pending (board fit is done).
+5. **Open a project file from disk** — `readProjectFile` exists; wire a file picker
+   + drag-drop → `replaceDoc`/new project. (In-app project library is done.)
+6. **Markdown import parser** — turn the scanned `.md` into a real `StoryDoc`
+   (currently prompt + summary scan only).
 7. **(Later) Cloud backend** — `ApiStorageAdapter`, auth, sync.
 
 ---
@@ -333,3 +341,32 @@ menu.
   Surfaced as "Merge" in the Projects modal.
 - Verified in-browser: wordmark, editable words, char/world add+remove pickers,
   delete confirmation prompt, multi-project. `tsc -b` + `vite build` clean.
+
+### 2026-06-28 — Per-book versions, timeline act bands, modal/series fixes (Session 8)
+
+- **Versions are per book** (not per series). `drafts` + `activeDraftId` moved into
+  `BookData`; the top-level `drafts`/`activeDraftId` now represent the *active*
+  book's versions and are stashed/restored alongside chapters/links/notes in
+  `switchBook`, `addBook`, and `mergeProjectIntoSeries`. The version dropdown is
+  hidden on the series map (it's a book-level concern). Sample data: Book One has
+  `[Main draft, Alt ending]`; Books Two/Three start with `[Main draft]`.
+  Verified: Book 1 shows both versions, Book 2 only `Main draft`.
+- **Scene-card stacking fix** (`ChapterDetail.tsx`): the scene canvas is now an
+  isolated stacking context (`isolate`), so its absolutely-positioned scene cards
+  (z-5/z-10) no longer paint over the sticky modal header when the modal scrolls.
+- **Series connect fix** (`SeriesMap.tsx`): the viewport only pans / cancels
+  connect mode on a *background* mousedown — card mousedowns are ignored via a
+  `[data-book-card]` guard. Previously a bubbled card mousedown (notably in
+  timeline mode, which doesn't stop propagation) cancelled connect mode before the
+  click registered, so books couldn't be connected. Verified: link count 3→4.
+- **Series File menu**: "New chapter" and "Use a template" are book-level only and
+  are hidden on the series map.
+- **Scene flow expanded by default**: the chapter modal opens with the scene
+  canvas expanded; expanded mode now uses a wider modal (`min(1320px, 96vw)`) and a
+  taller canvas (`78vh`) to take up more of the screen. Toggle reads Collapse/Expand.
+- **Act bands in the book timeline** (`Board.tsx`): in timeline view, each Act gets
+  a labelled dashed band behind its (consecutive) chapters — "Act I / II / III" —
+  so the grouping is visible. Works in both vertical and horizontal orientations;
+  bands sit behind connectors/cards and pan/zoom with the canvas.
+- All changes verified in-browser; `tsc -b` clean. Committed locally (not pushed to
+  GitHub yet — remote setup to be discussed).
