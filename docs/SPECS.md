@@ -163,11 +163,11 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 3. ~~**Project rename + multi-document picker**~~ — ✅ done (Session 6, Projects modal).
 4. ~~**Timeline act band labels**~~ — ✅ done (Session 8). Fit-to-view on timeline
    switch still pending (board fit is done).
-5. **Open a project file from disk** — `readProjectFile` exists; wire a file picker
-   + drag-drop → `replaceDoc`/new project. (In-app project library is done.)
-6. **Markdown import parser** — turn the scanned `.md` into a real `StoryDoc`
-   (currently prompt + summary scan only).
-7. **(Later) Cloud backend** — `ApiStorageAdapter`, auth, sync.
+5. ~~**Markdown import parser**~~ — ✅ done (Session 9). `parseImportMarkdown`.
+6. ~~**Open a project file from disk**~~ — ✅ done (Session 9). "Open file..." in
+   the Projects modal. (Drag-drop onto the board still a nice-to-have.)
+7. **(Later) Cloud backend** — `ApiStorageAdapter`, auth, sync. See also §7
+   Integrations (Obsidian/Google Docs).
 
 ---
 
@@ -432,3 +432,30 @@ menu.
   bands sit behind connectors/cards and pan/zoom with the canvas.
 - All changes verified in-browser; `tsc -b` clean. Committed locally (not pushed to
   GitHub yet — remote setup to be discussed).
+
+### 2026-06-28 — Markdown import parser + open from disk (Session 9)
+
+- **Import actually works now.** `parseImportMarkdown(text, fileName)` in
+  `lib/markdown.ts` turns the import-prompt schema into a complete `StoryDoc`:
+  title + premise; `## Characters` (`**Name** — role | archetype` plus
+  bio/traits/goals/motivations and a combined `Wants: … | Needs: …` line);
+  `## World` (`**Name** [Category] — desc // Notes: …`); and `## Act N` → `### n.
+  Title · 3,200 words` with a `> summary`, a `Scenes:` numbered list whose
+  `(therefore|but|and)` tags become scene connectors, and a `Characters:` line.
+  Tolerant of AI drift (smart dashes, missing optional fields, spacing); unknown
+  chapter character names are created as stub characters so nothing is dropped.
+  Chapters are grid-laid-out and chained with `therefore` links.
+- **Import modal** parses the dropped file, shows accurate counts (chapters/
+  scenes/characters/world), reports a clear error if no chapters are found, and
+  opens the result as a **new project** (current project stays in the library).
+- **`openDoc(doc)`** (store): stash current project, activate the incoming doc
+  (fresh id on collision). Shared by import and open-from-disk.
+- **Open from disk**: "Open file..." in the Projects modal reads an exported
+  `.estoria.json` via `readProjectFile` → `openDoc`, with an error on bad files.
+- Verified in-browser with a fresh sample manuscript ("The Glass Orchard"):
+  3 chapters / 8 scenes / 2 characters / 3 world parsed correctly — board cards,
+  word counts, scene connectors (Therefore/But), character chips, and World
+  categories all correct. `tsc -b` + `vite build` clean.
+- Roadmap: the two main functional gaps are now closed. Remaining: drag-drop file
+  onto the board (nice-to-have), timeline fit-on-switch, and the cloud/integrations
+  work (§4, §7). Still local-only — not pushed to GitHub.
