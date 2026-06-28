@@ -13,6 +13,7 @@ import { NotesPanel } from "@/components/panels/NotesPanel";
 import { ExportModal } from "@/components/modals/ExportModal";
 import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { ImportModal } from "@/components/modals/ImportModal";
+import { NewBookModal } from "@/components/modals/NewBookModal";
 
 export function App() {
   const theme = useStore((s) => s.theme);
@@ -42,6 +43,7 @@ export function App() {
       <ExportModal />
       <TemplatesModal />
       <ImportModal />
+      <NewBookModal />
       <Lightbox />
       <Welcome />
     </div>

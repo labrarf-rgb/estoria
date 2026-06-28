@@ -50,6 +50,7 @@ interface UiState {
   showTemplates: boolean;
   showImport: boolean;
   showSeries: boolean;
+  showNewBook: boolean;
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
@@ -168,7 +169,8 @@ export type PanelKey =
   | "showExport"
   | "showTemplates"
   | "showImport"
-  | "showSeries";
+  | "showSeries"
+  | "showNewBook";
 
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
@@ -209,6 +211,7 @@ const initialUi: UiState = {
   showTemplates: false,
   showImport: false,
   showSeries: false,
+  showNewBook: false,
   selChar: null,
   selWorld: null,
   selBook: null,
@@ -638,6 +641,7 @@ export const useStore = create<StoreState>()(
             level: "book",
             newMenu: false,
             showSeries: false,
+            showNewBook: false,
           };
         }),
 
@@ -917,6 +921,7 @@ export const useStore = create<StoreState>()(
           level: "book",
           view: "board",
           openCh: null,
+          showNewBook: false,
           // Offer creation options right away.
           showTemplates: true,
         }),

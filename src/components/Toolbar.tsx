@@ -23,7 +23,6 @@ export function Toolbar() {
   const closeNewMenu = useStore((s) => s.closeNewMenu);
   const addChapter = useStore((s) => s.addChapter);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
-  const addBook = useStore((s) => s.addBook);
   const toggleSeriesMode = useStore((s) => s.toggleSeriesMode);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
@@ -224,7 +223,11 @@ export function Toolbar() {
           + New <span className="opacity-70">▾</span>
         </button>
         <Popover anchorRef={newBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={236}>
-          <MenuItem title="New book" sub="Start another volume in the series" onClick={addBook} />
+          <MenuItem
+            title="New book"
+            sub="Standalone, or add to this series"
+            onClick={() => setPanel("showNewBook", true)}
+          />
           <MenuItem
             title="New chapter"
             sub="A single empty chapter"
