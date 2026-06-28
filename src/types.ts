@@ -136,6 +136,8 @@ export interface Chapter {
   rot?: number;
   /** Character ids appearing in this chapter. */
   chars: string[];
+  /** World-entry ids referenced in this chapter. */
+  worldRefs?: string[];
   /** Scene beats, in order. */
   scenes: string[];
   /** Link type between scene i and i+1 (length = scenes.length - 1). */

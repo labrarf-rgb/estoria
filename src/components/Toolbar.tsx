@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Popover } from "@/components/ui/Popover";
 
@@ -25,13 +25,15 @@ export function Toolbar() {
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const toggleSeriesMode = useStore((s) => s.toggleSeriesMode);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
+  const updateBook = useStore((s) => s.updateBook);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
   const addDraft = useStore((s) => s.addDraft);
+  const renameDraft = useStore((s) => s.renameDraft);
   const deleteDraft = useStore((s) => s.deleteDraft);
 
   const [versionMenu, setVersionMenu] = useState(false);
   const versionBtnRef = useRef<HTMLButtonElement>(null);
-  const newBtnRef = useRef<HTMLButtonElement>(null);
+  const fileBtnRef = useRef<HTMLButtonElement>(null);
 
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
@@ -46,55 +48,84 @@ export function Toolbar() {
     "flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[11px] py-[7px] text-[12px] font-semibold text-ink hover:border-faint";
 
   return (
-    <div className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[9px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {/* Brand + editable title */}
-      <div className="flex flex-shrink-0 items-center gap-[9px]">
+    <div className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Brand wordmark */}
+      <div className="flex flex-shrink-0 items-center gap-[8px]">
         <div className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-ink font-serif text-[14px] font-semibold text-bg">
           E
         </div>
+        <span className="font-serif text-[17px] font-semibold tracking-tight text-ink">Estoria</span>
+      </div>
+
+      <span className="h-[24px] w-px shrink-0 bg-rule" />
+
+      {/* Identity: series name -> book name, stat underneath, version to the right */}
+      <div className="flex min-w-0 flex-shrink-0 items-center gap-[10px]">
         <div className="flex min-w-0 flex-col leading-[1.15]">
-          <input
-            value={doc.projectTitle}
-            onChange={(e) => setProjectTitle(e.target.value)}
-            placeholder="Project name"
-            className="w-[150px] bg-transparent text-[13.5px] font-semibold text-ink outline-none placeholder:text-faint"
-            title="Click to rename project"
-          />
+          <div className="flex items-center gap-[5px]">
+            {doc.seriesMode ? (
+              <>
+                <EditableName
+                  value={doc.projectTitle}
+                  onChange={setProjectTitle}
+                  onNavigate={goToSeries}
+                  active={onSeriesMap}
+                  placeholder="Series name"
+                />
+                <span className="text-faint">▸</span>
+                <EditableName
+                  value={activeBook?.title ?? "Book"}
+                  onChange={(t) => activeBook && updateBook(activeBook.id, { title: t })}
+                  onNavigate={() => setLevel("book")}
+                  active={!onSeriesMap}
+                  placeholder="Book name"
+                />
+              </>
+            ) : (
+              <EditableName
+                value={doc.projectTitle}
+                onChange={setProjectTitle}
+                placeholder="Story name"
+              />
+            )}
+          </div>
           <span className="text-[10.5px] font-medium tracking-wide text-soft">{bookStat}</span>
         </div>
 
         {/* Version / draft dropdown */}
-        <div className="ml-[4px]">
+        <div>
           <button
             ref={versionBtnRef}
             onClick={() => setVersionMenu((v) => !v)}
             className="flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[9px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+            title="Draft version"
           >
             <span className="h-[7px] w-[7px] rounded-full bg-but" />
             {activeDraft?.name ?? "Main draft"} <span className="text-faint">▾</span>
           </button>
-          <Popover
-            anchorRef={versionBtnRef}
-            open={versionMenu}
-            onClose={() => setVersionMenu(false)}
-            width={220}
-          >
+          <Popover anchorRef={versionBtnRef} open={versionMenu} onClose={() => setVersionMenu(false)} width={250}>
+            <div className="px-[8px] pb-[4px] pt-[2px] text-[10px] font-semibold uppercase tracking-wide text-faint">
+              Versions
+            </div>
             {doc.drafts.map((d) => (
               <div
                 key={d.id}
-                className={`flex items-center gap-1 rounded-lg px-[6px] ${
+                className={`flex items-center gap-[4px] rounded-lg pl-[6px] pr-[4px] ${
                   d.id === doc.activeDraftId ? "bg-chip" : ""
                 }`}
               >
                 <button
-                  onClick={() => {
-                    setActiveDraft(d.id);
-                    setVersionMenu(false);
-                  }}
-                  className="flex-1 py-[8px] text-left text-[12.5px] font-medium text-ink"
+                  onClick={() => setActiveDraft(d.id)}
+                  title="Use this version"
+                  className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border border-faint"
                 >
-                  {d.name}
+                  {d.id === doc.activeDraftId && <span className="h-[7px] w-[7px] rounded-full bg-ink" />}
                 </button>
+                <input
+                  value={d.name}
+                  onChange={(e) => renameDraft(d.id, e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent py-[8px] text-[12.5px] font-medium text-ink outline-none"
+                />
                 {d.id !== "main" && (
                   <button
                     onClick={() => deleteDraft(d.id)}
@@ -122,30 +153,6 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
-      {/* Series breadcrumb (only once the project is a series) */}
-      {doc.seriesMode && (
-        <div className="flex shrink-0 items-center gap-[5px] text-[12px] font-medium">
-          <button
-            onClick={goToSeries}
-            className={`rounded-md px-[8px] py-[5px] ${
-              onSeriesMap ? "bg-chip text-ink" : "text-soft hover:bg-chip"
-            }`}
-          >
-            Series
-          </button>
-          <span className="text-faint">▸</span>
-          <button
-            onClick={() => setLevel("book")}
-            className={`rounded-md px-[8px] py-[5px] ${
-              !onSeriesMap ? "bg-chip text-ink" : "text-soft hover:bg-chip"
-            }`}
-          >
-            {activeBook ? activeBook.subtitle || activeBook.title : "Book"}
-          </button>
-          <span className="mx-[2px] h-[22px] w-px shrink-0 bg-rule" />
-        </div>
-      )}
-
       {/* New chapter / Auto-arrange (book level only) */}
       {!onSeriesMap && (
         <>
@@ -155,50 +162,47 @@ export function Toolbar() {
           <button onClick={autoArrangeBoard} className={action}>
             Auto-arrange
           </button>
-
           <span className="h-[22px] w-px shrink-0 bg-rule" />
         </>
       )}
 
-      {/* View toggle: Board/Map vs Timeline (both levels) */}
-      {
-          <div className="flex shrink-0 items-center gap-[6px]">
-            <div className="flex rounded-[9px] bg-chip p-[3px]">
-              <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
-                {onSeriesMap ? "Map" : "Board"}
-              </button>
-              <button className={view === "timeline" ? segOn : segOff} onClick={() => setView("timeline")}>
-                Timeline
-              </button>
-            </div>
-            <div className="flex rounded-[9px] bg-chip p-[3px]">
-              <button
-                title="Vertical timeline"
-                onClick={() => {
-                  setOrient("vertical");
-                  setView("timeline");
-                }}
-                className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-                  view === "timeline" && orient === "vertical" ? "bg-card text-ink" : "text-soft hover:bg-card"
-                }`}
-              >
-                ↓
-              </button>
-              <button
-                title="Horizontal timeline"
-                onClick={() => {
-                  setOrient("horizontal");
-                  setView("timeline");
-                }}
-                className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
-                  view === "timeline" && orient === "horizontal" ? "bg-card text-ink" : "text-soft hover:bg-card"
-                }`}
-              >
-                →
-              </button>
-            </div>
-          </div>
-      }
+      {/* View toggle: Board/Map vs Timeline */}
+      <div className="flex shrink-0 items-center gap-[6px]">
+        <div className="flex rounded-[9px] bg-chip p-[3px]">
+          <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
+            {onSeriesMap ? "Map" : "Board"}
+          </button>
+          <button className={view === "timeline" ? segOn : segOff} onClick={() => setView("timeline")}>
+            Timeline
+          </button>
+        </div>
+        <div className="flex rounded-[9px] bg-chip p-[3px]">
+          <button
+            title="Vertical timeline"
+            onClick={() => {
+              setOrient("vertical");
+              setView("timeline");
+            }}
+            className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
+              view === "timeline" && orient === "vertical" ? "bg-card text-ink" : "text-soft hover:bg-card"
+            }`}
+          >
+            ↓
+          </button>
+          <button
+            title="Horizontal timeline"
+            onClick={() => {
+              setOrient("horizontal");
+              setView("timeline");
+            }}
+            className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[14px] ${
+              view === "timeline" && orient === "horizontal" ? "bg-card text-ink" : "text-soft hover:bg-card"
+            }`}
+          >
+            →
+          </button>
+        </div>
+      </div>
 
       {/* Side panels */}
       <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
@@ -213,19 +217,19 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* New menu */}
+      {/* File menu */}
       <div className="shrink-0">
         <button
-          ref={newBtnRef}
+          ref={fileBtnRef}
           onClick={toggleNewMenu}
           className="flex items-center gap-[6px] whitespace-nowrap rounded-lg bg-ink px-3 py-[7px] text-[12px] font-semibold text-bg"
         >
-          + New <span className="opacity-70">▾</span>
+          File <span className="opacity-70">▾</span>
         </button>
-        <Popover anchorRef={newBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={236}>
+        <Popover anchorRef={fileBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={244}>
           <MenuItem
             title="New book"
-            sub="Standalone, or add to this series"
+            sub="Standalone, new series, or add to a series"
             onClick={() => setPanel("showNewBook", true)}
           />
           <MenuItem
@@ -248,23 +252,28 @@ export function Toolbar() {
           />
           <div className="mx-[6px] my-1 h-px bg-rule" />
           <MenuItem
-            title={doc.seriesMode ? "Open series map" : "Make this a series"}
-            sub="Map and connect multiple books"
-            onClick={() => {
-              if (!doc.seriesMode) toggleSeriesMode();
-              goToSeries();
-              closeNewMenu();
-            }}
+            title="Open project..."
+            sub="Switch between your projects"
+            onClick={() => setPanel("showProjects", true)}
+          />
+          {!doc.seriesMode && (
+            <MenuItem
+              title="Make this a series"
+              sub="Turn this book into a multi-book series"
+              onClick={() => {
+                toggleSeriesMode();
+                goToSeries();
+                closeNewMenu();
+              }}
+            />
+          )}
+          <MenuItem
+            title="Export..."
+            sub="Markdown vault or project file"
+            onClick={() => setPanel("showExport", true)}
           />
         </Popover>
       </div>
-
-      <button
-        onClick={() => setPanel("showExport", true)}
-        className="flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-medium text-ink hover:border-faint"
-      >
-        Export <span className="text-faint">↓</span>
-      </button>
 
       {/* Zoom (board level only; the series map has its own zoom) */}
       {!onSeriesMap && (
@@ -287,7 +296,7 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* Theme (icon only to save space) */}
+      {/* Theme (icon only) */}
       <button
         onClick={toggleTheme}
         title={theme === "dark" ? "Dark theme" : "Light theme"}
@@ -299,6 +308,65 @@ export function Toolbar() {
         />
       </button>
     </div>
+  );
+}
+
+/**
+ * A name in the header. Single click navigates (when `onNavigate` is given);
+ * double-click switches to an input to rename. Without `onNavigate`, a single
+ * click renames directly.
+ */
+function EditableName({
+  value,
+  onChange,
+  onNavigate,
+  active,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onNavigate?: () => void;
+  active?: boolean;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          onChange(draft.trim() || value);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+        placeholder={placeholder}
+        className="w-[150px] rounded-[5px] bg-card px-[4px] text-[13.5px] font-semibold text-ink outline-none ring-1 ring-faint"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => (onNavigate ? onNavigate() : setEditing(true))}
+      onDoubleClick={() => setEditing(true)}
+      title={onNavigate ? "Click to open · double-click to rename" : "Click to rename"}
+      className={`max-w-[200px] truncate text-[13.5px] font-semibold decoration-dotted decoration-rule underline-offset-2 hover:underline ${
+        active ? "text-ink" : onNavigate ? "text-soft hover:text-ink" : "text-ink"
+      }`}
+    >
+      {value || placeholder}
+    </button>
   );
 }
 

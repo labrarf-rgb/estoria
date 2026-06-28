@@ -27,6 +27,8 @@ export function ChapterDetail() {
   const patchChapter = useStore((s) => s.patchChapter);
   const editChapterText = useStore((s) => s.editChapterText);
   const toggleChapterChar = useStore((s) => s.toggleChapterChar);
+  const toggleChapterWorld = useStore((s) => s.toggleChapterWorld);
+  const setPanel = useStore((s) => s.setPanel);
   const deleteChapter = useStore((s) => s.deleteChapter);
   const addScene = useStore((s) => s.addScene);
   const updateScene = useStore((s) => s.updateScene);
@@ -198,7 +200,51 @@ export function ChapterDetail() {
               );
             })}
             {doc.characters.length === 0 && (
-              <span className="text-[12px] text-faint">Add characters from the Characters panel.</span>
+              <span className="text-[12px] text-faint">
+                No characters yet.{" "}
+                <button onClick={() => setPanel("showChars", true)} className="underline hover:text-ink">
+                  Add one
+                </button>
+                .
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* World in this chapter */}
+        <div className="border-b border-rule px-[26px] py-[14px]">
+          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+            World in this chapter
+          </div>
+          <div className="flex flex-wrap gap-[7px]">
+            {doc.world.map((w) => {
+              const on = (ch.worldRefs ?? []).includes(w.id);
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => toggleChapterWorld(ch.id, w.id)}
+                  className={`flex items-center gap-[7px] rounded-full border px-[10px] py-[5px] text-[12px] font-medium ${
+                    on ? "border-transparent bg-ink text-bg" : "border-rule bg-card text-soft hover:border-faint"
+                  }`}
+                >
+                  <span
+                    className={`h-[7px] w-[7px] rounded-full ${on ? "bg-bg" : "bg-soft"}`}
+                  />
+                  {w.name}
+                  <span className={`text-[9px] uppercase ${on ? "opacity-70" : "text-faint"}`}>
+                    {w.cat}
+                  </span>
+                </button>
+              );
+            })}
+            {doc.world.length === 0 && (
+              <span className="text-[12px] text-faint">
+                No world entries yet.{" "}
+                <button onClick={() => setPanel("showWorld", true)} className="underline hover:text-ink">
+                  Add one
+                </button>
+                .
+              </span>
             )}
           </div>
         </div>

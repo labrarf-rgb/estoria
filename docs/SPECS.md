@@ -290,3 +290,27 @@ menu.
   click.
 - Verified in-browser: welcome flow, auto-fit on load + on add, portal dropdowns,
   series timeline layout, delete-chapter cleanup. `tsc -b` + `vite build` clean.
+
+### 2026-06-27 — Multi-project, File menu, header redesign (Session 6)
+
+- **Multi-project library**: independent projects, each its own `StoryDoc`. Store
+  keeps the active `doc` plus `projectStash` (inactive full docs) and derives the
+  list via `listProjects()`. Actions: `switchProject`, `newProject({series,
+  keepCurrent})`, `deleteProject` (never leaves zero projects). `projectStash` is
+  persisted. New `ProjectsModal` ("Open project") lists/switches/deletes/creates.
+- **Header redesign** (`Toolbar.tsx`): "Estoria" wordmark; an `EditableName`
+  component shows the real Series name ▸ Book name (single click navigates,
+  double-click renames); words/chapters stat sits under the names; the version
+  dropdown moved to the right of the names. Versions are renamable inline (radio
+  to activate, input to rename, ✕ to delete) plus "+ Add version".
+- **File menu** (replaces "+ New"): New book, New chapter, Use a template, Import
+  markdown, Open project, Make this a series (when standalone), Export. "Open
+  series map" removed (the series name in the header navigates there).
+- **New-book chooser** (`NewBookModal`): Standalone / Start a series / Add to an
+  existing series (lists series projects). Before a new project replaces the
+  current one it prompts: Keep it / Export a copy then keep / Discard.
+- **Chapter modal**: characters AND world entries are linkable via toggle chips
+  (`toggleChapterChar`, `toggleChapterWorld`; `Chapter.worldRefs`).
+- Verified in-browser: header names/stat/version, File menu items, projects
+  create/switch/delete (two independent projects), save-current prompt, chapter
+  world/character toggles. `tsc -b` + `vite build` clean.

@@ -51,6 +51,7 @@ interface UiState {
   showImport: boolean;
   showSeries: boolean;
   showNewBook: boolean;
+  showProjects: boolean;
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
@@ -60,8 +61,19 @@ interface UiState {
   onboarded: boolean;
 }
 
+/** Lightweight descriptor for the project library list. */
+export interface ProjectMeta {
+  id: string;
+  title: string;
+  isSeries: boolean;
+  books: number;
+  chapters: number;
+}
+
 interface StoreState extends UiState {
   doc: StoryDoc;
+  /** Full docs for inactive projects, keyed by StoryDoc.id. */
+  projectStash: Record<string, StoryDoc>;
 
   // ---- camera ----
   setCamera: (cam: Partial<Camera>) => void;
@@ -70,6 +82,10 @@ interface StoreState extends UiState {
 
   // ---- project ----
   setProjectTitle: (title: string) => void;
+  listProjects: () => ProjectMeta[];
+  switchProject: (id: string) => void;
+  newProject: (opts: { series: boolean; keepCurrent: boolean }) => void;
+  deleteProject: (id: string) => void;
 
   // ---- chapters ----
   moveChapter: (id: string, x: number, y: number) => void;
@@ -81,6 +97,7 @@ interface StoreState extends UiState {
   patchChapter: (id: string, patch: Partial<Chapter>) => void;
   editChapterText: (id: string, patch: { title?: string; summary?: string }) => void;
   toggleChapterChar: (id: string, charId: string) => void;
+  toggleChapterWorld: (id: string, worldId: string) => void;
 
   // ---- scenes ----
   addScene: (chId: string) => void;
@@ -170,7 +187,8 @@ export type PanelKey =
   | "showTemplates"
   | "showImport"
   | "showSeries"
-  | "showNewBook";
+  | "showNewBook"
+  | "showProjects";
 
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
@@ -212,6 +230,7 @@ const initialUi: UiState = {
   showImport: false,
   showSeries: false,
   showNewBook: false,
+  showProjects: false,
   selChar: null,
   selWorld: null,
   selBook: null,
@@ -221,9 +240,10 @@ const initialUi: UiState = {
 
 export const useStore = create<StoreState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialUi,
       doc: sampleStory,
+      projectStash: {},
 
       // ---- camera ----
       setCamera: (cam) => set((s) => ({ ...s, ...cam })),
@@ -232,6 +252,82 @@ export const useStore = create<StoreState>()(
 
       // ---- project ----
       setProjectTitle: (title) => set((s) => ({ doc: { ...s.doc, projectTitle: title } })),
+
+      listProjects: () => {
+        const s = get();
+        const metaOf = (d: StoryDoc): ProjectMeta => ({
+          id: d.id,
+          title: d.projectTitle || "Untitled",
+          isSeries: d.seriesMode,
+          books: d.books.length,
+          chapters:
+            d.chapters.length +
+            Object.values(d.bookData || {}).reduce((a, b) => a + (b.chapters?.length ?? 0), 0),
+        });
+        return [metaOf(s.doc), ...Object.values(s.projectStash).map(metaOf)];
+      },
+
+      switchProject: (id) =>
+        set((s) => {
+          if (id === s.doc.id) return { showProjects: false } as Partial<StoreState>;
+          const target = s.projectStash[id];
+          if (!target) return s;
+          const stash = { ...s.projectStash, [s.doc.id]: s.doc };
+          delete stash[id];
+          return {
+            doc: target,
+            projectStash: stash,
+            level: target.seriesMode ? "series" : "book",
+            view: "board",
+            openCh: null,
+            arrangeN: 0,
+            showProjects: false,
+          };
+        }),
+
+      newProject: ({ series, keepCurrent }) =>
+        set((s) => {
+          const fresh = emptyStory();
+          if (series) {
+            fresh.seriesMode = true;
+          }
+          const stash = { ...s.projectStash };
+          if (keepCurrent) stash[s.doc.id] = s.doc;
+          return {
+            doc: fresh,
+            projectStash: stash,
+            onboarded: true,
+            level: series ? "series" : "book",
+            view: "board",
+            openCh: null,
+            showNewBook: false,
+            showProjects: false,
+            // Offer a way to begin the first book.
+            showTemplates: !series,
+          };
+        }),
+
+      deleteProject: (id) =>
+        set((s) => {
+          // Deleting the active project: fall back to any stashed one.
+          if (id === s.doc.id) {
+            const others = Object.values(s.projectStash);
+            if (others.length === 0) return s; // never leave zero projects
+            const [next, ...rest] = others;
+            const stash: Record<string, StoryDoc> = {};
+            rest.forEach((d) => (stash[d.id] = d));
+            return {
+              doc: next,
+              projectStash: stash,
+              level: next.seriesMode ? "series" : "book",
+              view: "board",
+              openCh: null,
+            };
+          }
+          const stash = { ...s.projectStash };
+          delete stash[id];
+          return { projectStash: stash };
+        }),
 
       // ---- chapters ----
       moveChapter: (id, x, y) =>
@@ -340,6 +436,22 @@ export const useStore = create<StoreState>()(
               return {
                 ...c,
                 chars: has ? c.chars.filter((x) => x !== charId) : c.chars.concat(charId),
+              };
+            }),
+          },
+        })),
+
+      toggleChapterWorld: (id, worldId) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) => {
+              if (c.id !== id) return c;
+              const cur = c.worldRefs ?? [];
+              const has = cur.includes(worldId);
+              return {
+                ...c,
+                worldRefs: has ? cur.filter((x) => x !== worldId) : cur.concat(worldId),
               };
             }),
           },
@@ -932,6 +1044,7 @@ export const useStore = create<StoreState>()(
       storage: createJSONStorage(() => zustandStorage),
       partialize: (s) => ({
         doc: s.doc,
+        projectStash: s.projectStash,
         theme: s.theme,
         view: s.view,
         timelineOrient: s.timelineOrient,
