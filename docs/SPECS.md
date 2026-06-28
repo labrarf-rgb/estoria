@@ -482,3 +482,27 @@ menu.
 - Verified in-browser: ⋯ hidden at 1600px / shown at 980px / hidden again at
   1600px; timeline-pan then back-to-board shows cards; auto-arrange fits all 8
   sample chapters on screen. `tsc -b` clean.
+
+### 2026-06-28 — Structure templates expanded; New-project modal fix (Session 11)
+
+- **Projects modal "+ New project" fix**: it opened the New Book chooser *behind*
+  the still-open Projects modal (looked like nothing happened). Now closes Projects
+  first, so the chooser is on top.
+- **Story-structure templates** (`lib/templates.ts`) expanded from the in-house
+  "Narrative Frameworks and Story Structure Research" compendium:
+  - **Single Blank Chapter is now the first option** in the Templates modal.
+  - **Hero's Journey split** into two entries: **Vogler (12 stages)** and
+    **Campbell (17 stages)** with the full Departure/Initiation/Return taxonomy
+    ("Woman as Temptress" modernized to "Temptation").
+  - **New frameworks added**: Dan Harmon's Story Circle (8), Story Grid Five
+    Commandments (Coyne), Kishotenketsu (4-act, no-conflict — uses a real Act 4),
+    Propp's Morphology (folktale functions), Sanskrit Panchasandhi
+    (Natyasastra), Jo-ha-kyu (pacing). Existing three-act/Save the Cat/romance/
+    mystery retained.
+  - Deliberately NOT added as chapter templates (they aren't one-chapter-per-beat
+    structures): Snowflake Method, Scene-&-Sequel, MRUs, GMC, McKee value charges,
+    Vonnegut shapes, interactive-fiction topologies. Candidates for other UI later.
+- Source note: research lives in the user's Obsidian vault ("Narrative Frameworks
+  and Story Structure Research.md"), outside the repo.
+- Verified in-browser (Templates order + new entries render); `tsc -b` + `vite
+  build` clean. Local only — not pushed to GitHub.
