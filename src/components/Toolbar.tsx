@@ -116,7 +116,9 @@ export function Toolbar() {
           <span className="text-[10.5px] font-medium tracking-wide text-soft">{bookStat}</span>
         </div>
 
-        {/* Version / draft dropdown */}
+        {/* Version / draft dropdown — versions are per book, so hide on the
+            series map. */}
+        {!onSeriesMap && (
         <div>
           <button
             ref={versionBtnRef}
@@ -180,6 +182,7 @@ export function Toolbar() {
             </button>
           </Popover>
         </div>
+        )}
       </div>
 
       <div className="flex-1" />
