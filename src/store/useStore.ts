@@ -94,6 +94,7 @@ interface StoreState extends UiState {
   listProjects: () => ProjectMeta[];
   switchProject: (id: string) => void;
   newProject: (opts: { series: boolean; keepCurrent: boolean }) => void;
+  openDoc: (doc: StoryDoc) => void;
   deleteProject: (id: string) => void;
   mergeProjectIntoSeries: (sourceId: string, targetId: string) => void;
 
@@ -324,6 +325,29 @@ export const useStore = create<StoreState>()(
             showProjects: false,
             // Offer a way to begin the first book.
             showTemplates: !series,
+          };
+        }),
+
+      openDoc: (incoming) =>
+        set((s) => {
+          // Stash the current project, then make the incoming one active.
+          // Give it a fresh id if it would collide with an existing project.
+          const stash = { ...s.projectStash, [s.doc.id]: s.doc };
+          let id = incoming.id || uid("story");
+          if (id === s.doc.id || stash[id]) id = uid("story");
+          delete stash[id];
+          const doc: StoryDoc = { ...incoming, id, schemaVersion: SCHEMA_VERSION };
+          return {
+            doc,
+            projectStash: stash,
+            onboarded: true,
+            level: doc.seriesMode ? ("series" as Level) : ("book" as Level),
+            view: "board" as View,
+            openCh: null,
+            arrangeN: 0,
+            showImport: false,
+            showProjects: false,
+            showNewBook: false,
           };
         }),
 

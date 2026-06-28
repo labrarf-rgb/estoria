@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
-import { importPrompt, summarizeImport, type ImportSummary } from "@/lib/markdown";
+import { importPrompt, parseImportMarkdown, type ParseResult } from "@/lib/markdown";
 
 export function ImportModal() {
   const show = useStore((s) => s.showImport);
   const setPanel = useStore((s) => s.setPanel);
+  const openDoc = useStore((s) => s.openDoc);
   const [copied, setCopied] = useState(false);
-  const [result, setResult] = useState<ImportSummary | null>(null);
+  const [parsed, setParsed] = useState<ParseResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   if (!show) return null;
-  const close = () => setPanel("showImport", false);
+  const close = () => {
+    setParsed(null);
+    setError(null);
+    setPanel("showImport", false);
+  };
 
   const prompt = importPrompt();
   const copyPrompt = () => {
@@ -20,9 +26,27 @@ export function ImportModal() {
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    const text = await f.text();
-    setResult(summarizeImport(f.name, text));
     e.target.value = "";
+    setError(null);
+    try {
+      const text = await f.text();
+      const res = parseImportMarkdown(text, f.name);
+      if (res.summary.chapters === 0) {
+        setError(
+          "No chapters found. Make sure the file uses the schema above (## Act 1, then ### 1. Title)."
+        );
+        setParsed(null);
+        return;
+      }
+      setParsed(res);
+    } catch {
+      setError("Could not read that file.");
+      setParsed(null);
+    }
+  };
+  const openImported = () => {
+    if (parsed) openDoc(parsed.doc);
+    setParsed(null);
   };
 
   return (
@@ -61,7 +85,8 @@ export function ImportModal() {
           </Step>
           <Step n={2} title="Upload the markdown file it gives you">
             <p className="mb-[11px] text-[12.5px] leading-[1.5] text-soft">
-              Estoria reads the chapters, scenes, characters and world straight off the file.
+              Estoria reads the chapters, scenes, characters and world straight off the file and
+              opens it as a new project (your current one stays in My Projects).
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-[7px] rounded-xl border-[1.5px] border-dashed border-line bg-card p-[26px] text-center hover:border-faint">
               <span className="text-[13px] font-semibold text-ink">
@@ -75,18 +100,31 @@ export function ImportModal() {
                 className="hidden"
               />
             </label>
-            {result && (
+            {error && (
+              <div className="mt-3 rounded-[11px] border border-but bg-card px-[15px] py-[12px] text-[12.5px] font-medium text-ink">
+                {error}
+              </div>
+            )}
+            {parsed && (
               <div className="mt-3 flex items-center gap-3 rounded-[11px] border border-therefore bg-card px-[15px] py-[13px]">
-                <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-therefore text-[15px] font-semibold text-white">
+                <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg bg-therefore text-[15px] font-semibold text-white">
                   ✓
                 </span>
-                <div>
-                  <div className="text-[13px] font-semibold text-ink">{result.name}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold text-ink">
+                    {parsed.doc.projectTitle}
+                  </div>
                   <div className="mt-[2px] font-mono text-[11.5px] font-medium text-soft">
-                    {result.chapters} chapters · {result.scenes} scenes · {result.characters}{" "}
-                    characters detected
+                    {parsed.summary.chapters} chapters · {parsed.summary.scenes} scenes ·{" "}
+                    {parsed.summary.characters} characters · {parsed.doc.world.length} world
                   </div>
                 </div>
+                <button
+                  onClick={openImported}
+                  className="flex-shrink-0 rounded-lg bg-ink px-[14px] py-[8px] text-[12.5px] font-semibold text-bg"
+                >
+                  Open imported story
+                </button>
               </div>
             )}
           </Step>

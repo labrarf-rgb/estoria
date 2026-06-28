@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
+import { readProjectFile } from "@/store/persistence";
 
 /** "Open project" - switch between independent projects, or merge one into a series. */
 export function ProjectsModal() {
@@ -10,10 +11,24 @@ export function ProjectsModal() {
   const switchProject = useStore((s) => s.switchProject);
   const deleteProject = useStore((s) => s.deleteProject);
   const mergeProjectIntoSeries = useStore((s) => s.mergeProjectIntoSeries);
+  const openDoc = useStore((s) => s.openDoc);
   const askConfirm = useStore((s) => s.askConfirm);
   const setPanel = useStore((s) => s.setPanel);
 
   const [mergeId, setMergeId] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const onOpenFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    e.target.value = "";
+    setFileError(null);
+    try {
+      openDoc(await readProjectFile(f));
+    } catch {
+      setFileError("That isn't a valid Estoria project file.");
+    }
+  };
 
   if (!show) return null;
   const close = () => {
@@ -152,8 +167,17 @@ export function ProjectsModal() {
             >
               + New project
             </button>
+            <label className="cursor-pointer rounded-lg border border-rule bg-card px-[14px] py-[9px] text-[13px] font-medium text-ink hover:border-faint">
+              Open file...
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={onOpenFile}
+                className="hidden"
+              />
+            </label>
             <span className="text-[11.5px] font-medium text-faint">
-              {projects.length} project{projects.length === 1 ? "" : "s"} · saved in this browser
+              {fileError ?? `${projects.length} project${projects.length === 1 ? "" : "s"} · saved in this browser`}
             </span>
           </div>
         )}
