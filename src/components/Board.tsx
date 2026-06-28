@@ -39,6 +39,7 @@ export function Board() {
   const panX = useStore((s) => s.panX);
   const panY = useStore((s) => s.panY);
   const dragId = useStore((s) => s.dragId);
+  const arrangeN = useStore((s) => s.arrangeN);
 
   const setCamera = useStore((s) => s.setCamera);
   const moveChapter = useStore((s) => s.moveChapter);
@@ -132,6 +133,31 @@ export function Board() {
     if (!visible) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.chapters.length]);
+
+  // Returning to the board from the timeline: snap back to the cards (the
+  // timeline's scroll position would otherwise leave the board looking empty).
+  const prevView = useRef(view);
+  useEffect(() => {
+    const was = prevView.current;
+    prevView.current = view;
+    if (view === "board" && was === "timeline") {
+      const vp = viewportRef.current;
+      if (vp) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  // Auto-arrange also fits the arranged grid to the visible board, so the result
+  // is always on-screen. (The grid/jitter behaviour itself is unchanged.)
+  const prevArrange = useRef(arrangeN);
+  useEffect(() => {
+    const grew = arrangeN > prevArrange.current;
+    prevArrange.current = arrangeN;
+    if (!grew || view !== "board") return;
+    const vp = viewportRef.current;
+    if (vp) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrangeN]);
 
   const isVert = isTimeline && orient === "vertical";
   const pos = layoutPositions(doc, view, orient);

@@ -459,3 +459,26 @@ menu.
 - Roadmap: the two main functional gaps are now closed. Remaining: drag-drop file
   onto the board (nice-to-have), timeline fit-on-switch, and the cloud/integrations
   work (§4, §7). Still local-only — not pushed to GitHub.
+
+### 2026-06-28 — Import-prompt rewrite, snap/arrange, overflow fix (Session 10)
+
+- **Import prompt hardened** (`importPrompt`): explicit "organizer, not co-author"
+  framing with absolute-fidelity rules (don't invent/continue/embellish; leave
+  unknown fields blank) to stop models like Gemini from fabricating. Asks for a
+  **downloadable `.md` named `<Title> - estoria download.md`** (or a `FILENAME:`
+  first line if it can't attach), and explicitly supports **paste OR file
+  attachment** (use the attachment if both). Parser already tolerates a leading
+  `FILENAME:`/code-fence line.
+- **Timeline → board snap** (`Board.tsx`): returning to the board from the
+  timeline now fits-to-content, so the timeline's scroll position no longer leaves
+  the board looking empty.
+- **Auto-arrange also fits** the arranged grid to the visible board (additive;
+  the grid/jitter algorithm is unchanged) — result is always on-screen.
+- **Toolbar overflow fix**: the ⋯ (collapsing zoom/theme) now appears **only when
+  the bar truly overflows**. Rewrote the measure to remember the expanded
+  `fullWidth` and expand back once `clientWidth ≥ fullWidth + 8`, re-measuring via
+  `useLayoutEffect` each render + ResizeObserver + window resize (the old
+  guess-from-compacted-width heuristic got stuck compact).
+- Verified in-browser: ⋯ hidden at 1600px / shown at 980px / hidden again at
+  1600px; timeline-pan then back-to-board shows cards; auto-arrange fits all 8
+  sample chapters on screen. `tsc -b` clean.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Popover } from "@/components/ui/Popover";
 
@@ -41,22 +41,34 @@ export function Toolbar() {
   const barRef = useRef<HTMLDivElement>(null);
 
   // Collapse the zoom + theme controls into a "more" menu only when the toolbar
-  // doesn't fit. Hysteresis avoids flip-flopping as the layout reflows.
-  useEffect(() => {
+  // genuinely doesn't fit. We remember the width the bar needs while expanded
+  // (`fullWidth`) so that, once compacted, we know exactly when there's room to
+  // expand again — instead of guessing from the compacted layout's own width.
+  const compactRef = useRef(false);
+  compactRef.current = compact;
+  const fullWidth = useRef(0);
+  useLayoutEffect(() => {
     const el = barRef.current;
     if (!el) return;
     const measure = () => {
-      const overflow = el.scrollWidth - el.clientWidth;
-      setCompact((prev) => {
-        if (!prev && overflow > 2) return true;
-        if (prev && el.clientWidth - el.scrollWidth > 190) return false;
-        return prev;
-      });
+      if (!el.isConnected) return;
+      if (!compactRef.current) {
+        // Expanded: this is the true width everything needs.
+        fullWidth.current = el.scrollWidth;
+        if (el.scrollWidth > el.clientWidth + 2) setCompact(true);
+      } else {
+        // Compacted: expand once the viewport can hold the full bar again.
+        if (fullWidth.current && el.clientWidth >= fullWidth.current + 8) setCompact(false);
+      }
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   });
 
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
