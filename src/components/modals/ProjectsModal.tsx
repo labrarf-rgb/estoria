@@ -162,7 +162,10 @@ export function ProjectsModal() {
         {!mergeId && (
           <div className="flex items-center gap-[10px] border-t border-rule px-[24px] py-[14px]">
             <button
-              onClick={() => setPanel("showNewBook", true)}
+              onClick={() => {
+                setPanel("showProjects", false);
+                setPanel("showNewBook", true);
+              }}
               className="rounded-lg bg-ink px-[14px] py-[9px] text-[13px] font-semibold text-bg"
             >
               + New project
