@@ -17,6 +17,7 @@ export function WorldPanel() {
   const addWorldRef = useStore((s) => s.addWorldRef);
   const updateWorldRef = useStore((s) => s.updateWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
+  const askConfirm = useStore((s) => s.askConfirm);
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
 
@@ -112,7 +113,13 @@ export function WorldPanel() {
                       />
                     </div>
                     <button
-                      onClick={() => deleteWorldEntry(w.id)}
+                      onClick={() =>
+                        askConfirm({
+                          message: `Delete "${w.name}"?`,
+                          danger: true,
+                          onConfirm: () => deleteWorldEntry(w.id),
+                        })
+                      }
                       className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
                     >
                       Delete entry

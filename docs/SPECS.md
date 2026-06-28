@@ -314,3 +314,22 @@ menu.
 - Verified in-browser: header names/stat/version, File menu items, projects
   create/switch/delete (two independent projects), save-current prompt, chapter
   world/character toggles. `tsc -b` + `vite build` clean.
+
+### 2026-06-28 — Confirmations, overflow, chapter polish, project merge (Session 7)
+
+- **Global confirm dialog**: store `askConfirm({message,detail,danger,onConfirm})`
+  + `ConfirmDialog`. All destructive deletes route through it (chapter, scene,
+  ref via RefList, character, world entry, version, book, book link, project).
+- **Toolbar**: dropped the "E" box for an italic-serif "Estoria" wordmark. Zoom +
+  theme collapse into a "⋯" menu only when the bar overflows (ResizeObserver with
+  190px hysteresis to avoid flip-flop).
+- **Chapter modal**: editable per-chapter word count (sums into the book total);
+  Characters and World sections are now member lists with explicit remove (✕) and
+  an add-picker (existing + create new), not highlight-all; "World in this
+  chapter" renamed to "World details"; Scene flow has an Expand toggle
+  (40vh ↔ 74vh); pinned references use uniform fixed-size cells so they align.
+- **Project merge** (`mergeProjectIntoSeries`): move a standalone project's
+  book(s) + characters/world/assets into an existing series, then drop the source.
+  Surfaced as "Merge" in the Projects modal.
+- Verified in-browser: wordmark, editable words, char/world add+remove pickers,
+  delete confirmation prompt, multi-project. `tsc -b` + `vite build` clean.

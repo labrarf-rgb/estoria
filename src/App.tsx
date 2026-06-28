@@ -15,6 +15,7 @@ import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { ImportModal } from "@/components/modals/ImportModal";
 import { NewBookModal } from "@/components/modals/NewBookModal";
 import { ProjectsModal } from "@/components/modals/ProjectsModal";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export function App() {
   const theme = useStore((s) => s.theme);
@@ -46,6 +47,7 @@ export function App() {
       <ImportModal />
       <NewBookModal />
       <ProjectsModal />
+      <ConfirmDialog />
       <Lightbox />
       <Welcome />
     </div>

@@ -25,6 +25,7 @@ export function SeriesMap() {
   const addBookLink = useStore((s) => s.addBookLink);
   const updateBookLink = useStore((s) => s.updateBookLink);
   const deleteBookLink = useStore((s) => s.deleteBookLink);
+  const askConfirm = useStore((s) => s.askConfirm);
   const view = useStore((s) => s.view);
   const orient = useStore((s) => s.timelineOrient);
   const openLightbox = useStore((s) => s.openLightbox);
@@ -183,7 +184,14 @@ export function SeriesMap() {
                 className="w-[110px] bg-transparent text-center text-[10.5px] font-medium text-ink outline-none placeholder:text-faint"
               />
               <button
-                onClick={() => deleteBookLink(l.id)}
+                onClick={() =>
+                  askConfirm({
+                    message: "Remove this connection?",
+                    confirmLabel: "Remove",
+                    danger: true,
+                    onConfirm: () => deleteBookLink(l.id),
+                  })
+                }
                 className="text-[11px] leading-none text-faint hover:text-but"
                 title="Remove connection"
               >
@@ -296,7 +304,14 @@ export function SeriesMap() {
                   </button>
                   {doc.books.length > 1 && !isActive && (
                     <button
-                      onClick={() => deleteBook(b.id)}
+                      onClick={() =>
+                        askConfirm({
+                          message: `Delete "${b.title}"?`,
+                          detail: "Its chapters, links and notes will be permanently removed.",
+                          danger: true,
+                          onConfirm: () => deleteBook(b.id),
+                        })
+                      }
                       className="rounded-md border border-rule bg-panel px-[8px] py-[3px] text-[10px] font-semibold text-soft shadow-[var(--shadow)] hover:border-faint hover:text-but"
                     >
                       Delete

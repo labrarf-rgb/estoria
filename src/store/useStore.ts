@@ -61,6 +61,15 @@ interface UiState {
   onboarded: boolean;
 }
 
+/** A pending confirmation prompt (e.g. before a destructive delete). */
+export interface ConfirmRequest {
+  message: string;
+  detail?: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+}
+
 /** Lightweight descriptor for the project library list. */
 export interface ProjectMeta {
   id: string;
@@ -86,6 +95,12 @@ interface StoreState extends UiState {
   switchProject: (id: string) => void;
   newProject: (opts: { series: boolean; keepCurrent: boolean }) => void;
   deleteProject: (id: string) => void;
+  mergeProjectIntoSeries: (sourceId: string, targetId: string) => void;
+
+  // ---- confirmation ----
+  confirm: ConfirmRequest | null;
+  askConfirm: (req: ConfirmRequest) => void;
+  closeConfirm: () => void;
 
   // ---- chapters ----
   moveChapter: (id: string, x: number, y: number) => void;
@@ -204,6 +219,11 @@ const CHAR_PALETTE = [
 
 const uid = (prefix: string) =>
   `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
+  const seen = new Set<string>();
+  return arr.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
+};
 
 /** Renumber chapters sequentially (1..n) after add/delete. */
 const renumber = (chapters: Chapter[]): Chapter[] =>
@@ -328,6 +348,69 @@ export const useStore = create<StoreState>()(
           delete stash[id];
           return { projectStash: stash };
         }),
+
+      mergeProjectIntoSeries: (sourceId, targetId) =>
+        set((s) => {
+          if (sourceId === targetId) return s;
+          const getDoc = (id: string) => (id === s.doc.id ? s.doc : s.projectStash[id]);
+          const source = getDoc(sourceId);
+          const target = getDoc(targetId);
+          if (!source || !target) return s;
+
+          // Each source book + its board data (active book lives at the top level).
+          const sourceBooks = source.books.map((b) => ({
+            meta: b,
+            data:
+              b.id === source.activeBookId
+                ? { chapters: source.chapters, links: source.links, storyNotes: source.storyNotes }
+                : source.bookData[b.id] ?? { chapters: [], links: [], storyNotes: "" },
+          }));
+
+          const newBookData = { ...target.bookData };
+          const addedMetas = sourceBooks.map(({ meta, data }, i) => {
+            const nid = uid("b");
+            newBookData[nid] = {
+              chapters: data.chapters,
+              links: data.links,
+              storyNotes: data.storyNotes,
+            };
+            return {
+              ...meta,
+              id: nid,
+              subtitle: meta.subtitle || `Book ${target.books.length + i + 1}`,
+            };
+          });
+
+          const mergedTarget: StoryDoc = {
+            ...target,
+            seriesMode: true,
+            books: target.books.concat(addedMetas),
+            bookData: newBookData,
+            characters: dedupeById(target.characters.concat(source.characters)),
+            world: dedupeById(target.world.concat(source.world)),
+            assets: dedupeById(target.assets.concat(source.assets)),
+          };
+
+          const stash = { ...s.projectStash };
+          delete stash[sourceId];
+          delete stash[targetId];
+          // Keep any other currently-active project in the library.
+          if (s.doc.id !== sourceId && s.doc.id !== targetId) stash[s.doc.id] = s.doc;
+
+          return {
+            doc: mergedTarget,
+            projectStash: stash,
+            level: "series" as Level,
+            view: "board" as View,
+            openCh: null,
+            showProjects: false,
+          };
+        }),
+
+      // ---- confirmation ----
+      confirm: null,
+      askConfirm: (req) => set({ confirm: req }),
+      closeConfirm: () => set({ confirm: null }),
 
       // ---- chapters ----
       moveChapter: (id, x, y) =>

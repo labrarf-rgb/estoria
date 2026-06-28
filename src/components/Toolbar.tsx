@@ -30,10 +30,34 @@ export function Toolbar() {
   const addDraft = useStore((s) => s.addDraft);
   const renameDraft = useStore((s) => s.renameDraft);
   const deleteDraft = useStore((s) => s.deleteDraft);
+  const askConfirm = useStore((s) => s.askConfirm);
 
   const [versionMenu, setVersionMenu] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
+  const [compact, setCompact] = useState(false);
   const versionBtnRef = useRef<HTMLButtonElement>(null);
   const fileBtnRef = useRef<HTMLButtonElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Collapse the zoom + theme controls into a "more" menu only when the toolbar
+  // doesn't fit. Hysteresis avoids flip-flopping as the layout reflows.
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const measure = () => {
+      const overflow = el.scrollWidth - el.clientWidth;
+      setCompact((prev) => {
+        if (!prev && overflow > 2) return true;
+        if (prev && el.clientWidth - el.scrollWidth > 190) return false;
+        return prev;
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
 
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
@@ -48,14 +72,14 @@ export function Toolbar() {
     "flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-[11px] py-[7px] text-[12px] font-semibold text-ink hover:border-faint";
 
   return (
-    <div className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      ref={barRef}
+      className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {/* Brand wordmark */}
-      <div className="flex flex-shrink-0 items-center gap-[8px]">
-        <div className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-ink font-serif text-[14px] font-semibold text-bg">
-          E
-        </div>
-        <span className="font-serif text-[17px] font-semibold tracking-tight text-ink">Estoria</span>
-      </div>
+      <span className="shrink-0 select-none font-serif text-[21px] font-semibold italic tracking-tight text-ink">
+        Estoria
+      </span>
 
       <span className="h-[24px] w-px shrink-0 bg-rule" />
 
@@ -128,7 +152,14 @@ export function Toolbar() {
                 />
                 {d.id !== "main" && (
                   <button
-                    onClick={() => deleteDraft(d.id)}
+                    onClick={() =>
+                      askConfirm({
+                        message: `Delete the "${d.name}" version?`,
+                        detail: "Its title and summary overrides will be removed.",
+                        danger: true,
+                        onConfirm: () => deleteDraft(d.id),
+                      })
+                    }
                     className="px-[6px] text-[12px] text-faint hover:text-but"
                     title="Delete version"
                   >
@@ -275,38 +306,72 @@ export function Toolbar() {
         </Popover>
       </div>
 
-      {/* Zoom (board level only; the series map has its own zoom) */}
-      {!onSeriesMap && (
-        <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+      {/* Utility controls: inline when they fit, otherwise a "more" menu. */}
+      {compact ? (
+        <div className="shrink-0">
           <button
-            onClick={zoomOut}
-            className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
+            ref={moreBtnRef}
+            onClick={() => setMoreMenu((v) => !v)}
+            title="More controls"
+            className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-rule bg-card text-[18px] leading-none text-ink hover:border-faint"
           >
-            −
+            ⋯
           </button>
-          <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            onClick={zoomIn}
-            className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-          >
-            +
-          </button>
+          <Popover anchorRef={moreBtnRef} open={moreMenu} onClose={() => setMoreMenu(false)} align="right" width={200}>
+            {!onSeriesMap && (
+              <div className="flex items-center justify-between px-[8px] py-[6px]">
+                <span className="text-[12px] font-medium text-soft">Zoom</span>
+                <div className="flex items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+                  <button onClick={zoomOut} className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card">−</button>
+                  <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <button onClick={zoomIn} className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card">+</button>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-between rounded-lg px-[8px] py-[8px] text-left text-[12.5px] font-medium text-ink hover:bg-chip"
+            >
+              Theme
+              <span className="text-soft">{theme === "dark" ? "Dark" : "Light"}</span>
+            </button>
+          </Popover>
         </div>
+      ) : (
+        <>
+          {!onSeriesMap && (
+            <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+              <button
+                onClick={zoomOut}
+                className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
+              >
+                −
+              </button>
+              <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={zoomIn}
+                className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+              >
+                +
+              </button>
+            </div>
+          )}
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Dark theme" : "Light theme"}
+            className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-rule bg-card text-ink hover:border-faint"
+          >
+            <span
+              className="h-[14px] w-[14px] rounded-full border-[1.5px] border-ink"
+              style={{ background: "linear-gradient(90deg,var(--ink) 50%,transparent 50%)" }}
+            />
+          </button>
+        </>
       )}
-
-      {/* Theme (icon only) */}
-      <button
-        onClick={toggleTheme}
-        title={theme === "dark" ? "Dark theme" : "Light theme"}
-        className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-rule bg-card text-ink hover:border-faint"
-      >
-        <span
-          className="h-[14px] w-[14px] rounded-full border-[1.5px] border-ink"
-          style={{ background: "linear-gradient(90deg,var(--ink) 50%,transparent 50%)" }}
-        />
-      </button>
     </div>
   );
 }

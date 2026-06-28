@@ -28,7 +28,6 @@ export function ChapterDetail() {
   const editChapterText = useStore((s) => s.editChapterText);
   const toggleChapterChar = useStore((s) => s.toggleChapterChar);
   const toggleChapterWorld = useStore((s) => s.toggleChapterWorld);
-  const setPanel = useStore((s) => s.setPanel);
   const deleteChapter = useStore((s) => s.deleteChapter);
   const addScene = useStore((s) => s.addScene);
   const updateScene = useStore((s) => s.updateScene);
@@ -40,12 +39,18 @@ export function ChapterDetail() {
   const updateChapterRef = useStore((s) => s.updateChapterRef);
   const deleteChapterRef = useStore((s) => s.deleteChapterRef);
   const linkAssetToChapter = useStore((s) => s.linkAssetToChapter);
+  const addCharacter = useStore((s) => s.addCharacter);
+  const addWorldEntry = useStore((s) => s.addWorldEntry);
+  const askConfirm = useStore((s) => s.askConfirm);
 
   const ch = doc.chapters.find((c) => c.id === openCh);
   const chIdRef = useRef<string | null>(null);
   chIdRef.current = ch?.id ?? null;
 
   const [linkOpen, setLinkOpen] = useState(false);
+  const [charAdd, setCharAdd] = useState(false);
+  const [worldAdd, setWorldAdd] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
   const sdrag = useRef<{ idx: number; mx: number; my: number; ox: number; oy: number } | null>(null);
@@ -121,9 +126,17 @@ export function ChapterDetail() {
             )}
 
             <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
-              <span className="font-mono text-[11.5px] font-medium text-soft">
-                {ch.words.toLocaleString()} words
-              </span>
+              <label className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]">
+                <input
+                  type="number"
+                  min={0}
+                  value={ch.words}
+                  onChange={(e) => patchChapter(ch.id, { words: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                  className="w-[56px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield]"
+                  title="Words in this chapter"
+                />
+                <span className="font-mono text-[11px] font-medium text-soft">words</span>
+              </label>
               <span className="font-mono text-[11.5px] font-medium text-faint">
                 · {ch.scenes.length} scenes
               </span>
@@ -172,82 +185,141 @@ export function ChapterDetail() {
           <CloseButton onClick={closeChapter} />
         </div>
 
-        {/* Characters in this chapter */}
-        <div className="border-b border-rule px-[26px] py-[14px]">
-          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-            Characters in this chapter
-          </div>
-          <div className="flex flex-wrap gap-[7px]">
-            {doc.characters.map((c) => {
-              const on = ch.chars.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => toggleChapterChar(ch.id, c.id)}
-                  className={`flex items-center gap-[7px] rounded-full border px-[10px] py-[5px] text-[12px] font-medium ${
-                    on ? "border-transparent text-white" : "border-rule bg-card text-soft hover:border-faint"
-                  }`}
-                  style={on ? { background: c.color } : undefined}
-                >
+        {/* Characters */}
+        {(() => {
+          const members = doc.characters.filter((c) => ch.chars.includes(c.id));
+          const available = doc.characters.filter((c) => !ch.chars.includes(c.id));
+          return (
+            <div className="border-b border-rule px-[26px] py-[14px]">
+              <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+                Characters
+              </div>
+              <div className="flex flex-wrap items-center gap-[7px]">
+                {members.map((c) => (
                   <span
-                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8.5px] font-semibold text-white"
-                    style={{ background: on ? "rgba(0,0,0,.22)" : c.color }}
+                    key={c.id}
+                    className="flex items-center gap-[7px] rounded-full border border-transparent py-[5px] pl-[8px] pr-[6px] text-[12px] font-medium text-white"
+                    style={{ background: c.color }}
                   >
-                    {c.initials}
+                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/25 text-[8.5px] font-semibold">
+                      {c.initials}
+                    </span>
+                    {c.name}
+                    <button
+                      onClick={() => toggleChapterChar(ch.id, c.id)}
+                      className="ml-[1px] flex h-[16px] w-[16px] items-center justify-center rounded-full text-[10px] hover:bg-black/25"
+                      title={`Remove ${c.name}`}
+                    >
+                      ✕
+                    </button>
                   </span>
-                  {c.name}
-                </button>
-              );
-            })}
-            {doc.characters.length === 0 && (
-              <span className="text-[12px] text-faint">
-                No characters yet.{" "}
-                <button onClick={() => setPanel("showChars", true)} className="underline hover:text-ink">
-                  Add one
-                </button>
-                .
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* World in this chapter */}
-        <div className="border-b border-rule px-[26px] py-[14px]">
-          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-            World in this chapter
-          </div>
-          <div className="flex flex-wrap gap-[7px]">
-            {doc.world.map((w) => {
-              const on = (ch.worldRefs ?? []).includes(w.id);
-              return (
+                ))}
+                {members.length === 0 && (
+                  <span className="text-[12px] text-faint">No characters in this chapter yet.</span>
+                )}
                 <button
-                  key={w.id}
-                  onClick={() => toggleChapterWorld(ch.id, w.id)}
-                  className={`flex items-center gap-[7px] rounded-full border px-[10px] py-[5px] text-[12px] font-medium ${
-                    on ? "border-transparent bg-ink text-bg" : "border-rule bg-card text-soft hover:border-faint"
-                  }`}
+                  onClick={() => setCharAdd((v) => !v)}
+                  className="rounded-full border border-dashed border-line px-[11px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
                 >
+                  + Add character
+                </button>
+              </div>
+              {charAdd && (
+                <div className="mt-[10px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+                  {available.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleChapterChar(ch.id, c.id)}
+                      className="flex items-center gap-[6px] rounded-full border border-rule bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+                    >
+                      <span
+                        className="flex h-[16px] w-[16px] items-center justify-center rounded-full text-[8px] font-semibold text-white"
+                        style={{ background: c.color }}
+                      >
+                        {c.initials}
+                      </span>
+                      {c.name}
+                    </button>
+                  ))}
+                  {available.length === 0 && (
+                    <span className="text-[12px] text-faint">Everyone is already in this chapter.</span>
+                  )}
+                  <button
+                    onClick={() => addCharacter()}
+                    className="rounded-full border border-dashed border-line px-[10px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
+                  >
+                    + Create new character
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* World details */}
+        {(() => {
+          const refs = ch.worldRefs ?? [];
+          const members = doc.world.filter((w) => refs.includes(w.id));
+          const available = doc.world.filter((w) => !refs.includes(w.id));
+          return (
+            <div className="border-b border-rule px-[26px] py-[14px]">
+              <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+                World details
+              </div>
+              <div className="flex flex-wrap items-center gap-[7px]">
+                {members.map((w) => (
                   <span
-                    className={`h-[7px] w-[7px] rounded-full ${on ? "bg-bg" : "bg-soft"}`}
-                  />
-                  {w.name}
-                  <span className={`text-[9px] uppercase ${on ? "opacity-70" : "text-faint"}`}>
-                    {w.cat}
+                    key={w.id}
+                    className="flex items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg"
+                  >
+                    {w.name}
+                    <span className="text-[9px] uppercase opacity-70">{w.cat}</span>
+                    <button
+                      onClick={() => toggleChapterWorld(ch.id, w.id)}
+                      className="flex h-[16px] w-[16px] items-center justify-center rounded-full text-[10px] hover:bg-white/20"
+                      title={`Remove ${w.name}`}
+                    >
+                      ✕
+                    </button>
                   </span>
+                ))}
+                {members.length === 0 && (
+                  <span className="text-[12px] text-faint">No world details in this chapter yet.</span>
+                )}
+                <button
+                  onClick={() => setWorldAdd((v) => !v)}
+                  className="rounded-full border border-dashed border-line px-[11px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
+                >
+                  + Add world detail
                 </button>
-              );
-            })}
-            {doc.world.length === 0 && (
-              <span className="text-[12px] text-faint">
-                No world entries yet.{" "}
-                <button onClick={() => setPanel("showWorld", true)} className="underline hover:text-ink">
-                  Add one
-                </button>
-                .
-              </span>
-            )}
-          </div>
-        </div>
+              </div>
+              {worldAdd && (
+                <div className="mt-[10px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+                  {available.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => toggleChapterWorld(ch.id, w.id)}
+                      className="flex items-center gap-[6px] rounded-full border border-rule bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+                    >
+                      <span className="h-[7px] w-[7px] rounded-full bg-soft" />
+                      {w.name}
+                      <span className="text-[9px] uppercase text-faint">{w.cat}</span>
+                    </button>
+                  ))}
+                  {available.length === 0 && (
+                    <span className="text-[12px] text-faint">Every world entry is already added.</span>
+                  )}
+                  <button
+                    onClick={() => addWorldEntry()}
+                    className="rounded-full border border-dashed border-line px-[10px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
+                  >
+                    + Create new entry
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Scene flow toolbar */}
         <div className="flex items-center gap-[9px] px-[26px] pb-[12px] pt-[16px]">
@@ -255,6 +327,13 @@ export function ChapterDetail() {
             Scene flow
           </span>
           <div className="ml-auto flex items-center gap-[9px]">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+              title={expanded ? "Shrink the scene area" : "Expand the scene area"}
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
             <button
               onClick={() => arrangeScenes(ch.id, false)}
               className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
@@ -272,7 +351,9 @@ export function ChapterDetail() {
 
         {/* Scene canvas */}
         <div
-          className="mx-[22px] max-h-[40vh] overflow-auto rounded-xl border border-rule bg-bg"
+          className={`mx-[22px] overflow-auto rounded-xl border border-rule bg-bg ${
+            expanded ? "max-h-[74vh]" : "max-h-[40vh]"
+          }`}
           style={{
             backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
             backgroundSize: "22px 22px",
@@ -332,7 +413,13 @@ export function ChapterDetail() {
                       <div className="flex-1" />
                       {ch.scenes.length > 1 && (
                         <button
-                          onClick={() => deleteScene(ch.id, i)}
+                          onClick={() =>
+                            askConfirm({
+                              message: `Delete scene ${i + 1}?`,
+                              danger: true,
+                              onConfirm: () => deleteScene(ch.id, i),
+                            })
+                          }
                           className="text-[12px] leading-none text-faint opacity-0 transition-opacity hover:text-but group-hover:opacity-100"
                           title="Delete scene"
                         >
@@ -417,7 +504,14 @@ export function ChapterDetail() {
         {/* Danger zone */}
         <div className="flex items-center justify-end border-t border-rule px-[26px] py-[14px]">
           <button
-            onClick={() => deleteChapter(ch.id)}
+            onClick={() =>
+              askConfirm({
+                message: `Delete "${ch.title}"?`,
+                detail: "The chapter and its scenes will be permanently removed.",
+                danger: true,
+                onConfirm: () => deleteChapter(ch.id),
+              })
+            }
             className="rounded-lg border border-rule px-[12px] py-[7px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
           >
             Delete chapter

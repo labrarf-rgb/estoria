@@ -11,6 +11,7 @@ export function CharactersPanel() {
   const addCharacter = useStore((s) => s.addCharacter);
   const updateCharacter = useStore((s) => s.updateCharacter);
   const deleteCharacter = useStore((s) => s.deleteCharacter);
+  const askConfirm = useStore((s) => s.askConfirm);
   if (!show) return null;
   const close = () => setPanel("showChars", false);
 
@@ -121,7 +122,14 @@ export function CharactersPanel() {
                       </Field>
                     )}
                     <button
-                      onClick={() => deleteCharacter(p.id)}
+                      onClick={() =>
+                        askConfirm({
+                          message: `Delete ${p.name}?`,
+                          detail: "They will be removed from every chapter they appear in.",
+                          danger: true,
+                          onConfirm: () => deleteCharacter(p.id),
+                        })
+                      }
                       className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
                     >
                       Delete character
