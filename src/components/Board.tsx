@@ -8,6 +8,7 @@ import {
   type Camera,
 } from "@/lib/layout";
 import { displaySummary, resolveTitle } from "@/lib/drafts";
+import { roman } from "@/lib/markdown";
 import type { Chapter, ConnType } from "@/types";
 
 const CONN_COLOR: Record<ConnType, string> = {
@@ -132,9 +133,39 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.chapters.length]);
 
+  const isVert = isTimeline && orient === "vertical";
   const pos = layoutPositions(doc, view, orient);
   const posById: Record<string, { x: number; y: number }> = {};
   pos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
+
+  // In timeline view, draw a band behind each Act so the grouping is visible.
+  const actBands = (() => {
+    if (!isTimeline) return [] as {
+      act: number;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }[];
+    const groups: { act: number; ids: string[] }[] = [];
+    doc.chapters.forEach((c) => {
+      const last = groups[groups.length - 1];
+      if (last && last.act === c.act) last.ids.push(c.id);
+      else groups.push({ act: c.act, ids: [c.id] });
+    });
+    return groups.map((g) => {
+      const ps = g.ids.map((id) => posById[id]).filter(Boolean);
+      const xs = ps.map((p) => p.x);
+      const ys = ps.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs) + CARD_W;
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys) + CARD_H;
+      return isVert
+        ? { act: g.act, left: minX - 22, top: minY - 34, width: CARD_W + 44, height: maxY - minY + 34 + 18 }
+        : { act: g.act, left: minX - 20, top: minY - 38, width: maxX - minX + 40, height: CARD_H + 38 + 18 };
+    });
+  })();
 
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
     if (isTimeline) return;
@@ -171,6 +202,43 @@ export function Board() {
           transformOrigin: "0 0",
         }}
       >
+        {/* Act bands (timeline only) */}
+        {actBands.map((b, i) => (
+          <div
+            key={`act-${i}`}
+            style={{
+              position: "absolute",
+              left: b.left,
+              top: b.top,
+              width: b.width,
+              height: b.height,
+              border: "1.5px dashed var(--line)",
+              borderRadius: 16,
+              background: "var(--panel)",
+              opacity: 0.55,
+              zIndex: 0,
+            }}
+          />
+        ))}
+        {actBands.map((b, i) => (
+          <div
+            key={`act-label-${i}`}
+            style={{
+              position: "absolute",
+              left: b.left + 12,
+              top: b.top + 8,
+              zIndex: 1,
+              font: "600 11px 'Hanken Grotesk'",
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+              color: "var(--faint)",
+              pointerEvents: "none",
+            }}
+          >
+            Act {roman(b.act)}
+          </div>
+        ))}
+
         {/* Connectors */}
         <svg
           width={6000}
