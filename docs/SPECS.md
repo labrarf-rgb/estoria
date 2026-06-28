@@ -171,7 +171,69 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 
 ---
 
-## 7. Session Log
+## 7. Integrations / external sync (future, not started)
+
+A separate area from §4 cloud. **Cloud (item 4)** syncs Estoria's *own* data
+(`.estoria.json`) across the user's devices. **Integrations** project Estoria
+*into other tools* (Obsidian, Google Docs) for writing prose or sharing.
+
+### The core tension
+
+Estoria's model is a **structured graph** (board positions, scene node positions,
+typed connectors, characters, world, per-book versions, multi-book). The targets
+are **linear text**. Export is easy; reading edits *back* without losing structure
+is the hard part. Stance: **Estoria owns structure; the external tool owns prose.**
+Embed stable IDs + structural metadata as YAML front-matter / hidden blocks so a
+round-trip survives; regenerate (don't store) anything the target can't represent
+(e.g. board positions in a Google Doc).
+
+Three levels of ambition: (1) one-way export — already have markdown; (2) one-way
+push sync — keep the external copy updated; (3) two-way sync — reconcile both
+sides (genuinely hard; do last, behind a manual "pull").
+
+### Obsidian — preferred first integration (local, no backend)
+
+- A vault is just markdown files in a folder; no API/OAuth. The browser writes to
+  it via the **File System Access API** (user grants a folder handle once). Fits
+  Estoria's local-first ethos and slots behind the existing `StorageAdapter` seam.
+- Mapping (we're ~90% there): one note per chapter (folder per book),
+  characters/world as notes, `[[wikilinks]]` (already emitted), a project index
+  note. **Front-matter** carries `estoria-id`, act, status, version, scene order/
+  positions, connector types → enables pull-back.
+- Two-way is tractable: re-read on focus, **match by `estoria-id`, not title**
+  (titles change), update chapter summary / scene prose from the body, keep
+  structure from front-matter.
+
+### Google Docs — later, one-way share (rides the cloud milestone)
+
+- Real cloud API + **OAuth**; realistically needs a small **backend** (PKCE in a
+  pure SPA hits CORS/quota friction). So it's coupled to item 4, not before it.
+- Rich text, not markdown: writing a clean formatted manuscript (chapters = H1,
+  scenes = paragraphs) is fine; **parsing a Doc back is fragile**. Treat as a
+  one-way "export to a shareable Doc" for editors who live in Google. **Skip
+  two-way Docs** — not worth the cost.
+
+### Key sequencing insight
+
+The **markdown import parser** (§6 item 6) and the **Obsidian pull side** are the
+same code (markdown → `StoryDoc`). Build the parser first: it makes Import actually
+work *and* becomes the read-back engine for Obsidian sync. → Do parser, then
+Obsidian folder sync, then (with cloud) one-way Google Docs export.
+
+### Decisions to settle before building
+
+- **Granularity:** sync per **book** (a book = a manuscript = a vault folder / one
+  Doc), not whole-project.
+- **Which version syncs:** just the **active** version (multiple versions → multiple
+  files gets confusing).
+- **Conflicts:** start with Estoria-owns-structure / external-owns-prose + a manual
+  **pull** button before anything live or automatic.
+- **Google Docs intent:** sharing with editors vs. writing there — likely sharing,
+  which means one-way is enough.
+
+---
+
+## 8. Session Log
 
 ### 2026-06-27 — Project scaffolded (Session 1)
 
