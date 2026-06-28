@@ -263,19 +263,24 @@ export function Toolbar() {
             sub="Standalone, new series, or add to a series"
             onClick={() => setPanel("showNewBook", true)}
           />
-          <MenuItem
-            title="New chapter"
-            sub="A single empty chapter"
-            onClick={() => {
-              addChapter();
-              closeNewMenu();
-            }}
-          />
-          <MenuItem
-            title="Use a template..."
-            sub="Three-act, Hero's Journey, Save the Cat..."
-            onClick={() => setPanel("showTemplates", true)}
-          />
+          {/* Chapter-level actions don't apply to the series map. */}
+          {!onSeriesMap && (
+            <>
+              <MenuItem
+                title="New chapter"
+                sub="A single empty chapter"
+                onClick={() => {
+                  addChapter();
+                  closeNewMenu();
+                }}
+              />
+              <MenuItem
+                title="Use a template..."
+                sub="Three-act, Hero's Journey, Save the Cat..."
+                onClick={() => setPanel("showTemplates", true)}
+              />
+            </>
+          )}
           <MenuItem
             title="Import markdown..."
             sub="Bring an existing draft via AI"

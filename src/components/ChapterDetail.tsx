@@ -50,7 +50,7 @@ export function ChapterDetail() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
   const sdrag = useRef<{ idx: number; mx: number; my: number; ox: number; oy: number } | null>(null);
@@ -98,7 +98,9 @@ export function ChapterDetail() {
     <Scrim onClose={closeChapter} z={50} center>
       <div
         onMouseDown={stop}
-        className="max-h-[88vh] w-[min(980px,100%)] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+        className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+          expanded ? "w-[min(1320px,96vw)]" : "w-[min(980px,100%)]"
+        }`}
       >
         {/* Header */}
         <div className="sticky top-0 z-[2] flex items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
@@ -354,7 +356,7 @@ export function ChapterDetail() {
             the modal scrolls. */}
         <div
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
-            expanded ? "max-h-[74vh]" : "max-h-[40vh]"
+            expanded ? "max-h-[78vh]" : "max-h-[40vh]"
           }`}
           style={{
             backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
