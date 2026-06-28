@@ -281,7 +281,19 @@ export const sampleStory: StoryDoc = {
   ],
 
   bookData: {
-    b2: { chapters: [], links: [], storyNotes: "" },
-    b3: { chapters: [], links: [], storyNotes: "" },
+    b2: {
+      chapters: [],
+      links: [],
+      storyNotes: "",
+      drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+      activeDraftId: MAIN_DRAFT_ID,
+    },
+    b3: {
+      chapters: [],
+      links: [],
+      storyNotes: "",
+      drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+      activeDraftId: MAIN_DRAFT_ID,
+    },
   },
 };

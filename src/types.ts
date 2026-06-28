@@ -106,11 +106,13 @@ export interface BookLink {
   label?: string;
 }
 
-/** The editable board contents of a single book. */
+/** The editable board contents of a single book. Drafts/versions are per book. */
 export interface BookData {
   chapters: Chapter[];
   links: ChapterLink[];
   storyNotes: string;
+  drafts: DraftVersion[];
+  activeDraftId: string;
 }
 
 /** A free position on a canvas. */

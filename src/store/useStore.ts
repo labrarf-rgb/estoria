@@ -358,12 +358,25 @@ export const useStore = create<StoreState>()(
           if (!source || !target) return s;
 
           // Each source book + its board data (active book lives at the top level).
+          const defaultDrafts = () => [{ id: MAIN_DRAFT_ID, name: "Main draft" }];
           const sourceBooks = source.books.map((b) => ({
             meta: b,
             data:
               b.id === source.activeBookId
-                ? { chapters: source.chapters, links: source.links, storyNotes: source.storyNotes }
-                : source.bookData[b.id] ?? { chapters: [], links: [], storyNotes: "" },
+                ? {
+                    chapters: source.chapters,
+                    links: source.links,
+                    storyNotes: source.storyNotes,
+                    drafts: source.drafts,
+                    activeDraftId: source.activeDraftId,
+                  }
+                : source.bookData[b.id] ?? {
+                    chapters: [],
+                    links: [],
+                    storyNotes: "",
+                    drafts: defaultDrafts(),
+                    activeDraftId: MAIN_DRAFT_ID,
+                  },
           }));
 
           const newBookData = { ...target.bookData };
@@ -373,6 +386,8 @@ export const useStore = create<StoreState>()(
               chapters: data.chapters,
               links: data.links,
               storyNotes: data.storyNotes,
+              drafts: data.drafts ?? defaultDrafts(),
+              activeDraftId: data.activeDraftId ?? MAIN_DRAFT_ID,
             };
             return {
               ...meta,
@@ -769,9 +784,17 @@ export const useStore = create<StoreState>()(
               chapters: s.doc.chapters,
               links: s.doc.links,
               storyNotes: s.doc.storyNotes,
+              drafts: s.doc.drafts,
+              activeDraftId: s.doc.activeDraftId,
             },
           };
-          const load = stash[id] ?? { chapters: [], links: [], storyNotes: "" };
+          const load = stash[id] ?? {
+            chapters: [],
+            links: [],
+            storyNotes: "",
+            drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+            activeDraftId: MAIN_DRAFT_ID,
+          };
           const rest = { ...stash };
           delete rest[id];
           return {
@@ -781,6 +804,8 @@ export const useStore = create<StoreState>()(
               chapters: load.chapters,
               links: load.links,
               storyNotes: load.storyNotes,
+              drafts: load.drafts ?? [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+              activeDraftId: load.activeDraftId ?? MAIN_DRAFT_ID,
               bookData: rest,
             },
             openCh: null,
@@ -807,6 +832,8 @@ export const useStore = create<StoreState>()(
               chapters: s.doc.chapters,
               links: s.doc.links,
               storyNotes: s.doc.storyNotes,
+              drafts: s.doc.drafts,
+              activeDraftId: s.doc.activeDraftId,
             },
           };
           const lastX = Math.max(80, ...s.doc.books.map((b) => b.x ?? 80));
@@ -829,6 +856,8 @@ export const useStore = create<StoreState>()(
               chapters: [],
               links: [],
               storyNotes: "",
+              drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+              activeDraftId: MAIN_DRAFT_ID,
               bookData: stash,
             },
             openCh: null,

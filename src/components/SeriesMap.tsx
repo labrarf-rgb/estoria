@@ -131,6 +131,10 @@ export function SeriesMap() {
     <div
       ref={viewportRef}
       onMouseDown={(e) => {
+        // Only the background pans / cancels connect mode. Clicks that land on a
+        // book card must not cancel connect (that broke connecting, especially
+        // in timeline mode where cards don't stop mousedown propagation).
+        if ((e.target as HTMLElement).closest("[data-book-card]")) return;
         pan.current = { mx: e.clientX, my: e.clientY, px: cam.panX, py: cam.panY };
         if (connectFrom) setConnectFrom(null);
       }}
@@ -209,6 +213,7 @@ export function SeriesMap() {
           return (
             <div
               key={b.id}
+              data-book-card
               onMouseDown={(e) => onCardDown(e, b.id, p.x, p.y)}
               onClick={() => onCardClick(b.id)}
               onDoubleClick={() => enterBook(b.id)}

@@ -349,9 +349,11 @@ export function ChapterDetail() {
           </div>
         </div>
 
-        {/* Scene canvas */}
+        {/* Scene canvas. `isolate` keeps the absolutely-positioned scene cards
+            (z-5/z-10) contained so they can't paint over the sticky header when
+            the modal scrolls. */}
         <div
-          className={`mx-[22px] overflow-auto rounded-xl border border-rule bg-bg ${
+          className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
             expanded ? "max-h-[74vh]" : "max-h-[40vh]"
           }`}
           style={{
