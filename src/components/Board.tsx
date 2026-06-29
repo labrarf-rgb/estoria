@@ -42,6 +42,7 @@ export function Board() {
   const arrangeN = useStore((s) => s.arrangeN);
 
   const setCamera = useStore((s) => s.setCamera);
+  const setBoardSize = useStore((s) => s.setBoardSize);
   const moveChapter = useStore((s) => s.moveChapter);
   const setDragId = useStore((s) => s.setDragId);
   const openChapter = useStore((s) => s.openChapter);
@@ -103,6 +104,17 @@ export function Board() {
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
   }, [isTimeline, orient, setCamera]);
+
+  // Keep the store's board size current so auto-arrange can size to the viewport.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const report = () => setBoardSize(vp.clientWidth, vp.clientHeight);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [setBoardSize]);
 
   // Fit all cards to the screen on first load and whenever we switch books.
   const activeBookId = doc.activeBookId;

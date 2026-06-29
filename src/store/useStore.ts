@@ -16,6 +16,7 @@ import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
   autoArrange,
+  bestColumns,
   CARD_W,
   sceneAutoArrange,
   type Camera,
@@ -39,6 +40,9 @@ interface UiState {
   panX: number;
   panY: number;
   arrangeN: number;
+  /** Last reported board viewport size, used to size auto-arrange. */
+  boardW: number;
+  boardH: number;
   dragId: string | null;
   openCh: string | null;
   sceneArrangeN: number;
@@ -108,6 +112,7 @@ interface StoreState extends UiState {
   addChapter: () => void;
   deleteChapter: (id: string) => void;
   autoArrangeBoard: () => void;
+  setBoardSize: (w: number, h: number) => void;
   setChapterAct: (id: string, act: number) => void;
   bumpChapterAct: (id: string, delta: number) => void;
   patchChapter: (id: string, patch: Partial<Chapter>) => void;
@@ -239,6 +244,8 @@ const initialUi: UiState = {
   panX: 34,
   panY: 28,
   arrangeN: 0,
+  boardW: 0,
+  boardH: 0,
   dragId: null,
   openCh: null,
   sceneArrangeN: 0,
@@ -497,9 +504,14 @@ export const useStore = create<StoreState>()(
 
       autoArrangeBoard: () =>
         set((s) => {
-          const { chapters, arrangeN } = autoArrange(s.doc.chapters, s.arrangeN);
+          // Size the grid to the visible board so the result fills the space
+          // (more columns on a wide screen) instead of a fixed 4-wide grid.
+          const cols = bestColumns(s.doc.chapters.length, s.boardW, s.boardH);
+          const { chapters, arrangeN } = autoArrange(s.doc.chapters, s.arrangeN, cols);
           return { doc: { ...s.doc, chapters }, arrangeN, view: "board" };
         }),
+
+      setBoardSize: (w, h) => set({ boardW: w, boardH: h }),
 
       setChapterAct: (id, act) =>
         set((s) => ({

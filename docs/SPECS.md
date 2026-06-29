@@ -506,3 +506,23 @@ menu.
   and Story Structure Research.md"), outside the repo.
 - Verified in-browser (Templates order + new entries render); `tsc -b` + `vite
   build` clean. Local only — not pushed to GitHub.
+
+### 2026-06-28 — Shipped to Pages; smarter auto-arrange (Session 12)
+
+- **Live**: merged `multi-book-and-editing` → `main`, created public repo
+  `labrarf-rgb/estoria`, added Vite `base: /estoria/` (prod only) and a GitHub
+  Actions Pages workflow. Site auto-deploys on push to main:
+  https://labrarf-rgb.github.io/estoria/ (embedded on labrarf.com — beta).
+- **Auto-arrange maximizes board space** (beta feedback: 17-stage Hero's Journey
+  was a fixed 4-wide grid → tiny 69% fit on a 13" MacBook Air). New
+  `bestColumns(n, vpW, vpH)` in `lib/layout.ts` picks the column count whose
+  fit-to-content zoom is largest (ties break toward the grid aspect closest to
+  the viewport, so small boards don't become a tall single column). `autoArrange`
+  takes an optional `cols`; the Board reports its size to the store
+  (`setBoardSize` via ResizeObserver) and `autoArrangeBoard` feeds `bestColumns`.
+  Also tightened the grid + fit padding (gaps 48/56, margin 28, `FIT_PAD` 36,
+  shared by `autoArrange`/`bestColumns`/`fitToContent`) so the fit zooms in to
+  actually fill the board instead of leaving big margins. The `FIT_ZOOM_MAX`
+  (1.05) cap keeps a 1–4 card book from blowing up to oversized cards.
+  Verified: 17 chapters lay out 5-per-row and fill the board (~85%); a 4-beat
+  book stays at a normal ~105% size, centered.

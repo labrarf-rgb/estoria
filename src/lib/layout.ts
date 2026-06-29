@@ -18,20 +18,59 @@ export interface ArrangeResult {
   arrangeN: number;
 }
 
+/** Grid spacing shared by auto-arrange and the column-count estimator. Kept
+ *  fairly tight so an auto-arranged board fills the screen and stays readable. */
+export const GRID_GAP_X = 48;
+export const GRID_GAP_Y = 56;
+export const GRID_MARGIN = 28;
+/** Viewport breathing room used by fit-to-content and the column estimator. */
+export const FIT_PAD = 36;
+/** Largest zoom fit-to-content will use — keeps small boards from oversizing. */
+export const FIT_ZOOM_MAX = 1.05;
+
+/**
+ * Choose the column count that makes the arranged grid fill the visible board
+ * best — i.e. the layout whose fit-to-content zoom is largest. Ties (everything
+ * already fits at max zoom, common for small boards) break toward the grid whose
+ * aspect ratio is closest to the viewport, avoiding a lone tall column.
+ */
+export function bestColumns(n: number, vpW: number, vpH: number, pad = FIT_PAD): number {
+  if (n <= 1) return 1;
+  if (vpW <= 0 || vpH <= 0) return Math.min(4, n);
+  const vpAspect = vpW / vpH;
+  let best = 1;
+  let bestZoom = -Infinity;
+  let bestAspectDiff = Infinity;
+  for (let c = 1; c <= n; c++) {
+    const rows = Math.ceil(n / c);
+    const cw = c * CARD_W + (c - 1) * GRID_GAP_X;
+    const ch = rows * CARD_H + (rows - 1) * GRID_GAP_Y;
+    const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
+    const aspectDiff = Math.abs(cw / ch - vpAspect);
+    if (zoom > bestZoom + 0.01 || (Math.abs(zoom - bestZoom) <= 0.01 && aspectDiff < bestAspectDiff)) {
+      bestZoom = Math.max(bestZoom, zoom);
+      bestAspectDiff = aspectDiff;
+      best = c;
+    }
+  }
+  return best;
+}
+
 /**
  * Lay chapters out on a grid with decaying jitter. Each successive call eases
  * toward a clean grid (amp shrinks) without ever snapping perfectly straight,
- * giving a hand-arranged feel.
+ * giving a hand-arranged feel. `cols` defaults to 4; pass a value (e.g. from
+ * `bestColumns`) to size the grid to the available board space.
  */
-export function autoArrange(chapters: Chapter[], arrangeN: number): ArrangeResult {
-  const cols = 4;
-  const gapX = 72;
-  const gapY = 82;
-  const m = 46;
+export function autoArrange(chapters: Chapter[], arrangeN: number, cols = 4): ArrangeResult {
+  const c0 = Math.max(1, cols);
+  const gapX = GRID_GAP_X;
+  const gapY = GRID_GAP_Y;
+  const m = GRID_MARGIN;
   const amp = Math.pow(0.6, arrangeN);
   const next = chapters.map((c, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
+    const col = i % c0;
+    const row = Math.floor(i / c0);
     const jx = (prand(i + 1) * 2 - 1) * 30 * amp;
     const jy = ((prand(i + 9) * 2 - 1) * 34 + (col % 2 === 0 ? 26 : -22)) * amp;
     return {
@@ -87,7 +126,7 @@ export function fitToContent(
   chapters: Chapter[],
   vpW: number,
   vpH: number,
-  pad = 72
+  pad = FIT_PAD
 ): Camera {
   if (chapters.length === 0) return { zoom: 1, panX: pad, panY: pad };
   const xs = chapters.map((c) => c.x);
@@ -98,7 +137,7 @@ export function fitToContent(
   const maxY = Math.max(...ys) + CARD_H;
   const cw = maxX - minX;
   const ch = maxY - minY;
-  const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, 1.05);
+  const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
   return {
     zoom,
     panX: (vpW - cw * zoom) / 2 - minX * zoom,
