@@ -532,3 +532,11 @@ menu.
   matching the viewport aspect — so 4 cards become 2x2, not 3+1. The
   maximize-zoom path is unchanged, so larger counts still spread wider to use the
   available width. Verified: 4 cards = 2x2 at 1680px wide.
+- **Scene auto-arrange fills the visible canvas** (beta follow-up): the chapter
+  modal's scene canvas isn't zoomed, it scrolls, so `sceneColumnsForWidth(n, visW)`
+  packs as many columns as fit the *visible* canvas width; `sceneAutoArrange`/
+  `arrangeScenes` take an optional `cols`. The chapter modal measures the scene
+  box (`sceneBoxRef`) at click time, so Auto-arrange lays out into more columns
+  when expanded and fewer when collapsed — each mode fills its own width.
+  Verified: 12 scenes → ~5 columns expanded (box ~1252px) vs 3 collapsed
+  (box ~912px).

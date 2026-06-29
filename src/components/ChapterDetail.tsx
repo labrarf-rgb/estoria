@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
-import { SCENE_W, SCENE_H } from "@/lib/layout";
+import { SCENE_W, SCENE_H, sceneColumnsForWidth } from "@/lib/layout";
 import { resolveSummary, resolveTitle } from "@/lib/drafts";
 import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType } from "@/types";
 
@@ -51,6 +51,7 @@ export function ChapterDetail() {
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const sceneBoxRef = useRef<HTMLDivElement>(null);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
   const sdrag = useRef<{ idx: number; mx: number; my: number; ox: number; oy: number } | null>(null);
@@ -80,6 +81,13 @@ export function ChapterDetail() {
   const positions = ch.scenePos ?? [];
   const canvasW = Math.max(640, ...positions.map((p) => p.x + SCENE_W)) + 24;
   const canvasH = Math.max(260, ...positions.map((p) => p.y + SCENE_H)) + 24;
+
+  // Auto-arrange scenes to fill the *visible* canvas (collapsed vs expanded use
+  // different widths, so each mode arranges into a different column count).
+  const onArrangeScenes = () => {
+    const w = sceneBoxRef.current?.clientWidth ?? 0;
+    arrangeScenes(ch.id, false, sceneColumnsForWidth(ch.scenes.length, w));
+  };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
     const target = e.target as HTMLElement;
@@ -337,7 +345,7 @@ export function ChapterDetail() {
               {expanded ? "Collapse" : "Expand"}
             </button>
             <button
-              onClick={() => arrangeScenes(ch.id, false)}
+              onClick={onArrangeScenes}
               className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
             >
               Auto-arrange
@@ -355,6 +363,7 @@ export function ChapterDetail() {
             (z-5/z-10) contained so they can't paint over the sticky header when
             the modal scrolls. */}
         <div
+          ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
             expanded ? "max-h-[78vh]" : "max-h-[40vh]"
           }`}

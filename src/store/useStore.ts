@@ -126,7 +126,7 @@ interface StoreState extends UiState {
   deleteScene: (chId: string, idx: number) => void;
   moveScene: (chId: string, idx: number, x: number, y: number) => void;
   cycleSceneLink: (chId: string, idx: number) => void;
-  arrangeScenes: (chId: string, reset?: boolean) => void;
+  arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
   // ---- chapter refs ----
   addChapterRef: (chId: string, kind: RefKind) => void;
@@ -668,7 +668,7 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      arrangeScenes: (chId, reset = false) =>
+      arrangeScenes: (chId, reset = false, cols) =>
         set((s) => {
           const n = reset ? 0 : s.sceneArrangeN;
           return {
@@ -676,7 +676,7 @@ export const useStore = create<StoreState>()(
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? { ...c, scenePos: sceneAutoArrange(c.scenes, n) } : c
+                c.id === chId ? { ...c, scenePos: sceneAutoArrange(c.scenes, n, cols) } : c
               ),
             },
           };

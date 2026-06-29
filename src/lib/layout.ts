@@ -146,21 +146,42 @@ export function fitToContent(
   };
 }
 
-/** Scene-node grid columns by scene count. */
+/** Scene-node grid columns by scene count (fallback when no width is known). */
 function sceneCols(n: number): number {
   return n <= 1 ? 1 : n <= 4 ? 2 : 3;
 }
 
-/** Lay scene nodes for a chapter's detail canvas, with decaying jitter. */
-export function sceneAutoArrange(scenes: string[], arrangeN: number): Vec2[] {
-  const gx = 44;
-  const gy = 40;
-  const m = 18;
-  const cols = sceneCols(scenes.length);
+const SCENE_GAP_X = 44;
+const SCENE_GAP_Y = 40;
+const SCENE_MARGIN = 18;
+
+/**
+ * Columns that fit across the *visible* scene-canvas width (the canvas isn't
+ * zoomed, it scrolls), so auto-arrange uses the room it actually has — more
+ * columns when the chapter modal is expanded, fewer when collapsed.
+ */
+export function sceneColumnsForWidth(n: number, visW: number): number {
+  if (n <= 1) return 1;
+  if (visW <= 0) return sceneCols(n);
+  const usable = visW - SCENE_MARGIN * 2;
+  const fit = Math.floor((usable + SCENE_GAP_X) / (SCENE_W + SCENE_GAP_X));
+  return Math.max(1, Math.min(n, fit));
+}
+
+/**
+ * Lay scene nodes for a chapter's detail canvas, with decaying jitter. `cols`
+ * defaults to a count-based heuristic; pass a width-derived value
+ * (see `sceneColumnsForWidth`) to fill the visible canvas.
+ */
+export function sceneAutoArrange(scenes: string[], arrangeN: number, cols?: number): Vec2[] {
+  const gx = SCENE_GAP_X;
+  const gy = SCENE_GAP_Y;
+  const m = SCENE_MARGIN;
+  const c0 = Math.max(1, cols ?? sceneCols(scenes.length));
   const amp = Math.pow(0.6, arrangeN);
   return scenes.map((_, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
+    const col = i % c0;
+    const row = Math.floor(i / c0);
     const jx = (prand(i + 1) * 2 - 1) * 18 * amp;
     const jy = ((prand(i + 9) * 2 - 1) * 18 + (col % 2 === 0 ? 12 : -10)) * amp;
     return { x: m + col * (SCENE_W + gx) + jx, y: m + row * (SCENE_H + gy) + jy };
