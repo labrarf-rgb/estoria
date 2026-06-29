@@ -526,3 +526,9 @@ menu.
   (1.05) cap keeps a 1–4 card book from blowing up to oversized cards.
   Verified: 17 chapters lay out 5-per-row and fill the board (~85%); a 4-beat
   book stays at a normal ~105% size, centered.
+- **Balanced grids on ties** (beta follow-up): on a wide screen, small counts hit
+  the zoom cap for several column counts; the tie-break now prefers a square-ish
+  grid (closest to `ceil(sqrt(n))`, nudged toward more columns) instead of
+  matching the viewport aspect — so 4 cards become 2x2, not 3+1. The
+  maximize-zoom path is unchanged, so larger counts still spread wider to use the
+  available width. Verified: 4 cards = 2x2 at 1680px wide.

@@ -30,26 +30,27 @@ export const FIT_ZOOM_MAX = 1.05;
 
 /**
  * Choose the column count that makes the arranged grid fill the visible board
- * best — i.e. the layout whose fit-to-content zoom is largest. Ties (everything
- * already fits at max zoom, common for small boards) break toward the grid whose
- * aspect ratio is closest to the viewport, avoiding a lone tall column.
+ * best — i.e. the layout whose fit-to-content zoom is largest. When several
+ * column counts tie (everything already fits at the max-zoom cap, common on a
+ * wide screen with few cards) prefer a balanced, square-ish grid — so 4 cards
+ * become 2x2, not 3+1 — nudging slightly toward more columns to use width.
  */
 export function bestColumns(n: number, vpW: number, vpH: number, pad = FIT_PAD): number {
   if (n <= 1) return 1;
   if (vpW <= 0 || vpH <= 0) return Math.min(4, n);
-  const vpAspect = vpW / vpH;
+  const target = Math.ceil(Math.sqrt(n)); // a balanced grid
   let best = 1;
   let bestZoom = -Infinity;
-  let bestAspectDiff = Infinity;
+  let bestScore = Infinity; // lower = more balanced
   for (let c = 1; c <= n; c++) {
     const rows = Math.ceil(n / c);
     const cw = c * CARD_W + (c - 1) * GRID_GAP_X;
     const ch = rows * CARD_H + (rows - 1) * GRID_GAP_Y;
     const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
-    const aspectDiff = Math.abs(cw / ch - vpAspect);
-    if (zoom > bestZoom + 0.01 || (Math.abs(zoom - bestZoom) <= 0.01 && aspectDiff < bestAspectDiff)) {
+    const score = Math.abs(c - target) - c * 1e-4; // ties nudge to wider grids
+    if (zoom > bestZoom + 0.01 || (Math.abs(zoom - bestZoom) <= 0.01 && score < bestScore)) {
       bestZoom = Math.max(bestZoom, zoom);
-      bestAspectDiff = aspectDiff;
+      bestScore = score;
       best = c;
     }
   }
