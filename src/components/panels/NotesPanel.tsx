@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
-import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import type { PinnedRef } from "@/types";
 
@@ -16,7 +15,10 @@ export function NotesPanel() {
   const addAsset = useStore((s) => s.addAsset);
   const updateAsset = useStore((s) => s.updateAsset);
   const deleteAsset = useStore((s) => s.deleteAsset);
-  const [libView, setLibView] = useState<RefView>("list");
+  const libView = useStore((s) => s.refView);
+  const setLibView = useStore((s) => s.setRefView);
+  const notesExpanded = useStore((s) => s.textareaExpanded.storyNotes);
+  const toggleTextarea = useStore((s) => s.toggleTextarea);
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
 
@@ -44,6 +46,8 @@ export function NotesPanel() {
             placeholder="Jot themes, throughlines, open questions, pacing notes..."
             collapsedRows={9}
             expandedHeight="62vh"
+            expanded={notesExpanded}
+            onToggleExpanded={() => toggleTextarea("storyNotes")}
             className="rounded-xl border border-rule bg-card p-4 font-serif text-[13.5px] leading-[1.65] text-ink outline-none"
           />
 

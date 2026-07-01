@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
-import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth } from "@/lib/layout";
 import { resolveSummary, resolveTitle } from "@/lib/drafts";
@@ -44,6 +44,14 @@ export function ChapterDetail() {
   const addCharacter = useStore((s) => s.addCharacter);
   const addWorldEntry = useStore((s) => s.addWorldEntry);
   const askConfirm = useStore((s) => s.askConfirm);
+  const collapsed = useStore((s) => s.chapterSectionsCollapsed);
+  const toggleSection = useStore((s) => s.toggleChapterSection);
+  const refView = useStore((s) => s.refView);
+  const setRefView = useStore((s) => s.setRefView);
+  const expanded = useStore((s) => s.sceneFlowExpanded);
+  const setSceneFlowExpanded = useStore((s) => s.setSceneFlowExpanded);
+  const notesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
+  const toggleTextarea = useStore((s) => s.toggleTextarea);
 
   const ch = doc.chapters.find((c) => c.id === openCh);
   const chIdRef = useRef<string | null>(null);
@@ -52,8 +60,6 @@ export function ChapterDetail() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
-  const [expanded, setExpanded] = useState(true);
-  const [refView, setRefView] = useState<RefView>("list");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
@@ -204,9 +210,14 @@ export function ChapterDetail() {
           const available = doc.characters.filter((c) => !ch.chars.includes(c.id));
           return (
             <div className="border-b border-rule px-[26px] py-[14px]">
-              <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-                Characters
-              </div>
+              <SectionHeader
+                label="Characters"
+                count={members.length ? `${members.length}` : undefined}
+                collapsed={collapsed.chars}
+                onToggle={() => toggleSection("chars")}
+              />
+              {collapsed.chars ? null : (
+              <>
               <div className="flex flex-wrap items-center gap-[7px]">
                 {members.map((c) => (
                   <span
@@ -265,6 +276,8 @@ export function ChapterDetail() {
                   </button>
                 </div>
               )}
+              </>
+              )}
             </div>
           );
         })()}
@@ -276,9 +289,14 @@ export function ChapterDetail() {
           const available = doc.world.filter((w) => !refs.includes(w.id));
           return (
             <div className="border-b border-rule px-[26px] py-[14px]">
-              <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-                World details
-              </div>
+              <SectionHeader
+                label="World details"
+                count={members.length ? `${members.length}` : undefined}
+                collapsed={collapsed.world}
+                onToggle={() => toggleSection("world")}
+              />
+              {collapsed.world ? null : (
+              <>
               <div className="flex flex-wrap items-center gap-[7px]">
                 {members.map((w) => (
                   <span
@@ -330,6 +348,8 @@ export function ChapterDetail() {
                   </button>
                 </div>
               )}
+              </>
+              )}
             </div>
           );
         })()}
@@ -341,7 +361,7 @@ export function ChapterDetail() {
           </span>
           <div className="ml-auto flex items-center gap-[9px]">
             <button
-              onClick={() => setExpanded((v) => !v)}
+              onClick={() => setSceneFlowExpanded(!expanded)}
               className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
               title={expanded ? "Shrink the scene area" : "Expand the scene area"}
             >
@@ -462,28 +482,39 @@ export function ChapterDetail() {
 
         {/* Chapter notes */}
         <div className="px-[26px] pt-[18px]">
-          <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-            Chapter notes
-          </div>
-          <ExpandableTextarea
-            value={ch.notes ?? ""}
-            onChange={(v) => patchChapter(ch.id, { notes: v })}
-            placeholder="Reminders, revision ideas, continuity flags for this chapter..."
-            collapsedRows={3}
-            expandedHeight="52vh"
-            className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
+          <SectionHeader
+            label="Chapter notes"
+            count={ch.notes?.trim() ? "written" : undefined}
+            collapsed={collapsed.notes}
+            onToggle={() => toggleSection("notes")}
           />
+          {!collapsed.notes && (
+            <ExpandableTextarea
+              value={ch.notes ?? ""}
+              onChange={(v) => patchChapter(ch.id, { notes: v })}
+              placeholder="Reminders, revision ideas, continuity flags for this chapter..."
+              collapsedRows={3}
+              expandedHeight="52vh"
+              expanded={notesExpanded}
+              onToggleExpanded={() => toggleTextarea("chapterNotes")}
+              className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
+            />
+          )}
         </div>
 
         {/* Pinned refs */}
         <div className="px-[26px] py-[18px]">
-          <div className="mb-[13px] flex items-center gap-[12px]">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-soft">
-              Pinned references
-            </div>
-            <div className="flex-1" />
-            <ViewToggle view={refView} onChange={setRefView} />
+          <div className={collapsed.refs ? "" : "mb-[13px]"}>
+            <SectionHeader
+              label="Pinned references"
+              count={ch.refs.length ? `${ch.refs.length}` : undefined}
+              collapsed={collapsed.refs}
+              onToggle={() => toggleSection("refs")}
+              right={collapsed.refs ? undefined : <ViewToggle view={refView} onChange={setRefView} />}
+            />
           </div>
+          {!collapsed.refs && (
+          <>
           <RefList
             refs={ch.refs}
             onAdd={(kind) => addChapterRef(ch.id, kind)}
@@ -521,6 +552,8 @@ export function ChapterDetail() {
               )}
             </div>
           )}
+          </>
+          )}
         </div>
 
         {/* Danger zone */}
@@ -541,5 +574,40 @@ export function ChapterDetail() {
         </div>
       </div>
     </Scrim>
+  );
+}
+
+/** Collapsible section label for the chapter modal. Clicking the label (or its
+ *  chevron) hides the section body while keeping this row visible. `right` holds
+ *  optional controls (e.g. the refs view toggle) shown only when expanded. */
+function SectionHeader({
+  label,
+  count,
+  collapsed,
+  onToggle,
+  right,
+}: {
+  label: string;
+  count?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-[12px]">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft hover:text-ink"
+        title={collapsed ? "Expand section" : "Collapse section"}
+      >
+        <span className="text-[9px] font-medium text-faint">{collapsed ? "▸" : "▾"}</span>
+        {label}
+        {count && (
+          <span className="font-medium normal-case tracking-normal text-faint">· {count}</span>
+        )}
+      </button>
+      <div className="flex-1" />
+      {right}
+    </div>
   );
 }

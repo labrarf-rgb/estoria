@@ -13,6 +13,8 @@ export function ExpandableTextarea({
   className = "",
   collapsedRows = 2,
   expandedHeight = "48vh",
+  expanded: expandedProp,
+  onToggleExpanded,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -20,8 +22,14 @@ export function ExpandableTextarea({
   className?: string;
   collapsedRows?: number;
   expandedHeight?: string;
+  /** Controlled expand state. When omitted, the component manages its own. */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [internal, setInternal] = useState(false);
+  const controlled = expandedProp !== undefined;
+  const expanded = controlled ? expandedProp : internal;
+  const toggle = () => (controlled ? onToggleExpanded?.() : setInternal((v) => !v));
   return (
     <div className="relative">
       <textarea
@@ -33,7 +41,7 @@ export function ExpandableTextarea({
         className={`w-full resize-y ${className}`}
       />
       <button
-        onClick={() => setExpanded((v) => !v)}
+        onClick={toggle}
         className="absolute right-[8px] top-[8px] rounded-md bg-chip px-[8px] py-[2px] text-[10px] font-semibold uppercase tracking-wide text-soft hover:text-ink"
         title={expanded ? "Shrink" : "Make longer"}
       >

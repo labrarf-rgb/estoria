@@ -569,3 +569,49 @@ Verified in-browser on the sample: story-notes expand + library list view with
 click-to-expand; chapter notes expand; pinned-refs list view (image row expands to
 its upload/thumbnail, note row to title+body); world Description/Notes expand +
 References Card/List toggle. `tsc -b` + `vite build` clean (65 modules).
+
+Follow-ups: **list is the default** ref view (RefList prop + all three consumers'
+initial state); Card is one click away.
+
+### 2026-06-30 — Collapsible chapter-modal sections (Session 14)
+
+The chapter modal was getting tall. Its sections can now be **collapsed to a
+single header row** that stays visible (same disclosure idea as the Characters /
+World side-panel entry cards), so you can compact what you're not using and shrink
+the modal.
+
+- **Which sections:** Characters, World details, Chapter notes, Pinned references.
+  Scene flow is deliberately excluded — it already has its own Collapse/Expand
+  sizing toggle (40vh↔78vh) and two competing controls would confuse.
+- **`SectionHeader`** (local to `ChapterDetail.tsx`): a clickable label + `▸/▾`
+  chevron; collapsing hides the body. Shows a light count hint when there's content
+  (`CHARACTERS · 2`, `PINNED REFERENCES · 1`, chapter notes shows `· written`).
+  The refs view (Card/List) toggle rides in the header's `right` slot and only
+  shows when that section is expanded.
+- **Persisted, global** collapse state: new store field
+  `chapterSectionsCollapsed: Record<ChapterSection, boolean>` (`ChapterSection =
+  "chars" | "world" | "notes" | "refs"`) + `toggleChapterSection`, added to
+  `partialize` so it survives reloads. It's a global preference (applies to every
+  chapter), not per-chapter — collapse Pinned references once and every chapter you
+  open opens it collapsed. Older persisted state without the key falls back to the
+  all-expanded default via zustand's shallow merge (no migration needed).
+
+Verified in-browser: collapsing Characters/World/Notes/Refs compacts each to a
+header row while Scene flow stays open; localStorage shows the four flags; reload
+restores them. `tsc -b` + `vite build` clean.
+
+Follow-up (same session) — **the remaining view/size states now persist too**, all
+as global prefs added to `partialize`:
+- `refView: RefView` — the Card/List choice, shared across chapter pinned refs, the
+  story-notes library, and world refs (one setting, `setRefView`). The three
+  consumers dropped their local `useState` for the store value.
+- `textareaExpanded: Record<TextareaKey, boolean>` (`"storyNotes" | "chapterNotes"
+  | "worldDesc" | "worldNotes"`) + `toggleTextarea` — remembers each expandable
+  textarea's tall/short state. `ExpandableTextarea` gained optional controlled
+  props (`expanded` / `onToggleExpanded`); it still self-manages when they're
+  omitted.
+- `sceneFlowExpanded: boolean` + `setSceneFlowExpanded` — the chapter modal's
+  scene-flow Collapse/Expand (replaces its old local `expanded` state; default
+  still expanded).
+  Verified: set Card view + collapse scene flow + expand chapter notes, reload →
+  all three restored from localStorage. `tsc -b` + `vite build` clean.

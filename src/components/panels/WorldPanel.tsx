@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
-import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import type { WorldCategory } from "@/types";
 
@@ -21,7 +20,11 @@ export function WorldPanel() {
   const updateWorldRef = useStore((s) => s.updateWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
   const askConfirm = useStore((s) => s.askConfirm);
-  const [refView, setRefView] = useState<RefView>("list");
+  const refView = useStore((s) => s.refView);
+  const setRefView = useStore((s) => s.setRefView);
+  const descExpanded = useStore((s) => s.textareaExpanded.worldDesc);
+  const notesExpanded = useStore((s) => s.textareaExpanded.worldNotes);
+  const toggleTextarea = useStore((s) => s.toggleTextarea);
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
 
@@ -95,6 +98,8 @@ export function WorldPanel() {
                         value={w.desc}
                         onChange={(v) => updateWorldEntry(w.id, { desc: v })}
                         expandedHeight="40vh"
+                        expanded={descExpanded}
+                        onToggleExpanded={() => toggleTextarea("worldDesc")}
                         className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
                       />
                     </div>
@@ -104,6 +109,8 @@ export function WorldPanel() {
                         value={w.notes}
                         onChange={(v) => updateWorldEntry(w.id, { notes: v })}
                         expandedHeight="40vh"
+                        expanded={notesExpanded}
+                        onToggleExpanded={() => toggleTextarea("worldNotes")}
                         className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
                       />
                     </div>

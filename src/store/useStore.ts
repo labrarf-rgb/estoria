@@ -24,12 +24,19 @@ import {
 } from "@/lib/layout";
 import { TEMPLATES } from "@/lib/templates";
 import { zustandStorage } from "@/store/persistence";
+import type { RefView } from "@/components/ui/ViewToggle";
 
 export type View = "board" | "timeline";
 export type Theme = "light" | "dark";
 
 /** Which level of the hierarchy is on screen: the series map or a book's board. */
 export type Level = "series" | "book";
+
+/** Collapsible sections of the chapter modal (Scene flow has its own sizing toggle). */
+export type ChapterSection = "chars" | "world" | "notes" | "refs";
+
+/** Expandable textarea surfaces whose tall/short state is remembered (global). */
+export type TextareaKey = "storyNotes" | "chapterNotes" | "worldDesc" | "worldNotes";
 
 interface UiState {
   theme: Theme;
@@ -63,6 +70,14 @@ interface UiState {
   lightbox: string | null;
   /** False until the user has chosen sample-vs-fresh on first launch. */
   onboarded: boolean;
+  /** Per-section collapse state for the chapter modal (persisted, global). */
+  chapterSectionsCollapsed: Record<ChapterSection, boolean>;
+  /** Card-vs-list view for reference lists (persisted, global across surfaces). */
+  refView: RefView;
+  /** Tall/short state per expandable-textarea surface (persisted, global). */
+  textareaExpanded: Record<TextareaKey, boolean>;
+  /** Chapter-modal scene-flow canvas size (persisted). */
+  sceneFlowExpanded: boolean;
 }
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
@@ -189,6 +204,10 @@ interface StoreState extends UiState {
   toggleNewMenu: () => void;
   closeNewMenu: () => void;
   setPanel: (panel: PanelKey, open: boolean) => void;
+  toggleChapterSection: (section: ChapterSection) => void;
+  setRefView: (view: RefView) => void;
+  toggleTextarea: (key: TextareaKey) => void;
+  setSceneFlowExpanded: (expanded: boolean) => void;
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
   selectBook: (id: string | null) => void;
@@ -264,6 +283,10 @@ const initialUi: UiState = {
   selBook: null,
   lightbox: null,
   onboarded: false,
+  chapterSectionsCollapsed: { chars: false, world: false, notes: false, refs: false },
+  refView: "list",
+  textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
+  sceneFlowExpanded: true,
 };
 
 export const useStore = create<StoreState>()(
@@ -1166,6 +1189,19 @@ export const useStore = create<StoreState>()(
       closeNewMenu: () => set({ newMenu: false }),
       setPanel: (panel, open) =>
         set({ [panel]: open, newMenu: false } as Pick<StoreState, PanelKey> & { newMenu: boolean }),
+      toggleChapterSection: (section) =>
+        set((s) => ({
+          chapterSectionsCollapsed: {
+            ...s.chapterSectionsCollapsed,
+            [section]: !s.chapterSectionsCollapsed[section],
+          },
+        })),
+      setRefView: (view) => set({ refView: view }),
+      toggleTextarea: (key) =>
+        set((s) => ({
+          textareaExpanded: { ...s.textareaExpanded, [key]: !s.textareaExpanded[key] },
+        })),
+      setSceneFlowExpanded: (expanded) => set({ sceneFlowExpanded: expanded }),
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
       selectBook: (id) => set((s) => ({ selBook: s.selBook === id ? null : id })),
@@ -1197,6 +1233,10 @@ export const useStore = create<StoreState>()(
         view: s.view,
         timelineOrient: s.timelineOrient,
         onboarded: s.onboarded,
+        chapterSectionsCollapsed: s.chapterSectionsCollapsed,
+        refView: s.refView,
+        textareaExpanded: s.textareaExpanded,
+        sceneFlowExpanded: s.sceneFlowExpanded,
       }),
       // On a schema bump, discard the old persisted document rather than risk
       // reading a shape that no longer matches the model.
