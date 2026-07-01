@@ -615,3 +615,30 @@ as global prefs added to `partialize`:
   still expanded).
   Verified: set Card view + collapse scene flow + expand chapter notes, reload →
   all three restored from localStorage. `tsc -b` + `vite build` clean.
+
+### 2026-06-30 — Even scene grid, connectors clear of text (Session 15)
+
+The and/but/therefore connector pills were painting over scene-card text, and the
+scene layout's decaying jitter made the spacing look uneven.
+
+- **Even grid** (`lib/layout.ts`): `sceneAutoArrange` drops the jitter/stagger —
+  scenes lay out on a plain equal-gap grid. Equal gaps also keep every connector
+  pill parked in the space between cards.
+- **Wider horizontal gap:** `SCENE_GAP_X` 44 → **88** (the widest pill, "Therefore",
+  measures ~79px, so 88 clears it with the cards' 13px padding as slack);
+  `SCENE_GAP_Y` 40 → 48. Now a horizontally-adjacent connector sits in the gap, not
+  over text; row-wrap connectors land in the vertical gap between rows.
+- **Expand fits 5 / collapse fits 3:** the expanded chapter modal widened to
+  `min(1500px, 96vw)` (was 1320) so five 208px cards + four 88px gaps fit across;
+  collapsed stays `min(980px, …)` → three across. `sceneColumnsForWidth` (unchanged
+  formula) yields 5 vs 3 at those widths.
+- **Auto-reflow on mode toggle:** toggling Scene-flow Collapse/Expand now
+  re-arranges to the new column count (an effect in `ChapterDetail` that fires only
+  on an actual toggle, via a prev-value ref, so it never clobbers manual drags on
+  open or chapter-switch). `openChapter` also seeds a fresh chapter's layout using a
+  width estimate for the current mode (`window.innerWidth`-based), so it opens
+  already filled.
+
+Verified in-browser at 1680px: 7 scenes lay out 5-across expanded with all
+BUT/THEREFORE pills sitting in gaps (no text covered), then reflow to 3-across on
+Collapse. `tsc -b` + `vite build` clean.

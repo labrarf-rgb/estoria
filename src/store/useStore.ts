@@ -19,6 +19,7 @@ import {
   bestColumns,
   CARD_W,
   sceneAutoArrange,
+  sceneColumnsForWidth,
   type Camera,
   type TimelineOrient,
 } from "@/lib/layout";
@@ -1172,18 +1173,28 @@ export const useStore = create<StoreState>()(
       setOrient: (o) => set({ timelineOrient: o }),
       setDragId: (id) => set({ dragId: id }),
       openChapter: (id) =>
-        set((s) => ({
-          openCh: id,
-          sceneArrangeN: 0,
-          doc: {
-            ...s.doc,
-            chapters: s.doc.chapters.map((c) =>
-              c.id === id && (!c.scenePos || c.scenePos.length !== c.scenes.length)
-                ? { ...c, scenePos: sceneAutoArrange(c.scenes, 0) }
-                : c
-            ),
-          },
-        })),
+        set((s) => {
+          // Estimate the visible scene-canvas width for the current mode so a
+          // freshly-laid-out chapter fills it (~5 columns expanded, ~3 collapsed).
+          const vw = typeof window !== "undefined" ? window.innerWidth : 1500;
+          const modalW = s.sceneFlowExpanded ? Math.min(1500, vw * 0.96) : Math.min(980, vw);
+          const boxW = modalW - 44;
+          return {
+            openCh: id,
+            sceneArrangeN: 0,
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id === id && (!c.scenePos || c.scenePos.length !== c.scenes.length)
+                  ? {
+                      ...c,
+                      scenePos: sceneAutoArrange(c.scenes, 0, sceneColumnsForWidth(c.scenes.length, boxW)),
+                    }
+                  : c
+              ),
+            },
+          };
+        }),
       closeChapter: () => set({ openCh: null }),
       toggleNewMenu: () => set((s) => ({ newMenu: !s.newMenu })),
       closeNewMenu: () => set({ newMenu: false }),

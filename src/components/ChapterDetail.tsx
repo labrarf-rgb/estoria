@@ -83,6 +83,22 @@ export function ChapterDetail() {
     };
   }, [moveScene]);
 
+  // Reflow scenes to the new column count when the user toggles expand/collapse:
+  // the visible width changes (~5 wide expanded, ~3 collapsed), so a fixed layout
+  // would overflow or leave the canvas sparse. Only fires on an actual toggle, so
+  // it never clobbers manual drags on open or when switching chapters.
+  const prevExpanded = useRef<boolean | null>(null);
+  useEffect(() => {
+    const id = chIdRef.current;
+    if (id && prevExpanded.current !== null && prevExpanded.current !== expanded) {
+      const w = sceneBoxRef.current?.clientWidth ?? 0;
+      const n = doc.chapters.find((c) => c.id === id)?.scenes.length ?? 0;
+      arrangeScenes(id, false, sceneColumnsForWidth(n, w));
+    }
+    prevExpanded.current = expanded;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
+
   if (!ch) return null;
 
   const draftId = doc.activeDraftId;
@@ -116,7 +132,7 @@ export function ChapterDetail() {
       <div
         onMouseDown={stop}
         className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-          expanded ? "w-[min(1320px,96vw)]" : "w-[min(980px,100%)]"
+          expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
         }`}
       >
         {/* Header */}

@@ -151,8 +151,10 @@ function sceneCols(n: number): number {
   return n <= 1 ? 1 : n <= 4 ? 2 : 3;
 }
 
-const SCENE_GAP_X = 44;
-const SCENE_GAP_Y = 40;
+// Horizontal gap must clear the connector pill (~79px for "Therefore") so the
+// pill sits in the gap between cards instead of over their text.
+const SCENE_GAP_X = 88;
+const SCENE_GAP_Y = 48;
 const SCENE_MARGIN = 18;
 
 /**
@@ -173,17 +175,15 @@ export function sceneColumnsForWidth(n: number, visW: number): number {
  * defaults to a count-based heuristic; pass a width-derived value
  * (see `sceneColumnsForWidth`) to fill the visible canvas.
  */
-export function sceneAutoArrange(scenes: string[], arrangeN: number, cols?: number): Vec2[] {
+export function sceneAutoArrange(scenes: string[], _arrangeN: number, cols?: number): Vec2[] {
   const gx = SCENE_GAP_X;
   const gy = SCENE_GAP_Y;
   const m = SCENE_MARGIN;
   const c0 = Math.max(1, cols ?? sceneCols(scenes.length));
-  const amp = Math.pow(0.6, arrangeN);
+  // Even grid (no jitter): equal gaps keep the connector pills clear of text.
   return scenes.map((_, i) => {
     const col = i % c0;
     const row = Math.floor(i / c0);
-    const jx = (prand(i + 1) * 2 - 1) * 18 * amp;
-    const jy = ((prand(i + 9) * 2 - 1) * 18 + (col % 2 === 0 ? 12 : -10)) * amp;
-    return { x: m + col * (SCENE_W + gx) + jx, y: m + row * (SCENE_H + gy) + jy };
+    return { x: m + col * (SCENE_W + gx), y: m + row * (SCENE_H + gy) };
   });
 }
