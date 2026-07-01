@@ -137,10 +137,11 @@ interface StoreState extends UiState {
   toggleChapterWorld: (id: string, worldId: string) => void;
 
   // ---- scenes ----
-  addScene: (chId: string) => void;
+  addScene: (chId: string, cols?: number) => void;
+  insertScene: (chId: string, atIdx: number, cols?: number) => void;
   updateScene: (chId: string, idx: number, text: string) => void;
   deleteScene: (chId: string, idx: number) => void;
-  moveScene: (chId: string, idx: number, x: number, y: number) => void;
+  reorderScene: (chId: string, fromIdx: number, toIdx: number, cols?: number) => void;
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
@@ -616,21 +617,31 @@ export const useStore = create<StoreState>()(
         })),
 
       // ---- scenes ----
-      addScene: (chId) =>
+      addScene: (chId, cols) =>
         set((s) => ({
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => {
               if (c.id !== chId) return c;
-              const pos = (c.scenePos || []).slice();
-              const last = pos[pos.length - 1];
-              pos.push(last ? { x: last.x + 40, y: last.y + 40 } : { x: 18, y: 18 });
-              return {
-                ...c,
-                scenes: c.scenes.concat("New scene."),
-                sceneLinks: c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks,
-                scenePos: pos,
-              };
+              const scenes = c.scenes.concat("New scene.");
+              const sceneLinks = c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks;
+              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
+            }),
+          },
+        })),
+
+      insertScene: (chId, atIdx, cols) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) => {
+              if (c.id !== chId) return c;
+              const idx = Math.max(0, Math.min(atIdx, c.scenes.length));
+              const scenes = c.scenes.slice();
+              scenes.splice(idx, 0, "New scene.");
+              const sceneLinks = c.sceneLinks.slice();
+              if (scenes.length > 1) sceneLinks.splice(Math.min(idx, sceneLinks.length), 0, "therefore");
+              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
             }),
           },
         })),
@@ -663,15 +674,26 @@ export const useStore = create<StoreState>()(
           },
         })),
 
-      moveScene: (chId, idx, x, y) =>
+      reorderScene: (chId, fromIdx, toIdx, cols) =>
         set((s) => ({
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => {
-              if (c.id !== chId) return c;
-              const pos = (c.scenePos || []).slice();
-              pos[idx] = { x, y };
-              return { ...c, scenePos: pos };
+              if (c.id !== chId || fromIdx < 0 || fromIdx >= c.scenes.length) return c;
+              const scenes = c.scenes.slice();
+              const [moved] = scenes.splice(fromIdx, 1);
+              const to = Math.max(0, Math.min(toIdx, scenes.length));
+              scenes.splice(to, 0, moved);
+
+              // Links are positional (the gap between adjacent scenes), so a
+              // reorder drops the gap at the scene's old slot and opens a
+              // fresh one at its new slot rather than trying to carry a
+              // "meaning" along with the moved scene.
+              const sceneLinks = c.sceneLinks.slice();
+              if (sceneLinks.length) sceneLinks.splice(Math.min(fromIdx, sceneLinks.length - 1), 1);
+              if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "therefore");
+
+              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
             }),
           },
         })),

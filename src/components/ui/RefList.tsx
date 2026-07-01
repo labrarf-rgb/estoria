@@ -97,13 +97,6 @@ export function RefList({
                   <div className="truncate text-[11.5px] text-soft">{snippet}</div>
                 </button>
                 <button
-                  onClick={() => confirmDelete(r)}
-                  className="text-[12px] text-faint opacity-0 transition-opacity hover:text-but group-hover:opacity-100"
-                  title="Delete"
-                >
-                  ✕
-                </button>
-                <button
                   onClick={() => setOpenId(open ? null : r.id)}
                   className="text-[12px] font-medium text-faint"
                   title={open ? "Collapse" : "Expand"}
@@ -113,12 +106,21 @@ export function RefList({
               </div>
               {open && (
                 <div className="flex flex-col gap-[9px] border-t border-rule px-[12px] py-[11px]">
-                  <input
-                    value={r.label}
-                    onChange={(e) => onUpdate(r.id, { label: e.target.value })}
-                    placeholder={r.kind === "IMAGE" ? "Image title" : "Note title"}
-                    className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] font-semibold text-ink outline-none focus:border-faint"
-                  />
+                  <div className="flex items-center gap-[8px]">
+                    <input
+                      value={r.label}
+                      onChange={(e) => onUpdate(r.id, { label: e.target.value })}
+                      placeholder={r.kind === "IMAGE" ? "Image title" : "Note title"}
+                      className="min-w-0 flex-1 rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] font-semibold text-ink outline-none focus:border-faint"
+                    />
+                    <button
+                      onClick={() => confirmDelete(r)}
+                      className="shrink-0 text-[12px] text-faint hover:text-but"
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  </div>
                   {r.kind === "IMAGE" ? (
                     r.src ? (
                       <button

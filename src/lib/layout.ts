@@ -153,9 +153,9 @@ function sceneCols(n: number): number {
 
 // Horizontal gap must clear the connector pill (~79px for "Therefore") so the
 // pill sits in the gap between cards instead of over their text.
-const SCENE_GAP_X = 88;
-const SCENE_GAP_Y = 48;
-const SCENE_MARGIN = 18;
+export const SCENE_GAP_X = 88;
+export const SCENE_GAP_Y = 48;
+export const SCENE_MARGIN = 18;
 
 /**
  * Columns that fit across the *visible* scene-canvas width (the canvas isn't
@@ -186,4 +186,19 @@ export function sceneAutoArrange(scenes: string[], _arrangeN: number, cols?: num
     const row = Math.floor(i / c0);
     return { x: m + col * (SCENE_W + gx), y: m + row * (SCENE_H + gy) };
   });
+}
+
+/**
+ * Row-major grid slot nearest a point inside the scene canvas (in the same
+ * local coordinate space as `sceneAutoArrange`'s output). Used while dragging
+ * a scene card to preview which slot it will land in on release.
+ */
+export function sceneSlotFromPoint(x: number, y: number, cols: number): number {
+  const c0 = Math.max(1, cols);
+  const col = Math.max(
+    0,
+    Math.min(c0 - 1, Math.round((x - SCENE_MARGIN - SCENE_W / 2) / (SCENE_W + SCENE_GAP_X)))
+  );
+  const row = Math.max(0, Math.round((y - SCENE_MARGIN - SCENE_H / 2) / (SCENE_H + SCENE_GAP_Y)));
+  return row * c0 + col;
 }

@@ -4,9 +4,9 @@ import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
-import { SCENE_W, SCENE_H, sceneColumnsForWidth } from "@/lib/layout";
+import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { resolveSummary, resolveTitle } from "@/lib/drafts";
-import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType } from "@/types";
+import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
@@ -32,9 +32,10 @@ export function ChapterDetail() {
   const toggleChapterWorld = useStore((s) => s.toggleChapterWorld);
   const deleteChapter = useStore((s) => s.deleteChapter);
   const addScene = useStore((s) => s.addScene);
+  const insertScene = useStore((s) => s.insertScene);
   const updateScene = useStore((s) => s.updateScene);
   const deleteScene = useStore((s) => s.deleteScene);
-  const moveScene = useStore((s) => s.moveScene);
+  const reorderScene = useStore((s) => s.reorderScene);
   const cycleSceneLink = useStore((s) => s.cycleSceneLink);
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
@@ -62,18 +63,66 @@ export function ChapterDetail() {
   const [worldAdd, setWorldAdd] = useState(false);
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
-  // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
-  const sdrag = useRef<{ idx: number; mx: number; my: number; ox: number; oy: number } | null>(null);
+  // Scene drag-to-reorder: either an existing card ("move") or the ghost from
+  // a long-pressed Add-scene button ("new"). Coordinates are canvas-local
+  // (relative to sceneBoxRef's content, including its scroll offset) so they
+  // line up directly with scenePos / sceneAutoArrange output.
+  type SceneDrag =
+    | {
+        kind: "move";
+        fromIdx: number;
+        overIdx: number;
+        cx: number;
+        cy: number;
+        clientY: number;
+        offX: number;
+        offY: number;
+      }
+    | { kind: "new"; overIdx: number; cx: number; cy: number; clientY: number };
+  const [drag, setDrag] = useState<SceneDrag | null>(null);
+  const dragRef = useRef<SceneDrag | null>(null);
+  dragRef.current = drag;
+  const addScenePressRef = useRef(false);
+
+  const canvasPoint = (clientX: number, clientY: number) => {
+    const box = sceneBoxRef.current;
+    if (!box) return { x: 0, y: 0 };
+    const rect = box.getBoundingClientRect();
+    return { x: clientX - rect.left + box.scrollLeft, y: clientY - rect.top + box.scrollTop };
+  };
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const d = sdrag.current;
-      if (!d || !chIdRef.current) return;
-      const nx = Math.max(0, d.ox + (e.clientX - d.mx));
-      const ny = Math.max(0, d.oy + (e.clientY - d.my));
-      moveScene(chIdRef.current, d.idx, nx, ny);
+      const d = dragRef.current;
+      const chId = chIdRef.current;
+      const box = sceneBoxRef.current;
+      if (!d || !chId || !box) return;
+      const c = useStore.getState().doc.chapters.find((x) => x.id === chId);
+      if (!c) return;
+      const pt = canvasPoint(e.clientX, e.clientY);
+      // Total slots rendered in the preview grid (including the gap) — must
+      // match the `others.length + 1` used by the render logic below, or the
+      // column count (and therefore the detected slot) desyncs from what's
+      // actually on screen.
+      const total = d.kind === "move" ? c.scenes.length : c.scenes.length + 1;
+      const cols = sceneColumnsForWidth(total, box.clientWidth);
+      const overIdx = Math.max(0, Math.min(sceneSlotFromPoint(pt.x, pt.y, cols), total - 1));
+      setDrag({ ...d, cx: pt.x, cy: pt.y, clientY: e.clientY, overIdx });
     };
     const onUp = () => {
-      sdrag.current = null;
+      const d = dragRef.current;
+      const chId = chIdRef.current;
+      const box = sceneBoxRef.current;
+      if (d && chId) {
+        const c = useStore.getState().doc.chapters.find((x) => x.id === chId);
+        if (c) {
+          const total = d.kind === "move" ? c.scenes.length : c.scenes.length + 1;
+          const cols = sceneColumnsForWidth(total, box?.clientWidth ?? 0);
+          if (d.kind === "move") reorderScene(chId, d.fromIdx, d.overIdx, cols);
+          else insertScene(chId, d.overIdx, cols);
+        }
+      }
+      setDrag(null);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -81,7 +130,36 @@ export function ChapterDetail() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [moveScene]);
+  }, [reorderScene, insertScene]);
+
+  // Auto-scroll the scene canvas while dragging near its top/bottom edge, so
+  // reordering works on boards with more scenes than fit on screen.
+  useEffect(() => {
+    if (!drag) return;
+    const EDGE = 56;
+    const MAX_SPEED = 16;
+    let raf = 0;
+    const tick = () => {
+      const box = sceneBoxRef.current;
+      const d = dragRef.current;
+      if (box && d) {
+        const rect = box.getBoundingClientRect();
+        const y = d.clientY;
+        if (y < rect.top + EDGE && box.scrollTop > 0) {
+          box.scrollTop = Math.max(0, box.scrollTop - (MAX_SPEED * (rect.top + EDGE - y)) / EDGE);
+        } else if (y > rect.bottom - EDGE) {
+          box.scrollTop = Math.min(
+            box.scrollHeight - box.clientHeight,
+            box.scrollTop + (MAX_SPEED * (y - (rect.bottom - EDGE))) / EDGE
+          );
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!drag]);
 
   // Reflow scenes to the new column count when the user toggles expand/collapse:
   // the visible width changes (~5 wide expanded, ~3 collapsed), so a fixed layout
@@ -104,14 +182,51 @@ export function ChapterDetail() {
   const draftId = doc.activeDraftId;
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
   const positions = ch.scenePos ?? [];
-  const canvasW = Math.max(640, ...positions.map((p) => p.x + SCENE_W)) + 24;
-  const canvasH = Math.max(260, ...positions.map((p) => p.y + SCENE_H)) + 24;
+  const boxW = sceneBoxRef.current?.clientWidth ?? 0;
+
+  // While dragging, build a preview layout: the moved (or not-yet-created)
+  // scene occupies a "gap" slot that follows the pointer, and every other
+  // card previews the grid position it will land in on release.
+  let cardSlots: { idx: number; pos: Vec2; num: number }[] = ch.scenes.map((_, i) => ({
+    idx: i,
+    pos: positions[i] ?? { x: 0, y: 0 },
+    num: i + 1,
+  }));
+  let gapPos: Vec2 | null = null;
+  let ghostPos: Vec2 | null = null;
+  let ghostText: string | null = null;
+  let ghostNum = 1;
+
+  if (drag) {
+    const others =
+      drag.kind === "move"
+        ? ch.scenes.map((_, i) => i).filter((i) => i !== drag.fromIdx)
+        : ch.scenes.map((_, i) => i);
+    const at = Math.max(0, Math.min(drag.overIdx, others.length));
+    const previewCols = sceneColumnsForWidth(others.length + 1, boxW);
+    const previewPos = sceneAutoArrange(new Array(others.length + 1).fill(""), 0, previewCols);
+    cardSlots = others.map((origIdx, i) => ({
+      idx: origIdx,
+      pos: previewPos[i < at ? i : i + 1],
+      num: i < at ? i + 1 : i + 2,
+    }));
+    gapPos = previewPos[at];
+    ghostNum = at + 1;
+    ghostText = drag.kind === "move" ? ch.scenes[drag.fromIdx] : "New scene.";
+    ghostPos =
+      drag.kind === "move"
+        ? { x: drag.cx - drag.offX, y: drag.cy - drag.offY }
+        : { x: drag.cx - SCENE_W / 2, y: drag.cy - SCENE_H / 2 };
+  }
+
+  const extent = [...cardSlots.map((s) => s.pos), ...(gapPos ? [gapPos] : []), ...(ghostPos ? [ghostPos] : [])];
+  const canvasW = Math.max(640, ...extent.map((p) => p.x + SCENE_W)) + 24;
+  const canvasH = Math.max(260, ...extent.map((p) => p.y + SCENE_H)) + 24;
 
   // Auto-arrange scenes to fill the *visible* canvas (collapsed vs expanded use
   // different widths, so each mode arranges into a different column count).
   const onArrangeScenes = () => {
-    const w = sceneBoxRef.current?.clientWidth ?? 0;
-    arrangeScenes(ch.id, false, sceneColumnsForWidth(ch.scenes.length, w));
+    arrangeScenes(ch.id, false, sceneColumnsForWidth(ch.scenes.length, boxW));
   };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
@@ -119,7 +234,44 @@ export function ChapterDetail() {
     if (target.closest("textarea") || target.closest("button")) return;
     e.preventDefault();
     const p = positions[idx] ?? { x: 0, y: 0 };
-    sdrag.current = { idx, mx: e.clientX, my: e.clientY, ox: p.x, oy: p.y };
+    const pt = canvasPoint(e.clientX, e.clientY);
+    setDrag({
+      kind: "move",
+      fromIdx: idx,
+      overIdx: idx,
+      cx: pt.x,
+      cy: pt.y,
+      clientY: e.clientY,
+      offX: pt.x - p.x,
+      offY: pt.y - p.y,
+    });
+  };
+
+  // Long-press the Add-scene button to get a draggable ghost card that can be
+  // dropped anywhere in the grid; a plain click still appends to the end.
+  const onAddSceneDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    addScenePressRef.current = false;
+    const startClientY = e.clientY;
+    const timer = window.setTimeout(() => {
+      addScenePressRef.current = true;
+      const box = sceneBoxRef.current;
+      const cx = box ? box.scrollLeft + box.clientWidth / 2 : 0;
+      const cy = box ? box.scrollTop + box.clientHeight / 2 : 0;
+      const cols = sceneColumnsForWidth(ch.scenes.length + 1, box?.clientWidth ?? 0);
+      const overIdx = Math.max(0, Math.min(sceneSlotFromPoint(cx, cy, cols), ch.scenes.length));
+      setDrag({ kind: "new", cx, cy, clientY: startClientY, overIdx });
+    }, 220);
+    const cancel = () => window.clearTimeout(timer);
+    window.addEventListener("mouseup", cancel, { once: true });
+  };
+
+  const onAddSceneClick = () => {
+    if (addScenePressRef.current) {
+      addScenePressRef.current = false;
+      return;
+    }
+    addScene(ch.id, sceneColumnsForWidth(ch.scenes.length + 1, boxW));
   };
 
   const sceneCenter = (idx: number) => {
@@ -390,7 +542,9 @@ export function ChapterDetail() {
               Auto-arrange
             </button>
             <button
-              onClick={() => addScene(ch.id)}
+              onMouseDown={onAddSceneDown}
+              onClick={onAddSceneClick}
+              title="Click to append · press and hold to drag it into place"
               className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
             >
               + Add scene
@@ -412,62 +566,73 @@ export function ChapterDetail() {
           }}
         >
           <div className="relative" style={{ width: canvasW, height: canvasH }}>
-            <svg
-              width={canvasW}
-              height={canvasH}
-              className="pointer-events-none absolute left-0 top-0 overflow-visible"
-            >
-              {ch.scenes.slice(0, -1).map((_, i) => {
+            {!drag && (
+              <svg
+                width={canvasW}
+                height={canvasH}
+                className="pointer-events-none absolute left-0 top-0 overflow-visible"
+              >
+                {ch.scenes.slice(0, -1).map((_, i) => {
+                  const a = sceneCenter(i);
+                  const b = sceneCenter(i + 1);
+                  return (
+                    <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--line)" strokeWidth={1.75} />
+                  );
+                })}
+              </svg>
+            )}
+
+            {!drag &&
+              ch.scenes.slice(0, -1).map((_, i) => {
                 const a = sceneCenter(i);
                 const b = sceneCenter(i + 1);
+                const type = ch.sceneLinks[i] ?? "therefore";
                 return (
-                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--line)" strokeWidth={1.75} />
+                  <button
+                    key={i}
+                    onClick={() => cycleSceneLink(ch.id, i)}
+                    className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide"
+                    style={{
+                      left: (a.x + b.x) / 2,
+                      top: (a.y + b.y) / 2,
+                      color: CONN[type].color,
+                      borderColor: CONN[type].color,
+                    }}
+                    title="Click to cycle Therefore / But / And"
+                  >
+                    {CONN[type].label}
+                  </button>
                 );
               })}
-            </svg>
 
-            {ch.scenes.slice(0, -1).map((_, i) => {
-              const a = sceneCenter(i);
-              const b = sceneCenter(i + 1);
-              const type = ch.sceneLinks[i] ?? "therefore";
-              return (
-                <button
-                  key={i}
-                  onClick={() => cycleSceneLink(ch.id, i)}
-                  className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide"
-                  style={{
-                    left: (a.x + b.x) / 2,
-                    top: (a.y + b.y) / 2,
-                    color: CONN[type].color,
-                    borderColor: CONN[type].color,
-                  }}
-                  title="Click to cycle Therefore / But / And"
-                >
-                  {CONN[type].label}
-                </button>
-              );
-            })}
+            {gapPos && (
+              <div
+                className="pointer-events-none absolute z-0 rounded-[11px] border-2 border-dashed border-faint/60 bg-faint/5"
+                style={{ left: gapPos.x, top: gapPos.y, width: SCENE_W, minHeight: SCENE_H }}
+              />
+            )}
 
-            {ch.scenes.map((s, i) => {
-              const p = positions[i] ?? { x: 0, y: 0 };
+            {cardSlots.map((slot) => {
+              const i = slot.idx;
+              const s = ch.scenes[i];
               return (
                 <div
                   key={i}
                   onMouseDown={(e) => onSceneDown(e, i)}
-                  className="group absolute z-[5] cursor-grab active:cursor-grabbing"
-                  style={{ left: p.x, top: p.y, width: SCENE_W, minHeight: SCENE_H }}
+                  className="group absolute z-[5] cursor-grab transition-[left,top] duration-150 ease-out active:cursor-grabbing"
+                  style={{ left: slot.pos.x, top: slot.pos.y, width: SCENE_W, minHeight: SCENE_H }}
                 >
                   <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint">
                     <div className="flex items-center">
                       <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
-                        SCENE {i + 1}
+                        SCENE {slot.num}
                       </span>
                       <div className="flex-1" />
                       {ch.scenes.length > 1 && (
                         <button
                           onClick={() =>
                             askConfirm({
-                              message: `Delete scene ${i + 1}?`,
+                              message: `Delete scene ${slot.num}?`,
                               danger: true,
                               onConfirm: () => deleteScene(ch.id, i),
                             })
@@ -490,10 +655,24 @@ export function ChapterDetail() {
                 </div>
               );
             })}
+
+            {ghostPos && (
+              <div
+                className="pointer-events-none absolute z-20 rotate-1 scale-[1.03] cursor-grabbing opacity-90"
+                style={{ left: ghostPos.x, top: ghostPos.y, width: SCENE_W, minHeight: SCENE_H }}
+              >
+                <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-faint bg-card p-[12px_13px] shadow-[0_18px_38px_rgba(0,0,0,0.35)]">
+                  <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
+                    SCENE {ghostNum}
+                  </span>
+                  <div className="line-clamp-4 flex-1 text-[13px] leading-[1.5] text-ink">{ghostText}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="px-[26px] pt-[8px] text-[11px] font-medium text-faint">
-          Drag scenes to rearrange · click a connector to toggle Therefore / But / And
+          Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And
         </div>
 
         {/* Chapter notes */}
