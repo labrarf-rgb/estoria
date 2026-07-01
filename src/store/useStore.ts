@@ -17,6 +17,8 @@ import { emptyStory } from "@/data/emptyStory";
 import {
   autoArrange,
   bestColumns,
+  bestBookColumns,
+  bookAutoArrange,
   CARD_W,
   sceneAutoArrange,
   sceneColumnsForWidth,
@@ -48,6 +50,8 @@ interface UiState {
   panX: number;
   panY: number;
   arrangeN: number;
+  /** Bumps on each series-map auto-arrange, so the map can re-fit its camera. */
+  seriesArrangeN: number;
   /** Last reported board viewport size, used to size auto-arrange. */
   boardW: number;
   boardH: number;
@@ -125,6 +129,7 @@ interface StoreState extends UiState {
 
   // ---- chapters ----
   moveChapter: (id: string, x: number, y: number) => void;
+  reorderChapter: (id: string, targetId: string, after: boolean) => void;
   addChapter: () => void;
   deleteChapter: (id: string) => void;
   autoArrangeBoard: () => void;
@@ -168,6 +173,8 @@ interface StoreState extends UiState {
   updateBook: (id: string, patch: Partial<StoryDoc["books"][number]>) => void;
   deleteBook: (id: string) => void;
   moveBook: (id: string, x: number, y: number) => void;
+  reorderBook: (id: string, targetId: string, after: boolean) => void;
+  autoArrangeSeries: () => void;
   addBookLink: (fromId: string, toId: string) => void;
   updateBookLink: (id: string, label: string) => void;
   deleteBookLink: (id: string) => void;
@@ -265,6 +272,7 @@ const initialUi: UiState = {
   panX: 34,
   panY: 28,
   arrangeN: 0,
+  seriesArrangeN: 0,
   boardW: 0,
   boardH: 0,
   dragId: null,
@@ -491,6 +499,33 @@ export const useStore = create<StoreState>()(
             chapters: s.doc.chapters.map((c) => (c.id === id ? { ...c, x, y } : c)),
           },
         })),
+
+      // Dropping a chapter card onto another reorders the underlying sequence
+      // (num badges, timeline order). The connector chain is rebuilt to follow
+      // the new order so the threads track the reorder instead of staying wired
+      // to the old sequence and crossing over each other — chapter links are a
+      // consecutive therefore-chain with no board UI to retype them, so a fresh
+      // chain loses no user intent (any existing type on an unchanged adjacent
+      // pair is carried over).
+      reorderChapter: (id, targetId, after) =>
+        set((s) => {
+          const chapters = s.doc.chapters.slice();
+          const fromIdx = chapters.findIndex((c) => c.id === id);
+          if (fromIdx === -1) return s;
+          const [moved] = chapters.splice(fromIdx, 1);
+          let toIdx = chapters.findIndex((c) => c.id === targetId);
+          if (toIdx === -1) toIdx = chapters.length;
+          else if (after) toIdx += 1;
+          chapters.splice(toIdx, 0, moved);
+          const ordered = renumber(chapters);
+          const prevType = new Map(s.doc.links.map((l) => [`${l.fromId}>${l.toId}`, l.type]));
+          const links = ordered.slice(0, -1).map((c, i) => ({
+            fromId: c.id,
+            toId: ordered[i + 1].id,
+            type: prevType.get(`${c.id}>${ordered[i + 1].id}`) ?? ("therefore" as const),
+          }));
+          return { doc: { ...s.doc, chapters: ordered, links } };
+        }),
 
       addChapter: () =>
         set((s) => {
@@ -975,6 +1010,32 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           doc: { ...s.doc, books: s.doc.books.map((b) => (b.id === id ? { ...b, x, y } : b)) },
         })),
+
+      // Same reorder-on-drop as reorderChapter: books keep their free position,
+      // only the sequence (Book N badge, timeline order) changes.
+      reorderBook: (id, targetId, after) =>
+        set((s) => {
+          const books = s.doc.books.slice();
+          const fromIdx = books.findIndex((b) => b.id === id);
+          if (fromIdx === -1) return s;
+          const [moved] = books.splice(fromIdx, 1);
+          let toIdx = books.findIndex((b) => b.id === targetId);
+          if (toIdx === -1) toIdx = books.length;
+          else if (after) toIdx += 1;
+          books.splice(toIdx, 0, moved);
+          return { doc: { ...s.doc, books } };
+        }),
+
+      // Lay books out on a reading-order grid sized to the series-map viewport.
+      // Bumps seriesArrangeN so the map re-fits its camera to the result.
+      autoArrangeSeries: () =>
+        set((s) => {
+          const cols = bestBookColumns(s.doc.books.length, s.boardW, s.boardH);
+          return {
+            doc: { ...s.doc, books: bookAutoArrange(s.doc.books, cols) },
+            seriesArrangeN: s.seriesArrangeN + 1,
+          };
+        }),
 
       addBookLink: (fromId, toId) =>
         set((s) => {

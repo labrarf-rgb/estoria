@@ -6,6 +6,9 @@ export const CARD_H = 142;
 /** Scene-node dimensions in the chapter-detail canvas. */
 export const SCENE_W = 208;
 export const SCENE_H = 124;
+/** Book-card dimensions on the series map. */
+export const BOOK_W = 290;
+export const BOOK_H = 188;
 
 /** Deterministic pseudo-random in [0,1) — keeps auto-arrange stable per index. */
 function prand(n: number): number {
@@ -58,17 +61,20 @@ export function bestColumns(n: number, vpW: number, vpH: number, pad = FIT_PAD):
 }
 
 /**
- * Lay chapters out on a grid with decaying jitter. Each successive call eases
- * toward a clean grid (amp shrinks) without ever snapping perfectly straight,
- * giving a hand-arranged feel. `cols` defaults to 4; pass a value (e.g. from
- * `bestColumns`) to size the grid to the available board space.
+ * Lay chapters out on a grid with decaying jitter. Successive calls keep easing
+ * toward a straighter grid (amp shrinks), but a small floor stops it ever
+ * snapping to a perfectly rigid lattice — the board approaches neat yet always
+ * keeps a faint hand-laid imperfection. `cols` defaults to 4; pass a value
+ * (e.g. from `bestColumns`) to size the grid to the available board space.
  */
 export function autoArrange(chapters: Chapter[], arrangeN: number, cols = 4): ArrangeResult {
   const c0 = Math.max(1, cols);
   const gapX = GRID_GAP_X;
   const gapY = GRID_GAP_Y;
   const m = GRID_MARGIN;
-  const amp = Math.pow(0.6, arrangeN);
+  // First arrange is liveliest; repeats settle toward straight but never below
+  // ~15% jitter, so it lines up neatly without ever looking machine-perfect.
+  const amp = Math.max(0.15, Math.pow(0.6, arrangeN));
   const next = chapters.map((c, i) => {
     const col = i % c0;
     const row = Math.floor(i / c0);
@@ -86,6 +92,122 @@ export function autoArrange(chapters: Chapter[], arrangeN: number, cols = 4): Ar
 
 export type TimelineOrient = "vertical" | "horizontal";
 
+/**
+ * Sequential timeline positions for an arbitrary chapter list (not just
+ * `doc.chapters` in its current order) — takes an act-grouped extra gap
+ * between groups. Standalone so a live drag-reorder preview can feed it a
+ * candidate order without mutating the store.
+ */
+export function timelineChapterPositions(
+  chapters: { id: string; act: number }[],
+  orient: TimelineOrient
+): { id: string; x: number; y: number }[] {
+  const out: { id: string; x: number; y: number }[] = [];
+  if (orient === "vertical") {
+    let y = 64;
+    const colX = 300;
+    chapters.forEach((c, i) => {
+      if (i > 0 && c.act !== chapters[i - 1].act) y += 54;
+      out.push({ id: c.id, x: colX, y });
+      y += CARD_H + 72;
+    });
+  } else {
+    const y = 214;
+    let x = 60;
+    chapters.forEach((c, i) => {
+      if (i > 0 && c.act !== chapters[i - 1].act) x += 46;
+      out.push({ id: c.id, x, y });
+      x += 286;
+    });
+  }
+  return out;
+}
+
+/** Sequential timeline positions for an arbitrary book list — no act grouping. */
+export function timelineBookPositions(
+  books: { id: string }[],
+  orient: TimelineOrient
+): { id: string; x: number; y: number }[] {
+  return books.map((b, i) => ({
+    id: b.id,
+    ...(orient === "vertical"
+      ? { x: 320, y: 50 + i * (BOOK_H + 70) }
+      : { x: 60 + i * (BOOK_W + 90), y: 170 }),
+  }));
+}
+
+/** Grid spacing for the series-map auto-arrange. */
+const BOOK_GAP_X = 60;
+const BOOK_GAP_Y = 70;
+const BOOK_MARGIN = 40;
+
+/** Column count whose arranged book grid best fills the series-map viewport. */
+export function bestBookColumns(n: number, vpW: number, vpH: number, pad = FIT_PAD): number {
+  if (n <= 1) return 1;
+  if (vpW <= 0 || vpH <= 0) return Math.min(3, n);
+  let best = 1;
+  let bestZoom = -Infinity;
+  const target = Math.ceil(Math.sqrt(n));
+  let bestScore = Infinity;
+  for (let c = 1; c <= n; c++) {
+    const rows = Math.ceil(n / c);
+    const cw = c * BOOK_W + (c - 1) * BOOK_GAP_X;
+    const ch = rows * BOOK_H + (rows - 1) * BOOK_GAP_Y;
+    const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
+    const score = Math.abs(c - target) - c * 1e-4;
+    if (zoom > bestZoom + 0.01 || (Math.abs(zoom - bestZoom) <= 0.01 && score < bestScore)) {
+      bestZoom = Math.max(bestZoom, zoom);
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/**
+ * Lay books out on a reading-order grid (row-major) with a small, deterministic
+ * jitter so the map looks hand-placed rather than a rigid lattice. Books have no
+ * rotation, so only positions are nudged.
+ */
+export function bookAutoArrange<T extends { x: number; y: number }>(books: T[], cols: number): T[] {
+  const c0 = Math.max(1, cols);
+  return books.map((b, i) => {
+    const col = i % c0;
+    const row = Math.floor(i / c0);
+    const jx = (prand(i + 1) * 2 - 1) * 12;
+    const jy = (prand(i + 7) * 2 - 1) * 14;
+    return {
+      ...b,
+      x: BOOK_MARGIN + col * (BOOK_W + BOOK_GAP_X) + jx,
+      y: BOOK_MARGIN + row * (BOOK_H + BOOK_GAP_Y) + jy,
+    };
+  });
+}
+
+/** Fit all books within the given viewport (series map). */
+export function fitBooksToContent(
+  books: { x: number; y: number }[],
+  vpW: number,
+  vpH: number,
+  pad = FIT_PAD
+): Camera {
+  if (books.length === 0) return { zoom: 1, panX: pad, panY: pad };
+  const xs = books.map((b) => b.x);
+  const ys = books.map((b) => b.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs) + BOOK_W;
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys) + BOOK_H;
+  const cw = maxX - minX;
+  const ch = maxY - minY;
+  const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
+  return {
+    zoom,
+    panX: (vpW - cw * zoom) / 2 - minX * zoom,
+    panY: (vpH - ch * zoom) / 2 - minY * zoom,
+  };
+}
+
 /** Positions for each chapter, by current view. Returns {id,x,y} list. */
 export function layoutPositions(
   doc: StoryDoc,
@@ -95,25 +217,7 @@ export function layoutPositions(
   if (view !== "timeline") {
     return doc.chapters.map((c) => ({ id: c.id, x: c.x, y: c.y }));
   }
-  const out: { id: string; x: number; y: number }[] = [];
-  if (orient === "vertical") {
-    let y = 64;
-    const colX = 300;
-    doc.chapters.forEach((c, i) => {
-      if (i > 0 && c.act !== doc.chapters[i - 1].act) y += 54;
-      out.push({ id: c.id, x: colX, y });
-      y += CARD_H + 72;
-    });
-  } else {
-    const y = 214;
-    let x = 60;
-    doc.chapters.forEach((c, i) => {
-      if (i > 0 && c.act !== doc.chapters[i - 1].act) x += 46;
-      out.push({ id: c.id, x, y });
-      x += 286;
-    });
-  }
-  return out;
+  return timelineChapterPositions(doc.chapters, orient);
 }
 
 export interface Camera {

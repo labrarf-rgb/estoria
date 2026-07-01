@@ -22,7 +22,9 @@ export function Toolbar() {
   const toggleNewMenu = useStore((s) => s.toggleNewMenu);
   const closeNewMenu = useStore((s) => s.closeNewMenu);
   const addChapter = useStore((s) => s.addChapter);
+  const addBook = useStore((s) => s.addBook);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
+  const autoArrangeSeries = useStore((s) => s.autoArrangeSeries);
   const toggleSeriesMode = useStore((s) => s.toggleSeriesMode);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const updateBook = useStore((s) => s.updateBook);
@@ -206,6 +208,19 @@ export function Toolbar() {
             <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
           </button>
           <button onClick={autoArrangeBoard} className={action}>
+            Auto-arrange
+          </button>
+          <span className="h-[22px] w-px shrink-0 bg-rule" />
+        </>
+      )}
+
+      {/* New book / Auto-arrange (series map only) */}
+      {onSeriesMap && (
+        <>
+          <button onClick={addBook} className={action}>
+            <span className="-mt-px text-[15px] font-normal leading-none">+</span> New book
+          </button>
+          <button onClick={autoArrangeSeries} className={action}>
             Auto-arrange
           </button>
           <span className="h-[22px] w-px shrink-0 bg-rule" />

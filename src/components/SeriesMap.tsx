@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { readFileAsDataURL } from "@/lib/files";
+import { BOOK_W, BOOK_H, timelineBookPositions, fitBooksToContent } from "@/lib/layout";
 import type { BookStatus } from "@/types";
-
-const BOOK_W = 290;
-const BOOK_H = 188;
 
 const STATUSES: BookStatus[] = ["drafting", "planned", "idea"];
 const STATUS_LABEL: Record<BookStatus, string> = {
@@ -19,6 +17,10 @@ export function SeriesMap() {
   const doc = useStore((s) => s.doc);
   const enterBook = useStore((s) => s.enterBook);
   const moveBook = useStore((s) => s.moveBook);
+  const reorderBook = useStore((s) => s.reorderBook);
+  const autoArrangeSeries = useStore((s) => s.autoArrangeSeries);
+  const setBoardSize = useStore((s) => s.setBoardSize);
+  const seriesArrangeN = useStore((s) => s.seriesArrangeN);
   const updateBook = useStore((s) => s.updateBook);
   const deleteBook = useStore((s) => s.deleteBook);
   const addBook = useStore((s) => s.addBook);
@@ -36,36 +38,99 @@ export function SeriesMap() {
   // Tolerate older/partial docs that predate book positions and links.
   const bookLinks = doc.bookLinks ?? [];
 
-  // In timeline mode books are laid out in reading order; in map mode they use
-  // their free canvas positions.
-  const timeline = view === "timeline";
-  const posById: Record<string, { x: number; y: number }> = {};
-  doc.books.forEach((b, i) => {
-    posById[b.id] = timeline
-      ? orient === "vertical"
-        ? { x: 320, y: 50 + i * (BOOK_H + 70) }
-        : { x: 60 + i * (BOOK_W + 90), y: 170 }
-      : { x: b.x ?? 0, y: b.y ?? 0 };
-  });
-
-  const uploadCover = async (id: string, file: File | undefined) => {
-    if (!file) return;
-    updateBook(id, { coverSrc: await readFileAsDataURL(file) });
-  };
-
   const viewportRef = useRef<HTMLDivElement>(null);
   const camRef = useRef(cam);
   camRef.current = cam;
   const drag = useRef<{ id: string; mx: number; my: number; ox: number; oy: number } | null>(null);
   const pan = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
 
+  // While dragging a book (map view), the card it's currently over is a
+  // reorder target — dropping on it offers a resequence via confirmation.
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dropTargetRef = useRef<string | null>(null);
+  // Position + hit-test are coalesced to one update per animation frame
+  // (rather than once per native mousemove) so the dragged card, its
+  // connector threads, and the highlight all stay in lockstep during a fast
+  // real drag instead of lagging behind the pointer.
+  const dragRaf = useRef<number | null>(null);
+  const pendingDragPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Timeline-only drag-to-reorder: positions there are purely derived from
+  // array order (no stored x/y), so dragging live-splices a preview order and
+  // everyone — including the dragged card — reflows to the resulting
+  // sequential slots. Map mode keeps free placement; dropping a card onto
+  // another there just offers a reorder via confirmation (see onUp).
+  const timelineDrag = useRef<{ id: string; fromIdx: number } | null>(null);
+  const [timelineDragId, setTimelineDragId] = useState<string | null>(null);
+  const [timelineOverIdx, setTimelineOverIdx] = useState<number | null>(null);
+  const timelineOverRef = useRef<number | null>(null);
+
+  // In timeline mode books are laid out in reading order; in map mode they use
+  // their free canvas positions.
+  const timeline = view === "timeline";
+  let bookPos: { id: string; x: number; y: number }[];
+  if (!timeline) {
+    bookPos = doc.books.map((b) => ({ id: b.id, x: b.x ?? 0, y: b.y ?? 0 }));
+  } else if (timelineDragId && timelineOverIdx !== null) {
+    const dragged = doc.books.find((b) => b.id === timelineDragId);
+    const others = doc.books.filter((b) => b.id !== timelineDragId);
+    const preview = others.slice();
+    if (dragged) preview.splice(Math.max(0, Math.min(timelineOverIdx, others.length)), 0, dragged);
+    bookPos = timelineBookPositions(dragged ? preview : doc.books, orient);
+  } else {
+    bookPos = timelineBookPositions(doc.books, orient);
+  }
+  const posById: Record<string, { x: number; y: number }> = {};
+  bookPos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
+
+  const uploadCover = async (id: string, file: File | undefined) => {
+    if (!file) return;
+    updateBook(id, { coverSrc: await readFileAsDataURL(file) });
+  };
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (drag.current) {
         const z = camRef.current.zoom;
-        const nx = drag.current.ox + (e.clientX - drag.current.mx) / z;
-        const ny = drag.current.oy + (e.clientY - drag.current.my) / z;
-        moveBook(drag.current.id, Math.max(0, nx), Math.max(0, ny));
+        const nx = Math.max(0, drag.current.ox + (e.clientX - drag.current.mx) / z);
+        const ny = Math.max(0, drag.current.oy + (e.clientY - drag.current.my) / z);
+        pendingDragPos.current = { x: nx, y: ny };
+        if (dragRaf.current == null) {
+          dragRaf.current = requestAnimationFrame(() => {
+            dragRaf.current = null;
+            if (!drag.current || !pendingDragPos.current) return;
+            const { x, y } = pendingDragPos.current;
+            moveBook(drag.current.id, x, y);
+            const cx = x + BOOK_W / 2;
+            const cy = y + BOOK_H / 2;
+            const hit = useStore
+              .getState()
+              .doc.books.find(
+                (b) => b.id !== drag.current!.id && cx >= b.x && cx <= b.x + BOOK_W && cy >= b.y && cy <= b.y + BOOK_H
+              );
+            const hitId = hit?.id ?? null;
+            if (dropTargetRef.current !== hitId) {
+              dropTargetRef.current = hitId;
+              setDropTargetId(hitId);
+            }
+          });
+        }
+      } else if (timelineDrag.current) {
+        const vp = viewportRef.current;
+        if (!vp) return;
+        const rect = vp.getBoundingClientRect();
+        const c = camRef.current;
+        const wx = (e.clientX - rect.left - c.panX) / c.zoom;
+        const wy = (e.clientY - rect.top - c.panY) / c.zoom;
+        const primary = orient === "vertical" ? wy : wx;
+        const books = useStore.getState().doc.books;
+        const others = books.filter((b) => b.id !== timelineDrag.current!.id);
+        const otherPos = timelineBookPositions(others, orient);
+        const rank = otherPos.filter((p) => (orient === "vertical" ? p.y : p.x) < primary).length;
+        if (timelineOverRef.current !== rank) {
+          timelineOverRef.current = rank;
+          setTimelineOverIdx(rank);
+        }
       } else if (pan.current) {
         setCam((c) => ({
           ...c,
@@ -75,7 +140,55 @@ export function SeriesMap() {
       }
     };
     const onUp = () => {
-      drag.current = null;
+      if (drag.current) {
+        // Flush any coalesced position update still pending so the hit-test
+        // below reflects the card's true final (not one-frame-stale) position.
+        if (dragRaf.current != null) {
+          cancelAnimationFrame(dragRaf.current);
+          dragRaf.current = null;
+        }
+        if (pendingDragPos.current) {
+          moveBook(drag.current.id, pendingDragPos.current.x, pendingDragPos.current.y);
+          pendingDragPos.current = null;
+        }
+        const draggedId = drag.current.id;
+        const targetId = dropTargetRef.current;
+        drag.current = null;
+        if (targetId) {
+          const books = useStore.getState().doc.books;
+          const dragged = books.find((b) => b.id === draggedId);
+          const target = books.find((b) => b.id === targetId);
+          if (dragged && target) {
+            const after = dragged.x > target.x;
+            askConfirm({
+              message: "Reorder books?",
+              detail: `"${dragged.title}" will move ${after ? "after" : "before"} "${target.title}", and the map will re-arrange to match.`,
+              confirmLabel: "Reorder",
+              onConfirm: () => {
+                reorderBook(draggedId, target.id, after);
+                autoArrangeSeries();
+              },
+            });
+          }
+        }
+        dropTargetRef.current = null;
+        setDropTargetId(null);
+      }
+      if (timelineDrag.current) {
+        const { id, fromIdx } = timelineDrag.current;
+        const finalIdx = timelineOverRef.current ?? fromIdx;
+        const books = useStore.getState().doc.books;
+        const others = books.filter((b) => b.id !== id);
+        const clamped = Math.max(0, Math.min(finalIdx, others.length));
+        if (others.length) {
+          const targetId = clamped < others.length ? others[clamped].id : others[others.length - 1].id;
+          reorderBook(id, targetId, clamped >= others.length);
+        }
+        timelineDrag.current = null;
+        timelineOverRef.current = null;
+        setTimelineDragId(null);
+        setTimelineOverIdx(null);
+      }
       pan.current = null;
     };
     window.addEventListener("mousemove", onMove);
@@ -83,8 +196,29 @@ export function SeriesMap() {
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
     };
-  }, [moveBook]);
+  }, [moveBook, reorderBook, autoArrangeSeries, orient, askConfirm]);
+
+  // Report the series-map viewport size so auto-arrange can size its grid, and
+  // re-fit the camera to the books whenever an auto-arrange runs.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const report = () => setBoardSize(vp.clientWidth, vp.clientHeight);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [setBoardSize]);
+
+  const prevSeriesArrange = useRef(seriesArrangeN);
+  useEffect(() => {
+    if (seriesArrangeN === prevSeriesArrange.current) return;
+    prevSeriesArrange.current = seriesArrangeN;
+    const vp = viewportRef.current;
+    if (vp) setCam(fitBooksToContent(useStore.getState().doc.books, vp.clientWidth, vp.clientHeight));
+  }, [seriesArrangeN]);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -111,12 +245,18 @@ export function SeriesMap() {
     return { x: p.x + BOOK_W / 2, y: p.y + BOOK_H / 2 };
   };
 
-  const onCardDown = (e: React.MouseEvent, id: string, x: number, y: number) => {
-    if (timeline) return; // positions are computed in timeline mode
+  const onCardDown = (e: React.MouseEvent, id: string, x: number, y: number, idx: number) => {
     const t = e.target as HTMLElement;
     if (t.closest("input") || t.closest("textarea") || t.closest("select") || t.closest("button")) return;
     e.stopPropagation();
     e.preventDefault();
+    if (timeline) {
+      timelineDrag.current = { id, fromIdx: idx };
+      timelineOverRef.current = idx;
+      setTimelineDragId(id);
+      setTimelineOverIdx(idx);
+      return;
+    }
     drag.current = { id, mx: e.clientX, my: e.clientY, ox: x, oy: y };
   };
 
@@ -214,15 +354,35 @@ export function SeriesMap() {
             <div
               key={b.id}
               data-book-card
-              onMouseDown={(e) => onCardDown(e, b.id, p.x, p.y)}
+              onMouseDown={(e) => onCardDown(e, b.id, p.x, p.y, i)}
               onClick={() => onCardClick(b.id)}
               onDoubleClick={() => enterBook(b.id)}
-              className={`group absolute ${timeline ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
-              style={{ left: p.x, top: p.y, width: BOOK_W, minHeight: BOOK_H, zIndex: 5 }}
+              className={`group absolute cursor-default`}
+              style={{
+                left: p.x,
+                top: p.y,
+                width: BOOK_W,
+                minHeight: BOOK_H,
+                zIndex: dropTargetId === b.id || timelineDragId === b.id ? 20 : 5,
+                transition: timeline ? "left 150ms ease-out, top 150ms ease-out" : undefined,
+              }}
             >
               <div
-                className="flex h-full flex-col gap-[8px] rounded-2xl border bg-card p-[15px] shadow-[var(--shadow)]"
-                style={{ borderColor: isConnectSource ? "var(--but)" : "var(--rule)" }}
+                className="flex h-full flex-col gap-[8px] rounded-2xl border bg-card p-[15px]"
+                style={{
+                  borderColor:
+                    isConnectSource
+                      ? "var(--but)"
+                      : dropTargetId === b.id
+                        ? "color-mix(in srgb, var(--but) 60%, var(--rule))"
+                        : "var(--rule)",
+                  boxShadow:
+                    dropTargetId === b.id
+                      ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent), var(--shadow)"
+                      : timelineDragId === b.id
+                        ? "0 14px 32px rgba(0,0,0,0.26), var(--shadow)"
+                        : "var(--shadow)",
+                }}
               >
                 {/* Cover */}
                 {b.coverSrc ? (
@@ -248,7 +408,16 @@ export function SeriesMap() {
                   </label>
                 )}
 
-                <div className="flex items-center gap-[9px]">
+                <div className="flex items-center gap-[7px]">
+                  <span
+                    title="Drag to reorder"
+                    className="-ml-[4px] flex h-[26px] w-[13px] shrink-0 cursor-grab select-none flex-col items-center justify-center gap-[2px] leading-none text-line hover:text-faint active:cursor-grabbing"
+                    aria-hidden
+                  >
+                    <span className="text-[9px] leading-[5px] tracking-[-1px]">••</span>
+                    <span className="text-[9px] leading-[5px] tracking-[-1px]">••</span>
+                    <span className="text-[9px] leading-[5px] tracking-[-1px]">••</span>
+                  </span>
                   <span className="flex h-[30px] w-[28px] flex-shrink-0 items-center justify-center rounded-md bg-but font-serif text-[15px] font-semibold text-white">
                     {i + 1}
                   </span>

@@ -117,8 +117,9 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Area | Feature | Status | Notes |
 | --- | --- | --- | --- |
 | Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; double-click opens detail. |
+| Board | Reorder chapters | ✅ | Board: drop a card on another → confirm → resequences **and** auto-arranges so threads stay clean. Timeline: drag to reorder with live reflow. Connector chain rebuilt to follow the new order. |
 | Board | Connectors (therefore/but/and) | ✅ | SVG curves, colored by type, alt-draft aware. |
-| Board | Auto-arrange | ✅ | Decaying-jitter grid. |
+| Board | Auto-arrange | ✅ | Decaying-jitter grid, floored so it approaches straight but never a rigid lattice. |
 | Board | Add chapter | ✅ | |
 | Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange. |
@@ -135,6 +136,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
 | Series | Planner view + mode toggle | ✅ | Read view; add/edit book to do. |
+| Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. |
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Toggle swaps titles/summaries/alt connectors. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter. |
@@ -687,3 +689,71 @@ bottom appends it last; long-press Add scene previews and inserts between two
 existing scenes; a quick click still appends normally; expanding a pinned note shows
 its delete button, the collapsed row shows only the caret. `tsc -b` + `vite build`
 clean. Committed and pushed to `origin/main`.
+
+### 2026-07-01 — Reorder chapters & books (board + timeline), series auto-arrange, "+ New book" (Session 17)
+
+Brought the scene reorder idea (Session 16) to the chapter board and the series
+map. This went through several rounds of user feedback; the notes below describe
+the **final** shape, not the intermediate drafts.
+
+Two reorder gestures per view, because board/map are a freeform corkboard while
+timeline is an ordered lane:
+
+- **Timeline view (chapters & books)** — the clean, dedicated reorder. Dragging a
+  card live-splices a preview order and every card (including the dragged one)
+  reflows to the resulting sequential slots; commit on release. Positions are
+  derived from array order here, so nothing needs auto-arranging afterward.
+  Implemented in `Board.tsx` (`timelineChapterPositions`) and `SeriesMap.tsx`
+  (`timelineBookPositions`) — both new standalone helpers in `layout.ts` that
+  take an arbitrary ordered list so a candidate order can be previewed without
+  mutating the store.
+- **Board / map view (freeform)** — drop a card onto another → **confirm dialog**
+  → resequence **and** auto-arrange so the change is visible and threads stay
+  clean. (Earlier iterations left positions untouched, which read as "nothing
+  happened" / left cards stacked — the user asked for the auto-arrange follow-up.)
+
+Key fixes discovered through testing:
+
+- **Threads followed the old order after a reorder.** Chapter connectors are a
+  consecutive `chapter[i]→chapter[i+1]` "therefore" chain wired *by id*; reordering
+  the array left the chain pointing at the old sequence, so lines crisscrossed.
+  There's no board UI to retype chapter links (connectors are plain `<path>`, no
+  click handler), so `reorderChapter` now **rebuilds the chain** to follow the new
+  order, carrying over any existing type on an adjacency that didn't move. Book
+  links (`bookLinks`) are user-drawn labeled connections, not a sequence chain, so
+  `reorderBook` leaves them alone.
+- **Position updates lagged the connectors during a fast drag.** The board drag
+  now coalesces move + hit-test into one `requestAnimationFrame` per frame
+  (`pendingDragPos`/`dragRaf`), flushed on mouseup, so card, threads, and the
+  drop highlight stay in lockstep.
+- **Auto-arrange had lost its character** — `amp = 0.6^arrangeN` decays to 0, so
+  repeated arranges snapped to a rigid grid. Floored at `0.15`: it still eases
+  toward straight (max tilt ~3.3°→0.5° over clicks) but never lines up perfectly.
+- **Book cards weren't grabbable.** Unlike chapter cards (display-only text), book
+  cards are almost fully covered by the title `<input>`, premise `<textarea>`,
+  status `<select>`, and buttons — the drag guard bailed on all of them, so a real
+  click never started a drag ("reorder isn't working in series view"). Added a
+  visible **drag-handle grip** (dot grid, grab cursor, "Drag to reorder" tooltip)
+  left of each book's number badge; the card cursor is now default so only the
+  handle advertises dragging.
+
+New this session:
+
+- **Series auto-arrange** (`layout.ts` `bookAutoArrange` / `bestBookColumns` /
+  `fitBooksToContent`; store `autoArrangeSeries` + `seriesArrangeN`): lays books
+  on a reading-order grid with slight deterministic jitter, sized to the map
+  viewport. `SeriesMap` reports its size via `setBoardSize` and re-fits its camera
+  on each arrange (keyed on `seriesArrangeN`). Surfaced as an **"Auto-arrange"**
+  toolbar button on the series map, alongside a new **"+ New book"** button
+  (mirrors "+ New chapter"; the floating corner button and File-menu →
+  `NewBookModal` remain).
+- **Highlight** is a soft translucent glow ring (`box-shadow` + `color-mix`), not
+  a solid border/outline; the dragged card gets a gentle lift shadow.
+- New store actions: `reorderChapter`, `reorderBook`, `autoArrangeSeries`.
+
+Verified in-browser on the sample (8-chapter book + 4-book series): board reorder
+resequences `01..08` and re-arranges with clean threads; timeline reorder reflows
+live for chapters and books; series auto-arrange grids the books (0 overlaps) and
+fits the camera; grip-drag reorders books and repositions freely; repeated
+auto-arrange approaches straight but keeps a faint tilt. `tsc -b` + `vite build`
+clean (65 modules).

@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import {
   CARD_W,
   CARD_H,
   fitToContent,
   layoutPositions,
+  timelineChapterPositions,
   type Camera,
 } from "@/lib/layout";
 import { displaySummary, resolveTitle } from "@/lib/drafts";
@@ -44,8 +45,11 @@ export function Board() {
   const setCamera = useStore((s) => s.setCamera);
   const setBoardSize = useStore((s) => s.setBoardSize);
   const moveChapter = useStore((s) => s.moveChapter);
+  const reorderChapter = useStore((s) => s.reorderChapter);
+  const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const setDragId = useStore((s) => s.setDragId);
   const openChapter = useStore((s) => s.openChapter);
+  const askConfirm = useStore((s) => s.askConfirm);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   // Live interaction state kept in refs to avoid stale closures in listeners.
@@ -54,16 +58,74 @@ export function Board() {
   const cam = useRef<Camera>({ zoom, panX, panY });
   cam.current = { zoom, panX, panY };
 
+  // While dragging a chapter (map view), the card it's currently over is a
+  // reorder target — dropping on it offers a resequence via confirmation.
+  // Mirrored into a ref for the window-level handlers.
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dropTargetRef = useRef<string | null>(null);
+  // Position + hit-test are coalesced to one update per animation frame
+  // (rather than once per native mousemove, which can fire faster than the
+  // screen repaints) so the dragged card, its connectors, and the highlight
+  // all stay in lockstep with the pointer during a fast real drag.
+  const dragRaf = useRef<number | null>(null);
+  const pendingDragPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Timeline-only drag-to-reorder: positions there are purely derived from
+  // array order (no stored x/y), so dragging live-splices a preview order and
+  // everyone — including the dragged card — reflows to the resulting
+  // sequential slots. Board (map) view keeps free placement; dropping a card
+  // onto another there just offers a reorder via confirmation (see onUp).
+  const timelineDrag = useRef<{ id: string; fromIdx: number } | null>(null);
+  const [timelineDragId, setTimelineDragId] = useState<string | null>(null);
+  const [timelineOverIdx, setTimelineOverIdx] = useState<number | null>(null);
+  const timelineOverRef = useRef<number | null>(null);
+
   const isTimeline = view === "timeline";
 
-  // Pointer drag (chapters) and background pan, via window listeners.
+  // Pointer drag (chapters), timeline reorder, and background pan — via window listeners.
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (drag.current) {
         const z = cam.current.zoom;
         const nx = drag.current.ox + (e.clientX - drag.current.mx) / z;
         const ny = drag.current.oy + (e.clientY - drag.current.my) / z;
-        moveChapter(drag.current.id, nx, ny);
+        pendingDragPos.current = { x: nx, y: ny };
+        if (dragRaf.current == null) {
+          dragRaf.current = requestAnimationFrame(() => {
+            dragRaf.current = null;
+            if (!drag.current || !pendingDragPos.current) return;
+            const { x, y } = pendingDragPos.current;
+            moveChapter(drag.current.id, x, y);
+            const cx = x + CARD_W / 2;
+            const cy = y + CARD_H / 2;
+            const hit = useStore
+              .getState()
+              .doc.chapters.find(
+                (c) => c.id !== drag.current!.id && cx >= c.x && cx <= c.x + CARD_W && cy >= c.y && cy <= c.y + CARD_H
+              );
+            const hitId = hit?.id ?? null;
+            if (dropTargetRef.current !== hitId) {
+              dropTargetRef.current = hitId;
+              setDropTargetId(hitId);
+            }
+          });
+        }
+      } else if (timelineDrag.current) {
+        const vp = viewportRef.current;
+        if (!vp) return;
+        const rect = vp.getBoundingClientRect();
+        const c = cam.current;
+        const wx = (e.clientX - rect.left - c.panX) / c.zoom;
+        const wy = (e.clientY - rect.top - c.panY) / c.zoom;
+        const primary = orient === "vertical" ? wy : wx;
+        const chapters = useStore.getState().doc.chapters;
+        const others = chapters.filter((ch) => ch.id !== timelineDrag.current!.id);
+        const otherPos = timelineChapterPositions(others, orient);
+        const rank = otherPos.filter((p) => (orient === "vertical" ? p.y : p.x) < primary).length;
+        if (timelineOverRef.current !== rank) {
+          timelineOverRef.current = rank;
+          setTimelineOverIdx(rank);
+        }
       } else if (pan.current) {
         setCamera({
           panX: pan.current.px + (e.clientX - pan.current.mx),
@@ -73,8 +135,55 @@ export function Board() {
     };
     const onUp = () => {
       if (drag.current) {
+        // Flush any coalesced position update still pending so the hit-test
+        // below reflects the card's true final (not one-frame-stale) position.
+        if (dragRaf.current != null) {
+          cancelAnimationFrame(dragRaf.current);
+          dragRaf.current = null;
+        }
+        if (pendingDragPos.current) {
+          moveChapter(drag.current.id, pendingDragPos.current.x, pendingDragPos.current.y);
+          pendingDragPos.current = null;
+        }
+        const draggedId = drag.current.id;
+        const targetId = dropTargetRef.current;
         drag.current = null;
         setDragId(null);
+        if (targetId) {
+          const chapters = useStore.getState().doc.chapters;
+          const dragged = chapters.find((c) => c.id === draggedId);
+          const target = chapters.find((c) => c.id === targetId);
+          if (dragged && target) {
+            const draftId = useStore.getState().doc.activeDraftId;
+            const after = dragged.x > target.x;
+            askConfirm({
+              message: "Reorder chapters?",
+              detail: `"${resolveTitle(dragged, draftId)}" will move ${after ? "after" : "before"} "${resolveTitle(target, draftId)}", and the board will re-arrange to match.`,
+              confirmLabel: "Reorder",
+              onConfirm: () => {
+                reorderChapter(draggedId, target.id, after);
+                autoArrangeBoard();
+              },
+            });
+          }
+        }
+        dropTargetRef.current = null;
+        setDropTargetId(null);
+      }
+      if (timelineDrag.current) {
+        const { id, fromIdx } = timelineDrag.current;
+        const finalIdx = timelineOverRef.current ?? fromIdx;
+        const chapters = useStore.getState().doc.chapters;
+        const others = chapters.filter((c) => c.id !== id);
+        const clamped = Math.max(0, Math.min(finalIdx, others.length));
+        if (others.length) {
+          const targetId = clamped < others.length ? others[clamped].id : others[others.length - 1].id;
+          reorderChapter(id, targetId, clamped >= others.length);
+        }
+        timelineDrag.current = null;
+        timelineOverRef.current = null;
+        setTimelineDragId(null);
+        setTimelineOverIdx(null);
       }
       pan.current = null;
     };
@@ -83,8 +192,9 @@ export function Board() {
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
     };
-  }, [moveChapter, setCamera, setDragId]);
+  }, [moveChapter, reorderChapter, autoArrangeBoard, setCamera, setDragId, askConfirm, orient]);
 
   // Wheel: zoom on the board, scroll-pan on the timeline.
   useEffect(() => {
@@ -172,7 +282,16 @@ export function Board() {
   }, [arrangeN]);
 
   const isVert = isTimeline && orient === "vertical";
-  const pos = layoutPositions(doc, view, orient);
+  let pos = layoutPositions(doc, view, orient);
+  if (isTimeline && timelineDragId && timelineOverIdx !== null) {
+    const dragged = doc.chapters.find((c) => c.id === timelineDragId);
+    const others = doc.chapters.filter((c) => c.id !== timelineDragId);
+    if (dragged) {
+      const preview = others.slice();
+      preview.splice(Math.max(0, Math.min(timelineOverIdx, others.length)), 0, dragged);
+      pos = timelineChapterPositions(preview, orient);
+    }
+  }
   const posById: Record<string, { x: number; y: number }> = {};
   pos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
 
@@ -206,9 +325,16 @@ export function Board() {
   })();
 
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
-    if (isTimeline) return;
     e.stopPropagation();
     e.preventDefault();
+    if (isTimeline) {
+      const fromIdx = doc.chapters.findIndex((c) => c.id === ch.id);
+      timelineDrag.current = { id: ch.id, fromIdx };
+      timelineOverRef.current = fromIdx;
+      setTimelineDragId(ch.id);
+      setTimelineOverIdx(fromIdx);
+      return;
+    }
     drag.current = { id: ch.id, mx: e.clientX, my: e.clientY, ox: ch.x, oy: ch.y };
     setDragId(ch.id);
   };
@@ -316,13 +442,25 @@ export function Board() {
                 top: p.y,
                 width: CARD_W,
                 minHeight: CARD_H,
-                cursor: isTimeline ? "pointer" : dragId === c.id ? "grabbing" : "grab",
-                zIndex: dragId === c.id ? 20 : 5,
+                cursor: dragId === c.id || timelineDragId === c.id ? "grabbing" : "grab",
+                zIndex: dragId === c.id || timelineDragId === c.id ? 20 : 5,
                 transform: !isTimeline && c.rot ? `rotate(${c.rot}deg)` : "none",
                 transformOrigin: "center center",
+                transition: isTimeline ? "left 150ms ease-out, top 150ms ease-out" : undefined,
               }}
             >
-              <div className="flex h-full flex-col gap-[7px] rounded-xl border border-rule bg-card p-[12px_14px] shadow-[var(--shadow)] hover:border-faint">
+              <div
+                className="flex h-full flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] hover:border-faint"
+                style={{
+                  borderColor: dropTargetId === c.id ? "color-mix(in srgb, var(--but) 60%, var(--rule))" : "var(--rule)",
+                  boxShadow:
+                    dropTargetId === c.id
+                      ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent), var(--shadow)"
+                      : dragId === c.id || timelineDragId === c.id
+                        ? "0 14px 32px rgba(0,0,0,0.26), var(--shadow)"
+                        : "var(--shadow)",
+                }}
+              >
                 <div className="flex items-center gap-2">
                   <span className="rounded-md bg-ink px-[7px] py-[2px] font-mono text-[11px] font-semibold text-bg">
                     {String(c.num).padStart(2, "0")}
