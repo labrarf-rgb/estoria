@@ -121,7 +121,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Board | Auto-arrange | ✅ | Decaying-jitter grid. |
 | Board | Add chapter | ✅ | |
 | Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
-| Detail | Scene flow canvas | ✅ | Draggable scene nodes, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange. |
+| Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange. |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | 🟡 | Add note/image works; **renaming a ref label** still to do. |
@@ -642,3 +642,48 @@ scene layout's decaying jitter made the spacing look uneven.
 Verified in-browser at 1680px: 7 scenes lay out 5-across expanded with all
 BUT/THEREFORE pills sitting in gaps (no text covered), then reflow to 3-across on
 Collapse. `tsc -b` + `vite build` clean.
+
+### 2026-07-01 — Scene drag-to-reorder, long-press insert, ref delete placement (Session 16)
+
+Scene positions in `scenePos` are always a clean auto-arranged grid now (nothing
+freeform left), so scene dragging was reworked from "move to an arbitrary x/y" into
+a real **reorder**, plus two smaller fixes.
+
+- **Add scene auto-arranges.** `addScene`/new `insertScene` (`useStore.ts`) recompute
+  the whole grid via `sceneAutoArrange` instead of nudging the new card's position by
+  a fixed offset, so a new scene always lands in a proper grid slot. `moveScene`
+  (arbitrary x/y) is removed — it was already inconsistent with `openChapter`'s
+  grid-seeding behavior.
+- **Drag-to-reorder with live preview** (`ChapterDetail.tsx`): dragging a scene card
+  now previews the drop: every other card reflows to the grid position it'll land in,
+  a dashed placeholder marks the target slot, and the grabbed card follows the
+  cursor as a ghost. The reorder only commits (new store action `reorderScene`) on
+  mouseup, and only if the pointer is actually over a slot — dragging further just
+  keeps moving the preview. `sceneLinks` (the therefore/but/and connectors) are
+  treated as positional (a gap between cards, not tied to a specific scene), so a
+  reorder always ends with a valid `scenes.length - 1` links array — connector
+  continuity is never broken. Connectors are hidden while dragging to avoid
+  stale-looking lines mid-reflow.
+- **Long-press Add scene to insert**: holding the button ~220ms spawns a draggable
+  "New scene." ghost using the same preview/insert mechanism as an existing-scene
+  drag (`insertScene`); a quick click still just appends to the end.
+- **Auto-scroll while dragging**: a `requestAnimationFrame` loop scrolls the scene
+  canvas up/down when the pointer nears its top/bottom edge, so reordering works on
+  chapters with more scenes than fit on screen.
+- New `sceneSlotFromPoint` (`lib/layout.ts`) maps a canvas-local point to a row-major
+  grid slot — shared by the live preview and the commit logic. Bug caught in
+  testing: the mousemove handler was computing the grid's column count from a
+  different item total (`n-1`) than the render preview used (`n`), desyncing the
+  detected drop slot from what was visually shown; fixed by unifying both on the
+  same "total slots including the gap" value.
+- **Pinned reference notes** (`ui/RefList.tsx`, list view): the delete (✕) was
+  sitting right next to the expand/collapse caret, easy to mis-click. Removed it
+  from the collapsed row; it now only appears in the expanded body, next to the
+  title field.
+
+Verified in-browser (sample chapter, "The Drowned Map"): dragging a scene mid-list
+reflows the other cards and commits to the right position; dragging to the far
+bottom appends it last; long-press Add scene previews and inserts between two
+existing scenes; a quick click still appends normally; expanding a pinned note shows
+its delete button, the collapsed row shows only the caret. `tsc -b` + `vite build`
+clean. Committed and pushed to `origin/main`.
