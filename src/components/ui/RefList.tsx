@@ -20,7 +20,7 @@ export function RefList({
   onDelete,
   onLink,
   linkLabel = "Link asset",
-  view = "card",
+  view = "list",
 }: {
   refs: PinnedRef[];
   onAdd: (kind: RefKind) => void;

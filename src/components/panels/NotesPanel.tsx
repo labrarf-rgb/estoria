@@ -16,7 +16,7 @@ export function NotesPanel() {
   const addAsset = useStore((s) => s.addAsset);
   const updateAsset = useStore((s) => s.updateAsset);
   const deleteAsset = useStore((s) => s.deleteAsset);
-  const [libView, setLibView] = useState<RefView>("card");
+  const [libView, setLibView] = useState<RefView>("list");
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
 

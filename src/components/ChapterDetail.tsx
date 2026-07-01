@@ -53,7 +53,7 @@ export function ChapterDetail() {
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
   const [expanded, setExpanded] = useState(true);
-  const [refView, setRefView] = useState<RefView>("card");
+  const [refView, setRefView] = useState<RefView>("list");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).

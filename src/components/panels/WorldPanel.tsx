@@ -21,7 +21,7 @@ export function WorldPanel() {
   const updateWorldRef = useStore((s) => s.updateWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
   const askConfirm = useStore((s) => s.askConfirm);
-  const [refView, setRefView] = useState<RefView>("card");
+  const [refView, setRefView] = useState<RefView>("list");
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
 
