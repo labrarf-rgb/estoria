@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth } from "@/lib/layout";
 import { resolveSummary, resolveTitle } from "@/lib/drafts";
 import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType } from "@/types";
@@ -51,6 +53,7 @@ export function ChapterDetail() {
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [refView, setRefView] = useState<RefView>("card");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
   // Scene-node drag, via window listeners (canvas isn't zoomed -> 1:1 deltas).
@@ -462,19 +465,24 @@ export function ChapterDetail() {
           <div className="mb-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft">
             Chapter notes
           </div>
-          <textarea
+          <ExpandableTextarea
             value={ch.notes ?? ""}
-            onChange={(e) => patchChapter(ch.id, { notes: e.target.value })}
+            onChange={(v) => patchChapter(ch.id, { notes: v })}
             placeholder="Reminders, revision ideas, continuity flags for this chapter..."
-            rows={2}
-            className="w-full resize-none rounded-xl border border-rule bg-card p-[12px] text-[13px] leading-[1.55] text-ink outline-none"
+            collapsedRows={3}
+            expandedHeight="52vh"
+            className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
           />
         </div>
 
         {/* Pinned refs */}
         <div className="px-[26px] py-[18px]">
-          <div className="mb-[13px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-            Pinned references
+          <div className="mb-[13px] flex items-center gap-[12px]">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-soft">
+              Pinned references
+            </div>
+            <div className="flex-1" />
+            <ViewToggle view={refView} onChange={setRefView} />
           </div>
           <RefList
             refs={ch.refs}
@@ -483,6 +491,7 @@ export function ChapterDetail() {
             onDelete={(refId) => deleteChapterRef(ch.id, refId)}
             onLink={() => setLinkOpen((v) => !v)}
             linkLabel="Link book asset"
+            view={refView}
           />
           {linkOpen && (
             <div className="mt-3 rounded-xl border border-rule bg-card p-3">

@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import type { WorldCategory } from "@/types";
 
 const CATEGORIES: WorldCategory[] = ["Place", "Faction", "Lore", "Event"];
@@ -18,6 +21,7 @@ export function WorldPanel() {
   const updateWorldRef = useStore((s) => s.updateWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
   const askConfirm = useStore((s) => s.askConfirm);
+  const [refView, setRefView] = useState<RefView>("card");
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
 
@@ -87,29 +91,34 @@ export function WorldPanel() {
                     </div>
                     <div>
                       <Label>Description</Label>
-                      <textarea
+                      <ExpandableTextarea
                         value={w.desc}
-                        onChange={(e) => updateWorldEntry(w.id, { desc: e.target.value })}
-                        rows={2}
-                        className="w-full resize-none rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
+                        onChange={(v) => updateWorldEntry(w.id, { desc: v })}
+                        expandedHeight="40vh"
+                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
                       />
                     </div>
                     <div>
                       <Label>Notes</Label>
-                      <textarea
+                      <ExpandableTextarea
                         value={w.notes}
-                        onChange={(e) => updateWorldEntry(w.id, { notes: e.target.value })}
-                        rows={2}
-                        className="w-full resize-none rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
+                        onChange={(v) => updateWorldEntry(w.id, { notes: v })}
+                        expandedHeight="40vh"
+                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
                       />
                     </div>
                     <div>
-                      <Label>References</Label>
+                      <div className="mb-[5px] flex items-center gap-[10px]">
+                        <Label>References</Label>
+                        <div className="flex-1" />
+                        <ViewToggle view={refView} onChange={setRefView} />
+                      </div>
                       <RefList
                         refs={w.refs}
                         onAdd={(kind) => addWorldRef(w.id, kind)}
                         onUpdate={(refId, patch) => updateWorldRef(w.id, refId, patch)}
                         onDelete={(refId) => deleteWorldRef(w.id, refId)}
+                        view={refView}
                       />
                     </div>
                     <button

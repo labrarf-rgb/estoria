@@ -540,3 +540,32 @@ menu.
   when expanded and fewer when collapsed — each mode fills its own width.
   Verified: 12 scenes → ~5 columns expanded (box ~1252px) vs 3 collapsed
   (box ~912px).
+
+### 2026-06-30 — Expandable notes + card/list ref views (Session 13)
+
+Readability + browsing pass over notes and references. Two small reusable UI
+primitives now back every notes/refs surface:
+- **`ui/ExpandableTextarea.tsx`** — a textarea with an Expand/Collapse pill (swaps
+  a compact row count for a tall fixed height) plus native `resize-y` drag, so any
+  reading/editing area can be made longer.
+- **`ui/ViewToggle.tsx`** — a small segmented Card / List switch (values `"card"`
+  / `"list"`, exported `RefView` type).
+- **`RefList` gained a `view` prop.** Card view is unchanged (fixed-size grid);
+  the new **list view** renders compact rows (icon · title · snippet) that you
+  click to expand into an inline detail editor — note title + body, or image
+  title + thumbnail/upload. Add/Link buttons sit in a row beneath the list.
+
+Wired into all three consumers:
+- **Story notes** (`NotesPanel`): the main notes textarea is now an
+  `ExpandableTextarea` (9 rows collapsed → 62vh expanded); the shared library has a
+  Card/List toggle.
+- **World detail** (`WorldPanel`): Description and Notes are `ExpandableTextarea`s
+  (40vh expanded, `pr` reserved for the pill); each entry's References have a
+  Card/List toggle (shared view state across entries).
+- **Chapter modal** (`ChapterDetail`): Chapter notes is an `ExpandableTextarea`
+  (3 rows → 52vh); Pinned references have a Card/List toggle.
+
+Verified in-browser on the sample: story-notes expand + library list view with
+click-to-expand; chapter notes expand; pinned-refs list view (image row expands to
+its upload/thumbnail, note row to title+body); world Description/Notes expand +
+References Card/List toggle. `tsc -b` + `vite build` clean (65 modules).

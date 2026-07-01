@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { ViewToggle, type RefView } from "@/components/ui/ViewToggle";
+import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import type { PinnedRef } from "@/types";
 
 export function NotesPanel() {
@@ -13,6 +16,7 @@ export function NotesPanel() {
   const addAsset = useStore((s) => s.addAsset);
   const updateAsset = useStore((s) => s.updateAsset);
   const deleteAsset = useStore((s) => s.deleteAsset);
+  const [libView, setLibView] = useState<RefView>("card");
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
 
@@ -34,22 +38,29 @@ export function NotesPanel() {
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-auto p-[18px]">
-          <textarea
+          <ExpandableTextarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={setNotes}
             placeholder="Jot themes, throughlines, open questions, pacing notes..."
-            className="min-h-[200px] flex-1 resize-none rounded-xl border border-rule bg-card p-4 font-serif text-[13.5px] leading-[1.65] text-ink outline-none"
+            collapsedRows={9}
+            expandedHeight="62vh"
+            className="rounded-xl border border-rule bg-card p-4 font-serif text-[13.5px] leading-[1.65] text-ink outline-none"
           />
 
           <div>
-            <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-wide text-faint">
-              Shared library · link these into any chapter
+            <div className="mb-[8px] flex items-center gap-[10px]">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+                Shared library · link these into any chapter
+              </div>
+              <div className="flex-1" />
+              <ViewToggle view={libView} onChange={setLibView} />
             </div>
             <RefList
               refs={assets as PinnedRef[]}
               onAdd={(kind) => addAsset(kind)}
               onUpdate={(id, patch) => updateAsset(id, patch)}
               onDelete={(id) => deleteAsset(id)}
+              view={libView}
             />
           </div>
 

@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { readFileAsDataURL } from "@/lib/files";
 import type { PinnedRef, RefKind } from "@/types";
+import type { RefView } from "@/components/ui/ViewToggle";
 
 /**
- * Editable grid of pinned references (notes + uploadable images). Reused by the
- * chapter detail, the World panel, and the notes/assets library. Every cell is
- * the same fixed size so the grid lines up. Images open in the lightbox.
+ * Editable collection of pinned references (notes + uploadable images). Reused by
+ * the chapter detail, the World panel, and the notes/assets library.
+ *
+ * Two layouts, chosen by `view`:
+ *  - "card": a wrap grid of fixed-size cells (default).
+ *  - "list": compact rows you click to expand into an inline detail editor.
+ * Images open in the lightbox.
  */
 export function RefList({
   refs,
@@ -14,6 +20,7 @@ export function RefList({
   onDelete,
   onLink,
   linkLabel = "Link asset",
+  view = "card",
 }: {
   refs: PinnedRef[];
   onAdd: (kind: RefKind) => void;
@@ -21,9 +28,11 @@ export function RefList({
   onDelete: (refId: string) => void;
   onLink?: () => void;
   linkLabel?: string;
+  view?: RefView;
 }) {
   const openLightbox = useStore((s) => s.openLightbox);
   const askConfirm = useStore((s) => s.askConfirm);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const upload = async (refId: string, file: File | undefined) => {
     if (!file) return;
@@ -38,6 +47,119 @@ export function RefList({
       onConfirm: () => onDelete(r.id),
     });
 
+  const addButtons = () => (
+    <>
+      <button
+        onClick={() => onAdd("NOTE")}
+        className="rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
+      >
+        + Note
+      </button>
+      <button
+        onClick={() => onAdd("IMAGE")}
+        className="rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
+      >
+        + Image
+      </button>
+      {onLink && (
+        <button
+          onClick={onLink}
+          className="rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
+        >
+          {linkLabel}
+        </button>
+      )}
+    </>
+  );
+
+  // ── List view ──────────────────────────────────────────────────────────────
+  if (view === "list") {
+    return (
+      <div className="flex flex-col gap-[7px]">
+        {refs.length === 0 && (
+          <div className="px-[2px] text-[12px] text-faint">No references yet.</div>
+        )}
+        {refs.map((r) => {
+          const open = openId === r.id;
+          const snippet =
+            r.kind === "IMAGE" ? "Image" : (r.body ?? "").trim() || "Empty note";
+          return (
+            <div key={r.id} className="rounded-[10px] border border-rule bg-card">
+              <div className="group flex items-center gap-[10px] px-[12px] py-[9px]">
+                <span className="text-[13px]">{r.kind === "IMAGE" ? "🖼" : "📝"}</span>
+                <button
+                  onClick={() => setOpenId(open ? null : r.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate text-[12.5px] font-semibold text-ink">
+                    {r.label || (r.kind === "IMAGE" ? "Untitled image" : "Untitled note")}
+                  </div>
+                  <div className="truncate text-[11.5px] text-soft">{snippet}</div>
+                </button>
+                <button
+                  onClick={() => confirmDelete(r)}
+                  className="text-[12px] text-faint opacity-0 transition-opacity hover:text-but group-hover:opacity-100"
+                  title="Delete"
+                >
+                  ✕
+                </button>
+                <button
+                  onClick={() => setOpenId(open ? null : r.id)}
+                  className="text-[12px] font-medium text-faint"
+                  title={open ? "Collapse" : "Expand"}
+                >
+                  {open ? "▴" : "▾"}
+                </button>
+              </div>
+              {open && (
+                <div className="flex flex-col gap-[9px] border-t border-rule px-[12px] py-[11px]">
+                  <input
+                    value={r.label}
+                    onChange={(e) => onUpdate(r.id, { label: e.target.value })}
+                    placeholder={r.kind === "IMAGE" ? "Image title" : "Note title"}
+                    className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] font-semibold text-ink outline-none focus:border-faint"
+                  />
+                  {r.kind === "IMAGE" ? (
+                    r.src ? (
+                      <button
+                        onClick={() => openLightbox(r.src!)}
+                        className="block max-h-[220px] overflow-hidden rounded-[10px] border border-rule"
+                        title="Click to view"
+                      >
+                        <img src={r.src} alt={r.label} className="max-h-[220px] w-full object-cover" />
+                      </button>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-[1.5px] border-dashed border-line py-[18px] text-center text-[11px] font-medium text-faint hover:border-faint hover:text-ink">
+                        Upload image
+                        <span className="text-[10px]">click to browse</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => upload(r.id, e.target.files?.[0])}
+                        />
+                      </label>
+                    )
+                  ) : (
+                    <textarea
+                      value={r.body ?? ""}
+                      onChange={(e) => onUpdate(r.id, { body: e.target.value })}
+                      placeholder="Note..."
+                      rows={4}
+                      className="w-full resize-y rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.55] text-ink outline-none focus:border-faint"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="mt-[2px] grid grid-cols-2 gap-[7px] sm:grid-cols-3">{addButtons()}</div>
+      </div>
+    );
+  }
+
+  // ── Card view ────────────────────────────────────────────────────────────────
   const CELL = "w-[164px] h-[150px]";
 
   return (
@@ -106,28 +228,7 @@ export function RefList({
         )
       )}
 
-      <div className={`flex flex-col justify-center gap-[6px] ${CELL}`}>
-        <button
-          onClick={() => onAdd("NOTE")}
-          className="w-full rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
-        >
-          + Note
-        </button>
-        <button
-          onClick={() => onAdd("IMAGE")}
-          className="w-full rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
-        >
-          + Image
-        </button>
-        {onLink && (
-          <button
-            onClick={onLink}
-            className="w-full rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink"
-          >
-            {linkLabel}
-          </button>
-        )}
-      </div>
+      <div className={`flex flex-col justify-center gap-[6px] ${CELL}`}>{addButtons()}</div>
     </div>
   );
 }
