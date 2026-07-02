@@ -27,12 +27,40 @@ type PickerWindow = Window & {
   showDirectoryPicker?: (opts?: {
     id?: string;
     mode?: "read" | "readwrite";
+    startIn?: "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos";
   }) => Promise<FileSystemDirectoryHandle>;
 };
 
-/** Whether this browser can remember a backup folder (Chromium only). */
+// Set when the picker throws SecurityError at runtime; from then on backups
+// go straight to the download fallback instead of failing.
+let pickerBlocked = false;
+
+/**
+ * Chromium blocks the File System Access pickers inside cross-origin iframes
+ * (e.g. the portfolio embed on labrarf.com iframing the github.io app) — the
+ * call throws SecurityError and no dialog appears. There is no Permissions-
+ * Policy `allow` token to delegate it (unlike clipboard), so detect the
+ * situation and use the download fallback there.
+ */
+function inCrossOriginFrame(): boolean {
+  if (typeof window === "undefined" || window.self === window.top) return false;
+  try {
+    // Throws for a cross-origin parent; same-origin frames may use pickers.
+    void window.top!.location.href;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** Whether this context can remember a backup folder (Chromium, not embedded). */
 export function isBackupPickerSupported(): boolean {
-  return typeof window !== "undefined" && !!(window as PickerWindow).showDirectoryPicker;
+  return (
+    typeof window !== "undefined" &&
+    !!(window as PickerWindow).showDirectoryPicker &&
+    !inCrossOriginFrame() &&
+    !pickerBlocked
+  );
 }
 
 // ---- Remembering the folder handle (IndexedDB; handles can't go in
@@ -96,7 +124,15 @@ export async function chooseBackupFolder(): Promise<string | null> {
   const picker = (window as PickerWindow).showDirectoryPicker;
   if (!picker) return null;
   try {
-    const dir = (await picker({ id: "estoria-backups", mode: "readwrite" })) as BackupDirHandle;
+    // startIn steers the first pick toward Documents: Chrome refuses
+    // system-adjacent locations (home root, Library, drive roots) with a
+    // "contains system files" message, so a normal subfolder is what we want.
+    // With `id` set, later picks reopen wherever the user last chose.
+    const dir = (await picker({
+      id: "estoria-backups",
+      mode: "readwrite",
+      startIn: "documents",
+    })) as BackupDirHandle;
     sessionDir = dir;
     await idbSetDir(dir);
     return dir.name;
@@ -140,7 +176,19 @@ export async function backupProject(doc: StoryDoc): Promise<BackupResult | null>
 
   let dir = sessionDir ?? (await idbGetDir());
   if (!dir) {
-    if ((await chooseBackupFolder()) === null) return null;
+    try {
+      if ((await chooseBackupFolder()) === null) return null;
+    } catch (e) {
+      // Belt and braces: if the picker is blocked here despite the support
+      // check (e.g. an embedding context we didn't detect), download instead
+      // of failing — the user still gets their backup.
+      if ((e as DOMException)?.name === "SecurityError") {
+        pickerBlocked = true;
+        downloadProjectFile(doc);
+        return { fileName: `${slug}.estoria.json`, dirName: null, via: "download", kept: 1 };
+      }
+      throw e;
+    }
     dir = sessionDir;
     if (!dir) return null;
   }

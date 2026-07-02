@@ -8,6 +8,11 @@ import {
   isBackupPickerSupported,
 } from "@/lib/backup";
 
+// Chrome refuses system-adjacent folders (home root, Library, drive roots)
+// with a "contains system files" dialog; a normal subfolder always works.
+const FOLDER_TIP =
+  'No folder set. Tip: pick or create a normal folder like Documents/Estoria Backups (browsers block system folders).';
+
 /** Bottom bar: autosave indicator + one-click backup + canvas hint + attribution. */
 export function Footer() {
   const view = useStore((s) => s.view);
@@ -38,14 +43,17 @@ export function Footer() {
     try {
       const res = await backupProject(useStore.getState().doc);
       if (!res) {
-        setBackupState("idle"); // user cancelled the folder prompt
+        // Folder prompt abandoned: often Chrome refusing a system-adjacent
+        // location ("contains system files"), so surface the workaround.
+        setBackupState("idle");
+        setBackupMsg({ text: FOLDER_TIP });
         return;
       }
       if (res.dirName) setDirName(res.dirName);
       setBackupMsg({
         text:
           res.via === "download"
-            ? "Backup downloaded"
+            ? "Backup downloaded (check your browser's Downloads)"
             : `Backed up · ${res.fileName} (${res.kept} kept)`,
       });
       // Flash the button itself green so success is unmissable even without
@@ -55,7 +63,7 @@ export function Footer() {
     } catch {
       setBackupState("idle");
       setBackupMsg({
-        text: "Backup failed — click the folder icon to re-choose where backups go",
+        text: "Backup failed. Click the folder icon to re-choose where backups go.",
         error: true,
       });
     }
@@ -67,15 +75,17 @@ export function Footer() {
       if (name) {
         setDirName(name);
         setBackupMsg({ text: `Backups will save to "${name}"` });
+      } else {
+        setBackupMsg({ text: FOLDER_TIP });
       }
     } catch {
-      setBackupMsg({ text: "Couldn't open that folder", error: true });
+      setBackupMsg({ text: "Couldn't open that folder. " + FOLDER_TIP, error: true });
     }
   };
 
   const failed = status.state === "error";
   const saveText = failed
-    ? "Couldn't save — browser storage is full. Export your project to keep a copy."
+    ? "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
       ? "Auto-saving..."
       : status.savedAt

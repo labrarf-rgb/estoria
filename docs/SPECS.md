@@ -1095,6 +1095,23 @@ Backing up is now one click instead of File → Export → Save project → rena
   soft `color-mix` fill) for ~2.6s before returning to "Back up", so success
   is unmissable without reading the detail message; the message stays until
   the next action. Verified mid-flash via computed styles (label + green).
+- **Embedded-context fallback** (user report, 2026-07-02): on
+  www.labrarf.com the app runs in a **cross-origin iframe**
+  (`estoria-app.html` → github.io), where Chromium hard-blocks the File
+  System Access pickers — no dialog, SecurityError, and **no
+  Permissions-Policy `allow` token exists to delegate it** (unlike
+  clipboard). The user wants the labrarf.com wrapper kept, so the fix is
+  in-app: `isBackupPickerSupported()` also checks for a cross-origin frame
+  (folder icon hidden, "Back up" = download), plus a runtime SecurityError
+  catch that flips to the download fallback for any undetected embedder.
+  Verified: with a SecurityError-throwing picker, Back up downloads, flashes
+  ✓, shows "Backup downloaded (check your browser's Downloads)".
+- **System-folder refusal** (same report): opened directly, Chrome refuses
+  system-adjacent picks (home root, Library, drive roots) with its
+  "contains system files" dialog — not overridable. Mitigation: the picker
+  now opens with `startIn: "documents"`, and an abandoned pick shows a tip
+  ("pick or create a normal folder like Documents/Estoria Backups"). Also
+  swept em dashes out of the new footer strings per the UI-chrome rule.
 - Verified in-browser: controls render with correct tooltips; with a stubbed
   directory handle, 7 backups → exactly 5 files kept (oldest 2 pruned), each
   ~13.5 KB of real doc JSON, footer reports `(5 kept)`; removing
