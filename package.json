@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "sync:portfolio": "npm run build && rsync -a --delete dist/ ../../Portfolio-Website/estoria/ && echo 'Synced dist/ -> Portfolio-Website/estoria/. Commit and push the portfolio repo to publish.'"
   },
   "dependencies": {
     "react": "^19.0.0",

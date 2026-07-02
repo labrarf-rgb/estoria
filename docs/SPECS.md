@@ -295,21 +295,27 @@ shape of roadmap item 7 (cloud backend).
   these should eventually become separate files referenced by ID (§9 item 13).
   Not a blocker for v1 of the adapter.
 
-### Hosting migration (prerequisite before privatizing the repo)
+### Hosting migration (updated 2026-07-02 — see Session 22)
 
-- Estoria is on **GitHub Pages** (`labrarf-rgb.github.io/estoria/`), iframed
-  into the portfolio via `estoria-app.html`. Free GitHub accounts **cannot**
-  serve Pages from private repos.
-- **Plan: move hosting to Vercel first** (same as UnifyCRM, Hobby tier, free),
-  update the iframe src, **then** privatize the repo. Privatizing before the
-  Vercel move kills the live demo.
-- Code impact: `vite.config.ts` hardcodes `base: "/estoria/"` in production
-  builds for the Pages project path. On Vercel the app serves from the domain
-  root, so the base must become `/` (env-driven, e.g. keep `/estoria/` only
-  when building for Pages), and the Pages workflow gets retired after cutover.
-- OAuth impact: the Google OAuth client's authorized origins must list the
-  Vercel domain — one more reason to do the hosting move **before** the Drive
-  adapter, so the OAuth setup is done once against the final origin.
+- **The embed is now a same-origin copy.** The built app is synced into the
+  portfolio repo (`Portfolio-Website/estoria/`, via `npm run sync:portfolio`)
+  and served at **www.labrarf.com/estoria/**; `estoria-app.html` iframes
+  `/estoria/`. Reason: Chromium blocks the File System Access pickers
+  (backup folder) in cross-origin iframes with no `allow` delegation, so the
+  old github.io iframe couldn't offer folder backups. Same-origin fixes it
+  and keeps Ray's URL on top.
+- **Privatizing this repo is no longer blocked on Vercel.** The live demo now
+  ships from the (public) portfolio repo as build output; the estoria source
+  repo's own Pages site (`labrarf-rgb.github.io/estoria/`) is a secondary
+  direct URL and can be retired when the repo goes private.
+- **Vercel remains the eventual home** (rewrite/proxy under labrarf.com would
+  make same-origin permanent without the copy step). When that happens:
+  `vite.config.ts` hardcodes `base: "/estoria/"` in production — keep it if
+  the app stays under a `/estoria/` path, switch to env-driven if it moves to
+  a domain root.
+- OAuth impact unchanged: authorized origins must list the final serving
+  origin(s) — settle hosting before the Drive adapter so OAuth is set up once.
+  With the same-origin copy, that origin is `https://www.labrarf.com`.
 
 ---
 
@@ -1112,6 +1118,34 @@ Backing up is now one click instead of File → Export → Save project → rena
   now opens with `startIn: "documents"`, and an abandoned pick shows a tip
   ("pick or create a normal folder like Documents/Estoria Backups"). Also
   swept em dashes out of the new footer strings per the UI-chrome rule.
+
+### 2026-07-02 — Same-origin embed: full backups on labrarf.com (Session 22)
+
+The download fallback wasn't enough (no folder choice, no rotation) and the
+user wants the labrarf.com URL kept — so the embed itself moved same-origin.
+
+- **New `npm run sync:portfolio`**: builds and rsyncs `dist/` →
+  `Portfolio-Website/estoria/` (the portfolio repo serves it at
+  `www.labrarf.com/estoria/`; prod base is already `/estoria/`, so the same
+  build works unchanged). Portfolio's `estoria-app.html` iframe now points at
+  `/estoria/` — same origin as the page, so Chromium allows the folder picker
+  inside the embed: **folder backups + 5-file rotation now work on
+  labrarf.com**. The cross-origin download fallback stays as a safety net for
+  any other embedder.
+- Verified with a local static server on the portfolio root: the iframe is
+  same-origin (`contentDocument` reachable), the app boots from `/estoria/`,
+  and the footer shows both "Back up" and the folder icon (hidden in the old
+  cross-origin embed). The picker dialog itself needs a real user gesture, so
+  that part is user-verified on the live site.
+- **Caveat (accepted)**: localStorage is per origin, so the embed's stored
+  projects reset once on the origin switch; recovery is Export at the old
+  URL → Open file at the new one.
+- **Plan impact** (§8 updated): privatizing the estoria repo no longer waits
+  on Vercel — the demo now ships from the public portfolio repo as build
+  output. Also added a `portfolio-static` launch config for verifying the
+  embed locally.
+- SITE-GUIDE.md (portfolio repo) updated in step: sections 2/4/5/10 + session
+  log. Both repos pushed.
 - Verified in-browser: controls render with correct tooltips; with a stubbed
   directory handle, 7 backups → exactly 5 files kept (oldest 2 pruned), each
   ~13.5 KB of real doc JSON, footer reports `(5 kept)`; removing
