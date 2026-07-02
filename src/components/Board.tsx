@@ -226,17 +226,20 @@ export function Board() {
     return () => ro.disconnect();
   }, [setBoardSize]);
 
-  // Fit all cards to the screen on first load and whenever we switch books.
+  // Fit all cards to the screen on first load and whenever we switch books or
+  // projects. Keyed on doc.id too: different projects can share the same
+  // default book id ("book-1"), which used to leave a stale camera on switch.
   const activeBookId = doc.activeBookId;
+  const docId = doc.id;
   const prevCount = useRef(doc.chapters.length);
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp || view !== "board") return;
     setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
     prevCount.current = doc.chapters.length;
-    // Re-fit on mount and on book change only.
+    // Re-fit on mount and on project/book change only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBookId]);
+  }, [docId, activeBookId]);
 
   // When a newly added chapter lands off-screen, auto fit-to-screen.
   useEffect(() => {

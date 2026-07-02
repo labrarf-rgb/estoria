@@ -23,10 +23,7 @@ export function ImportModal() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    e.target.value = "";
+  const handleFile = async (f: File) => {
     setError(null);
     try {
       const text = await f.text();
@@ -44,6 +41,20 @@ export function ImportModal() {
       setParsed(null);
     }
   };
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    e.target.value = "";
+    void handleFile(f);
+  };
+  // Without these, dropping a file triggers the browser's default handling
+  // and navigates away from the app.
+  const onDragOver = (e: React.DragEvent) => e.preventDefault();
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) void handleFile(f);
+  };
   const openImported = () => {
     if (parsed) openDoc(parsed.doc);
     setParsed(null);
@@ -53,6 +64,8 @@ export function ImportModal() {
     <Scrim onClose={close} z={60} center>
       <div
         onMouseDown={stop}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         className="flex max-h-[88vh] w-[min(820px,100%)] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
       >
         <div className="flex items-start gap-3 border-b border-rule px-[24px] py-5">
@@ -88,7 +101,11 @@ export function ImportModal() {
               Estoria reads the chapters, scenes, characters and world straight off the file and
               opens it as a new project (your current one stays in My Projects).
             </p>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-[7px] rounded-xl border-[1.5px] border-dashed border-line bg-card p-[26px] text-center hover:border-faint">
+            <label
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              className="flex cursor-pointer flex-col items-center justify-center gap-[7px] rounded-xl border-[1.5px] border-dashed border-line bg-card p-[26px] text-center hover:border-faint"
+            >
               <span className="text-[13px] font-semibold text-ink">
                 Drop a .md file here, or click to browse
               </span>

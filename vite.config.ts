@@ -13,5 +13,6 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  server: { port: 5173, open: true },
+  // PORT lets a harness assign a free port; default stays 5173 for plain `npm run dev`.
+  server: { port: Number(process.env.PORT) || 5173, open: !process.env.PORT },
 }));

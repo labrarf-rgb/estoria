@@ -555,8 +555,19 @@ export const useStore = create<StoreState>()(
 
       deleteChapter: (id) =>
         set((s) => {
+          const idx = s.doc.chapters.findIndex((c) => c.id === id);
+          if (idx === -1) return s;
+          const prev = s.doc.chapters[idx - 1];
+          const next = s.doc.chapters[idx + 1];
           const chapters = renumber(s.doc.chapters.filter((c) => c.id !== id));
-          const links = s.doc.links.filter((l) => l.fromId !== id && l.toId !== id);
+          let links = s.doc.links.filter((l) => l.fromId !== id && l.toId !== id);
+          // Bridge the neighbors so deleting a middle chapter doesn't leave a
+          // permanent gap in the therefore-chain; keep the incoming link's type.
+          if (prev && next && !links.some((l) => l.fromId === prev.id && l.toId === next.id)) {
+            const carried =
+              s.doc.links.find((l) => l.fromId === prev.id && l.toId === id)?.type ?? "therefore";
+            links = links.concat({ fromId: prev.id, toId: next.id, type: carried });
+          }
           return {
             doc: { ...s.doc, chapters, links },
             openCh: s.openCh === id ? null : s.openCh,
@@ -868,9 +879,14 @@ export const useStore = create<StoreState>()(
             };
           });
           const chapters = base.concat(made);
-          const links = chapters
-            .slice(0, -1)
-            .map((c, i) => ({ fromId: c.id, toId: chapters[i + 1].id, type: "therefore" as const }));
+          // Rebuild the chain but keep the type of any adjacency that already
+          // existed — inserting a template must not reset but/and links.
+          const prevType = new Map(s.doc.links.map((l) => [`${l.fromId}>${l.toId}`, l.type]));
+          const links = chapters.slice(0, -1).map((c, i) => ({
+            fromId: c.id,
+            toId: chapters[i + 1].id,
+            type: prevType.get(`${c.id}>${chapters[i + 1].id}`) ?? ("therefore" as const),
+          }));
           return {
             doc: { ...s.doc, chapters, links },
             view: "board",
@@ -1110,18 +1126,24 @@ export const useStore = create<StoreState>()(
         })),
 
       deleteCharacter: (id) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            characters: s.doc.characters.filter((c) => c.id !== id),
-            // Also drop the character from any chapter it appears in.
-            chapters: s.doc.chapters.map((c) => ({
-              ...c,
-              chars: c.chars.filter((x) => x !== id),
-            })),
-          },
-          selChar: s.selChar === id ? null : s.selChar,
-        })),
+        set((s) => {
+          // Characters are series-level: drop the id from the active book's
+          // chapters AND every stashed book, or inactive books keep dangling ids.
+          const sweep = (chs: Chapter[]) =>
+            chs.map((c) => (c.chars.includes(id) ? { ...c, chars: c.chars.filter((x) => x !== id) } : c));
+          const bookData = Object.fromEntries(
+            Object.entries(s.doc.bookData).map(([bid, b]) => [bid, { ...b, chapters: sweep(b.chapters) }])
+          );
+          return {
+            doc: {
+              ...s.doc,
+              characters: s.doc.characters.filter((c) => c.id !== id),
+              chapters: sweep(s.doc.chapters),
+              bookData,
+            },
+            selChar: s.selChar === id ? null : s.selChar,
+          };
+        }),
 
       // ---- world ----
       addWorldEntry: () =>
@@ -1150,10 +1172,26 @@ export const useStore = create<StoreState>()(
         })),
 
       deleteWorldEntry: (id) =>
-        set((s) => ({
-          doc: { ...s.doc, world: s.doc.world.filter((w) => w.id !== id) },
-          selWorld: s.selWorld === id ? null : s.selWorld,
-        })),
+        set((s) => {
+          // Like deleteCharacter: clear the id from chapter worldRefs in the
+          // active book and every stashed book.
+          const sweep = (chs: Chapter[]) =>
+            chs.map((c) =>
+              c.worldRefs?.includes(id) ? { ...c, worldRefs: c.worldRefs.filter((x) => x !== id) } : c
+            );
+          const bookData = Object.fromEntries(
+            Object.entries(s.doc.bookData).map(([bid, b]) => [bid, { ...b, chapters: sweep(b.chapters) }])
+          );
+          return {
+            doc: {
+              ...s.doc,
+              world: s.doc.world.filter((w) => w.id !== id),
+              chapters: sweep(s.doc.chapters),
+              bookData,
+            },
+            selWorld: s.selWorld === id ? null : s.selWorld,
+          };
+        }),
 
       addWorldRef: (wId, kind) =>
         set((s) => ({

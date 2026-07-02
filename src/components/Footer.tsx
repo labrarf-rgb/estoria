@@ -1,22 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistence";
 
 /** Bottom bar: autosave indicator + canvas hint + attribution. */
 export function Footer() {
-  const doc = useStore((s) => s.doc);
   const view = useStore((s) => s.view);
-  const [savedAt, setSavedAt] = useState<string>("");
-  const first = useRef(true);
+  // Real persistence status from the storage layer — not a guess from state
+  // changes, so a failed write (e.g. storage quota full) is actually visible.
+  const [status, setStatus] = useState<SaveStatus>(getSaveStatus());
+  useEffect(() => onSaveStatus(setStatus), []);
 
-  // The store persists on every change; reflect that as a live "saved" stamp.
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      setSavedAt("");
-      return;
-    }
-    setSavedAt(new Date().toLocaleTimeString());
-  }, [doc]);
+  const failed = status.state === "error";
+  const saveText = failed
+    ? "Couldn't save — browser storage is full. Export your project to keep a copy."
+    : status.state === "saving"
+      ? "Auto-saving..."
+      : status.savedAt
+        ? `Auto-saved at ${new Date(status.savedAt).toLocaleTimeString()}`
+        : "Auto-saved to this browser";
 
   const hint =
     view === "timeline"
@@ -25,9 +26,15 @@ export function Footer() {
 
   return (
     <div className="flex items-center gap-3 border-t border-rule bg-panel px-4 py-[6px] text-[11px] font-medium text-faint">
-      <span className="flex shrink-0 items-center gap-[6px]">
-        <span className="h-[6px] w-[6px] rounded-full bg-therefore" />
-        {savedAt ? `Auto-saved at ${savedAt}` : "Auto-saved to this browser"}
+      <span
+        className="flex shrink-0 items-center gap-[6px]"
+        style={failed ? { color: "var(--but)" } : undefined}
+      >
+        <span
+          className="h-[6px] w-[6px] rounded-full"
+          style={{ background: failed ? "var(--but)" : "var(--therefore)" }}
+        />
+        {saveText}
       </span>
       <span className="hidden flex-1 truncate text-center md:block">{hint}</span>
       <div className="flex-1 md:hidden" />

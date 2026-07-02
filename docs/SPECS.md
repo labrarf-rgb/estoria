@@ -59,10 +59,16 @@ Everything hinges on two seams so we can grow from local → cloud incrementally
    `.estoria.json` file, and what a server would persist.
 2. **`StorageAdapter`** — [`src/store/persistence.ts`](../src/store/persistence.ts)
    defines `load()` / `save()`. v1 ships `LocalStorageAdapter`. Cloud later =
-   write `ApiStorageAdapter` against the same interface + swap `activeAdapter`.
+   write a new adapter against the same interface + swap `activeAdapter`.
 
 What cloud adds later (and only then do we pay for it): **auth** and
 **multi-device sync / conflict resolution**. Starting local does not lock us out.
+
+**Decided 2026-07-01:** the cloud backend is the user's **own Google Drive**
+(`GoogleDriveStorageAdapter`), with **Sign in with Google** for auth — see §8.
+⚠️ Known issue: the current `zustandStorage` shim **bypasses the adapter on
+read** and **double-writes on save** — this must be fixed before any cloud
+adapter can work (see §9, item 1).
 
 ---
 
@@ -168,16 +174,20 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 5. ~~**Markdown import parser**~~ — ✅ done (Session 9). `parseImportMarkdown`.
 6. ~~**Open a project file from disk**~~ — ✅ done (Session 9). "Open file..." in
    the Projects modal. (Drag-drop onto the board still a nice-to-have.)
-7. **(Later) Cloud backend** — `ApiStorageAdapter`, auth, sync. See also §7
-   Integrations (Obsidian/Google Docs).
+7. **Cloud backend = Google Drive + Google sign-in** — decided 2026-07-01, see
+   §8 for the full plan. Prerequisites first: fix the persistence seam and
+   quota/perf issues in §9 (items 1–3), then move hosting to Vercel (§8),
+   then build `GoogleDriveStorageAdapter`. See also §7 Integrations
+   (Obsidian/Google Docs).
 
 ---
 
 ## 7. Integrations / external sync (future, not started)
 
-A separate area from §4 cloud. **Cloud (item 4)** syncs Estoria's *own* data
-(`.estoria.json`) across the user's devices. **Integrations** project Estoria
-*into other tools* (Obsidian, Google Docs) for writing prose or sharing.
+A separate area from the cloud backend. **Cloud (roadmap item 7, plan in §8)**
+syncs Estoria's *own* data (`.estoria.json`) across the user's devices.
+**Integrations** project Estoria *into other tools* (Obsidian, Google Docs) for
+writing prose or sharing.
 
 ### The core tension
 
@@ -209,7 +219,9 @@ sides (genuinely hard; do last, behind a manual "pull").
 ### Google Docs — later, one-way share (rides the cloud milestone)
 
 - Real cloud API + **OAuth**; realistically needs a small **backend** (PKCE in a
-  pure SPA hits CORS/quota friction). So it's coupled to item 4, not before it.
+  pure SPA hits CORS/quota friction). So it's coupled to the cloud milestone
+  (roadmap item 7 / §8), not before it. Note: the §8 Google sign-in work gives
+  us the OAuth client anyway — Docs export would add the `documents` scope.
 - Rich text, not markdown: writing a clean formatted manuscript (chapters = H1,
   scenes = paragraphs) is fine; **parsing a Doc back is fragile**. Treat as a
   one-way "export to a shareable Doc" for editors who live in Google. **Skip
@@ -235,7 +247,192 @@ Obsidian folder sync, then (with cloud) one-way Google Docs export.
 
 ---
 
-## 8. Session Log
+## 8. Auth, cloud storage & hosting plan (decided 2026-07-01)
+
+Decisions locked with the user in the 2026-07-01 session. This is the concrete
+shape of roadmap item 7 (cloud backend).
+
+### Auth — Sign in with Google, directly
+
+- **Google OAuth directly** (Google Identity Services), no Supabase and no
+  Firebase for auth. Drive already requires a Google account, so a separate
+  auth provider adds nothing. Supabase/Firebase stay **optional later** only if
+  a real hosted backend is ever needed.
+- Web + Android use the same Google identity. Android needs its **own OAuth
+  client ID** (normal Google setup), but no separate account-linking work.
+
+### Storage — the user's own Google Drive
+
+- A **`GoogleDriveStorageAdapter`** implementing the same `load()`/`save()`
+  interface as `LocalStorageAdapter`. Store and UI unchanged — this is exactly
+  the seam §2 was built for.
+- **`drive.file` scope only**: the app sees only files it created, never the
+  whole Drive. Works identically on web and Android.
+- **Local-first stays.** `LocalStorageAdapter` remains as the offline cache;
+  Drive syncs in the background. On first login, offer to migrate the existing
+  local `StoryDoc` via the existing export/import path.
+- **Cost: free at this scale.** The Drive API is free; storage comes out of the
+  user's own Drive quota. No database to host or pay for.
+- **Future sharing is not blocked**: Drive-native file sharing works
+  immediately with no backend. Real collaboration (live cursors etc.) would be
+  a new adapter added later — both can coexist.
+
+### Implementation notes (from the 2026-07-01 code review)
+
+- **Fix the seam first**: `zustandStorage` currently reads localStorage
+  directly (never calls `activeAdapter.load()`) and double-writes every save.
+  A Drive adapter dropped in today would never be read from. §9 item 1.
+- **Debounce saves before Drive**: persist currently serializes the whole store
+  on every keystroke — fine-ish locally, unacceptable against a network API
+  (quota + latency). Debounce ~500ms trailing + flush on `beforeunload`. §9 item 3.
+- **Granularity**: the persisted blob today is doc + `projectStash` + prefs in
+  one string. For Drive, prefer **one file per project**
+  (`<title>.estoria.json` in an app folder) plus keeping UI prefs local-only —
+  needs a small widening of `StorageAdapter` (`list()` / per-id load/save)
+  while the seam is being fixed anyway.
+- **Images**: cover/ref images are base64 data URLs inside the doc; on Drive
+  these should eventually become separate files referenced by ID (§9 item 13).
+  Not a blocker for v1 of the adapter.
+
+### Hosting migration (prerequisite before privatizing the repo)
+
+- Estoria is on **GitHub Pages** (`labrarf-rgb.github.io/estoria/`), iframed
+  into the portfolio via `estoria-app.html`. Free GitHub accounts **cannot**
+  serve Pages from private repos.
+- **Plan: move hosting to Vercel first** (same as UnifyCRM, Hobby tier, free),
+  update the iframe src, **then** privatize the repo. Privatizing before the
+  Vercel move kills the live demo.
+- Code impact: `vite.config.ts` hardcodes `base: "/estoria/"` in production
+  builds for the Pages project path. On Vercel the app serves from the domain
+  root, so the base must become `/` (env-driven, e.g. keep `/estoria/` only
+  when building for Pages), and the Pages workflow gets retired after cutover.
+- OAuth impact: the Google OAuth client's authorized origins must list the
+  Vercel domain — one more reason to do the hosting move **before** the Drive
+  adapter, so the OAuth setup is done once against the final origin.
+
+---
+
+## 9. Known issues & fix backlog (code review, 2026-07-01)
+
+Full-project review (store, persistence, layout, markdown, board/series/detail
+components, modals). Ordered by priority. Check items off here as they land,
+with a session-log entry.
+
+### P1 — persistence layer (fix before any cloud work)
+
+1. ✅ **Fixed 2026-07-01 (Session 20)** — reads now go through
+   `activeAdapter.load()` (async rehydrate), the duplicate write is gone, and
+   the legacy `estoria:doc:v1` copy is removed on first load to reclaim quota.
+   Still open from this item: widening `StorageAdapter` to per-project
+   granularity (deferred to the §8 Drive work).
+   *Original finding:* **`zustandStorage` bypasses the adapter on read and double-writes on save**
+   ([persistence.ts](../src/store/persistence.ts)). `setItem` writes the full
+   serialized store twice — once via `activeAdapter.save()` (which stores under
+   its own `estoria:doc:v1` key) and once directly to localStorage under the
+   persist key `estoria:store:v1`. `getItem` reads only the latter, directly —
+   `activeAdapter.load()` is **never called**, so the adapter copy is dead
+   weight that ~halves the effective localStorage quota, and a future Drive
+   adapter would save data no one ever loads. Fix: single write path through
+   the adapter + an async-hydrate read path (zustand persist supports async
+   storage), delete the duplicate key.
+2. ✅ **Fixed 2026-07-01 (Session 20)** — `save()` now propagates errors; a
+   `SaveStatus` pub/sub in persistence.ts drives the Footer, which shows a red
+   "Couldn't save — browser storage is full" message on failure and the real
+   last-successful-save time otherwise. *Original finding:*
+   **Save failures are silent.** `LocalStorageAdapter.save` and the shim
+   swallow quota errors (`QuotaExceededError`), while the footer keeps showing
+   an autosave stamp — with base64 images in the doc, quota exhaustion is a
+   *when*, not an *if*, and the user would lose work believing it saved. Fix:
+   propagate save failure into store state, show it in the footer; consider
+   IndexedDB (far larger quota) as the local adapter's backing store.
+3. ✅ **Fixed 2026-07-01 (Session 20)** — saves are debounced 500ms trailing,
+   with a synchronous flush on `beforeunload` and `visibilitychange → hidden`.
+   *Original finding:*
+   **Whole-store serialization on every keystroke.** zustand `persist` runs
+   `partialize` + `JSON.stringify(doc + projectStash + prefs)` synchronously on
+   each state change — typing in a scene textarea re-serializes every project
+   (including embedded images) per keystroke. Debounce/throttle persist writes
+   (~500ms trailing, flush on `beforeunload`). Mandatory before Drive.
+
+### P2 — correctness bugs
+
+4. ✅ **Fixed 2026-07-01 (Session 20)** — `deleteChapter` now bridges the two
+   neighbors, carrying the incoming link's type. *Original finding:*
+   **Deleting a middle chapter breaks the connector chain**
+   (`deleteChapter` in [useStore.ts](../src/store/useStore.ts)): both links
+   touching the deleted chapter are filtered out but the neighbors are never
+   re-joined, leaving a permanent gap in the therefore-chain on the board.
+   Fix: bridge the two neighbors (same idea as `reorderChapter`'s rebuild).
+5. ✅ **Fixed 2026-07-01 (Session 20)** — both deletes now sweep the active
+   book's chapters *and* every stashed `bookData[*]` book; world deletes clear
+   `worldRefs` too. *Original finding:*
+   **`deleteCharacter` / `deleteWorldEntry` leave dangling ids.**
+   `deleteCharacter` cleans only the *active* book's chapters — chapters
+   stashed in `bookData` (inactive books) keep the deleted id in `chars`.
+   `deleteWorldEntry` cleans nothing — even active-book `worldRefs` keep the
+   id. Renders are defensive (missing ids render as nothing) but counts and
+   markdown export can leak raw ids (`charName` falls back to the id string).
+   Fix: sweep `chapters` **and** all `bookData[*].chapters` on delete.
+6. ✅ **Fixed 2026-07-01 (Session 20)** — the rebuilt chain now carries over
+   the type of any adjacency that already existed (same approach as
+   `reorderChapter`). *Original finding:*
+   **`applyTemplate` (insert mode) wipes existing chapter-link types**: it
+   rebuilds the whole `links` array as a fresh all-"therefore" chain, so an
+   imported doc's `but`/`and` chapter links are silently reset when a template
+   is appended. Fix: keep existing adjacencies' types (like `reorderChapter`).
+7. ✅ **Fixed 2026-07-01 (Session 20)** — new `normalizeDoc()` in
+   persistence.ts defaults every missing v3 field (books, bookData, drafts,
+   per-chapter arrays) and validates ids; `readProjectFile` routes through it.
+   *Original finding:*
+   **`openDoc` / `readProjectFile` accept unvalidated shapes**
+   ([persistence.ts](../src/store/persistence.ts)): validation is only
+   "`chapters` is an array". A pre-v3 export or hand-edited file missing
+   `books` / `bookData` / `drafts` crashes the toolbar on first render
+   (`doc.books.find`). Fix: normalize/default all v3 fields on open (a small
+   `normalizeDoc()` — also the natural home for future schema migrations of
+   *files*, which unlike localStorage never went through zustand's `migrate`).
+8. ✅ **Fixed 2026-07-01 (Session 20)** — the drop zone (and the whole modal,
+   so near-misses don't navigate) now handles `dragover`/`drop` and feeds the
+   same parse path as the file picker. *Original finding:*
+   **Import modal advertises drag-and-drop but has no drop handler**
+   ([ImportModal.tsx](../src/components/modals/ImportModal.tsx) — "Drop a .md
+   file here"): dropping a file triggers the browser's default navigation and
+   leaves the app. Fix: `onDragOver` preventDefault + `onDrop` → same parse
+   path as the file input (and the board-level drag-drop nice-to-have from §6
+   could share it).
+9. ✅ **Fixed 2026-07-01 (Session 20)** — the fit effect is keyed on `doc.id`
+   as well. *Original finding:* **Board camera doesn't re-fit when switching
+   projects.** The fit effect was keyed on `activeBookId` only, but
+   `emptyStory()` and every import hardcode the book id `"book-1"`, so
+   switching between two standalone projects kept the stale camera.
+10. ✅ **Fixed 2026-07-01 (Session 20)** — the loose fallback is gone; only
+    headings *starting* with "act" parse as acts. *Original finding:*
+    **Import parser: any `##` heading containing "act" becomes an Act** (the
+    fallback `/act/.test(h)` misparsed sections like `## Factions`).
+
+### P3 — quality / round-trip / UX
+
+11. 🟡 **Mostly fixed 2026-07-01 (Session 20)** — export now emits `## World`
+    and full character fields (Desc/Bio/Traits/Goals/Motivations/Wants|Needs)
+    in the import-prompt schema, and the parser learned the `Desc:` line, so
+    the round-trip keeps them. Still open: export covers only the **active
+    book** — add a per-book choice (or label it) when the Obsidian work starts.
+    *Original finding:* **Markdown export is lossy vs the import schema.**
+12. **Wheel zoom is origin-anchored, not cursor-anchored** (Board + SeriesMap):
+    zooming drifts the content instead of zooming at the pointer. Standard fix:
+    adjust pan so the world point under the cursor stays fixed.
+13. **Images live inline in the doc as data URLs** (covers, image refs): bloats
+    every autosave/export and is the main localStorage-quota risk. Plan: store
+    image blobs separately (IndexedDB locally / own Drive files later),
+    reference by id. Coordinate with the Drive adapter design (§8).
+14. **Cosmetic**: delete-chapter confirm shows the base `ch.title` rather than
+    the draft-resolved title; `ChapterDetail` subscribes to the whole `doc`
+    (every keystroke re-renders the full modal — fine at current scale, use
+    narrower selectors if it ever feels sluggish).
+
+---
+
+## 10. Session Log
 
 ### 2026-06-27 — Project scaffolded (Session 1)
 
@@ -793,3 +990,76 @@ book `Untitled Voyage`; timeline wheel pans (panY 30 → −670, zoom unchanged)
 Add/Change/Remove all work under the title; deleting a non-active project removes it
 from the list with no reload. `tsc -p tsconfig.app.json --noEmit` clean, no console
 errors.
+
+### 2026-07-01 — Full code review + cloud/auth/hosting decisions (Session 19)
+
+Review-only session: no code changed; SPECS.md restructured instead.
+
+- **Decisions locked** (recorded in the new **§8**): Sign in with Google via
+  Google OAuth directly (no Supabase/Firebase for auth); storage in the user's
+  own Google Drive via a `GoogleDriveStorageAdapter` behind the existing
+  `StorageAdapter` seam, `drive.file` scope only; local-first stays as the
+  offline cache with a first-login migration offer; web + Android share the
+  same identity (Android just needs its own OAuth client ID); free at this
+  scale; Drive-native sharing available immediately, real collaboration a
+  later adapter. **Hosting**: move from GitHub Pages to Vercel *before*
+  privatizing the repo (Pages can't serve from a free private repo; the
+  portfolio iframe src updates at cutover; `vite.config.ts` base `/estoria/`
+  becomes `/`).
+- **Full project review** (store, persistence, lib, all canvases, modals) —
+  findings recorded as the prioritized backlog in the new **§9**. Headlines:
+  the persistence shim never reads through `StorageAdapter` and double-writes
+  every save (blocks any cloud adapter and halves the localStorage budget);
+  save failures are silently swallowed while the footer keeps claiming
+  autosave; persist re-serializes the entire store (all projects + embedded
+  images) on every keystroke; deleting a middle chapter leaves the
+  therefore-chain broken; character/world deletes leave dangling ids in
+  stashed books; template-insert wipes custom link types; `openDoc` accepts
+  unvalidated project files; the import drop zone doesn't actually handle
+  drops; project switches can keep a stale camera ("book-1" id collision);
+  the import parser treats any `##` heading containing "act" as an Act;
+  markdown export drops World entries (hurts the planned Obsidian round-trip).
+- **Sequencing agreed**: fix §9 items 1–3 (persistence seam, quota surfacing,
+  debounce) → Vercel move → Google OAuth + `GoogleDriveStorageAdapter` (§8),
+  with P2 correctness fixes landable independently along the way.
+- Doc changes: §2 and roadmap item 7 now point at §8/§9; Session Log renumbered
+  to §10.
+
+### 2026-07-01 — Bug-fix batch: §9 items 1–11 (Session 20)
+
+Landed the "fix now" batch from the Session-19 review. §9 items 1–10 are ✅
+(item 1's per-project adapter granularity deliberately deferred to the §8
+Drive work); item 11 is 🟡 (round-trip fixed, per-book export choice still
+open). Remaining open: 12–14 (cursor zoom, image blobs, cosmetics).
+
+- **Persistence rewrite** (`persistence.ts`): reads go through
+  `activeAdapter.load()` (async rehydrate — verified no Welcome flash or state
+  loss on reload); the double-write is gone and the legacy `estoria:doc:v1`
+  duplicate is deleted on first load (reclaims half the quota). Saves are
+  **debounced 500ms** with a synchronous flush on `beforeunload` /
+  `visibilitychange→hidden`. `save()` errors propagate into a new `SaveStatus`
+  pub/sub; the **Footer** now shows the real last-successful-save time,
+  "Auto-saving...", or a red "Couldn't save — browser storage is full" (tested
+  by making `setItem` throw `QuotaExceededError`: error shows, then recovers).
+- **`normalizeDoc()`**: file opens (`readProjectFile`) coerce old/partial
+  project files into a complete v3 `StoryDoc` instead of crashing the toolbar.
+- **Store fixes** (`useStore.ts`): `deleteChapter` bridges the neighbors
+  (carrying the incoming link type) so the therefore-chain never gaps —
+  verified: delete ch 4 of 8 → 6 links incl. `c3→c5`, board renumbers 01–07
+  with continuous threads; `deleteCharacter` / `deleteWorldEntry` sweep the
+  active book **and** all stashed `bookData` books (world deletes now clear
+  `worldRefs` at all); `applyTemplate` insert keeps existing link types.
+- **Board**: fit-to-content effect keyed on `doc.id` too, so switching between
+  projects that share the default `"book-1"` id re-fits the camera.
+- **Import modal**: real drag-and-drop (drop zone + whole modal guard) —
+  verified with a synthetic DataTransfer drop: parses, shows the summary, no
+  navigation. Parser: act headings must *start* with "act" (`## Factions` no
+  longer misparsed — verified in the same drop test).
+- **Markdown round-trip**: export emits `## World` and full character fields
+  in the import schema; parser learned `Desc:`. Verified: export shows
+  `- **[[Wren Calloway]]** — Protagonist | Hero` + Desc/Traits/Wants lines and
+  a World section; imported doc round-trips `desc`.
+- Tooling: `.claude/launch.json` gained `autoPort`; `vite.config.ts` respects
+  a `PORT` env (default behavior unchanged for plain `npm run dev`).
+- Verified in-browser end-to-end (sample project + import + project switch +
+  reload); `tsc -b` + `vite build` clean (65 modules). No console errors.

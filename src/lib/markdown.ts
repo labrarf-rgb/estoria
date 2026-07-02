@@ -46,10 +46,25 @@ export function buildMarkdown(doc: StoryDoc, draftId: string = doc.activeDraftId
     md += `\n## Story Notes\n\n${doc.storyNotes.trim()}\n`;
   }
 
+  // Character and World sections mirror the import-prompt schema, so an
+  // exported file round-trips through parseImportMarkdown without loss.
   md += "\n## Characters\n\n";
   doc.characters.forEach((c) => {
-    md += `- **[[${c.name}]]** — ${c.role}. ${c.desc}\n`;
+    md += `- **[[${c.name}]]** — ${c.role}${c.type ? ` | ${c.type}` : ""}\n`;
+    if (c.desc) md += `  - Desc: ${c.desc}\n`;
+    if (c.bio) md += `  - Bio: ${c.bio}\n`;
+    if (c.traits.length) md += `  - Traits: ${c.traits.join(", ")}\n`;
+    if (c.goals.length) md += `  - Goals: ${c.goals.join(", ")}\n`;
+    if (c.motivations) md += `  - Motivations: ${c.motivations}\n`;
+    if (c.want || c.need) md += `  - Wants: ${c.want}  | Needs: ${c.need}\n`;
   });
+
+  if (doc.world.length) {
+    md += "\n## World\n\n";
+    doc.world.forEach((w) => {
+      md += `- **${w.name}** [${w.cat}] — ${w.desc}${w.notes ? ` // Notes: ${w.notes}` : ""}\n`;
+    });
+  }
 
   const acts = [...new Set(doc.chapters.map((c) => c.act))];
   acts.forEach((a) => {
@@ -242,11 +257,12 @@ function parseCharacters(body: string[]): Character[] {
       continue;
     }
     if (!cur) continue;
-    const field = raw.match(/^\s*[-*]?\s*(bio|traits|goals|motivations?|wants?|needs?):\s*(.*)$/i);
+    const field = raw.match(/^\s*[-*]?\s*(desc|bio|traits|goals|motivations?|wants?|needs?):\s*(.*)$/i);
     if (!field) continue;
     const key = norm(field[1]);
     const val = field[2].trim();
-    if (key === "bio") cur.bio = clean(val);
+    if (key === "desc") cur.desc = clean(val);
+    else if (key === "bio") cur.bio = clean(val);
     else if (key === "traits") cur.traits = val.split(/[,;]/).map(clean).filter(Boolean);
     else if (key === "goals") cur.goals = val.split(/[,;]/).map(clean).filter(Boolean);
     else if (key.startsWith("motivation")) cur.motivations = clean(val);
@@ -401,7 +417,9 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
     const h = norm(sec.heading);
     if (/^characters?/.test(h)) characters = characters.concat(parseCharacters(sec.body));
     else if (/^world/.test(h)) world.push(...parseWorld(sec.body));
-    else if (/^act\b/.test(h) || /act/.test(h)) {
+    // Require the heading to *start* with "act" — the old loose fallback
+    // (/act/ anywhere) misread sections like "## Factions" as an act.
+    else if (/^act\b/.test(h)) {
       actCounter += 1;
       const act = parseActNumber(sec.heading, actCounter);
       parsedChapters.push(...parseActChapters(act, sec.body));
