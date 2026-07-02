@@ -145,7 +145,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. |
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Toggle swaps titles/summaries/alt connectors. |
-| Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter. |
+| Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
+| Persist | One-click backup | ✅ | Footer "Back up" + folder icon (File System Access API). Keeps newest 5 per project, prunes older; download fallback on Firefox/Safari. |
 | Persist | Project title editing | ⬜ | Field exists; no UI to rename yet. |
 
 ---
@@ -1063,3 +1064,36 @@ open). Remaining open: 12–14 (cursor zoom, image blobs, cosmetics).
   a `PORT` env (default behavior unchanged for plain `npm run dev`).
 - Verified in-browser end-to-end (sample project + import + project switch +
   reload); `tsc -b` + `vite build` clean (65 modules). No console errors.
+
+### 2026-07-01 — One-click backup in the footer (Session 21)
+
+Backing up is now one click instead of File → Export → Save project → rename.
+
+- **New `lib/backup.ts` + Footer controls**: next to the autosave stamp sit a
+  **"Back up" button** and a **folder icon**. The folder icon picks (or
+  changes) where backups go — `window.showDirectoryPicker` (File System
+  Access API), with the `FileSystemDirectoryHandle` remembered in **IndexedDB**
+  (handles can't live in localStorage) plus an in-session cache. "Back up"
+  writes the current project's JSON straight into that folder with no dialogs;
+  if no folder is set yet, the first click prompts for one.
+- **Rotation, not overwrite (decided with the user)**: each backup is a
+  timestamped `<project>-backup-<YYYYMMDD-HHMMSS>.estoria.json`; the newest
+  **5 per project** are kept and older ones pruned (`MAX_BACKUPS` in
+  `backup.ts`). Rationale: the working copy is already autosaved, so backups
+  exist for disaster recovery — a single overwrite file would let one
+  badly-timed click (e.g. backing up after an accidental mass-delete)
+  destroy the only good copy. Timestamps sort lexicographically, so the last
+  file alphabetically is always the newest.
+- **Fallback + failure handling**: browsers without the picker API
+  (Firefox/Safari) get a plain download instead and no folder icon. If the
+  chosen folder was deleted/moved (`NotFoundError`), the stored handle is
+  forgotten so the next click re-prompts. Permission is re-requested when the
+  browser drops it. Errors show in the footer ("Backup failed — click the
+  folder icon to re-choose"); success shows `Backed up · <file> (n kept)`.
+- Verified in-browser: controls render with correct tooltips; with a stubbed
+  directory handle, 7 backups → exactly 5 files kept (oldest 2 pruned), each
+  ~13.5 KB of real doc JSON, footer reports `(5 kept)`; removing
+  `showDirectoryPicker` flips the button to the download fallback ("Backup
+  downloaded") and hides the folder icon. `tsc -b` + `vite build` clean
+  (66 modules), no console errors. (The OS folder picker itself can't be
+  driven headlessly — first real click will show it once.)
