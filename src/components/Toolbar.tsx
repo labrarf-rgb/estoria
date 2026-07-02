@@ -25,7 +25,7 @@ export function Toolbar() {
   const addBook = useStore((s) => s.addBook);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const autoArrangeSeries = useStore((s) => s.autoArrangeSeries);
-  const toggleSeriesMode = useStore((s) => s.toggleSeriesMode);
+  const makeSeries = useStore((s) => s.makeSeries);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const updateBook = useStore((s) => s.updateBook);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
@@ -327,7 +327,7 @@ export function Toolbar() {
               title="Make this a series"
               sub="Turn this book into a multi-book series"
               onClick={() => {
-                toggleSeriesMode();
+                makeSeries();
                 goToSeries();
                 closeNewMenu();
               }}

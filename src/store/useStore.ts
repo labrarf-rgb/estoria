@@ -165,6 +165,7 @@ interface StoreState extends UiState {
 
   // ---- books / series ----
   toggleSeriesMode: () => void;
+  makeSeries: () => void;
   switchBook: (id: string) => void;
   enterBook: (id: string) => void;
   goToSeries: () => void;
@@ -891,6 +892,18 @@ export const useStore = create<StoreState>()(
 
       // ---- books / series ----
       toggleSeriesMode: () => set((s) => ({ doc: { ...s.doc, seriesMode: !s.doc.seriesMode } })),
+
+      // Promote a standalone book to a series: the name the user gave the story
+      // stays on the (now-first) book, and the series itself starts as "Untitled
+      // Series" for them to rename.
+      makeSeries: () =>
+        set((s) => {
+          if (s.doc.seriesMode) return s;
+          const books = s.doc.books.map((b) =>
+            b.id === s.doc.activeBookId ? { ...b, title: s.doc.projectTitle || b.title } : b
+          );
+          return { doc: { ...s.doc, seriesMode: true, projectTitle: "Untitled Series", books } };
+        }),
 
       switchBook: (id) =>
         set((s) => {

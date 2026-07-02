@@ -757,3 +757,39 @@ live for chapters and books; series auto-arrange grids the books (0 overlaps) an
 fits the camera; grip-drag reorders books and repositions freely; repeated
 auto-arrange approaches straight but keeps a faint tilt. `tsc -b` + `vite build`
 clean (65 modules).
+
+### 2026-07-01 — Series-map cover/grab redesign, timeline scroll, project-list & make-series fixes (Session 18)
+
+Five user-reported fixes, all on the series level plus the project library:
+
+- **Series book card redesigned.** The book **cover moved from the top of the card
+  to under the title**, and the number-badge + title row is now the grabbable top
+  of the card (`cursor-grab`, kept the dot-grid grip). A set cover now shows
+  **Change** / **Remove** controls on hover (`group/cover` + `opacity` transition);
+  Remove clears it via `updateBook(id, { coverSrc: undefined })` and the "+ Add
+  cover" affordance returns. Previously the cover occupied the top as a
+  button/label, so the top wasn't draggable and there was no way to change/delete a
+  cover once set (`SeriesMap.tsx`).
+- **Series timeline now scrolls like the chapter timeline.** `SeriesMap`'s wheel
+  handler previously always zoomed; it now **pans** in timeline view (vertical:
+  `panY -= deltaY`; horizontal: `panX -= deltaY+deltaX`) and only zooms on the map,
+  mirroring `Board.tsx`. Effect now keys on `[timeline, orient]`.
+- **Removed the floating on-canvas "+ New book" button** from the series map; the
+  "New book" entry points remain in the toolbar (series-map action) and File →
+  `NewBookModal`. Dropped the now-unused `addBook` import in `SeriesMap`.
+- **Deleting a project now updates the list immediately.** `ProjectsModal` read the
+  project list via the non-reactive `listProjects()` method and only subscribed to
+  `doc.id`, so deleting a *stashed* (non-active) project changed `projectStash`
+  without re-rendering — the row lingered until a manual refresh. The modal now also
+  subscribes to `doc` and `projectStash`, so add/delete/merge re-render at once.
+- **"Make this a series" keeps the book's name.** New `makeSeries` store action
+  (wired into the File menu, replacing the raw `toggleSeriesMode` call): promoting a
+  standalone book copies the current `projectTitle` onto the active (first) book and
+  sets the series title to **"Untitled Series"** for the user to rename — instead of
+  leaving the story's name on the series and "Untitled Book" on the book.
+
+Verified in-browser on the sample: make-series yields series `Untitled Series` ▸
+book `Untitled Voyage`; timeline wheel pans (panY 30 → −670, zoom unchanged); cover
+Add/Change/Remove all work under the title; deleting a non-active project removes it
+from the list with no reload. `tsc -p tsconfig.app.json --noEmit` clean, no console
+errors.

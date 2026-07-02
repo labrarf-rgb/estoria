@@ -23,7 +23,6 @@ export function SeriesMap() {
   const seriesArrangeN = useStore((s) => s.seriesArrangeN);
   const updateBook = useStore((s) => s.updateBook);
   const deleteBook = useStore((s) => s.deleteBook);
-  const addBook = useStore((s) => s.addBook);
   const addBookLink = useStore((s) => s.addBookLink);
   const updateBookLink = useStore((s) => s.updateBookLink);
   const deleteBookLink = useStore((s) => s.deleteBookLink);
@@ -220,17 +219,24 @@ export function SeriesMap() {
     if (vp) setCam(fitBooksToContent(useStore.getState().doc.books, vp.clientWidth, vp.clientHeight));
   }, [seriesArrangeN]);
 
+  // Wheel: zoom on the map, scroll-pan on the timeline (mirrors the book board,
+  // so the series timeline scrolls down like the chapter timeline does).
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const f = e.deltaY < 0 ? 1.08 : 0.925;
-      setCam((c) => ({ ...c, zoom: Math.min(1.6, Math.max(0.4, c.zoom * f)) }));
+      if (timeline) {
+        if (orient === "vertical") setCam((c) => ({ ...c, panY: c.panY - e.deltaY }));
+        else setCam((c) => ({ ...c, panX: c.panX - (e.deltaY + e.deltaX) }));
+      } else {
+        const f = e.deltaY < 0 ? 1.08 : 0.925;
+        setCam((c) => ({ ...c, zoom: Math.min(1.6, Math.max(0.4, c.zoom * f)) }));
+      }
     };
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [timeline, orient]);
 
   const chapterCount = (bookId: string) =>
     bookId === doc.activeBookId
@@ -384,34 +390,12 @@ export function SeriesMap() {
                         : "var(--shadow)",
                 }}
               >
-                {/* Cover */}
-                {b.coverSrc ? (
-                  <button
-                    onClick={() => openLightbox(b.coverSrc!)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="-mx-[15px] -mt-[15px] mb-[2px] block h-[70px] overflow-hidden rounded-t-2xl border-b border-rule"
-                  >
-                    <img src={b.coverSrc} alt="" className="h-full w-full object-cover" />
-                  </button>
-                ) : (
-                  <label
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="-mx-[15px] -mt-[15px] mb-[2px] flex h-[34px] cursor-pointer items-center justify-center gap-1 rounded-t-2xl border-b border-dashed border-line text-[10.5px] font-medium text-faint hover:text-ink"
-                  >
-                    + Add cover
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => uploadCover(b.id, e.target.files?.[0])}
-                    />
-                  </label>
-                )}
-
-                <div className="flex items-center gap-[7px]">
+                {/* Header — the grabbable top of the card: drag it to move the
+                    book (map) or reorder it (timeline). */}
+                <div className="flex cursor-grab items-center gap-[7px] active:cursor-grabbing">
                   <span
-                    title="Drag to reorder"
-                    className="-ml-[4px] flex h-[26px] w-[13px] shrink-0 cursor-grab select-none flex-col items-center justify-center gap-[2px] leading-none text-line hover:text-faint active:cursor-grabbing"
+                    title="Drag to move"
+                    className="-ml-[4px] flex h-[26px] w-[13px] shrink-0 select-none flex-col items-center justify-center gap-[2px] leading-none text-line group-hover:text-faint"
                     aria-hidden
                   >
                     <span className="text-[9px] leading-[5px] tracking-[-1px]">••</span>
@@ -424,6 +408,7 @@ export function SeriesMap() {
                   <input
                     value={b.title}
                     onChange={(e) => updateBook(b.id, { title: e.target.value })}
+                    onMouseDown={(e) => e.stopPropagation()}
                     className="min-w-0 flex-1 bg-transparent font-serif text-[16px] font-semibold text-ink outline-none"
                   />
                   {isActive && (
@@ -432,6 +417,53 @@ export function SeriesMap() {
                     </span>
                   )}
                 </div>
+
+                {/* Cover — shown under the title; add, change, or remove it. */}
+                {b.coverSrc ? (
+                  <div className="group/cover relative h-[74px] overflow-hidden rounded-lg border border-rule">
+                    <button
+                      onClick={() => openLightbox(b.coverSrc!)}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="block h-full w-full"
+                    >
+                      <img src={b.coverSrc} alt="" className="h-full w-full object-cover" />
+                    </button>
+                    <div
+                      className="absolute right-[6px] top-[6px] flex gap-[4px] opacity-0 transition-opacity group-hover/cover:opacity-100"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <label className="cursor-pointer rounded-md bg-ink/85 px-[7px] py-[3px] text-[9.5px] font-semibold text-bg hover:bg-ink">
+                        Change
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => uploadCover(b.id, e.target.files?.[0])}
+                        />
+                      </label>
+                      <button
+                        onClick={() => updateBook(b.id, { coverSrc: undefined })}
+                        className="rounded-md bg-ink/85 px-[7px] py-[3px] text-[9.5px] font-semibold text-bg hover:bg-but"
+                        title="Remove cover"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex h-[30px] cursor-pointer items-center justify-center gap-1 rounded-lg border border-dashed border-line text-[10.5px] font-medium text-faint hover:border-faint hover:text-ink"
+                  >
+                    + Add cover
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => uploadCover(b.id, e.target.files?.[0])}
+                    />
+                  </label>
+                )}
 
                 <textarea
                   value={b.premise}
@@ -497,13 +529,6 @@ export function SeriesMap() {
           );
         })}
       </div>
-
-      <button
-        onClick={addBook}
-        className="absolute bottom-4 left-4 flex items-center gap-2 rounded-[11px] border border-rule bg-panel px-[15px] py-[10px] text-[12.5px] font-semibold text-ink shadow-[var(--shadow)] hover:border-faint"
-      >
-        <span className="-mt-px text-[17px] font-normal leading-none">+</span> New book
-      </button>
     </div>
   );
 }

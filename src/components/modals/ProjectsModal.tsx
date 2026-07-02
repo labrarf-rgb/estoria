@@ -7,6 +7,10 @@ import { readProjectFile } from "@/store/persistence";
 export function ProjectsModal() {
   const show = useStore((s) => s.showProjects);
   const activeId = useStore((s) => s.doc.id);
+  // Subscribe to the doc and stash so the list re-renders immediately when a
+  // project is added, deleted, or merged (listProjects itself isn't reactive).
+  useStore((s) => s.doc);
+  useStore((s) => s.projectStash);
   const listProjects = useStore((s) => s.listProjects);
   const switchProject = useStore((s) => s.switchProject);
   const deleteProject = useStore((s) => s.deleteProject);
