@@ -1090,6 +1090,11 @@ Backing up is now one click instead of File → Export → Save project → rena
   forgotten so the next click re-prompts. Permission is re-requested when the
   browser drops it. Errors show in the footer ("Backup failed — click the
   folder icon to re-choose"); success shows `Backed up · <file> (n kept)`.
+- **Visual confirmation** (user follow-up, same day): on success the button
+  itself flashes **"Backed up ✓"** in the therefore-green (border, text, and a
+  soft `color-mix` fill) for ~2.6s before returning to "Back up", so success
+  is unmissable without reading the detail message; the message stays until
+  the next action. Verified mid-flash via computed styles (label + green).
 - Verified in-browser: controls render with correct tooltips; with a stubbed
   directory handle, 7 backups → exactly 5 files kept (oldest 2 pruned), each
   ~13.5 KB of real doc JSON, footer reports `(5 kept)`; removing

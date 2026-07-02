@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistence";
 import {
@@ -20,34 +20,44 @@ export function Footer() {
   // (folder icon sets/changes it; first backup prompts if unset).
   const pickerSupported = isBackupPickerSupported();
   const [dirName, setDirName] = useState<string | null>(null);
-  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupState, setBackupState] = useState<"idle" | "busy" | "done">("idle");
   const [backupMsg, setBackupMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     void getBackupDirName().then(setDirName);
+    return () => {
+      if (doneTimer.current) clearTimeout(doneTimer.current);
+    };
   }, []);
 
   const runBackup = async () => {
-    if (backupBusy) return;
-    setBackupBusy(true);
+    if (backupState === "busy") return;
+    if (doneTimer.current) clearTimeout(doneTimer.current);
+    setBackupState("busy");
     setBackupMsg(null);
     try {
       const res = await backupProject(useStore.getState().doc);
-      if (res) {
-        if (res.dirName) setDirName(res.dirName);
-        setBackupMsg({
-          text:
-            res.via === "download"
-              ? "Backup downloaded"
-              : `Backed up · ${res.fileName} (${res.kept} kept)`,
-        });
+      if (!res) {
+        setBackupState("idle"); // user cancelled the folder prompt
+        return;
       }
+      if (res.dirName) setDirName(res.dirName);
+      setBackupMsg({
+        text:
+          res.via === "download"
+            ? "Backup downloaded"
+            : `Backed up · ${res.fileName} (${res.kept} kept)`,
+      });
+      // Flash the button itself green so success is unmissable even without
+      // reading the message; the detail message stays until the next action.
+      setBackupState("done");
+      doneTimer.current = setTimeout(() => setBackupState("idle"), 2600);
     } catch {
+      setBackupState("idle");
       setBackupMsg({
         text: "Backup failed — click the folder icon to re-choose where backups go",
         error: true,
       });
-    } finally {
-      setBackupBusy(false);
     }
   };
 
@@ -94,7 +104,7 @@ export function Footer() {
       <span className="flex shrink-0 items-center gap-[5px]">
         <button
           onClick={() => void runBackup()}
-          disabled={backupBusy}
+          disabled={backupState === "busy"}
           title={
             pickerSupported
               ? dirName
@@ -102,9 +112,19 @@ export function Footer() {
                 : "Save a backup copy (you'll pick a folder first)"
               : "Download a backup copy of this project"
           }
-          className="rounded-md border border-rule bg-card px-[8px] py-[3px] text-[11px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-60"
+          className="rounded-md border px-[8px] py-[3px] text-[11px] font-semibold transition-colors disabled:opacity-60"
+          style={
+            backupState === "done"
+              ? {
+                  borderColor: "var(--therefore)",
+                  color: "var(--therefore)",
+                  background:
+                    "color-mix(in srgb, var(--therefore) 12%, var(--card))",
+                }
+              : { borderColor: "var(--rule)", background: "var(--card)", color: "var(--soft)" }
+          }
         >
-          {backupBusy ? "Backing up..." : "Back up"}
+          {backupState === "busy" ? "Backing up..." : backupState === "done" ? "Backed up ✓" : "Back up"}
         </button>
         {pickerSupported && (
           <button
