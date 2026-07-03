@@ -1,24 +1,25 @@
 import type { StoryDoc } from "@/types";
-import { downloadProjectFile, slugify } from "@/store/persistence";
+import { slugify, stampModified } from "@/store/persistence";
 
 /**
- * One-click project backups (Footer "Back up" button).
+ * The user's Estoria folder + rotating backups.
  *
- * The user picks a backup folder once (File System Access API); the directory
- * handle is remembered in IndexedDB so every later click writes straight into
- * that folder with no dialogs. Each backup is a timestamped
- * `<project>-backup-<stamp>.estoria.json`; the newest MAX_BACKUPS per project
+ * The user picks their Estoria folder once (File System Access API); the
+ * directory handle is remembered in IndexedDB so later writes need no dialogs.
+ * This folder is where cross-app Sync (lib/sync.ts) keeps the canonical
+ * `<slug>.estoria.json`, and where each explicit Sync also drops a timestamped
+ * `<slug>-backup-<stamp>.estoria.json` — the newest MAX_BACKUPS per project
  * are kept and older ones pruned, so a bad state can never overwrite the only
- * good copy. Browsers without the API (Firefox/Safari) fall back to a plain
- * download.
+ * good copy. Browsers without the API (Firefox/Safari) get neither: they keep
+ * local auto-save and the export menus only.
  */
 
-/** How many backups to keep per project before pruning the oldest. */
-const MAX_BACKUPS = 5;
+/** How many rotating backups to keep per project before pruning the oldest. */
+export const MAX_BACKUPS = 5;
 
 // lib.dom ships the FileSystem*Handle types but not the WICG directory picker
 // or the permission / iteration methods, so declare the few extras we use.
-interface BackupDirHandle extends FileSystemDirectoryHandle {
+export interface BackupDirHandle extends FileSystemDirectoryHandle {
   values(): AsyncIterableIterator<FileSystemHandle>;
   queryPermission(desc: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission(desc: { mode: "readwrite" }): Promise<PermissionState>;
@@ -117,6 +118,23 @@ export async function getBackupDirName(): Promise<string | null> {
 }
 
 /**
+ * The remembered folder handle with readwrite permission, or null. This is the
+ * shared "Estoria folder" the cross-app Sync feature reads/writes too (see
+ * lib/sync.ts). With `requestPermission: false` it never shows a permission
+ * prompt — required for background checks, which run without a user gesture.
+ */
+export async function getBackupDir(opts?: {
+  requestPermission?: boolean;
+}): Promise<BackupDirHandle | null> {
+  const dir = sessionDir ?? (await idbGetDir());
+  if (!dir) return null;
+  sessionDir = dir;
+  if ((await dir.queryPermission({ mode: "readwrite" })) === "granted") return dir;
+  if (!opts?.requestPermission) return null;
+  return (await dir.requestPermission({ mode: "readwrite" })) === "granted" ? dir : null;
+}
+
+/**
  * Let the user pick (or change) the backup folder. Returns its name, or null
  * if they cancelled the picker.
  */
@@ -138,101 +156,57 @@ export async function chooseBackupFolder(): Promise<string | null> {
     return dir.name;
   } catch (e) {
     if ((e as DOMException)?.name === "AbortError") return null; // user cancelled
+    // Blocked picker (e.g. an embedding context the support check missed):
+    // remember, so the UI stops offering folder features this session.
+    if ((e as DOMException)?.name === "SecurityError") {
+      pickerBlocked = true;
+      return null;
+    }
     throw e;
   }
 }
 
-export interface BackupResult {
-  fileName: string;
-  dirName: string | null;
-  /** "folder" = written into the chosen folder; "download" = browser fallback. */
-  via: "folder" | "download";
-  /** How many backups of this project remain after pruning. */
-  kept: number;
-}
-
-async function ensurePermission(dir: BackupDirHandle): Promise<boolean> {
-  if ((await dir.queryPermission({ mode: "readwrite" })) === "granted") return true;
-  return (await dir.requestPermission({ mode: "readwrite" })) === "granted";
+/**
+ * Forget the remembered folder (it was moved/deleted, or writes started
+ * failing) so the next folder action re-prompts instead of failing forever.
+ */
+export async function forgetBackupDir(): Promise<void> {
+  sessionDir = null;
+  await idbSetDir(null);
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
-function stamp(d = new Date()): string {
+/** Local-time stamp for file names; lexicographic order == date order. */
+export function fileStamp(d = new Date()): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
 /**
- * Back up the given project. Uses the remembered folder, prompting for one on
- * first use; falls back to a plain download where pickers are unsupported.
- * Returns null if the user cancelled the folder prompt.
+ * Write a timestamped `<slug>-backup-<stamp>.estoria.json` into the folder,
+ * then prune to the newest MAX_BACKUPS for that project (timestamps in the
+ * name sort lexicographically, so a name sort is a date sort). Called by Sync
+ * on every explicit sync — the rotating safety net under the canonical file.
  */
-export async function backupProject(doc: StoryDoc): Promise<BackupResult | null> {
-  const slug = slugify(doc.projectTitle || "story");
+export async function writeRotatingBackup(
+  dir: BackupDirHandle,
+  doc: StoryDoc
+): Promise<{ fileName: string; kept: number }> {
+  const prefix = `${slugify(doc.projectTitle || "story")}-backup-`;
+  const fileName = `${prefix}${fileStamp()}.estoria.json`;
+  const fh = await dir.getFileHandle(fileName, { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(stampModified(doc), null, 2));
+  await w.close();
 
-  if (!isBackupPickerSupported()) {
-    downloadProjectFile(doc);
-    return { fileName: `${slug}.estoria.json`, dirName: null, via: "download", kept: 1 };
-  }
-
-  let dir = sessionDir ?? (await idbGetDir());
-  if (!dir) {
-    try {
-      if ((await chooseBackupFolder()) === null) return null;
-    } catch (e) {
-      // Belt and braces: if the picker is blocked here despite the support
-      // check (e.g. an embedding context we didn't detect), download instead
-      // of failing — the user still gets their backup.
-      if ((e as DOMException)?.name === "SecurityError") {
-        pickerBlocked = true;
-        downloadProjectFile(doc);
-        return { fileName: `${slug}.estoria.json`, dirName: null, via: "download", kept: 1 };
-      }
-      throw e;
+  const mine: string[] = [];
+  for await (const entry of dir.values()) {
+    if (entry.kind === "file" && entry.name.startsWith(prefix) && entry.name.endsWith(".estoria.json")) {
+      mine.push(entry.name);
     }
-    dir = sessionDir;
-    if (!dir) return null;
   }
-  sessionDir = dir;
-
-  if (!(await ensurePermission(dir))) {
-    throw new Error("Estoria wasn't allowed to write to the backup folder.");
+  mine.sort(); // oldest first
+  for (const name of mine.slice(0, Math.max(0, mine.length - MAX_BACKUPS))) {
+    await dir.removeEntry(name).catch(() => {});
   }
-
-  const prefix = `${slug}-backup-`;
-  const fileName = `${prefix}${stamp()}.estoria.json`;
-  try {
-    const fh = await dir.getFileHandle(fileName, { create: true });
-    const w = await fh.createWritable();
-    await w.write(JSON.stringify(doc, null, 2));
-    await w.close();
-
-    // Prune: keep only the newest MAX_BACKUPS for this project. Timestamps in
-    // the name sort lexicographically, so a name sort is a date sort.
-    const mine: string[] = [];
-    for await (const entry of dir.values()) {
-      if (entry.kind === "file" && entry.name.startsWith(prefix) && entry.name.endsWith(".estoria.json")) {
-        mine.push(entry.name);
-      }
-    }
-    mine.sort(); // oldest first
-    const excess = mine.slice(0, Math.max(0, mine.length - MAX_BACKUPS));
-    for (const name of excess) {
-      await dir.removeEntry(name).catch(() => {});
-    }
-
-    return {
-      fileName,
-      dirName: dir.name,
-      via: "folder",
-      kept: Math.min(mine.length, MAX_BACKUPS),
-    };
-  } catch (e) {
-    // The folder may have been deleted/moved since it was picked — forget it
-    // so the next click re-prompts instead of failing forever.
-    if ((e as DOMException)?.name === "NotFoundError") {
-      sessionDir = null;
-      await idbSetDir(null);
-    }
-    throw e;
-  }
+  return { fileName, kept: Math.min(mine.length, MAX_BACKUPS) };
 }

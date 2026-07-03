@@ -164,6 +164,14 @@ export interface StoryDoc {
   projectTitle: string;
   seriesMode: boolean;
 
+  /**
+   * ISO 8601 stamp of the last *file* write (export/backup/sync), shared with
+   * the Android app. Display only — cross-app conflict detection uses content
+   * fingerprints, never clocks (see docs/SPECS.md §8 "Cross-app Sync").
+   * Absent on docs that have never been written to a file.
+   */
+  modifiedAt?: string;
+
   // Drafts / versions.
   drafts: DraftVersion[];
   activeDraftId: string;

@@ -140,9 +140,20 @@ export const zustandStorage = {
 
 // ---- Explicit file save / load (the "document" experience) -----------------
 
+/**
+ * Return a copy of the doc with `modifiedAt` set to now. Every path that
+ * writes a `.estoria.json` file (download, backup, sync) stamps through this,
+ * per the cross-app contract — the Android app does the same on its writes.
+ */
+export function stampModified(doc: StoryDoc): StoryDoc {
+  return { ...doc, modifiedAt: new Date().toISOString() };
+}
+
 /** Download the current story as a portable .estoria.json project file. */
 export function downloadProjectFile(doc: StoryDoc): void {
-  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(stampModified(doc), null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -219,6 +230,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     schemaVersion: SCHEMA_VERSION,
     id: typeof d.id === "string" && d.id ? d.id : `story-${Date.now().toString(36)}`,
     projectTitle: title,
+    // Cross-app field stamped by whichever app last wrote the file — must
+    // survive normalization or every open would look like a fresh write.
+    ...(typeof d.modifiedAt === "string" && d.modifiedAt ? { modifiedAt: d.modifiedAt } : {}),
     seriesMode: !!d.seriesMode,
     drafts,
     activeDraftId,

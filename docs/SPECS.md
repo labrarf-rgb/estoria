@@ -146,7 +146,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Toggle swaps titles/summaries/alt connectors. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
-| Persist | One-click backup | ✅ | Footer "Back up" + folder icon (File System Access API). Keeps newest 5 per project, prunes older; download fallback on Firefox/Safari. |
+| Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Project title editing | ⬜ | Field exists; no UI to rename yet. |
 
 ---
@@ -180,6 +180,22 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    quota/perf issues in §9 (items 1–3), then move hosting to Vercel (§8),
    then build `GoogleDriveStorageAdapter`. See also §7 Integrations
    (Obsidian/Google Docs).
+
+> **Cross-project note — an Android companion app is planned (not built here).**
+> A **separate** native Kotlin/Compose app is planned (decided 2026-07-02); its
+> own spec lives at `/Users/rfcl/AndroidStudioProjects/Estoria/ESTORIA-ANDROID.md`.
+> **It is not part of this repo's roadmap and does not add web work** — it is
+> listed here only so web-side changes stay aware of it. What that awareness
+> means in practice:
+> - The Android app reads/writes the **same `.estoria.json` (schema v3)**. Any
+>   change to the document model here is a **cross-app compatibility event** —
+>   coordinate schema bumps, don't silently reshape `StoryDoc`.
+> - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
+>   both apps (same Google identity, one Drive file). Decisions made for the web
+>   OAuth/Drive setup should not preclude a second (Android) OAuth client under
+>   the same Google Cloud project.
+> - A future multi-user backend would be a **new adapter behind the existing
+>   seam** for both apps — a reason to keep the `StorageAdapter` seam clean.
 
 ---
 
@@ -294,6 +310,83 @@ shape of roadmap item 7 (cloud backend).
 - **Images**: cover/ref images are base64 data URLs inside the doc; on Drive
   these should eventually become separate files referenced by ID (§9 item 13).
   Not a blocker for v1 of the adapter.
+
+### Cross-app Sync — CONTRACT SETTLED 2026-07-03 (both sides built; web behavior extended same day, see below)
+
+Designed with the user in the Android session of 2026-07-03; the Android app
+implements its half (see the Android spec §8, same-day session log), and the
+web half shipped later the same day (Session 24). **The contract:**
+
+- **One canonical file per project.** In the user's Estoria folder (their
+  Google Drive folder, reached from this app via the remembered
+  File System Access directory handle — same handle `lib/backup.ts` uses),
+  each project has ONE stable-named working file: `<slug>.estoria.json`.
+  Both apps' Sync read/write that file. The timestamped
+  `<slug>-backup-<stamp>.estoria.json` rotation stays as the safety net.
+  Rationale: Android's file picker cannot grant *folder* access on Google
+  Drive (no `ACTION_OPEN_DOCUMENT_TREE` support in Drive's provider), so the
+  phone can only watch a single file — and `drive.file`-scoped API access
+  wouldn't see desktop-synced backups anyway.
+- **Change detection = per-device content fingerprint + `modifiedAt`.**
+  Each device remembers a hash of the state it last agreed on with the file
+  (web: localStorage/IDB alongside the dir handle). Compare:
+  local == remote → in sync; remote == last-synced → local ahead (offer
+  write); local == last-synced → remote ahead (offer reload); else →
+  conflict. Android hashes SHA-256 over the codec-canonical encoding with
+  `modifiedAt` stripped; the web side must likewise hash a canonical,
+  `modifiedAt`-less serialization of its own (the two hashes never cross the
+  app boundary, so they don't need to match each other — each device only
+  compares its own).
+- **`modifiedAt` (ISO 8601) is now an optional v3 top-level field.** Stamped
+  on every file write, used for "file last written …" display only — never
+  for conflict logic (clock skew). The Android model declares it;
+  **`normalizeDoc` here must preserve it** (and ideally stamp it in the
+  save-to-file/backup paths).
+- **Conflicts (v1): whole-file choice + diff summary, loser preserved.**
+  Show what differs (entities matched by stable ids, neutral phrasing),
+  user picks keep-mine/keep-theirs; the copy NOT kept is written as
+  `<slug>-conflict-<stamp>.estoria.json` (web: into the Estoria folder;
+  Android: stashed in app storage, exportable) so it can never override the
+  canonical file and can be merged manually later. Per-entity merge by ids
+  remains the later evolution.
+- **Check cadence:** on open/focus + a user-set foreground interval
+  (Android default 5 min; suggest mirroring), prompting to review — never
+  auto-applying.
+- Relation to the §8 Drive adapter: unchanged — the adapter is transport,
+  Sync is the reconciliation policy on top, and it works today over the
+  File System Access folder without Drive sign-in.
+
+**Web implementation (Session 24, 2026-07-03) — DONE, with user-decided
+extensions that go beyond the original to-do.** The web behavior is now:
+
+- **The footer "Back up" button is gone; Sync absorbed it.** Every completed
+  explicit Sync (including "already in sync" and conflict resolutions) writes
+  one timestamped `<slug>-backup-<stamp>.estoria.json` and prunes to the
+  newest 5 — the old Back up rotation, now a side effect of Sync. Backups are
+  NOT written by the background mirror (below), so a long editing session
+  can't churn out the 5 good copies.
+- **Auto-save mirrors into the canonical file.** Local auto-save (localStorage
+  via the `StorageAdapter` seam) stays the always-working base; ~2.5s after a
+  save settles, the state is also pushed to `<slug>.estoria.json` — but ONLY
+  as a pure fast-forward (file absent / identical / unchanged since
+  last-synced). If the file moved on its own, the mirror never writes; the
+  autosave line flips to "file changed elsewhere — press Sync". Effectively
+  auto-sync with manual conflict review.
+- **No footer button where folder access doesn't exist** (Firefox/Safari, the
+  labrarf.com cross-origin embed): user decision — those contexts keep local
+  auto-save and the export menus only. No download fallback on Sync.
+- Implementation: `lib/sync.ts` (fingerprint = SHA-256 over key-sorted,
+  `modifiedAt`-stripped JSON of the `normalizeDoc`-normalized doc; three-way
+  compare; conflict copies; all folder ops serialized through one lock so the
+  mirror and a Sync click can't interleave), `lib/backup.ts` (folder handle +
+  `writeRotatingBackup`, `backupProject` removed), `SyncConflictModal`,
+  footer wiring in `Footer.tsx` (focus + 5-min notify-only check per the
+  cadence bullet). `modifiedAt` stamped by `stampModified()` on every file
+  write incl. exports; preserved through `normalizeDoc`.
+- **Android follow-up (user's plan, not web work):** mirror the same extended
+  behavior on the phone — sync-writes-backup-rotation and auto-mirror. The
+  file contract above is unchanged by these extensions (rotation and mirrors
+  are device-local behavior), so nothing breaks while Android catches up.
 
 ### Hosting migration (updated 2026-07-02 — see Session 22)
 
@@ -1151,5 +1244,92 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   ~13.5 KB of real doc JSON, footer reports `(5 kept)`; removing
   `showDirectoryPicker` flips the button to the download fallback ("Backup
   downloaded") and hides the folder icon. `tsc -b` + `vite build` clean
+
+### 2026-07-02 — Android companion planned (cross-project note; no web code)
+
+- Decided to build a **separate** native Kotlin/Compose Android app (not a
+  WebView wrapper, not part of this repo). Full spec lives at
+  `/Users/rfcl/AndroidStudioProjects/Estoria/ESTORIA-ANDROID.md`.
+- **No change to web code or the web roadmap.** Added only a **cross-project
+  awareness note** under §6 (roadmap item 7) so future web-side changes account
+  for the Android app: the two apps share the same `.estoria.json` (schema v3),
+  so model changes here are cross-app compatibility events; the planned Google
+  sign-in/Drive work (§8) is intended to be shared (same identity, one Drive
+  file, second OAuth client under the same GCP project); a future multi-user
+  backend would be a new adapter behind the existing `StorageAdapter` seam.
+- Direction of dependency is one-way by design: **Android tracks this repo's
+  schema**, not the reverse. This doc stays the source of truth for `StoryDoc`.
   (66 modules), no console errors. (The OS folder picker itself can't be
   driven headlessly — first real click will show it once.)
+
+### 2026-07-03 — Android v1 usable; shared Sync feature planned (cross-project note)
+
+- The Android companion app now has a working v1 core (timeline, chapter/scene
+  editing, characters/world/notes, templates, file open/save incl. Drive via
+  the system picker, lossless round-trip of this app's `.estoria.json` —
+  verified against real exports). No web code changed.
+- **Planned jointly: an explicit Sync button/feature in BOTH apps** so a story
+  edited on phone and desktop reconciles instead of last-writer-wins. Design
+  notes under §8 ("Planned: explicit cross-app Sync feature"); mirrored in the
+  Android spec. To design next session — includes deciding the
+  "changed since last sync" marker (possible schema impact: optional
+  `modifiedAt`), so treat as a cross-app compatibility decision per the
+  2026-07-02 note.
+
+### 2026-07-03 (later) — Sync contract settled, Android side shipped (cross-project note)
+
+- Designed with the user in the Android session (no web code changed yet).
+  Full contract now lives in §8 ("Cross-app Sync — CONTRACT SETTLED"):
+  canonical `<slug>.estoria.json` per project in the user's Estoria folder,
+  per-device content fingerprint + optional v3 `modifiedAt` stamp, whole-file
+  conflict choice with the losing copy preserved as
+  `<slug>-conflict-<stamp>.estoria.json`, check on open/focus + foreground
+  interval.
+- **Schema note: `modifiedAt` (ISO 8601, optional) is now part of v3.** The
+  Android app stamps it on every file write. This app must preserve it
+  through `normalizeDoc` and stamp it too when it writes files.
+- Web implementation is the open half: Sync button + canonical-file
+  read/write in the backup flow (to-do list at the end of the §8 section).
+
+### 2026-07-03 (Session 24) — Web Sync shipped; Back up button retired
+
+- **Cross-app Sync implemented on the web side** per the §8 contract, then
+  extended the same session by user decision (details recorded in §8 under
+  "Web implementation (Session 24)"):
+  - Footer **"Sync" button** replaces "Back up". Sync three-way-compares the
+    project against `<slug>.estoria.json` in the Estoria folder (fingerprint:
+    SHA-256 over key-sorted JSON of the normalized doc, `modifiedAt`
+    stripped, vs. the last-agreed hash in
+    `localStorage["estoria:sync:lastHash:<docId>"]`), fast-forwards either
+    direction, and raises a conflict dialog otherwise (`SyncConflictModal`;
+    id-matched neutral diff summary; loser saved as
+    `<slug>-conflict-<stamp>.estoria.json`).
+  - **Every completed Sync also writes one rotating backup** (newest 5 kept)
+    — the old Back up behavior folded in (`writeRotatingBackup`;
+    `backupProject` and its download fallback removed).
+  - **Auto-save now mirrors to the file**: ~2.5s after local auto-save
+    settles, a fast-forward-only push updates the canonical file; a diverged
+    file is never overwritten — the autosave line shows "file changed
+    elsewhere — press Sync". Focus + 5-min background checks are notify-only.
+  - **`modifiedAt` (v3, optional)** added to `StoryDoc`; stamped via
+    `stampModified()` on every file write (exports included), preserved
+    through `normalizeDoc`.
+  - Firefox/Safari/embed (no File System Access): no footer button at all
+    (user decision) — local auto-save + export menus remain.
+  - All folder operations (Sync click, mirror, conflict resolution) are
+    serialized through one in-module lock; a vanished folder handle is
+    forgotten so the next action re-prompts.
+- New files: `src/lib/sync.ts`, `src/components/modals/SyncConflictModal.tsx`.
+  Touched: `types.ts`, `store/persistence.ts`, `lib/backup.ts`,
+  `components/Footer.tsx`.
+- Verified in the live app (OPFS directory handle standing in for the picked
+  folder, seeded through the real IndexedDB slot): created → in-sync →
+  pushed → pulled (background notice fired) → conflict → keep-mine resolution
+  (conflict copy written, canonical kept, back in sync); rotation pruned 6
+  planted backups + 1 new to 5; mirror wrote a real store edit to the file
+  ~3s after typing stopped and refused to write over a diverged file; footer
+  showed "· synced to file" and "file changed elsewhere — press Sync".
+  `tsc -b` + `vite build` clean (68 modules), no console errors.
+- **User's follow-up plan:** implement the same extended behavior
+  (sync-writes-rotation + auto-mirror) in the Android app. No schema impact —
+  the §8 file contract is unchanged.
