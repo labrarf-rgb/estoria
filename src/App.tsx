@@ -15,6 +15,8 @@ import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { ImportModal } from "@/components/modals/ImportModal";
 import { NewBookModal } from "@/components/modals/NewBookModal";
 import { ProjectsModal } from "@/components/modals/ProjectsModal";
+import { BackupsModal } from "@/components/modals/BackupsModal";
+import { AboutModal } from "@/components/modals/AboutModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export function App() {
@@ -47,6 +49,8 @@ export function App() {
       <ImportModal />
       <NewBookModal />
       <ProjectsModal />
+      <BackupsModal />
+      <AboutModal />
       <ConfirmDialog />
       <Lightbox />
       <Welcome />

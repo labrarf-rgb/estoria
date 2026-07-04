@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Popover } from "@/components/ui/Popover";
+import { isBackupPickerSupported } from "@/lib/backup";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -287,7 +288,34 @@ export function Toolbar() {
         >
           File <span className="opacity-70">▾</span>
         </button>
+        {/* Item names and order mirror the Android app's ⋮ menu (SPECS §8);
+            Android-only entries (Sync settings, Books/Series, Versions) are
+            simply absent here. */}
         <Popover anchorRef={fileBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={244}>
+          <MenuItem
+            title="Open project"
+            sub="Switch between your projects"
+            onClick={() => setPanel("showProjects", true)}
+          />
+          <MenuItem
+            title="Save to file"
+            sub="Markdown vault or project file"
+            onClick={() => setPanel("showExport", true)}
+          />
+          <MenuItem
+            title="Import markdown"
+            sub="Bring an existing draft via AI"
+            onClick={() => setPanel("showImport", true)}
+          />
+          {/* Needs folder access (File System Access API) like the footer Sync. */}
+          {isBackupPickerSupported() && (
+            <MenuItem
+              title="Backups & conflict copies"
+              sub="Restore a copy from your Estoria folder"
+              onClick={() => setPanel("showBackups", true)}
+            />
+          )}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
           <MenuItem
             title="New book"
             sub="Standalone, new series, or add to a series"
@@ -295,33 +323,15 @@ export function Toolbar() {
           />
           {/* Chapter-level actions don't apply to the series map. */}
           {!onSeriesMap && (
-            <>
-              <MenuItem
-                title="New chapter"
-                sub="A single empty chapter"
-                onClick={() => {
-                  addChapter();
-                  closeNewMenu();
-                }}
-              />
-              <MenuItem
-                title="Use a template..."
-                sub="Three-act, Hero's Journey, Save the Cat..."
-                onClick={() => setPanel("showTemplates", true)}
-              />
-            </>
+            <MenuItem
+              title="New chapter"
+              sub="A single empty chapter"
+              onClick={() => {
+                addChapter();
+                closeNewMenu();
+              }}
+            />
           )}
-          <MenuItem
-            title="Import markdown..."
-            sub="Bring an existing draft via AI"
-            onClick={() => setPanel("showImport", true)}
-          />
-          <div className="mx-[6px] my-1 h-px bg-rule" />
-          <MenuItem
-            title="Open project..."
-            sub="Switch between your projects"
-            onClick={() => setPanel("showProjects", true)}
-          />
           {!doc.seriesMode && (
             <MenuItem
               title="Make this a series"
@@ -333,10 +343,18 @@ export function Toolbar() {
               }}
             />
           )}
+          {!onSeriesMap && (
+            <MenuItem
+              title="Use a template"
+              sub="Three-act, Hero's Journey, Save the Cat..."
+              onClick={() => setPanel("showTemplates", true)}
+            />
+          )}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
           <MenuItem
-            title="Export..."
-            sub="Markdown vault or project file"
-            onClick={() => setPanel("showExport", true)}
+            title="About"
+            sub="About Estoria"
+            onClick={() => setPanel("showAbout", true)}
           />
         </Popover>
       </div>

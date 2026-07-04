@@ -1412,3 +1412,36 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   listed the exact items and fields; "Not now" dismissed without changes;
   keep-mine resolution wrote the conflict copy and re-synced. `tsc -b` +
   `vite build` clean.
+
+### 2026-07-04 (Session 25) — File menu mirrors the Android ⋮ menu
+
+- User decision: the web File dropdown and the Android app's 3-dots menu use
+  the **same item names and order** (Android changes handled in a separate
+  session). The shared order, with platform-unique items marked:
+  1. Open project · 2. Save to file (was "Export…" — name kept as "Save to
+  file") · 3. Import markdown (**to be added on Android**) · 4. Sync settings
+  (**Android-only**, not in web) · 5. Backups & conflict copies — divider —
+  6. New book · 7. New chapter · 8. Make this a series · 9. Use a template ·
+  10. Books / Series (**Android-only**) · 11. Versions (**Android-only**) —
+  divider — 12. About.
+- Web menu items keep their existing conditions in the new order: New
+  chapter / Use a template hidden on the series map, Make this a series
+  hidden when already a series; "Backups & conflict copies" hidden where the
+  File System Access API is missing (Firefox/Safari/embeds), like the footer
+  Sync. Ellipses dropped from item names to match Android.
+- **New: File → "Backups & conflict copies"** (`BackupsModal`) — the same
+  live/backup/conflict file list + undoable Restore as the footer folder-icon
+  popover, now also reachable from the menu; stays open across restores with
+  an inline result message and offers "Choose folder…" when no Estoria folder
+  is set. The list/restore UI was extracted into a shared `SyncFileList`
+  component used by both surfaces.
+- **New: File → About** (`AboutModal`) — name, tagline, browser/sync storage
+  note, schema version, author link.
+- ExportModal header renamed "Export to Markdown" → "Save to file" to match
+  its menu entry. Store gained `showBackups`/`showAbout` panel flags.
+- Verified live: menu renders in exactly the order above with both dividers;
+  Backups modal shows "not set yet" + Choose folder without a folder, lists
+  badged files with one set (OPFS stand-in), and an in-modal restore replaced
+  the doc, kept the modal open with "Restored … — previous version saved
+  as …", and refreshed the list; About shows tagline/schema/author. `tsc -b`
+  + `vite build` clean.

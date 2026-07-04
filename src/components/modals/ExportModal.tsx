@@ -40,10 +40,11 @@ export function ExportModal() {
       >
         <div className="flex items-center gap-3 border-b border-rule px-[24px] py-5">
           <div className="flex-1">
-            <div className="font-serif text-[18px] font-semibold text-ink">Export to Markdown</div>
+            <div className="font-serif text-[18px] font-semibold text-ink">Save to file</div>
             <div className="mt-[3px] text-[12px] font-medium text-soft">
-              Vault-ready: chapters become notes, characters become{" "}
-              <span className="font-mono">[[wikilinks]]</span> for Obsidian.
+              Markdown vault (chapters become notes, characters become{" "}
+              <span className="font-mono">[[wikilinks]]</span> for Obsidian) or a portable
+              project file.
             </div>
           </div>
           <CloseButton onClick={close} />
