@@ -146,7 +146,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Toggle swaps titles/summaries/alt connectors. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
-| Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
+| Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Project title editing | ⬜ | Field exists; no UI to rename yet. |
 
 ---
@@ -375,6 +375,20 @@ extensions that go beyond the original to-do.** The web behavior is now:
 - **No footer button where folder access doesn't exist** (Firefox/Safari, the
   labrarf.com cross-origin embed): user decision — those contexts keep local
   auto-save and the export menus only. No download fallback on Sync.
+- **Folder icon = file history + restore** (added later in Session 24, user
+  decision). With a folder set, clicking the footer folder icon opens a
+  popover listing this project's files in the Estoria folder with role badges
+  — **Live file** (the no-suffix `<slug>.estoria.json` sync target),
+  **Backup** (`-backup-<stamp>`, rotation copies), **Conflict copy**
+  (`-conflict-<stamp>`) — each with its written time and a **Restore**
+  action. Restore (after a confirm) replaces only the *working copy*; the
+  current state is first written as a new rotating backup, so every restore
+  is undoable from the same list. The live file is deliberately left alone —
+  the mirror/Sync path updates it afterwards with the usual never-clobber
+  guarantees, so restoring can still surface a conflict instead of silently
+  overwriting a phone-side change. "Change…" in the popover re-picks the
+  folder (`SyncHistoryPopover.tsx`; `listProjectFiles`/`restoreFromFile` in
+  `lib/sync.ts`; `Popover` grew a `side="above"` mode for bottom anchors).
 - Implementation: `lib/sync.ts` (fingerprint = SHA-256 over key-sorted,
   `modifiedAt`-stripped JSON of the `normalizeDoc`-normalized doc; three-way
   compare; conflict copies; all folder ops serialized through one lock so the
@@ -1333,3 +1347,68 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
 - **User's follow-up plan:** implement the same extended behavior
   (sync-writes-rotation + auto-mirror) in the Android app. No schema impact —
   the §8 file contract is unchanged.
+
+### 2026-07-03 (Session 24, later) — File history + restore on the folder icon
+
+- User asked how to tell the live sync file apart from the backups and asked
+  to be able to "select" one; chose the **restore picker** design (over
+  choosing an arbitrary canonical file name, which would have broken the
+  phone's fixed `<slug>.estoria.json` lookup).
+- **Folder icon now opens a file-history popover** (`SyncHistoryPopover.tsx`):
+  this project's folder files with role badges (Live file / Backup / Conflict
+  copy), written times, a per-file **Restore** action, and "Change…" to
+  re-pick the folder. No folder set → the icon still just opens the picker.
+- **Restore semantics** (`restoreFromFile` in `lib/sync.ts`): confirm dialog →
+  current state written as a new rotating backup (undo path) → picked file
+  becomes the working copy (`replaceDoc`). The live file is not touched;
+  the auto-save mirror/Sync reconcile it afterwards, preserving the
+  never-clobber guarantee. The picked file is read *before* the pre-restore
+  backup is written, since that backup's pruning could delete the oldest
+  backup — possibly the very file being restored.
+- `listProjectFiles` filters to the current project's names only (live +
+  `-backup-` + `-conflict-`), live first then newest-first by file mtime.
+  `Popover` gained `side="above"` (bottom-edge pinning) for footer anchors.
+- Verified in the live app (OPFS stand-in folder): popover lists all four
+  planted files with correct badges and skips another project's file;
+  restoring a planted backup via the real dialog replaced the doc, showed
+  "Restored … — previous version saved as …", and the auto-created backup
+  restored the original state (undo). `tsc -b` + `vite build` clean, no
+  console errors.
+
+### 2026-07-03 (Session 24, later still) — Conflict dialog: newer side, quantified diff, full report
+
+- User to-do: on a sync mismatch, show which side is newer, make the
+  messaging clearer, quantify how much differs (small vs a lot), and offer a
+  reviewable report of the exact differences.
+- **"Which is newer" panel** in the conflict dialog: "This app — last edited
+  <t>" vs "The file — last written <t>", with a green NEWER tag on the more
+  recent side and "· newer" appended to the matching keep-button. The file
+  time is its `modifiedAt`; the local time is a new per-project
+  `localStorage["estoria:sync:lastEdit:<docId>"]` stamped on every successful
+  auto-save (`recordLocalEdit`, subscribed in the footer). **Display only**,
+  same rule as `modifiedAt` — clock skew means it labels, never decides.
+  Missing timestamps show "couldn't tell which is newer".
+- **Quantified magnitude**: `diffDocs` (replaces `summarizeDiff` in
+  `lib/sync.ts`) returns a structured `DocDiff` — compact per-section lines
+  (as before), plus `differing`/`total` counts over the union of both sides'
+  entities (chapters across all books, characters, world, books, assets, +
+  title/story-notes/chapter-connections pseudo-items) and a magnitude bucket:
+  ≤2 items = small, ≥10 or ≥25% = large, else moderate. Dialog headline:
+  "Moderate difference — 4 of 23 items differ".
+- **"See full report"** toggle expands a per-entity listing grouped by
+  section: each item named (chapter title / character name / …) with its
+  state — differs / only in this app / only in the file — and, for changed
+  items, the friendly field names that differ (position fields collapse into
+  "layout"; list fields with different lengths are quantified, e.g.
+  "scenes (3 here / 5 in file)"). Whole-file resolution is unchanged — the
+  report is read-only review; per-entity merge remains the §8 contract's
+  later evolution.
+- Chapter connections (therefore/but/and links, incl. stashed books) are now
+  compared as a pseudo-item, and a hash-detected difference can never report
+  "0 items differ" (floors to 1 with the catch-all line).
+- Verified live (OPFS stand-in): staged phone-side edits (rename + scene adds
+  + new character + notes, file stamped hours old) against a fresh local
+  edit → dialog showed NEWER on "This app", correct counts/magnitude, report
+  listed the exact items and fields; "Not now" dismissed without changes;
+  keep-mine resolution wrote the conflict copy and re-synced. `tsc -b` +
+  `vite build` clean.

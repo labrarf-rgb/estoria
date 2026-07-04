@@ -5,10 +5,12 @@ import { chooseBackupFolder, getBackupDirName, isBackupPickerSupported } from "@
 import {
   checkRemoteChanged,
   pushCanonicalIfSafe,
+  recordLocalEdit,
   resolveConflict,
   syncProject,
 } from "@/lib/sync";
 import { SyncConflictModal, type SyncConflict } from "@/components/modals/SyncConflictModal";
+import { SyncHistoryPopover } from "@/components/SyncHistoryPopover";
 import type { StoryDoc } from "@/types";
 
 // Chrome refuses system-adjacent folders (home root, Library, drive roots)
@@ -27,6 +29,15 @@ export function Footer() {
   // changes, so a failed write (e.g. storage quota full) is actually visible.
   const [status, setStatus] = useState<SaveStatus>(getSaveStatus());
   useEffect(() => onSaveStatus(setStatus), []);
+  // Remember when this project was last edited on this device — shown in the
+  // conflict dialog's "which side is newer" comparison (display only).
+  useEffect(
+    () =>
+      onSaveStatus((s) => {
+        if (s.state === "saved") recordLocalEdit(useStore.getState().doc.id);
+      }),
+    []
+  );
 
   // Cross-app Sync (docs/SPECS.md §8): reconcile with the canonical
   // <slug>.estoria.json in the user's Estoria folder, shared with the Android
@@ -39,6 +50,9 @@ export function Footer() {
   const [conflict, setConflict] = useState<(SyncConflict & { remote: StoryDoc }) | null>(null);
   /** Relation of the folder file to local state, shown on the autosave line. */
   const [mirror, setMirror] = useState<"unknown" | "current" | "behind">("unknown");
+  // Folder-icon popover: live file / backups / conflict copies, with restore.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const folderBtnRef = useRef<HTMLButtonElement | null>(null);
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     void getBackupDirName().then(setDirName);
@@ -46,6 +60,20 @@ export function Footer() {
       if (doneTimer.current) clearTimeout(doneTimer.current);
     };
   }, []);
+
+  const pickFolder = async () => {
+    try {
+      const name = await chooseBackupFolder();
+      if (name) {
+        setDirName(name);
+        setMsg({ text: `Estoria folder set to "${name}"` });
+      } else {
+        setMsg({ text: FOLDER_TIP });
+      }
+    } catch {
+      setMsg({ text: "Couldn't open that folder. " + FOLDER_TIP, error: true });
+    }
+  };
 
   const syncDone = (text: string) => {
     setMsg({ text });
@@ -233,23 +261,17 @@ export function Footer() {
             {syncState === "busy" ? "Syncing..." : syncState === "done" ? "Synced ✓" : "Sync"}
           </button>
           <button
+            ref={folderBtnRef}
             onClick={() => {
-              void (async () => {
-                try {
-                  const name = await chooseBackupFolder();
-                  if (name) {
-                    setDirName(name);
-                    setMsg({ text: `Estoria folder set to "${name}"` });
-                  } else {
-                    setMsg({ text: FOLDER_TIP });
-                  }
-                } catch {
-                  setMsg({ text: "Couldn't open that folder. " + FOLDER_TIP, error: true });
-                }
-              })();
+              // No folder yet → pick one; otherwise show this project's files
+              // (live / backups / conflict copies) with restore.
+              if (dirName) setHistoryOpen((v) => !v);
+              else void pickFolder();
             }}
             title={
-              dirName ? `Estoria folder: ${dirName} · click to change` : "Choose your Estoria folder"
+              dirName
+                ? `Estoria folder: ${dirName} · click for files & restore`
+                : "Choose your Estoria folder"
             }
             className="flex h-[22px] w-[24px] items-center justify-center rounded-md border border-rule bg-card text-soft hover:border-faint hover:text-ink"
           >
@@ -285,6 +307,25 @@ export function Footer() {
           Ray Labra
         </a>
       </span>
+
+      {dirName && (
+        <SyncHistoryPopover
+          open={historyOpen}
+          anchorRef={folderBtnRef}
+          dirName={dirName}
+          onClose={() => setHistoryOpen(false)}
+          onChangeFolder={() => {
+            setHistoryOpen(false);
+            void pickFolder();
+          }}
+          onRestored={(fileName, backedUpAs) => {
+            // The mirror pushes the restored state to the live file on the
+            // next auto-save (or a conflict surfaces if the file moved too).
+            setMsg({ text: `Restored ${fileName} — previous version saved as ${backedUpAs}` });
+          }}
+          onError={(message) => setMsg({ text: message, error: true })}
+        />
+      )}
 
       {conflict && (
         <SyncConflictModal

@@ -90,6 +90,32 @@ function setLastSynced(docId: string, hash: string): void {
   }
 }
 
+// ---- "Last edited here" per project (display only, like modifiedAt) -----------
+
+const lastEditKey = (docId: string) => `estoria:sync:lastEdit:${docId}`;
+
+/**
+ * Note that the project was just edited on this device (called on every
+ * successful auto-save). Only used to tell the user which side *looks* newer
+ * in a conflict — never for conflict logic, same rule as `modifiedAt`.
+ */
+export function recordLocalEdit(docId: string): void {
+  try {
+    localStorage.setItem(lastEditKey(docId), String(Date.now()));
+  } catch {
+    // Display-only nicety; losing it just hides the "newer" hint.
+  }
+}
+
+function getLocalEditedAt(docId: string): number | null {
+  try {
+    const v = Number(localStorage.getItem(lastEditKey(docId)));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Canonical file I/O ------------------------------------------------------
 
 export function canonicalFileName(doc: StoryDoc): string {
@@ -172,8 +198,11 @@ export type SyncOutcome =
       kind: "conflict";
       fileName: string;
       remote: StoryDoc;
-      summary: string[];
+      diff: DocDiff;
+      /** When the file was last written (its `modifiedAt`), for display. */
       fileModifiedAt?: string;
+      /** When this device last auto-saved this project, for display. */
+      localEditedAt?: number;
     };
 
 /**
@@ -222,12 +251,14 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       };
     }
 
+    const localEditedAt = getLocalEditedAt(doc.id);
     return {
       kind: "conflict",
       fileName,
       remote,
-      summary: summarizeDiff(doc, remote),
+      diff: diffDocs(doc, remote),
       ...(remote.modifiedAt ? { fileModifiedAt: remote.modifiedAt } : {}),
+      ...(localEditedAt ? { localEditedAt } : {}),
     };
   });
 }
@@ -335,7 +366,105 @@ export async function checkRemoteChanged(doc: StoryDoc): Promise<boolean> {
   }
 }
 
-// ---- Conflict diff summary -----------------------------------------------------
+// ---- Folder history (list + restore) --------------------------------------------
+
+export interface ProjectFileInfo {
+  name: string;
+  /** "live" = the canonical sync file; the others are never touched by sync. */
+  role: "live" | "backup" | "conflict";
+  /** File mtime (ms epoch) for display. */
+  lastModified: number;
+}
+
+/**
+ * The current project's files in the Estoria folder: the live file first,
+ * then backups and conflict copies newest-first. null = no usable folder.
+ */
+export function listProjectFiles(doc: StoryDoc): Promise<ProjectFileInfo[] | null> {
+  return locked(async () => {
+    const dir = await getBackupDir({ requestPermission: true });
+    if (!dir) return null;
+
+    const live = canonicalFileName(doc);
+    const slug = slugify(doc.projectTitle || "story");
+    const files: ProjectFileInfo[] = [];
+    for await (const entry of dir.values()) {
+      if (entry.kind !== "file" || !entry.name.endsWith(".estoria.json")) continue;
+      const role =
+        entry.name === live
+          ? ("live" as const)
+          : entry.name.startsWith(`${slug}-backup-`)
+            ? ("backup" as const)
+            : entry.name.startsWith(`${slug}-conflict-`)
+              ? ("conflict" as const)
+              : null;
+      if (!role) continue; // some other project's files
+      const f = await (entry as FileSystemFileHandle).getFile();
+      files.push({ name: entry.name, role, lastModified: f.lastModified });
+    }
+    files.sort((a, b) =>
+      a.role === "live" ? -1 : b.role === "live" ? 1 : b.lastModified - a.lastModified
+    );
+    return files;
+  });
+}
+
+/**
+ * Load a copy from the folder as the working project. Only local state is
+ * replaced — the live file is deliberately left alone, so the auto-save
+ * mirror / Sync reconcile it afterwards with all the usual protections
+ * (a phone-side change can still surface as a conflict instead of being
+ * clobbered by a restore). The state being replaced is written as a rotating
+ * backup first, so a restore is always undoable from this same list.
+ */
+export function restoreFromFile(
+  current: StoryDoc,
+  fileName: string
+): Promise<{ doc: StoryDoc; backedUpAs: string }> {
+  return locked(async () => {
+    const dir = await getBackupDir({ requestPermission: true });
+    if (!dir) throw new Error("The Estoria folder is no longer available.");
+
+    // Read the copy before writing anything: the pre-restore backup below may
+    // prune this very file if it is the oldest of 5.
+    let restored: StoryDoc;
+    try {
+      const text = await (await (await dir.getFileHandle(fileName)).getFile()).text();
+      restored = normalizeDoc(JSON.parse(text));
+    } catch {
+      throw new Error(`"${fileName}" couldn't be read as an Estoria project.`);
+    }
+    const receipt = await writeRotatingBackup(dir, current);
+    return { doc: restored, backedUpAs: receipt.fileName };
+  });
+}
+
+// ---- Conflict diff report --------------------------------------------------------
+
+export interface DiffItem {
+  /** Display name of the entity (title / name / label). */
+  name: string;
+  state: "changed" | "only-here" | "only-file";
+  /** Friendly names of the fields that differ (state === "changed" only). */
+  fields?: string[];
+}
+
+export interface DiffSection {
+  label: string;
+  items: DiffItem[];
+}
+
+/** Quantified, reviewable difference between the local doc and the file. */
+export interface DocDiff {
+  /** One compact line per section, for the collapsed dialog view. */
+  lines: string[];
+  /** The full per-entity report (empty items are omitted). */
+  sections: DiffSection[];
+  /** How many items differ, out of how many compared (union of both sides). */
+  differing: number;
+  total: number;
+  magnitude: "small" | "moderate" | "large";
+}
 
 function byId<T extends { id: string }>(items: T[]): Map<string, T> {
   return new Map(items.map((i) => [i.id, i]));
@@ -346,45 +475,140 @@ function allChapters(doc: StoryDoc) {
   return byId([...doc.chapters, ...Object.values(doc.bookData).flatMap((b) => b.chapters)]);
 }
 
+const sameJson = (a: unknown, b: unknown) =>
+  JSON.stringify(sortKeysDeep(a)) === JSON.stringify(sortKeysDeep(b));
+
+/**
+ * Friendly names for entity fields in the report. Board-position fields all
+ * map to "layout" (the Set collapses them into one entry); unlisted fields
+ * fall back to the raw key so nothing ever hides from the report.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  x: "layout",
+  y: "layout",
+  rot: "layout",
+  scenePos: "layout",
+  coverSrc: "cover image",
+  worldRefs: "world links",
+  chars: "characters in chapter",
+  sceneLinks: "scene connections",
+  refs: "pinned references",
+  storyNotes: "story notes",
+  desc: "description",
+  cat: "category",
+  overrides: "draft overrides",
+};
+
+function changedFields<T extends object>(mine: T, theirs: T): string[] {
+  const keys = new Set([...Object.keys(mine), ...Object.keys(theirs)]);
+  const out = new Set<string>();
+  for (const key of keys) {
+    if (key === "id") continue;
+    const a = (mine as Record<string, unknown>)[key];
+    const b = (theirs as Record<string, unknown>)[key];
+    if (sameJson(a, b)) continue;
+    // Quantify list fields whose length changed (e.g. "scenes (5 here / 7 in file)").
+    if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) {
+      out.add(`${FIELD_LABELS[key] ?? key} (${a.length} here / ${b.length} in file)`);
+    } else {
+      out.add(FIELD_LABELS[key] ?? key);
+    }
+  }
+  return [...out];
+}
+
 function diffCollection<T extends { id: string }>(
   label: string,
   mine: Map<string, T>,
   theirs: Map<string, T>,
-  lines: string[]
-): void {
+  nameOf: (e: T) => string
+): { section: DiffSection; line: string | null; differing: number; total: number } {
+  const items: DiffItem[] = [];
+  let changed = 0;
   let onlyMine = 0;
   let onlyTheirs = 0;
-  let changed = 0;
   for (const [id, m] of mine) {
     const t = theirs.get(id);
-    if (!t) onlyMine++;
-    else if (JSON.stringify(sortKeysDeep(m)) !== JSON.stringify(sortKeysDeep(t))) changed++;
+    if (!t) {
+      onlyMine++;
+      items.push({ name: nameOf(m), state: "only-here" });
+    } else if (!sameJson(m, t)) {
+      changed++;
+      items.push({ name: nameOf(m), state: "changed", fields: changedFields(m, t) });
+    }
   }
-  for (const id of theirs.keys()) if (!mine.has(id)) onlyTheirs++;
+  for (const [id, t] of theirs) {
+    if (!mine.has(id)) {
+      onlyTheirs++;
+      items.push({ name: nameOf(t), state: "only-file" });
+    }
+  }
 
   const parts: string[] = [];
   if (changed) parts.push(`${changed} differ`);
   if (onlyMine) parts.push(`${onlyMine} only in this app`);
   if (onlyTheirs) parts.push(`${onlyTheirs} only in the file`);
-  if (parts.length) lines.push(`${label}: ${parts.join(" · ")}`);
+  return {
+    section: { label, items },
+    line: parts.length ? `${label}: ${parts.join(" · ")}` : null,
+    differing: items.length,
+    total: new Set([...mine.keys(), ...theirs.keys()]).size,
+  };
 }
 
 /**
- * Neutral, id-matched summary of what differs between the local project and
- * the file version, for the conflict dialog. Whole-entity granularity — the
- * per-field merge is the contract's "later evolution".
+ * Neutral, id-matched report of what differs between the local project and
+ * the file version, for the conflict dialog: compact lines, per-entity detail
+ * with the fields that changed, and a quantified magnitude. Whole-entity
+ * resolution stays the rule — the per-field merge is the contract's "later
+ * evolution"; this only *reports* at field level.
  */
-export function summarizeDiff(mine: StoryDoc, theirs: StoryDoc): string[] {
+export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
   const lines: string[] = [];
+  const sections: DiffSection[] = [];
+  let differing = 0;
+  let total = 2; // the two doc-level pseudo-items below (title, story notes)
+
   if (mine.projectTitle !== theirs.projectTitle) {
+    differing++;
     lines.push(`Title: “${mine.projectTitle}” here, “${theirs.projectTitle}” in the file`);
   }
-  diffCollection("Chapters", allChapters(mine), allChapters(theirs), lines);
-  diffCollection("Characters", byId(mine.characters), byId(theirs.characters), lines);
-  diffCollection("World entries", byId(mine.world), byId(theirs.world), lines);
-  diffCollection("Books", byId(mine.books), byId(theirs.books), lines);
-  diffCollection("Shared assets", byId(mine.assets), byId(theirs.assets), lines);
-  if (mine.storyNotes !== theirs.storyNotes) lines.push("Story notes differ");
-  if (!lines.length) lines.push("The versions differ only in layout, links, or other details.");
-  return lines;
+
+  const collections: Array<ReturnType<typeof diffCollection>> = [
+    diffCollection("Chapters", allChapters(mine), allChapters(theirs), (c) => c.title),
+    diffCollection("Characters", byId(mine.characters), byId(theirs.characters), (c) => c.name),
+    diffCollection("World entries", byId(mine.world), byId(theirs.world), (w) => w.name),
+    diffCollection("Books", byId(mine.books), byId(theirs.books), (b) => b.title),
+    diffCollection("Shared assets", byId(mine.assets), byId(theirs.assets), (a) => a.label),
+  ];
+  for (const c of collections) {
+    if (c.line) lines.push(c.line);
+    if (c.section.items.length) sections.push(c.section);
+    differing += c.differing;
+    total += c.total;
+  }
+
+  if (mine.storyNotes !== theirs.storyNotes) {
+    differing++;
+    lines.push("Story notes differ");
+  }
+  total++; // chapter connections, compared as one pseudo-item across all books
+  const connectionsOf = (d: StoryDoc) => ({
+    links: d.links,
+    stashed: Object.fromEntries(Object.entries(d.bookData).map(([id, b]) => [id, b.links])),
+  });
+  if (!sameJson(connectionsOf(mine), connectionsOf(theirs))) {
+    differing++;
+    lines.push("Chapter connections (therefore / but / and) differ");
+  }
+  if (!lines.length) {
+    // The hash said the docs differ, so something outside the reported
+    // collections changed (e.g. view settings) — never claim "0 items".
+    lines.push("The versions differ only in layout or other details.");
+    differing = Math.max(differing, 1);
+  }
+
+  const magnitude: DocDiff["magnitude"] =
+    differing <= 2 ? "small" : differing >= 10 || differing / total >= 0.25 ? "large" : "moderate";
+  return { lines, sections, differing, total, magnitude };
 }
