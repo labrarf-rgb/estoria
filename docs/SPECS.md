@@ -1515,3 +1515,41 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   empty commit to redeploy, then confirming the live asset hashes matched the
   committed ones. Wrote this up as a permanent **"Deploy runbook"** under §8
   Hosting migration — verify the Pages run after every embed publish.
+
+### 2026-07-04 (Session 27) — New items start empty so placeholders behave like placeholders
+
+- **Problem.** Newly-created records were seeded with real *stub text* as the
+  stored field **value** (`"New Character"`, `"New entry"`, `"Untitled Chapter"`,
+  `"A one-line description of this character."`, `"New scene."`, `"New note"`,
+  etc.). Because that text was the actual value (dark ink, not a placeholder),
+  the user had to select-and-delete it in every field before typing. The request:
+  keep the helpful hint text, but make it a true placeholder that disappears the
+  moment you type — no manual deletion.
+- **Fix — create empty, hint via `placeholder`.** Store creators now seed empty
+  strings and let the input's `placeholder` attribute supply the grey hint
+  (`src/store/useStore.ts`): `addCharacter`, `addWorldEntry`, `addChapter`
+  (+ template-built chapters), `addScene`/`insertScene` (scene text `""`), and
+  every ref/asset creator (`addChapterRef`, `addWorldRef`, `addAsset` → `label:
+  ""`).
+- **Placeholders added** where the field had none:
+  `CharactersPanel` (all 12 fields — Name/Initials/Role/Archetype/Description/
+  Bio/Traits/Goals/Motivations/Wants/Needs/Notes, via new `placeholder` props on
+  its local `Input`/`Area`), `WorldPanel` (Name + Description/Notes through
+  `ExpandableTextarea`, which already accepted `placeholder`), and the
+  `ChapterDetail` scene textarea ("Describe this beat…"). Chapter title/summary
+  and ref labels already had placeholders and now actually show them. All use
+  `placeholder:text-faint`.
+- **Display fallbacks** so an intentionally-empty record never renders blank:
+  board card title → muted "Untitled chapter"; character avatars → "?"; char
+  list header → "Unnamed character" / "No role"; chapter char/world chips →
+  "Unnamed character"/"?" and "Untitled entry"; world list header → "Untitled
+  entry"; delete-confirm dialogs get safe fallbacks. (`Board.tsx`,
+  `ChapterDetail.tsx`, `CharactersPanel.tsx`, `WorldPanel.tsx`.)
+- **Scope note.** Books ("Untitled Book") and versions ("Version 2") keep their
+  auto-generated names — those are conventional useful defaults (like "Untitled
+  document"), not delete-me stubs, and they feed the toolbar breadcrumb.
+- **Schema untouched** — this is UI/default-value only, so `.estoria.json`
+  stays compatible with the Android app (§6). Verified in a fresh dev server:
+  new character = all fields empty with grey placeholders and a "?" avatar; new
+  chapter = "Untitled chapter" muted on the board, modal title/summary/scene all
+  empty with placeholders. `npm run typecheck` + `npm run build` clean.

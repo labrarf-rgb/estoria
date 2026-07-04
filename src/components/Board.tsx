@@ -477,8 +477,12 @@ export function Board() {
                     {(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words
                   </span>
                 </div>
-                <div className="font-serif text-[16px] font-semibold leading-tight text-ink">
-                  {titleOf(c)}
+                <div
+                  className={`font-serif text-[16px] font-semibold leading-tight ${
+                    titleOf(c) ? "text-ink" : "text-faint"
+                  }`}
+                >
+                  {titleOf(c) || "Untitled chapter"}
                 </div>
                 <div className="line-clamp-2 text-[12.5px] leading-[1.45] text-soft">
                   {summaryOf(c)}
@@ -494,7 +498,7 @@ export function Board() {
                         className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
                         style={{ background: k.color }}
                       >
-                        {k.initials}
+                        {k.initials || "?"}
                       </span>
                     );
                   })}

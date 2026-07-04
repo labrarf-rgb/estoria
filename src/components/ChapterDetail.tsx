@@ -423,9 +423,9 @@ export function ChapterDetail() {
                     style={{ background: c.color }}
                   >
                     <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/25 text-[8.5px] font-semibold">
-                      {c.initials}
+                      {c.initials || "?"}
                     </span>
-                    {c.name}
+                    {c.name || "Unnamed character"}
                     <button
                       onClick={() => toggleChapterChar(ch.id, c.id)}
                       className="ml-[1px] flex h-[16px] w-[16px] items-center justify-center rounded-full text-[10px] hover:bg-black/25"
@@ -457,9 +457,9 @@ export function ChapterDetail() {
                         className="flex h-[16px] w-[16px] items-center justify-center rounded-full text-[8px] font-semibold text-white"
                         style={{ background: c.color }}
                       >
-                        {c.initials}
+                        {c.initials || "?"}
                       </span>
-                      {c.name}
+                      {c.name || "Unnamed character"}
                     </button>
                   ))}
                   {available.length === 0 && (
@@ -500,7 +500,7 @@ export function ChapterDetail() {
                     key={w.id}
                     className="flex items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg"
                   >
-                    {w.name}
+                    {w.name || "Untitled entry"}
                     <span className="text-[9px] uppercase opacity-70">{w.cat}</span>
                     <button
                       onClick={() => toggleChapterWorld(ch.id, w.id)}
@@ -530,7 +530,7 @@ export function ChapterDetail() {
                       className="flex items-center gap-[6px] rounded-full border border-rule bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
                     >
                       <span className="h-[7px] w-[7px] rounded-full bg-soft" />
-                      {w.name}
+                      {w.name || "Untitled entry"}
                       <span className="text-[9px] uppercase text-faint">{w.cat}</span>
                     </button>
                   ))}
@@ -700,7 +700,8 @@ export function ChapterDetail() {
                       onChange={(e) => updateScene(ch.id, i, e.target.value)}
                       onMouseDown={(e) => e.stopPropagation()}
                       rows={3}
-                      className="w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none"
+                      placeholder="Describe this beat..."
+                      className="w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint"
                     />
                   </div>
                 </div>

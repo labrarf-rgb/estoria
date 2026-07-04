@@ -543,13 +543,13 @@ export const useStore = create<StoreState>()(
             num: list.length + 1,
             act: last ? last.act : 1,
             status: "idea",
-            title: "Untitled Chapter",
-            summary: "A new chapter. Double-click to map its scenes.",
+            title: "",
+            summary: "",
             words: 0,
             x: last ? last.x + CARD_W + 72 : 60,
             y: last ? last.y : 90,
             chars: [],
-            scenes: ["New scene."],
+            scenes: [""],
             sceneLinks: [],
             refs: [],
           };
@@ -676,7 +676,7 @@ export const useStore = create<StoreState>()(
             ...s.doc,
             chapters: s.doc.chapters.map((c) => {
               if (c.id !== chId) return c;
-              const scenes = c.scenes.concat("New scene.");
+              const scenes = c.scenes.concat("");
               const sceneLinks = c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks;
               return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
             }),
@@ -691,7 +691,7 @@ export const useStore = create<StoreState>()(
               if (c.id !== chId) return c;
               const idx = Math.max(0, Math.min(atIdx, c.scenes.length));
               const scenes = c.scenes.slice();
-              scenes.splice(idx, 0, "New scene.");
+              scenes.splice(idx, 0, "");
               const sceneLinks = c.sceneLinks.slice();
               if (scenes.length > 1) sceneLinks.splice(Math.min(idx, sceneLinks.length), 0, "therefore");
               return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
@@ -793,7 +793,7 @@ export const useStore = create<StoreState>()(
                     refs: c.refs.concat({
                       id: uid("r"),
                       kind,
-                      label: kind === "IMAGE" ? "New image" : "New note",
+                      label: "",
                       body: kind === "NOTE" ? "" : undefined,
                     }),
                   }
@@ -879,7 +879,7 @@ export const useStore = create<StoreState>()(
               x: m + col * (CARD_W + gapX),
               y: m + row * (142 + gapY),
               chars: [],
-              scenes: ["New scene."],
+              scenes: [""],
               sceneLinks: [],
               refs: [],
             };
@@ -1102,19 +1102,19 @@ export const useStore = create<StoreState>()(
           const id = uid("p");
           const next: Character = {
             id,
-            name: "New Character",
-            role: "Supporting",
-            type: "Archetype",
-            initials: "NC",
+            name: "",
+            role: "",
+            type: "",
+            initials: "",
             color: CHAR_PALETTE[s.doc.characters.length % CHAR_PALETTE.length],
-            desc: "A one-line description of this character.",
-            bio: "Backstory and background.",
-            traits: ["Trait"],
-            goals: ["A concrete goal"],
-            motivations: "What drives them beneath the surface.",
-            want: "What they want.",
-            need: "What they need.",
-            notes: "Other notes about this character.",
+            desc: "",
+            bio: "",
+            traits: [],
+            goals: [],
+            motivations: "",
+            want: "",
+            need: "",
+            notes: "",
           };
           return {
             doc: { ...s.doc, characters: s.doc.characters.concat(next) },
@@ -1161,8 +1161,8 @@ export const useStore = create<StoreState>()(
               world: s.doc.world.concat({
                 id,
                 cat: "Lore",
-                name: "New entry",
-                desc: "Describe this piece of the world.",
+                name: "",
+                desc: "",
                 notes: "",
                 refs: [],
               }),
@@ -1210,7 +1210,7 @@ export const useStore = create<StoreState>()(
                     refs: w.refs.concat({
                       id: uid("r"),
                       kind,
-                      label: kind === "IMAGE" ? "New image" : "New note",
+                      label: "",
                       body: kind === "NOTE" ? "" : undefined,
                     }),
                   }
@@ -1250,7 +1250,7 @@ export const useStore = create<StoreState>()(
             assets: s.doc.assets.concat({
               id,
               kind,
-              label: kind === "IMAGE" ? "New image" : "New note",
+              label: "",
               body: kind === "NOTE" ? "" : undefined,
             }),
           },

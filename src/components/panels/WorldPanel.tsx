@@ -52,7 +52,9 @@ export function WorldPanel() {
                 <div className="flex items-center gap-[11px]">
                   <span className="h-[10px] w-[10px] flex-shrink-0 rounded-full bg-soft" />
                   <button onClick={() => selectWorld(w.id)} className="min-w-0 flex-1 text-left">
-                    <div className="font-serif text-[15px] font-semibold text-ink">{w.name}</div>
+                    <div className="font-serif text-[15px] font-semibold text-ink">
+                      {w.name || "Untitled entry"}
+                    </div>
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">
                       {w.cat}
                     </div>
@@ -72,7 +74,8 @@ export function WorldPanel() {
                         <input
                           value={w.name}
                           onChange={(e) => updateWorldEntry(w.id, { name: e.target.value })}
-                          className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none focus:border-faint"
+                          placeholder="e.g. The Drowned City"
+                          className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
                         />
                       </div>
                       <div className="w-[120px]">
@@ -97,10 +100,11 @@ export function WorldPanel() {
                       <ExpandableTextarea
                         value={w.desc}
                         onChange={(v) => updateWorldEntry(w.id, { desc: v })}
+                        placeholder="Describe this piece of the world"
                         expandedHeight="40vh"
                         expanded={descExpanded}
                         onToggleExpanded={() => toggleTextarea("worldDesc")}
-                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
+                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
                       />
                     </div>
                     <div>
@@ -108,10 +112,11 @@ export function WorldPanel() {
                       <ExpandableTextarea
                         value={w.notes}
                         onChange={(v) => updateWorldEntry(w.id, { notes: v })}
+                        placeholder="Extra notes, connections, open questions"
                         expandedHeight="40vh"
                         expanded={notesExpanded}
                         onToggleExpanded={() => toggleTextarea("worldNotes")}
-                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
+                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
                       />
                     </div>
                     <div>
@@ -131,7 +136,7 @@ export function WorldPanel() {
                     <button
                       onClick={() =>
                         askConfirm({
-                          message: `Delete "${w.name}"?`,
+                          message: `Delete "${w.name || "this entry"}"?`,
                           danger: true,
                           onConfirm: () => deleteWorldEntry(w.id),
                         })

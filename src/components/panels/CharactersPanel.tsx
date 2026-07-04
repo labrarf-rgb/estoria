@@ -41,12 +41,14 @@ export function CharactersPanel() {
                     className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"
                     style={{ background: p.color }}
                   >
-                    {p.initials}
+                    {p.initials || "?"}
                   </span>
                   <button onClick={() => selectChar(p.id)} className="min-w-0 flex-1 text-left">
-                    <div className="font-serif text-[15px] font-semibold text-ink">{p.name}</div>
+                    <div className="font-serif text-[15px] font-semibold text-ink">
+                      {p.name || "Unnamed character"}
+                    </div>
                     <div className="text-[11.5px] font-medium text-soft">
-                      {p.role} · in {chapterCount(p.id)} chapters
+                      {p.role || "No role"} · in {chapterCount(p.id)} chapters
                     </div>
                   </button>
                   <button
@@ -61,51 +63,53 @@ export function CharactersPanel() {
                   <div className="mt-[13px] flex flex-col gap-[12px] border-t border-rule pt-[13px]">
                     <Row>
                       <Field label="Name" className="flex-1">
-                        <Input value={p.name} onChange={(v) => set({ name: v })} />
+                        <Input value={p.name} onChange={(v) => set({ name: v })} placeholder="Character name" />
                       </Field>
                       <Field label="Initials" className="w-[70px]">
-                        <Input value={p.initials} onChange={(v) => set({ initials: v })} />
+                        <Input value={p.initials} onChange={(v) => set({ initials: v })} placeholder="AB" />
                       </Field>
                     </Row>
                     <Row>
                       <Field label="Role" className="flex-1">
-                        <Input value={p.role} onChange={(v) => set({ role: v })} />
+                        <Input value={p.role} onChange={(v) => set({ role: v })} placeholder="e.g. Protagonist" />
                       </Field>
                       <Field label="Archetype" className="flex-1">
-                        <Input value={p.type} onChange={(v) => set({ type: v })} />
+                        <Input value={p.type} onChange={(v) => set({ type: v })} placeholder="e.g. Mentor" />
                       </Field>
                     </Row>
                     <Field label="Description">
-                      <Area value={p.desc} onChange={(v) => set({ desc: v })} rows={2} />
+                      <Area value={p.desc} onChange={(v) => set({ desc: v })} rows={2} placeholder="A one-line description of this character" />
                     </Field>
                     <Field label="Bio">
-                      <Area value={p.bio} onChange={(v) => set({ bio: v })} rows={2} />
+                      <Area value={p.bio} onChange={(v) => set({ bio: v })} rows={2} placeholder="Backstory and background" />
                     </Field>
                     <Field label="Traits (comma separated)">
                       <Input
                         value={p.traits.join(", ")}
                         onChange={(v) => set({ traits: splitList(v) })}
+                        placeholder="brave, guarded, curious"
                       />
                     </Field>
                     <Field label="Goals (comma separated)">
                       <Input
                         value={p.goals.join(", ")}
                         onChange={(v) => set({ goals: splitList(v) })}
+                        placeholder="What they're trying to achieve"
                       />
                     </Field>
                     <Field label="Motivations">
-                      <Area value={p.motivations} onChange={(v) => set({ motivations: v })} rows={2} />
+                      <Area value={p.motivations} onChange={(v) => set({ motivations: v })} rows={2} placeholder="What drives them beneath the surface" />
                     </Field>
                     <Row>
                       <Field label="Wants" className="flex-1">
-                        <Area value={p.want} onChange={(v) => set({ want: v })} rows={2} />
+                        <Area value={p.want} onChange={(v) => set({ want: v })} rows={2} placeholder="What they want" />
                       </Field>
                       <Field label="Needs" className="flex-1">
-                        <Area value={p.need} onChange={(v) => set({ need: v })} rows={2} />
+                        <Area value={p.need} onChange={(v) => set({ need: v })} rows={2} placeholder="What they need" />
                       </Field>
                     </Row>
                     <Field label="Notes">
-                      <Area value={p.notes} onChange={(v) => set({ notes: v })} rows={2} />
+                      <Area value={p.notes} onChange={(v) => set({ notes: v })} rows={2} placeholder="Other notes about this character" />
                     </Field>
                     {appearsIn(p.id).length > 0 && (
                       <Field label="Appears in">
@@ -124,7 +128,7 @@ export function CharactersPanel() {
                     <button
                       onClick={() =>
                         askConfirm({
-                          message: `Delete ${p.name}?`,
+                          message: `Delete ${p.name || "this character"}?`,
                           detail: "They will be removed from every chapter they appear in.",
                           danger: true,
                           onConfirm: () => deleteCharacter(p.id),
@@ -181,12 +185,21 @@ function Field({
   );
 }
 
-function Input({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function Input({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none focus:border-faint"
+      placeholder={placeholder}
+      className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
     />
   );
 }
@@ -195,17 +208,20 @@ function Area({
   value,
   onChange,
   rows = 2,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  placeholder?: string;
 }) {
   return (
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
       rows={rows}
-      className="w-full resize-none rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none focus:border-faint"
+      placeholder={placeholder}
+      className="w-full resize-none rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
     />
   );
 }
