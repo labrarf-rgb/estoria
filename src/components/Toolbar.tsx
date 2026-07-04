@@ -351,11 +351,7 @@ export function Toolbar() {
             />
           )}
           <div className="mx-[6px] my-1 h-px bg-rule" />
-          <MenuItem
-            title="About"
-            sub="About Estoria"
-            onClick={() => setPanel("showAbout", true)}
-          />
+          <MenuItem title="About Estoria" onClick={() => setPanel("showAbout", true)} />
         </Popover>
       </div>
 
@@ -488,14 +484,14 @@ function EditableName({
   );
 }
 
-function MenuItem({ title, sub, onClick }: { title: string; sub: string; onClick: () => void }) {
+function MenuItem({ title, sub, onClick }: { title: string; sub?: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="flex flex-col gap-[2px] rounded-lg px-[11px] py-[9px] text-left hover:bg-chip"
     >
       <span className="text-[12.5px] font-semibold text-ink">{title}</span>
-      <span className="text-[11px] font-normal text-soft">{sub}</span>
+      {sub && <span className="text-[11px] font-normal text-soft">{sub}</span>}
     </button>
   );
 }

@@ -1435,8 +1435,10 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   an inline result message and offers "Choose folder…" when no Estoria folder
   is set. The list/restore UI was extracted into a shared `SyncFileList`
   component used by both surfaces.
-- **New: File → About** (`AboutModal`) — name, tagline, browser/sync storage
-  note, schema version, author link.
+- **New: File → About Estoria** (`AboutModal`) — name, tagline, browser/sync
+  storage note, schema version, author link. (Menu row is a single line
+  "About Estoria"; `MenuItem`'s `sub` is now optional so it doesn't read
+  "About / About Estoria".)
 - ExportModal header renamed "Export to Markdown" → "Save to file" to match
   its menu entry. Store gained `showBackups`/`showAbout` panel flags.
 - Verified live: menu renders in exactly the order above with both dividers;
