@@ -1536,7 +1536,7 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   Bio/Traits/Goals/Motivations/Wants/Needs/Notes, via new `placeholder` props on
   its local `Input`/`Area`), `WorldPanel` (Name + Description/Notes through
   `ExpandableTextarea`, which already accepted `placeholder`), and the
-  `ChapterDetail` scene textarea ("Describe this beat…"). Chapter title/summary
+  `ChapterDetail` scene textarea ("New scene"). Chapter title/summary
   and ref labels already had placeholders and now actually show them. All use
   `placeholder:text-faint`.
 - **Display fallbacks** so an intentionally-empty record never renders blank:

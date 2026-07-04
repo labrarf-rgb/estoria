@@ -700,7 +700,7 @@ export function ChapterDetail() {
                       onChange={(e) => updateScene(ch.id, i, e.target.value)}
                       onMouseDown={(e) => e.stopPropagation()}
                       rows={3}
-                      placeholder="Describe this beat..."
+                      placeholder="New scene"
                       className="w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint"
                     />
                   </div>
