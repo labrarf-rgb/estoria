@@ -424,6 +424,35 @@ extensions that go beyond the original to-do.** The web behavior is now:
   origin(s) — settle hosting before the Drive adapter so OAuth is set up once.
   With the same-origin copy, that origin is `https://www.labrarf.com`.
 
+#### Deploy runbook — always verify the Pages deploy after `sync:portfolio`
+
+Publishing an embed change is **two repos**: (1) commit/push the source repo,
+then (2) `npm run sync:portfolio` (builds + `rsync -a --delete dist/ →
+Portfolio-Website/estoria/`) and commit/push the **portfolio** repo. Pushing
+the portfolio repo triggers its `pages-build-deployment` Action, which is what
+actually publishes `www.labrarf.com/estoria/`.
+
+- **`sync:portfolio` uses `rsync --delete`**, so it removes the old
+  content-hashed `assets/index-*.{js,css}` and writes new ones. If the Pages
+  deploy then fails or stalls, Pages keeps serving the **last successful**
+  (old) build — so the site looks unchanged even though the repo is correct.
+  This is the trap: a green push does **not** mean a green deploy.
+- **Always confirm the deploy landed**, don't assume. Quick checks:
+  - `gh run list --limit 3` in the portfolio repo — the newest
+    `pages build and deployment` must be `completed / success`, not
+    `failure`/stuck `queued`.
+  - Compare hashes: `grep -o 'index-[^"]*\.\(js\|css\)'
+    Portfolio-Website/estoria/index.html` vs
+    `curl -s "https://www.labrarf.com/estoria/index.html?cb=$(date +%s)" |
+    grep -o 'index-[^"]*\.\(js\|css\)'` — they must match. (Cache-bust the
+    query string; hashed asset names already bust their own caches.)
+- **If the deploy failed or is stuck** (seen 2026-07-04: transient
+  "Deployment failed, try again later", and a `gh run rerun --failed` that then
+  hung `queued` ~6 min): don't wait on the rerun. Push a fresh **empty** commit
+  to the portfolio repo (`git commit --allow-empty -m "Redeploy Pages"`) to
+  kick a clean build+deploy, then re-verify hashes. It's almost always a
+  GitHub-side hiccup, not a content problem — the built artifact is fine.
+
 ---
 
 ## 9. Known issues & fix backlog (code review, 2026-07-01)
@@ -1479,3 +1508,10 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   index with zero button/pill overlap (2px clearance); footer reads "Saved in
   this browser · …" with the tip right-aligned and no attribution. `tsc -p
   tsconfig.app.json --noEmit` clean.
+- **Deploy incident (resolved).** After `sync:portfolio` + portfolio push, the
+  Pages deploy failed transiently and the embed at `www.labrarf.com/estoria/`
+  kept serving the previous build (the `rsync --delete` had already swapped the
+  hashed assets, so a healthy repo still looked stale). Fixed by pushing an
+  empty commit to redeploy, then confirming the live asset hashes matched the
+  committed ones. Wrote this up as a permanent **"Deploy runbook"** under §8
+  Hosting migration — verify the Pages run after every embed publish.
