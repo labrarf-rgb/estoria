@@ -24,6 +24,7 @@ export function ChapterDetail() {
   const openCh = useStore((s) => s.openCh);
   const doc = useStore((s) => s.doc);
   const closeChapter = useStore((s) => s.closeChapter);
+  const openChapter = useStore((s) => s.openChapter);
   const bumpAct = useStore((s) => s.bumpChapterAct);
   const setAct = useStore((s) => s.setChapterAct);
   const patchChapter = useStore((s) => s.patchChapter);
@@ -179,6 +180,12 @@ export function ChapterDetail() {
 
   if (!ch) return null;
 
+  // Prev/next navigation across the chapter sequence, shown beside the close
+  // button so the user can flip through chapters without leaving the modal.
+  const chIdx = doc.chapters.findIndex((c) => c.id === ch.id);
+  const prevCh = chIdx > 0 ? doc.chapters[chIdx - 1] : null;
+  const nextCh = chIdx >= 0 && chIdx < doc.chapters.length - 1 ? doc.chapters[chIdx + 1] : null;
+
   const draftId = doc.activeDraftId;
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
   const positions = ch.scenePos ?? [];
@@ -279,6 +286,10 @@ export function ChapterDetail() {
     return { x: p.x + SCENE_W / 2, y: p.y + SCENE_H / 2 };
   };
 
+  // Column count used when inserting a scene via the hover +buttons — sized for
+  // the grid that will hold one more card than there are now.
+  const insertCols = sceneColumnsForWidth(ch.scenes.length + 1, boxW);
+
   return (
     <Scrim onClose={closeChapter} z={50} center>
       <div
@@ -369,7 +380,25 @@ export function ChapterDetail() {
               </div>
             </div>
           </div>
-          <CloseButton onClick={closeChapter} />
+          <div className="flex items-center gap-[6px]">
+            <button
+              onClick={() => prevCh && openChapter(prevCh.id)}
+              disabled={!prevCh}
+              title={prevCh ? `Previous chapter · ${prevCh.title}` : "No previous chapter"}
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-rule bg-card text-[16px] font-medium text-ink hover:border-faint disabled:cursor-default disabled:opacity-40 disabled:hover:border-rule"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => nextCh && openChapter(nextCh.id)}
+              disabled={!nextCh}
+              title={nextCh ? `Next chapter · ${nextCh.title}` : "No next chapter"}
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-rule bg-card text-[16px] font-medium text-ink hover:border-faint disabled:cursor-default disabled:opacity-40 disabled:hover:border-rule"
+            >
+              ›
+            </button>
+            <CloseButton onClick={closeChapter} />
+          </div>
         </div>
 
         {/* Characters */}
@@ -558,7 +587,7 @@ export function ChapterDetail() {
         <div
           ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
-            expanded ? "max-h-[78vh]" : "max-h-[40vh]"
+            expanded ? "max-h-[58vh]" : "max-h-[40vh]"
           }`}
           style={{
             backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
@@ -622,6 +651,28 @@ export function ChapterDetail() {
                   className="group absolute z-[5] cursor-grab transition-[left,top] duration-150 ease-out active:cursor-grabbing"
                   style={{ left: slot.pos.x, top: slot.pos.y, width: SCENE_W, minHeight: SCENE_H }}
                 >
+                  {/* Hover the left/right edge of a card to drop a new scene in
+                      before or after it, without leaving the scene canvas. */}
+                  {!drag && (
+                    <>
+                      <button
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={() => insertScene(ch.id, i, insertCols)}
+                        title="Add a scene before this one"
+                        className="absolute left-[-11px] top-[38px] z-30 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-card text-[14px] font-semibold leading-none text-soft opacity-0 shadow-[var(--shadow)] transition-opacity hover:border-faint hover:text-ink group-hover:opacity-100"
+                      >
+                        +
+                      </button>
+                      <button
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={() => insertScene(ch.id, i + 1, insertCols)}
+                        title="Add a scene after this one"
+                        className="absolute right-[-11px] top-[38px] z-30 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-card text-[14px] font-semibold leading-none text-soft opacity-0 shadow-[var(--shadow)] transition-opacity hover:border-faint hover:text-ink group-hover:opacity-100"
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
                   <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint">
                     <div className="flex items-center">
                       <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">

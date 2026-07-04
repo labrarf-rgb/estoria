@@ -183,7 +183,7 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 
 > **Cross-project note — an Android companion app is planned (not built here).**
 > A **separate** native Kotlin/Compose app is planned (decided 2026-07-02); its
-> own spec lives at `/Users/rfcl/AndroidStudioProjects/Estoria/ESTORIA-ANDROID.md`.
+> own spec lives at `/Users/rfcl/AndroidStudioProjects/Estoria-aa/ESTORIA-ANDROID.md`.
 > **It is not part of this repo's roadmap and does not add web work** — it is
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
@@ -1263,7 +1263,7 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
 
 - Decided to build a **separate** native Kotlin/Compose Android app (not a
   WebView wrapper, not part of this repo). Full spec lives at
-  `/Users/rfcl/AndroidStudioProjects/Estoria/ESTORIA-ANDROID.md`.
+  `/Users/rfcl/AndroidStudioProjects/Estoria-aa/ESTORIA-ANDROID.md`.
 - **No change to web code or the web roadmap.** Added only a **cross-project
   awareness note** under §6 (roadmap item 7) so future web-side changes account
   for the Android app: the two apps share the same `.estoria.json` (schema v3),
@@ -1447,3 +1447,35 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   the doc, kept the modal open with "Restored … — previous version saved
   as …", and refreshed the list; About shows tagline/schema/author. `tsc -b`
   + `vite build` clean.
+
+### 2026-07-04 (Session 26) — Timeline roman fix, chapter-modal nav & scene-insert, footer tidy
+
+- **Fix — timeline Act numerals.** `roman()` (`src/lib/markdown.ts`) only
+  mapped 1–3 and fell back to arabic for Act 4+, so the timeline read "Act I,
+  II, III, 4". Replaced with a real subtractive converter, so acts render
+  "Act IV / V / …". Also corrects the `## Act N` headings in markdown export.
+- **New — prev/next chapter in the chapter modal.** Two arrow buttons (‹ ›)
+  sit beside the ✕ in the modal header and call `openChapter` on the adjacent
+  chapter in sequence; each disables at its end and its title is in the
+  tooltip. Lets the user flip through chapters without closing the modal.
+- **New — insert a scene from a card's side.** Hovering the left/right edge of
+  a scene card reveals a `+` that inserts a new scene before/after it (reuses
+  the existing `insertScene`), so scenes can be added mid-flow without the
+  toolbar "+ Add scene" (which still appends). The buttons are raised to just
+  above the connector line (`top-[38px]`) so they sit close to but never
+  overlap the Therefore/But/And pills that live at the card's vertical centre;
+  scene-grid spacing is untouched, so 3-across collapsed / 5-across expanded
+  still holds.
+- **Chapter modal — expanded scenes scroll on their own.** The expanded
+  scene-canvas cap dropped 78vh → 58vh so, like collapse mode, the scenes
+  scroll internally while the rest of the modal (notes, refs) stays reachable.
+- **Footer status bar.** Removed the "Built by Ray Labra" attribution and moved
+  the canvas hint to the right edge. Reworded the autosave line from
+  "Auto-saved…" to **"Saved in this browser · <time>"** — it writes to
+  `localStorage` (persistent per-origin storage, not a cache), so the old
+  phrasing undersold it and "cache" would have been misleading.
+- Verified live: timeline shows Act IV in roman; modal prev/next walk the
+  sequence and disable at the ends; side `+` inserts a scene at the right
+  index with zero button/pill overlap (2px clearance); footer reads "Saved in
+  this browser · …" with the tip right-aligned and no attribution. `tsc -p
+  tsconfig.app.json --noEmit` clean.

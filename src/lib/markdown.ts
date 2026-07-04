@@ -18,8 +18,25 @@ const CONN_LABEL: Record<ConnType, string> = {
   and: "And",
 };
 
+const ROMAN_UNITS: [number, string][] = [
+  [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+  [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+  [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+];
+
+/** Roman numeral for an Act number. Non-positive/invalid input falls back to
+ *  the arabic value so a stray act count never renders blank. */
 export function roman(a: number): string {
-  return ({ 1: "I", 2: "II", 3: "III" } as Record<number, string>)[a] || String(a);
+  if (!Number.isFinite(a) || a < 1) return String(a);
+  let n = Math.floor(a);
+  let out = "";
+  for (const [value, sym] of ROMAN_UNITS) {
+    while (n >= value) {
+      out += sym;
+      n -= value;
+    }
+  }
+  return out;
 }
 
 /**

@@ -207,10 +207,10 @@ export function Footer() {
   const saveText = failed
     ? "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
-      ? "Auto-saving..."
+      ? "Saving..."
       : (status.savedAt
-          ? `Auto-saved at ${new Date(status.savedAt).toLocaleTimeString()}`
-          : "Auto-saved to this browser") + mirrorSuffix;
+          ? `Saved in this browser · ${new Date(status.savedAt).toLocaleTimeString()}`
+          : "Saved in this browser") + mirrorSuffix;
 
   const hint =
     view === "timeline"
@@ -294,19 +294,8 @@ export function Footer() {
         </span>
       )}
 
-      <span className="hidden flex-1 truncate text-center md:block">{hint}</span>
-      <div className="flex-1 md:hidden" />
-      <span className="shrink-0">
-        Built by{" "}
-        <a
-          href="https://labrarf.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-soft underline decoration-rule underline-offset-2 hover:text-ink"
-        >
-          Ray Labra
-        </a>
-      </span>
+      <div className="flex-1" />
+      <span className="hidden shrink-0 max-w-[46vw] truncate text-right md:block">{hint}</span>
 
       {dirName && (
         <SyncHistoryPopover
