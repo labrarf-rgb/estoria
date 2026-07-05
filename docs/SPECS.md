@@ -1553,3 +1553,18 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   new character = all fields empty with grey placeholders and a "?" avatar; new
   chapter = "Untitled chapter" muted on the board, modal title/summary/scene all
   empty with placeholders. `npm run typecheck` + `npm run build` clean.
+
+### 2026-07-04 (Session 28) — Contact link in the File menu
+
+- **Added.** A **Contact** item in the File menu, directly above **About Estoria**
+  (inside the same footer group, after the "Use a template" divider). Opens
+  `https://www.labrarf.com/contact` in a new tab. Mirrored in the Android ⋮ menu
+  the same session.
+- **Rendered as a real `<a>`, not a `window.open` button** (`Toolbar.tsx`):
+  `target="_blank" rel="noopener noreferrer"` — gives middle/⌘-click, screen-reader
+  "link" semantics, and reverse-tabnabbing protection, none of which a button gets.
+  Closes the popover via the existing `closeNewMenu`. Styled to match the other
+  items, including a `text-soft` sub-line ("Questions, feedback, or say hello").
+- **No schema/data change** — purely a static outbound link, so `.estoria.json`
+  round-trip with Android is untouched. `npm run typecheck` clean; verified in a
+  dev server (item appears above About, correct href/target).

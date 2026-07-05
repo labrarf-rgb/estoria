@@ -351,6 +351,16 @@ export function Toolbar() {
             />
           )}
           <div className="mx-[6px] my-1 h-px bg-rule" />
+          <a
+            href="https://www.labrarf.com/contact"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={closeNewMenu}
+            className="flex flex-col gap-[2px] rounded-lg px-[11px] py-[9px] text-left hover:bg-chip"
+          >
+            <span className="text-[12.5px] font-semibold text-ink">Contact</span>
+            <span className="text-[11px] font-normal text-soft">Questions, feedback, or say hello</span>
+          </a>
           <MenuItem title="About Estoria" onClick={() => setPanel("showAbout", true)} />
         </Popover>
       </div>
