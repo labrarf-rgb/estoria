@@ -473,9 +473,22 @@ export function Board() {
                     style={{ background: statusColor(c.status) }}
                   />
                   <div className="flex-1" />
-                  <span className="font-mono text-[10.5px] font-medium text-soft">
-                    {(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words
-                  </span>
+                  <div className="flex items-center pr-[6px]">
+                    {c.chars.map((id) => {
+                      const k = charById(id);
+                      if (!k) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
+                          style={{ background: k.color }}
+                          title={k.name || undefined}
+                        >
+                          {k.initials || "?"}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div
                   className={`font-serif text-[16px] font-semibold leading-tight ${
@@ -488,27 +501,12 @@ export function Board() {
                   {summaryOf(c)}
                 </div>
                 <div className="flex-1" />
-                <div className="flex items-center gap-1">
-                  {c.chars.map((id) => {
-                    const k = charById(id);
-                    if (!k) return null;
-                    return (
-                      <span
-                        key={id}
-                        className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
-                        style={{ background: k.color }}
-                      >
-                        {k.initials || "?"}
-                      </span>
-                    );
-                  })}
-                  <div className="flex-1" />
-                  {c.refs.length > 0 && (
-                    <span className="flex items-center gap-[5px] font-mono text-[10.5px] font-medium text-faint">
-                      <span className="inline-block h-[6px] w-[6px] rotate-45 rounded-[1px] bg-faint" />
-                      {c.refs.length}
-                    </span>
-                  )}
+                <div className="flex items-center justify-end gap-[7px] font-mono text-[11px] font-medium text-soft">
+                  <span>
+                    {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
+                  </span>
+                  <span className="text-faint">·</span>
+                  <span>{(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words</span>
                 </div>
               </div>
             </div>

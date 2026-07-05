@@ -37,6 +37,7 @@ export function ChapterDetail() {
   const updateScene = useStore((s) => s.updateScene);
   const deleteScene = useStore((s) => s.deleteScene);
   const reorderScene = useStore((s) => s.reorderScene);
+  const moveScenesToChapter = useStore((s) => s.moveScenesToChapter);
   const cycleSceneLink = useStore((s) => s.cycleSceneLink);
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
@@ -62,6 +63,14 @@ export function ChapterDetail() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
+  // Scene-move mode: pick scenes with checkboxes, then choose a destination
+  // chapter to append them to. Selection is keyed by scene index.
+  const [moveMode, setMoveMode] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [destPickerOpen, setDestPickerOpen] = useState(false);
+  // Chosen destination + insertion position, shown in the confirm dialog.
+  const [moveDest, setMoveDest] = useState<{ id: string; num: number; title: string } | null>(null);
+  const [movePos, setMovePos] = useState<"beginning" | "middle" | "end">("end");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
   // Scene drag-to-reorder: either an existing card ("move") or the ghost from
@@ -178,6 +187,14 @@ export function ChapterDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
+  // Leaving a chapter (prev/next nav or close) cancels an in-progress move.
+  useEffect(() => {
+    setMoveMode(false);
+    setSelected(new Set());
+    setDestPickerOpen(false);
+    setMoveDest(null);
+  }, [openCh]);
+
   if (!ch) return null;
 
   // Prev/next navigation across the chapter sequence, shown beside the close
@@ -237,6 +254,7 @@ export function ChapterDetail() {
   };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
+    if (moveMode) return; // In move mode a card click toggles selection, not drag.
     const target = e.target as HTMLElement;
     if (target.closest("textarea") || target.closest("button")) return;
     e.preventDefault();
@@ -290,7 +308,39 @@ export function ChapterDetail() {
   // the grid that will hold one more card than there are now.
   const insertCols = sceneColumnsForWidth(ch.scenes.length + 1, boxW);
 
+  // Scene-move helpers.
+  const otherChapters = doc.chapters.filter((c) => c.id !== ch.id);
+  const toggleSelected = (i: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  const exitMoveMode = () => {
+    setMoveMode(false);
+    setSelected(new Set());
+    setDestPickerOpen(false);
+    setMoveDest(null);
+  };
+  // Picking a chapter opens the confirm dialog (where the position is chosen).
+  const pickDest = (dest: { id: string; num: number; title: string }) => {
+    setDestPickerOpen(false);
+    setMovePos("end");
+    setMoveDest(dest);
+  };
+  const confirmMove = () => {
+    if (!moveDest) return;
+    const destScenes = doc.chapters.find((c) => c.id === moveDest.id)?.scenes.length ?? 0;
+    const atIdx =
+      movePos === "beginning" ? 0 : movePos === "middle" ? Math.floor(destScenes / 2) : destScenes;
+    const remaining = ch.scenes.length - selected.size;
+    moveScenesToChapter(ch.id, moveDest.id, [...selected], atIdx, sceneColumnsForWidth(remaining, boxW));
+    exitMoveMode();
+  };
+
   return (
+    <>
     <Scrim onClose={closeChapter} z={50} center>
       <div
         onMouseDown={stop}
@@ -353,30 +403,31 @@ export function ChapterDetail() {
                 ))}
               </div>
 
-              <div className="flex-1" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
-                Act
-              </span>
-              <div className="flex items-center rounded-lg bg-chip p-[3px]">
-                <button
-                  onClick={() => bumpAct(ch.id, -1)}
-                  className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  value={ch.act}
-                  onChange={(e) => setAct(ch.id, parseInt(e.target.value, 10))}
-                  className="h-[24px] w-[38px] bg-transparent text-center font-mono text-[13px] font-semibold text-ink [appearance:textfield]"
-                />
-                <button
-                  onClick={() => bumpAct(ch.id, 1)}
-                  className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-                >
-                  +
-                </button>
+              <div className="flex items-center gap-[8px]">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
+                  Act
+                </span>
+                <div className="flex items-center rounded-lg bg-chip p-[3px]">
+                  <button
+                    onClick={() => bumpAct(ch.id, -1)}
+                    className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    value={ch.act}
+                    onChange={(e) => setAct(ch.id, parseInt(e.target.value, 10))}
+                    className="h-[24px] w-[38px] bg-transparent text-center font-mono text-[13px] font-semibold text-ink [appearance:textfield]"
+                  />
+                  <button
+                    onClick={() => bumpAct(ch.id, 1)}
+                    className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -556,30 +607,91 @@ export function ChapterDetail() {
           <span className="text-[11px] font-semibold uppercase tracking-widest text-soft">
             Scene flow
           </span>
-          <div className="ml-auto flex items-center gap-[9px]">
-            <button
-              onClick={() => setSceneFlowExpanded(!expanded)}
-              className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-              title={expanded ? "Shrink the scene area" : "Expand the scene area"}
-            >
-              {expanded ? "Collapse" : "Expand"}
-            </button>
-            <button
-              onClick={onArrangeScenes}
-              className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-            >
-              Auto-arrange
-            </button>
-            <button
-              onMouseDown={onAddSceneDown}
-              onClick={onAddSceneClick}
-              title="Click to append · press and hold to drag it into place"
-              className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
-            >
-              + Add scene
-            </button>
-          </div>
+          {moveMode ? (
+            <div className="ml-auto flex items-center gap-[9px]">
+              <span className="text-[12px] font-medium text-soft">
+                {selected.size === 0
+                  ? "Check the scenes to move"
+                  : `${selected.size} ${selected.size === 1 ? "scene" : "scenes"} selected`}
+              </span>
+              {selected.size > 0 && (
+                <button
+                  onClick={() => setDestPickerOpen((v) => !v)}
+                  className="flex items-center gap-[6px] rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
+                >
+                  Select chapter
+                  <span className="text-[9px]">▾</span>
+                </button>
+              )}
+              <button
+                onClick={exitMoveMode}
+                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="ml-auto flex items-center gap-[9px]">
+              <button
+                onClick={() => setSceneFlowExpanded(!expanded)}
+                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                title={expanded ? "Shrink the scene area" : "Expand the scene area"}
+              >
+                {expanded ? "Collapse" : "Expand"}
+              </button>
+              <button
+                onClick={onArrangeScenes}
+                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+              >
+                Auto-arrange
+              </button>
+              {otherChapters.length > 0 && ch.scenes.length > 0 && (
+                <button
+                  onClick={() => setMoveMode(true)}
+                  className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                  title="Select scenes to move to another chapter"
+                >
+                  Move scenes
+                </button>
+              )}
+              <button
+                onMouseDown={onAddSceneDown}
+                onClick={onAddSceneClick}
+                title="Click to append · press and hold to drag it into place"
+                className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
+              >
+                + Add scene
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Destination dropdown — the "Select chapter" menu. */}
+        {moveMode && destPickerOpen && selected.size > 0 && (
+          <div className="mx-[26px] mb-[4px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+            <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-faint">
+              Move to which chapter?
+            </span>
+            {otherChapters.map((c) => {
+              const title = resolveTitle(c, draftId);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => pickDest({ id: c.id, num: c.num, title })}
+                  className="flex items-center gap-[7px] rounded-full border border-rule bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+                >
+                  <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[10px] font-semibold text-bg">
+                    {String(c.num).padStart(2, "0")}
+                  </span>
+                  {title || "Untitled chapter"}
+                  <span className="font-mono text-[10px] text-faint">
+                    {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Scene canvas. `isolate` keeps the absolutely-positioned scene cards
             (z-5/z-10) contained so they can't paint over the sticky header when
@@ -644,16 +756,20 @@ export function ChapterDetail() {
             {cardSlots.map((slot) => {
               const i = slot.idx;
               const s = ch.scenes[i];
+              const isSelected = moveMode && selected.has(i);
               return (
                 <div
                   key={i}
                   onMouseDown={(e) => onSceneDown(e, i)}
-                  className="group absolute z-[5] cursor-grab transition-[left,top] duration-150 ease-out active:cursor-grabbing"
+                  onClick={moveMode ? () => toggleSelected(i) : undefined}
+                  className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
+                    moveMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+                  }`}
                   style={{ left: slot.pos.x, top: slot.pos.y, width: SCENE_W, minHeight: SCENE_H }}
                 >
                   {/* Hover the left/right edge of a card to drop a new scene in
                       before or after it, without leaving the scene canvas. */}
-                  {!drag && (
+                  {!drag && !moveMode && (
                     <>
                       <button
                         onMouseDown={(e) => e.stopPropagation()}
@@ -673,13 +789,32 @@ export function ChapterDetail() {
                       </button>
                     </>
                   )}
-                  <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint">
-                    <div className="flex items-center">
+                  <div
+                    className="flex h-full flex-col gap-[7px] rounded-[11px] border bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
+                    style={{
+                      borderColor: isSelected ? "var(--therefore)" : "var(--rule)",
+                      boxShadow: isSelected
+                        ? "0 0 0 2px color-mix(in srgb, var(--therefore) 45%, transparent), var(--shadow)"
+                        : "var(--shadow)",
+                    }}
+                  >
+                    <div className="flex items-center gap-[6px]">
+                      {moveMode && (
+                        <span
+                          className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] font-bold leading-none text-bg"
+                          style={{
+                            borderColor: isSelected ? "var(--therefore)" : "var(--faint)",
+                            background: isSelected ? "var(--therefore)" : "transparent",
+                          }}
+                        >
+                          {isSelected ? "✓" : ""}
+                        </span>
+                      )}
                       <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
                         SCENE {slot.num}
                       </span>
                       <div className="flex-1" />
-                      {ch.scenes.length > 1 && (
+                      {!moveMode && ch.scenes.length > 1 && (
                         <button
                           onClick={() =>
                             askConfirm({
@@ -698,10 +833,13 @@ export function ChapterDetail() {
                     <textarea
                       value={s}
                       onChange={(e) => updateScene(ch.id, i, e.target.value)}
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => !moveMode && e.stopPropagation()}
+                      readOnly={moveMode}
                       rows={3}
                       placeholder="New scene"
-                      className="w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint"
+                      className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint ${
+                        moveMode ? "pointer-events-none" : ""
+                      }`}
                     />
                   </div>
                 </div>
@@ -724,7 +862,9 @@ export function ChapterDetail() {
           </div>
         </div>
         <div className="px-[26px] pt-[8px] text-[11px] font-medium text-faint">
-          Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And
+          {moveMode
+            ? "Click scenes to select them, then choose a destination chapter · the scenes are appended to that chapter in order"
+            : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And"}
         </div>
 
         {/* Chapter notes */}
@@ -821,6 +961,68 @@ export function ChapterDetail() {
         </div>
       </div>
     </Scrim>
+
+    {/* Move confirmation — choose where in the destination chapter to drop the
+        selected scenes, then confirm. */}
+    {moveDest && (
+      <Scrim onClose={() => setMoveDest(null)} z={60} center>
+        <div
+          onMouseDown={stop}
+          className="w-[min(440px,92vw)] rounded-2xl border border-rule bg-panel p-[22px] shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+        >
+          <div className="font-serif text-[19px] font-semibold text-ink">
+            Move {selected.size} {selected.size === 1 ? "scene" : "scenes"}
+          </div>
+          <div className="mt-[4px] flex items-center gap-[7px] text-[13px] text-soft">
+            to
+            <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[11px] font-semibold text-bg">
+              {String(moveDest.num).padStart(2, "0")}
+            </span>
+            {moveDest.title || "Untitled chapter"}
+          </div>
+
+          <div className="mt-[18px] text-[11px] font-semibold uppercase tracking-widest text-soft">
+            Add them to the
+          </div>
+          <div className="mt-[8px] flex rounded-lg bg-chip p-[3px]">
+            {(["beginning", "middle", "end"] as const).map((pos) => (
+              <button
+                key={pos}
+                onClick={() => setMovePos(pos)}
+                className={`flex-1 rounded-md px-[10px] py-[6px] text-[12px] font-medium capitalize ${
+                  movePos === pos ? "bg-card text-ink" : "text-soft hover:bg-card"
+                }`}
+              >
+                {pos}
+              </button>
+            ))}
+          </div>
+          <div className="mt-[8px] text-[11.5px] leading-[1.5] text-faint">
+            {movePos === "beginning"
+              ? "The scenes will lead off the destination chapter, before its current first scene."
+              : movePos === "middle"
+                ? "The scenes will drop in around the middle of the destination chapter's scene flow."
+                : "The scenes will be appended after the destination chapter's current last scene."}
+          </div>
+
+          <div className="mt-[20px] flex justify-end gap-[9px]">
+            <button
+              onClick={() => setMoveDest(null)}
+              className="rounded-lg border border-rule bg-card px-[14px] py-[7px] text-[12px] font-medium text-ink hover:border-faint"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmMove}
+              className="rounded-lg bg-ink px-[14px] py-[7px] text-[12px] font-semibold text-bg"
+            >
+              Move {selected.size === 1 ? "scene" : "scenes"}
+            </button>
+          </div>
+        </div>
+      </Scrim>
+    )}
+    </>
   );
 }
 

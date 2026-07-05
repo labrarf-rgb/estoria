@@ -149,6 +149,15 @@ interface StoreState extends UiState {
   updateScene: (chId: string, idx: number, text: string) => void;
   deleteScene: (chId: string, idx: number) => void;
   reorderScene: (chId: string, fromIdx: number, toIdx: number, cols?: number) => void;
+  /** Move the given scene indices out of one chapter into another, inserted (in
+   *  order) at `atIdx` in the destination's scene list (defaults to the end). */
+  moveScenesToChapter: (
+    fromChId: string,
+    toChId: string,
+    indices: number[],
+    atIdx?: number,
+    cols?: number
+  ) => void;
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
@@ -750,6 +759,74 @@ export const useStore = create<StoreState>()(
             }),
           },
         })),
+
+      moveScenesToChapter: (fromChId, toChId, indices, atIdx, cols) =>
+        set((s) => {
+          if (fromChId === toChId || indices.length === 0) return {};
+          const from = s.doc.chapters.find((c) => c.id === fromChId);
+          const to = s.doc.chapters.find((c) => c.id === toChId);
+          if (!from || !to) return {};
+
+          // Take an ordered subset of a chapter's scenes, preserving each link
+          // that joined two scenes still adjacent after the subset (collapsed
+          // gaps default to "therefore").
+          const subset = (scenes: string[], links: ConnType[], keep: number[]) => {
+            const sorted = [...keep].sort((a, b) => a - b);
+            const outLinks: ConnType[] = [];
+            for (let j = 0; j < sorted.length - 1; j++) {
+              const a = sorted[j];
+              outLinks.push(sorted[j + 1] === a + 1 ? links[a] : "therefore");
+            }
+            return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
+          };
+
+          const moveSet = new Set(indices.filter((i) => i >= 0 && i < from.scenes.length));
+          if (moveSet.size === 0) return {};
+          const keepIdx = from.scenes.map((_, i) => i).filter((i) => !moveSet.has(i));
+          const moveIdx = from.scenes.map((_, i) => i).filter((i) => moveSet.has(i));
+
+          const remaining = subset(from.scenes, from.sceneLinks, keepIdx);
+          const moved = subset(from.scenes, from.sceneLinks, moveIdx);
+
+          // Insert the moved block into the destination at `p`; anything the
+          // insertion splits apart is re-joined with a neutral "therefore".
+          const p = Math.max(0, Math.min(atIdx ?? to.scenes.length, to.scenes.length));
+          const left = to.scenes.slice(0, p);
+          const right = to.scenes.slice(p);
+          const toScenes = left.concat(moved.scenes, right);
+          const leftLinks = to.sceneLinks.slice(0, Math.max(0, p - 1));
+          const rightLinks = to.sceneLinks.slice(p);
+          const toLinks = ([] as ConnType[]).concat(
+            leftLinks,
+            left.length > 0 && moved.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+            moved.sceneLinks,
+            right.length > 0 && moved.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+            rightLinks
+          );
+
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) => {
+                if (c.id === fromChId)
+                  return {
+                    ...c,
+                    scenes: remaining.scenes,
+                    sceneLinks: remaining.sceneLinks,
+                    scenePos: sceneAutoArrange(remaining.scenes, 0, cols),
+                  };
+                if (c.id === toChId)
+                  return {
+                    ...c,
+                    scenes: toScenes,
+                    sceneLinks: toLinks,
+                    scenePos: sceneAutoArrange(toScenes, 0),
+                  };
+                return c;
+              }),
+            },
+          };
+        }),
 
       cycleSceneLink: (chId, idx) =>
         set((s) => {

@@ -128,7 +128,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Board | Auto-arrange | ✅ | Decaying-jitter grid, floored so it approaches straight but never a rigid lattice. |
 | Board | Add chapter | ✅ | |
 | Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
-| Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange. |
+| Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
+| Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline). |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | 🟡 | Add note/image works; **renaming a ref label** still to do. |
@@ -1568,3 +1569,45 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
 - **No schema/data change** — purely a static outbound link, so `.estoria.json`
   round-trip with Android is untouched. `npm run typecheck` clean; verified in a
   dev server (item appears above About, correct href/target).
+
+### 2026-07-05 (Session 29) — Scene count on cards + move scenes between chapters
+
+- **Chapter-card meta redesign** (`Board.tsx`), visible in both **board (canvas)**
+  and **timeline** views (same card component). The bottom row now reads a clearly
+  labelled, **right-aligned** **"N scenes · N.Nk words"** (scene count added, word
+  count moved down from the top-right); the **character avatars moved to the
+  top-right**; the pinned-notes count was dropped (not useful at board zoom). Scene
+  count uses `ch.scenes.length`, matching the modal header. (Two earlier drafts —
+  a bare `○ N` chip, then a left-aligned row — were replaced after user feedback;
+  final is the right-aligned labelled row stacked under the top-right avatars.)
+- **Chapter-modal header wrap fix** (`ChapterDetail.tsx`). The **"Act" label + its
+  −/number/+ stepper** were two separate items in the wrapping meta row (with a
+  `flex-1` push to the right), so at a narrow width the stepper wrapped to its own
+  line away from the label and looked broken. They're now a single
+  `flex items-center` group and the right-push was removed, so the whole meta row
+  (words · scenes / status / Act) stays **left-aligned and wraps as coherent
+  units** at any width. Verified down to 480px.
+- **Move scenes to another chapter** (`ChapterDetail.tsx` + new
+  `moveScenesToChapter` store action). Flow, settled with the user:
+  1. **"Move scenes"** button in the Scene-flow toolbar (shown only when the book
+     has another chapter and this chapter has scenes) enters a **select mode** —
+     each scene card grows a checkbox; dragging/editing is suspended so a click
+     toggles selection.
+  2. The toolbar reads "Check the scenes to move"; once ≥1 is selected it shows a
+     **"Select chapter ▾"** dropdown listing the other chapters (num · title ·
+     scene count), plus **Cancel**.
+  3. Picking a destination opens a **confirmation modal** with a
+     **Beginning / Middle / End** segmented control (where in the destination's
+     scene list to drop them; End = append is the default) and **Move / Cancel**.
+- **Store action** `moveScenesToChapter(fromChId, toChId, indices, atIdx?, cols?)`:
+  takes an ordered subset out of the source and splices it into the destination at
+  `atIdx` (Beginning = 0, Middle = `floor(dest.length/2)`, End = append).
+  Scene-link semantics are preserved where scenes stay adjacent; any adjacency the
+  move/insert splits is re-joined with a neutral `therefore` (same convention as
+  `reorderScene`). `scenePos` is recomputed for both chapters. No schema change —
+  scenes are still `string[]` + positional `sceneLinks`, so the `.estoria.json`
+  round-trip with Android is untouched.
+- Verified in-browser on the sample: moved scenes 2+3 of ch01 to the **beginning**
+  of ch03 — ch01 dropped 3→1 scenes, ch03 grew 3→5 with the moved pair leading and
+  their internal `therefore` link preserved; card counts updated live
+  ("1 scene" / "5 scenes"). `npm run typecheck` clean.
