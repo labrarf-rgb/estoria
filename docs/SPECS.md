@@ -1611,3 +1611,34 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
   of ch03 — ch01 dropped 3→1 scenes, ch03 grew 3→5 with the moved pair leading and
   their internal `therefore` link preserved; card counts updated live
   ("1 scene" / "5 scenes"). `npm run typecheck` clean.
+
+### 2026-07-11 (Session 30) — Review fixes for the Session 29 move-scenes work
+
+Code review of `df7261e` (findings + instructions in `docs/REVIEW-FINDINGS.md`,
+all five now fixed and the doc marked accordingly):
+
+- **≥1-scene invariant** (`useStore.ts`, `moveScenesToChapter`): moving ALL
+  scenes out no longer leaves a 0-scene chapter — the emptied source keeps one
+  blank `""` placeholder scene (same state a freshly created chapter starts in),
+  so delete-button logic, markdown round-trip, and the Android `.estoria.json`
+  assumptions stay consistent. Move is never blocked.
+- **Scene-card hover regression** (`ChapterDetail.tsx`): the move-mode selection
+  ring set an inline `borderColor` on every card, which overrode
+  `hover:border-faint` in ALL modes. Inline style is now applied only when the
+  card is selected; `border-rule` restored in the className.
+- **Destination layout** (`useStore.ts`): destination `scenePos` is now
+  width-fitted via `sceneColumnsForWidth` + new shared `sceneBoxWidthEstimate()`
+  helper (extracted from `openChapter`, which now uses it too) instead of the
+  ≤3-column count heuristic — matters because `openChapter` skips re-arranging
+  when `scenePos.length` already matches.
+- **Connector pills inert in move mode** (`ChapterDetail.tsx`):
+  `disabled={moveMode}` + `disabled:pointer-events-none`; tooltip suppressed.
+  Still visible for context while selecting.
+- **Hardening**: `subset()` defends short imported `sceneLinks` arrays with
+  `links[a] ?? "therefore"` (matches render-side convention).
+- Verified in-browser on the sample: pill click in move mode is a no-op; moved
+  all 3 scenes of ch01 → end of ch03 (ch01 kept one true-placeholder scene,
+  "1 scenes"; ch03 grew 3→6, moved trio appended with internal but/therefore
+  preserved, re-join `therefore`, 4-column width-fitted grid); unselected cards
+  carry no inline style (hover works). `npm run typecheck` clean; no console
+  errors.

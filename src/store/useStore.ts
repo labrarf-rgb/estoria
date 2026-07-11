@@ -274,6 +274,15 @@ const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
 };
 
 /** Renumber chapters sequentially (1..n) after add/delete. */
+/** Estimated visible scene-canvas width for the chapter modal in the given
+ *  mode — used to lay out chapters whose modal isn't (or isn't yet) open,
+ *  e.g. on open and for a scene-move destination. */
+const sceneBoxWidthEstimate = (expanded: boolean) => {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1500;
+  const modalW = expanded ? Math.min(1500, vw * 0.96) : Math.min(980, vw);
+  return modalW - 44;
+};
+
 const renumber = (chapters: Chapter[]): Chapter[] =>
   chapters.map((c, i) => ({ ...c, num: i + 1 }));
 
@@ -775,7 +784,7 @@ export const useStore = create<StoreState>()(
             const outLinks: ConnType[] = [];
             for (let j = 0; j < sorted.length - 1; j++) {
               const a = sorted[j];
-              outLinks.push(sorted[j + 1] === a + 1 ? links[a] : "therefore");
+              outLinks.push(sorted[j + 1] === a + 1 ? links[a] ?? "therefore" : "therefore");
             }
             return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
           };
@@ -787,6 +796,13 @@ export const useStore = create<StoreState>()(
 
           const remaining = subset(from.scenes, from.sceneLinks, keepIdx);
           const moved = subset(from.scenes, from.sceneLinks, moveIdx);
+
+          // An emptied source keeps one blank placeholder scene — the same
+          // state a freshly created chapter starts in. Chapters never drop
+          // below one scene (delete enforces this too, and the markdown
+          // importer backfills, so 0 scenes wouldn't round-trip).
+          const srcScenes = remaining.scenes.length > 0 ? remaining.scenes : [""];
+          const srcLinks = remaining.scenes.length > 0 ? remaining.sceneLinks : [];
 
           // Insert the moved block into the destination at `p`; anything the
           // insertion splits apart is re-joined with a neutral "therefore".
@@ -811,16 +827,22 @@ export const useStore = create<StoreState>()(
                 if (c.id === fromChId)
                   return {
                     ...c,
-                    scenes: remaining.scenes,
-                    sceneLinks: remaining.sceneLinks,
-                    scenePos: sceneAutoArrange(remaining.scenes, 0, cols),
+                    scenes: srcScenes,
+                    sceneLinks: srcLinks,
+                    scenePos: sceneAutoArrange(srcScenes, 0, cols),
                   };
                 if (c.id === toChId)
                   return {
                     ...c,
                     scenes: toScenes,
                     sceneLinks: toLinks,
-                    scenePos: sceneAutoArrange(toScenes, 0),
+                    // Width-fitted like openChapter, so the destination doesn't
+                    // keep a cramped count-heuristic grid when later opened.
+                    scenePos: sceneAutoArrange(
+                      toScenes,
+                      0,
+                      sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(s.sceneFlowExpanded))
+                    ),
                   };
                 return c;
               }),
@@ -1393,9 +1415,7 @@ export const useStore = create<StoreState>()(
         set((s) => {
           // Estimate the visible scene-canvas width for the current mode so a
           // freshly-laid-out chapter fills it (~5 columns expanded, ~3 collapsed).
-          const vw = typeof window !== "undefined" ? window.innerWidth : 1500;
-          const modalW = s.sceneFlowExpanded ? Math.min(1500, vw * 0.96) : Math.min(980, vw);
-          const boxW = modalW - 44;
+          const boxW = sceneBoxWidthEstimate(s.sceneFlowExpanded);
           return {
             openCh: id,
             sceneArrangeN: 0,

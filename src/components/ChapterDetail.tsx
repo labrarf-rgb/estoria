@@ -731,15 +731,16 @@ export function ChapterDetail() {
                 return (
                   <button
                     key={i}
+                    disabled={moveMode} // Visible for context while selecting, but inert.
                     onClick={() => cycleSceneLink(ch.id, i)}
-                    className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide"
+                    className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide disabled:pointer-events-none"
                     style={{
                       left: (a.x + b.x) / 2,
                       top: (a.y + b.y) / 2,
                       color: CONN[type].color,
                       borderColor: CONN[type].color,
                     }}
-                    title="Click to cycle Therefore / But / And"
+                    title={moveMode ? undefined : "Click to cycle Therefore / But / And"}
                   >
                     {CONN[type].label}
                   </button>
@@ -790,13 +791,18 @@ export function ChapterDetail() {
                     </>
                   )}
                   <div
-                    className="flex h-full flex-col gap-[7px] rounded-[11px] border bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
-                    style={{
-                      borderColor: isSelected ? "var(--therefore)" : "var(--rule)",
-                      boxShadow: isSelected
-                        ? "0 0 0 2px color-mix(in srgb, var(--therefore) 45%, transparent), var(--shadow)"
-                        : "var(--shadow)",
-                    }}
+                    className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
+                    style={
+                      // Inline only when selected — a permanent inline borderColor
+                      // would override the hover:border-faint highlight.
+                      isSelected
+                        ? {
+                            borderColor: "var(--therefore)",
+                            boxShadow:
+                              "0 0 0 2px color-mix(in srgb, var(--therefore) 45%, transparent), var(--shadow)",
+                          }
+                        : undefined
+                    }
                   >
                     <div className="flex items-center gap-[6px]">
                       {moveMode && (
