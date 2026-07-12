@@ -1,19 +1,25 @@
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
-import { TEMPLATES } from "@/lib/templates";
+import { TEMPLATES, TEMPLATE_GROUPS } from "@/lib/templates";
 
 export function TemplatesModal() {
   const show = useStore((s) => s.showTemplates);
   const setPanel = useStore((s) => s.setPanel);
   const applyTemplate = useStore((s) => s.applyTemplate);
+  // Which facet is active in the filter bar; "All" shows every template.
+  const [filter, setFilter] = useState<string>("All");
   if (!show) return null;
   const close = () => setPanel("showTemplates", false);
+
+  const filters = ["All", ...TEMPLATE_GROUPS];
+  const shown = filter === "All" ? TEMPLATES : TEMPLATES.filter((t) => t.groups.includes(filter));
 
   return (
     <Scrim onClose={close} z={60} center>
       <div
         onMouseDown={stop}
-        className="flex max-h-[88vh] w-[min(880px,100%)] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+        className="flex max-h-[88vh] w-[min(980px,100%)] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
       >
         <div className="flex items-start gap-3 border-b border-rule px-[24px] py-5">
           <div className="flex-1">
@@ -25,8 +31,30 @@ export function TemplatesModal() {
           </div>
           <CloseButton onClick={close} />
         </div>
-        <div className="grid grid-cols-2 gap-[14px] overflow-auto px-[24px] py-5">
-          {TEMPLATES.map((t) => (
+        {/* Facet filter bar. A plain flex-wrap row: sits on one line when the
+            modal is wide, wraps on its own when it narrows. */}
+        <div className="flex flex-wrap items-center gap-[7px] border-b border-rule px-[24px] py-[13px]">
+          {filters.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full border px-[13px] py-[6px] text-[12.5px] font-medium ${
+                filter === f
+                  ? "border-ink bg-ink text-bg"
+                  : "border-rule text-soft hover:border-faint hover:text-ink"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          <span className="ml-auto font-mono text-[11px] font-medium text-faint">
+            {shown.length} {shown.length === 1 ? "template" : "templates"}
+          </span>
+        </div>
+        {/* Responsive grid: auto-fill sizes columns to the modal width — 3 wide,
+            2 at ~half screen, 1 on a phone — without any breakpoints. */}
+        <div className="grid gap-[14px] overflow-auto px-[24px] py-5 [grid-template-columns:repeat(auto-fill,minmax(235px,1fr))]">
+          {shown.map((t) => (
             <div
               key={t.id}
               className="flex flex-col gap-[9px] rounded-[13px] border border-rule bg-card p-[16px]"

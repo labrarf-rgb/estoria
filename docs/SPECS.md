@@ -138,7 +138,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 6 structures. |
+| Templates | Insert / replace skeletons | ✅ | 16 structures + blank starter (17 template cards), incl. 4 biography/autobiography life-story arcs with per-chapter prompts; facet filter bar. |
 | Import | AI prompt + file scan | 🟡 | Prompt copy + summary work; **parsing markdown into the doc** not yet implemented. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
@@ -1642,3 +1642,88 @@ all five now fixed and the doc marked accordingly):
   preserved, re-join `therefore`, 4-column width-fitted grid); unselected cards
   carry no inline style (hover works). `npm run typecheck` clean; no console
   errors.
+
+### 2026-07-11 (Session 31) — Life-story templates; add-character scroll-to-view
+
+Two user requests (source doc: "Biography and Autobiography Story Mapping
+Templates" Google Doc):
+
+- **4 biography/autobiography templates** (`lib/templates.ts`), bringing the
+  library to **16 story structures + the blank starter (17 template cards)**:
+  **The Transformation Memoir** (16 ch, Autobiography), **The
+  Innovator's Quest** (15 ch, Biography), **The Rags-to-Riches Trajectory** (15 ch,
+  Biography), **The Adversary Narrative** (16 ch, Memoir). The source doc gives a
+  writing-prompt sentence per chapter, so the `beats` tuple was widened to
+  `[title, act, summary?]` (new exported `TemplateBeat` type) and `applyTemplate`
+  now seeds each chapter's one-line **summary** from that third element
+  (`summary ?? ""` — existing templates, which omit it, are unchanged). The doc's
+  arcs have no named acts, so each was hand-assigned a multi-act curve (memoir
+  3/7/6 over three acts; Rags-to-Riches a 4-act rise/peak/fall/redemption; etc.).
+- **Characters panel scrolls the new card into view** (`CharactersPanel.tsx`):
+  `addCharacter()` already opened the panel + selected the new (last-in-list)
+  character, but on a long roster its card sat below the fold. Added an effect
+  keyed on `[show, sel]` that calls `scrollIntoView` on the selected card. Uses
+  **`block: "nearest"`** plus **`scroll-mt-[76px]`** on the card: the new card is
+  off-screen and taller than the panel, so `nearest` aligns its top edge just
+  under the sticky "Characters" bar (the `scroll-mt` clears it) — while a card
+  that's already fully visible (manually expanded mid-panel, or shown on reopen)
+  is left untouched, instead of being yanked to the top as `start`/`center`
+  would. NB: `behavior: "smooth"` was a silent no-op inside that nested overflow
+  container in the preview renderer, so the default (instant) scroll is used.
+- Verified in-browser on the sample: inserting The Transformation Memoir created
+  16 chapters with the right acts/titles and each summary prompt showing as the
+  card subtitle; all four templates render in the modal with tags/blurbs/beat
+  counts. On a padded roster (scrolled to top), creating a character scrolled the
+  panel so the new card's top landed at 76px — just below the sticky header
+  (bottom 71px) — with avatar, name/role summary, and Name/Initials inputs all
+  visible. `npm run typecheck` clean.
+
+### 2026-07-11 (Session 31 review) — Code review of the Session 31 work
+
+Review-only pass over the uncommitted Session 31 changes (findings +
+instructions for Opus in `docs/REVIEW-FINDINGS.md`, "Session 31 work" section;
+all items open):
+
+1. **Scroll effect fires on every card expand/reopen, not just add-character**
+   (`CharactersPanel.tsx`) — fix is `block: "start"` → `block: "nearest"`.
+2. **"17 structures" in this doc counts the blank starter** — reword to
+   16 structures + blank starter.
+3. *(Optional, ask user)* group the 17-card Templates modal into "Story
+   structures" / "Life story & memoir" sections.
+4. **AI import prompt caps drafts at 3 acts** (`markdown.ts:153`) while two new
+   templates are 4-act and the parser already accepts Act 4 — one-line reword.
+
+Everything else checked out: `TemplateBeat` widening is backward-compatible,
+act 4 is safe end-to-end (store unclamped, `roman()`, Board bands,
+`parseActNumber`), the four templates' act splits match this log, hooks order
+in `CharactersPanel` is valid, typecheck clean.
+
+### 2026-07-11 (Session 32) — Templates facet filter + responsive grid; Session 31 review closed
+
+Implemented the Session 31 review (`docs/REVIEW-FINDINGS.md`, "Session 31 work"),
+all four items now resolved. Items 1 (scroll `block: "nearest"`), 2 (doc "16
+structures + blank starter" wording), and 4 (import-prompt act cap reworded) were
+already in the working tree from Session 31; this session added item 3.
+
+- **Templates modal facet filter** (`lib/templates.ts` + `modals/TemplatesModal.tsx`).
+  The review suggested a two-section split (fiction vs life-story); discussing it,
+  the user rejected forcing each template into ONE bucket — several legitimately
+  span two (Vogler's Hero's Journey = *Myth & journey* + *Screenwriting*; Harmon's
+  Story Circle = *Foundational* + *Screenwriting* + *Myth & journey*; Propp =
+  *Myth & journey* + *World traditions*). So:
+  - `StoryTemplate` gained **`groups: string[]`**, merged on via a co-located
+    `GROUP_MEMBERSHIP` map (`RAW_TEMPLATES.map(t => ({...t, groups: …}))`), plus a
+    new exported ordered `TEMPLATE_GROUPS` (Foundational, Screenwriting, Myth &
+    journey, World traditions, Genre, Life story).
+  - The modal renders a **filter pill bar** — `All` (default) + the six facets,
+    with a live "N templates" count. A template appears under every facet it
+    carries; selecting a facet filters the grid.
+  - Facets are a **`flex flex-wrap` row**: one line when the modal is wide, wraps
+    on its own when narrow — no breakpoints.
+  - The card grid is now **responsive** via
+    `grid-template-columns: repeat(auto-fill, minmax(235px, 1fr))` — 3 columns at
+    full width, 2 at about half-screen, 1 on a phone. Modal widened `880px → 980px`
+    so three columns have room. Insert/Replace behavior unchanged.
+  - Facet memberships (Story Grid → Screenwriting; Propp double-tagged) are easy
+    to retune in the one `GROUP_MEMBERSHIP` map.
+- `npm run typecheck` clean. Built and deployed to the portfolio site.

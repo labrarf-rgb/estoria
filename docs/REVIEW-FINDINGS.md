@@ -149,3 +149,132 @@ and imported docs are the source of such gaps — but this line would write the
   put. Inherent to the data model — do not try to reapportion words.
 - **Avatar stack has no cap / "+N" overflow** on board cards. Pre-existing
   before `df7261e`; fine to leave unless the user raises it.
+
+---
+
+# Code review — Session 31 work (life-story templates + add-character scroll)
+
+Reviewed 2026-07-11 against the uncommitted working tree (Session 31, on top of
+`d4faa44`). **Status: all four items resolved (Sessions 31–32) — see the SPECS
+session log. Kept for the record.**
+
+The core of both features is sound: the `TemplateBeat` widening is
+backward-compatible (existing templates omit the third element; `applyTemplate`
+falls back with `summary ?? ""`); act 4 is safe end-to-end (the store never
+clamps acts upward, `roman()` renders any positive act, Board act-bands group
+dynamically, `parseActNumber` in `markdown.ts` reads digits and roman i–v, and
+Panchasandhi already shipped an act-4 beat); the four templates' act splits
+match the SPECS log (3/7/6, 4/5/6, 5/3/2/5, 3/3/4/6 — recounted, correct); and
+the hooks-before-early-return ordering in `CharactersPanel` is correct.
+`npm run typecheck` is clean on the current tree.
+
+Items ordered by priority: **1 is a real behavior defect; 2 is a doc-accuracy
+fix; 3–4 are small polish (4 is one line; 3 needs the user's OK).**
+
+Ground rules (same as the Session-29 review):
+
+- **No schema change.** The `.estoria.json` round-trip with Android must be
+  untouched.
+- Run `npm run typecheck` after the changes and verify in a dev server per the
+  steps under each item.
+- Log the session in `docs/SPECS.md` per the usual convention and mark items
+  ✅ here when fixed.
+
+## 1. ✅ Scroll effect hijacks EVERY card expand, not just add-character (FIXED)
+
+**Where:** `src/components/panels/CharactersPanel.tsx:22–28` (the new
+`useEffect` keyed on `[show, sel]`).
+
+**Problem:** The requested behavior was "scroll the NEW card into view after
++ Add character." But `selectChar` toggles `selChar` on every card-header click
+(`useStore.ts:1453`), and the effect fires on ANY `sel` change — so manually
+expanding any card, even one already fully visible mid-panel, yanks it to the
+top of the scroll area (`block: "start"` pins its top at 76px). Related:
+`selChar` is NOT cleared when the panel closes (`close()` only flips
+`showChars`), so merely REOPENING the panel later also fires the effect
+(`show` edge) and scroll-jumps to whatever card was last expanded, possibly
+from minutes ago.
+
+**Fix (chosen approach):** change `block: "start"` to `block: "nearest"` in the
+`scrollIntoView` call. Keep `scroll-mt-[76px]` on the card and keep the effect
+deps as `[show, sel]`. Why this is sufficient (per the CSSOM scroll spec):
+
+- Card already fully visible → **no scroll at all**. Fixes both the mid-panel
+  expand jump and the reopen jump for on-screen cards.
+- Card out of view below and taller than the panel (exactly the add-character
+  case — the new card is selected, therefore expanded) → aligns its **top**
+  edge, honoring scroll-margin. Identical end state to today's verified
+  behavior (card top at 76px, just under the sticky header).
+
+Do NOT add prev-sel refs / "was this an add?" bookkeeping — `nearest` covers
+every case with one word. Also update the Session 31 bullet in `docs/SPECS.md`
+(`block: "start"` → `block: "nearest"`, and note the why) so the log stays
+truthful.
+
+**Verify:** (a) padded roster scrolled to top, + Add character → new card's top
+lands at ~76px exactly as before. (b) Scroll so a collapsed card is fully
+visible mid-panel, click its header — the panel must NOT move if the expanded
+card still fits, and must scroll its top to ~76px if it doesn't. (c) Expand a
+card, close the panel, reopen it — no jump when that card is already in view.
+
+## 2. ✅ SPECS says "17 structures" — one of the 17 is the blank starter (FIXED)
+
+**Where:** `docs/SPECS.md` status table (Templates row) and the Session 31 log
+entry ("bringing the library to **17**").
+
+**Problem:** `TEMPLATES` has 17 entries, but `id: "blank"` ("Single Blank
+Chapter", 1 beat, tag "Minimal") is a starter, not a story structure. "17
+structures" overstates by one.
+
+**Fix (doc-only):** reword the table cell to "16 structures + blank starter
+(17 template cards), incl. 4 biography/autobiography life-story arcs with
+per-chapter prompts", and adjust the Session 31 log line the same way.
+
+## 3. ✅ Templates modal is 17 flat cards; the life-story arcs are buried at the bottom (FIXED — facet filter)
+
+**Where:** `src/components/modals/TemplatesModal.tsx` (single `TEMPLATES.map`
+into one 2-col grid).
+
+**Problem:** The modal was a long undifferentiated scroll; a memoirist had to
+scroll past the fiction structures to find the four new templates.
+
+**Resolution (with the user):** the user rejected forcing each template into a
+single bucket — several genuinely belong to two (Vogler's Hero's Journey is
+*Myth & journey* AND *Screenwriting*; Harmon's Story Circle is *Foundational* +
+*Screenwriting* + *Myth & journey*; Propp is *Myth & journey* + *World
+traditions*). So instead of the two-section split, `StoryTemplate` gained a
+**`groups: string[]`** field (merged on via a co-located `GROUP_MEMBERSHIP` map
+in `templates.ts`; new exported ordered `TEMPLATE_GROUPS`), and the modal renders
+a **facet filter bar** — `All` (default) + six facets (Foundational,
+Screenwriting, Myth & journey, World traditions, Genre, Life story). A template
+shows under every facet it carries; the bar is a `flex flex-wrap` row (one line
+when wide, wraps when narrow) with a live count. The card grid was also made
+responsive (`grid-template-columns: repeat(auto-fill, minmax(235px, 1fr))` →
+3 cols wide / 2 half-screen / 1 phone) and the modal widened `880px → 980px`. No
+change to Insert/Replace. Logged in SPECS Session 32.
+
+## 4. ✅ AI import prompt still tells the model to use at most three acts (FIXED)
+
+**Where:** `src/lib/markdown.ts:153` (the RULES line of the AI import prompt).
+
+**Problem:** "Group chapters under ## Act 1 / ## Act 2 / ## Act 3 (use only as
+many acts as the draft supports)" was written when everything was ≤3 acts. Two
+of the new shipped templates are 4-act, and the importer already parses
+`## Act 4` fine (`parseActNumber`, digits + roman i–v) — only the prompt
+wording caps the AI at three.
+
+**Fix (one line):** reword to "Group chapters under ## Act 1 / ## Act 2 / …
+headings (use as many acts as the draft supports)."
+
+**Verify:** typecheck; open the Import modal and eyeball the copied prompt text.
+
+## Noted, no action needed
+
+- **Duplicate beat title "The Blind Spot"** appears in both The Innovator's
+  Quest and The Rags-to-Riches Trajectory. Faithful to the source doc; chapter
+  ids are `uid()`s so there is no collision. Leave as is.
+- **`scroll-mt-[76px]` hardcodes the sticky-header clearance.** Acceptable and
+  documented in the Session 31 log; if the header ever changes height, update
+  the value — do not build a measuring ref for this.
+- **Long prompt summaries as card subtitles** were verified clamped in-browser
+  in Session 31; no overflow work needed.

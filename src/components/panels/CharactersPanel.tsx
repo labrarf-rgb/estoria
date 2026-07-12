@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import type { Character } from "@/types";
@@ -12,6 +13,22 @@ export function CharactersPanel() {
   const updateCharacter = useStore((s) => s.updateCharacter);
   const deleteCharacter = useStore((s) => s.deleteCharacter);
   const askConfirm = useStore((s) => s.askConfirm);
+
+  // Scroll the selected character's card into view whenever the selection
+  // changes — e.g. after "+ Create new character" from the chapter modal, which
+  // opens this panel and selects the (last-in-list) new character; without this
+  // its input fields sit below the fold on a long roster.
+  const selCardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // `nearest` so we only scroll when the selected card isn't already fully in
+    // view: after "+ Add character" the new (expanded, taller-than-panel) card
+    // is off-screen, so its top edge aligns just under the sticky header
+    // (`scroll-mt` clears the bar). But manually expanding an already-visible
+    // card — or reopening the panel onto one — leaves the scroll untouched,
+    // instead of yanking every selection to the top as `start` would.
+    if (show && sel) selCardRef.current?.scrollIntoView({ block: "nearest" });
+  }, [show, sel]);
+
   if (!show) return null;
   const close = () => setPanel("showChars", false);
 
@@ -35,7 +52,11 @@ export function CharactersPanel() {
             const open = sel === p.id;
             const set = (patch: Partial<Character>) => updateCharacter(p.id, patch);
             return (
-              <div key={p.id} className="rounded-[13px] border border-rule bg-card p-[14px]">
+              <div
+                key={p.id}
+                ref={open ? selCardRef : undefined}
+                className="scroll-mt-[76px] rounded-[13px] border border-rule bg-card p-[14px]"
+              >
                 <div className="flex items-center gap-[11px]">
                   <span
                     className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"

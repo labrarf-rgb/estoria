@@ -963,7 +963,7 @@ export const useStore = create<StoreState>()(
           const m = 46;
           const base = mode === "replace" ? [] : s.doc.chapters.slice();
           const startNum = base.length;
-          const made: Chapter[] = tpl.beats.map(([title, act], i) => {
+          const made: Chapter[] = tpl.beats.map(([title, act, summary], i) => {
             const idx = startNum + i;
             const col = idx % cols;
             const row = Math.floor(idx / cols);
@@ -973,7 +973,7 @@ export const useStore = create<StoreState>()(
               act,
               status: "idea",
               title,
-              summary: "",
+              summary: summary ?? "",
               words: 0,
               x: m + col * (CARD_W + gapX),
               y: m + row * (142 + gapY),

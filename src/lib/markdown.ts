@@ -150,7 +150,7 @@ export function importPrompt(): string {
     "3. <scene>",
     "Characters: <names in this chapter>",
     "",
-    "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition. Group chapters under ## Act 1 / ## Act 2 / ## Act 3 (use only as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
+    "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
     "",
     "--- MY MATERIAL BELOW (or attached as a file) ---",
     "<paste your draft / outline / notes here, or attach the file instead>",
