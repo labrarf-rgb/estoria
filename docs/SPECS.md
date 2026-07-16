@@ -138,7 +138,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 16 structures + blank starter (17 template cards), incl. 4 biography/autobiography life-story arcs with per-chapter prompts; facet filter bar. |
+| Templates | Insert / replace skeletons | ✅ | 26 structures + blank starter (27 template cards), incl. 9 life-story arcs and 7 genre beat sheets with per-chapter prompts; facet filter bar. |
 | Import | AI prompt + file scan | 🟡 | Prompt copy + summary work; **parsing markdown into the doc** not yet implemented. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
@@ -1727,3 +1727,24 @@ already in the working tree from Session 31; this session added item 3.
   - Facet memberships (Story Grid → Screenwriting; Propp double-tagged) are easy
     to retune in the one `GROUP_MEMBERSHIP` map.
 - `npm run typecheck` clean. Built and deployed to the portfolio site.
+
+### 2026-07-15 (Session 33) — 10 new templates: 5 life-story + 5 genre
+
+Added ten new skeletons to `lib/templates.ts`, taking the library from 17 to
+**27 template cards (26 structures + blank starter)**. Titles and per-chapter
+prompts are verbatim from two mapping guides ("Biography and Autobiography Story
+Mapping Templates V2" and "Fiction Genre Story Mapping Templates"); act groupings
+were assigned here along each template's narrative curve.
+
+- **5 life-story arcs** (Life story facet now 9): The Coming-of-Age Arc (15),
+  The Relocation & Fresh Start (15), The Nest Builders (15), The Creative Arc (15),
+  The Lifeline (16, 4-act full-life chronology).
+- **5 genre beat sheets** (Genre facet now 7, alongside Romance + Mystery):
+  Thriller / Suspense (15), High Fantasy / Sci-Fi Worldbuilder (16),
+  The Heist / Caper (15), Horror / Survival (15), Adventure / The Quest (15).
+- Pure data: each entry uses the existing `[title, act, summary]` `TemplateBeat`
+  shape and is registered in `GROUP_MEMBERSHIP`; no component or store changes.
+- Verified in-browser: Genre filter shows all 7 and Life story all 9 with correct
+  tags/blurbs/beat counts; a live Replace with Thriller built its 15 chapters in
+  order onto the board with each prompt as the card subtitle. `npm run typecheck`
+  clean. Built and deployed to GitHub Pages + the portfolio site.
