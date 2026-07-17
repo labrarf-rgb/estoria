@@ -138,7 +138,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 26 structures + blank starter (27 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 7 genre beat sheets; facet filter bar. |
+| Templates | Insert / replace skeletons | ✅ | 29 structures + blank starter (30 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 10 genre beat sheets; facet filter bar. |
 | Import | AI prompt + file scan | 🟡 | Prompt copy + summary work; **parsing markdown into the doc** not yet implemented. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
@@ -1780,4 +1780,60 @@ the length of the newer ones. This session closes that gap.
 - Verified in-browser: a live Replace with Three-Act built all 8 chapters in order
   with each prompt as the card subtitle, correctly sorted into acts; no console
   errors. `npm run typecheck` clean. Built and deployed to GitHub Pages + the
+  portfolio site.
+
+### 2026-07-17 (Session 35) — 3 speculative-fiction templates; facets cut from 6 to 3
+
+Added the three skeletons from the "Speculative Fiction Story Mapping Templates"
+guide, taking the library to **30 template cards (29 structures + blank starter)**.
+Fitting them into the Genre facet exposed a deeper problem in the taxonomy, and
+most of the session went there.
+
+- **3 speculative-fiction beat sheets** (Genre facet now 10): Dystopian /
+  Societal Rebellion (15), First Contact / The Cosmic Enigma (15), The Temporal
+  Paradox / Time Loop (15). Titles and per-chapter prompts verbatim from the
+  guide. That guide is explicitly written "without named phases or acts", but
+  `TemplateBeat` requires an act, so each 15-chapter curve was split 4/6/5 here
+  to match Thriller / Horror / Adventure, with the breaks on natural turns.
+- **Genre facet reordered**: High Fantasy → Adventure → the 3 new → Mystery →
+  Thriller → Heist → Horror → Romance.
+- **Facets cut from six to three** — `Structure` (11), `Genre` (10), `Life story`
+  (9). Foundational, Screenwriting, Myth & journey and World traditions all fold
+  into Structure. The old set spent four tabs on 11 abstract cards while 19
+  premise-carrying cards shared two, so the nav was high-resolution exactly where
+  the library was thin. "World traditions" was also a residual category — a 3-beat
+  tempo, a 4-act shape, a 5-juncture dramaturgy and a 14-function folktale
+  sequence share nothing except "not the Anglo-American canon", which is why it
+  never named well ("Western Structure" was considered and rejected: too long for
+  the Android chip row, and false — Campbell is comparative mythology and Propp is
+  Russian). The three that remain split the library by how much a template commits
+  to: shape, invented premise, true premise.
+- **This reverses the Session 32 decision** recorded in REVIEW-FINDINGS §3, where
+  single-bucket facets were rejected because Vogler, Story Circle and Propp
+  genuinely span several. Still true — but the multi-membership is what forced four
+  near-duplicate tabs over the same 11 cards. Collapsing them makes the spanning
+  moot: all three now sit in Structure together. The facets **partition the library
+  exactly** for the first time; every card sits in one.
+- `groups` stays `string[]` rather than becoming `group: string`, so the modal's
+  `includes()` filter is untouched and a cross-cutting facet stays possible later.
+- **RAW_TEMPLATES reordered to match**, so the default All list reads Structure →
+  Genre → Life story in three contiguous runs. Propp, Panchasandhi and Jo-ha-kyu
+  moved up behind Kishotenketsu. Blank is card 1 and Vogler card 4; under the old
+  array order Vogler would have landed at 24, below 19 genre/life-story cards.
+- **Considered and deferred**: starring templates into a Favorites tab. Plumbing is
+  cheap — `favoriteTemplates: string[]` beside `refView` in `partialize` is
+  cross-project for free (though `migrate` hand-carries only `theme` on a schema
+  bump, so it would need adding there or stars vanish silently). Parked because the
+  modal is a project-start surface visited about once a book, so the star never gets
+  set. The real need underneath is a *session shortlist* for comparing 2–3 cards
+  before committing, which wants no persistence at all. Also open: `group: string`
+  to make the partition a type invariant; splitting Genre into speculative /
+  crime-and-peril if the speculative side keeps growing (4 of 10 now); and the
+  still-generic `"Genre"` tag on Romance/Mystery, now conspicuous beside eight
+  specifically-tagged siblings.
+- Verified in-browser: chips read All · Structure · Genre · Life story with live
+  counts 30 / 11 / 10 / 9; a live Insert with Dystopian built its 15 chapters in
+  order with each prompt as the card subtitle; no console errors. `npm run
+  typecheck` clean. All 27 pre-existing cards diffed byte-identical against the
+  previous HEAD after the block moves. Built and deployed to GitHub Pages + the
   portfolio site.

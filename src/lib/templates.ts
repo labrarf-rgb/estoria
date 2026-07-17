@@ -7,7 +7,8 @@
  * Sources: the in-house "Narrative Frameworks and Story Structure Research"
  * compendium (Snyder, Campbell, Vogler, Harmon, Coyne, Kishotenketsu, Propp,
  * Natyasastra, Jo-ha-kyu); life-story templates from the "Biography and
- * Autobiography Story Mapping Templates" guide.
+ * Autobiography Story Mapping Templates" guide; speculative-fiction templates
+ * from the "Speculative Fiction Story Mapping Templates" guide.
  */
 export type TemplateBeat = [title: string, act: number, summary?: string];
 
@@ -16,22 +17,19 @@ export interface StoryTemplate {
   name: string;
   tag: string;
   blurb: string;
-  /** Filter facets in the Templates modal. A template can belong to several
-   *  (e.g. Vogler's Hero's Journey is both "Myth & journey" and "Screenwriting"). */
+  /** Filter facets in the Templates modal. The facets currently partition the
+   *  library exactly — every template sits in one — but the array shape allows
+   *  a cross-cutting facet later without touching the filter logic. */
   groups: string[];
   beats: TemplateBeat[];
 }
 
 /** Facets shown in the Templates modal filter bar, in display order. "All" is
- *  added by the modal itself. */
-export const TEMPLATE_GROUPS = [
-  "Foundational",
-  "Screenwriting",
-  "Myth & journey",
-  "World traditions",
-  "Genre",
-  "Life story",
-] as const;
+ *  added by the modal itself. The three facets split the library by how much a
+ *  template commits to: "Structure" is genre-agnostic shape, "Genre" and "Life
+ *  story" carry a premise (invented and true respectively). RAW_TEMPLATES below
+ *  is ordered to match, so the default "All" list reads in this same order. */
+export const TEMPLATE_GROUPS = ["Structure", "Genre", "Life story"] as const;
 
 const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
   {
@@ -171,19 +169,170 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
     ],
   },
   {
-    id: "romance",
-    name: "Romance Beat Sheet",
-    tag: "Genre",
-    blurb: "Meet, spark, rupture, grand gesture, HEA.",
+    id: "propp",
+    name: "Propp's Morphology",
+    tag: "Folktale",
+    blurb: "Propp's recurring folktale functions, in their fixed order.",
     beats: [
-      ["Meet Cute", 1, "The two leads collide for the first time in a way that sparks friction, charm, or both."],
-      ["No Way / Adhesion", 1, "Establish why they cannot be together, and the circumstance that forces them into proximity anyway."],
-      ["Falling in Love", 2, "The leads lower their guard through shared time, small intimacies, and growing attraction."],
-      ["Midpoint of Love", 2, "A high point of connection that raises what both of them now stand to lose."],
-      ["The Rupture", 2, "The secret, the lie, or the outside force that pulls the leads apart."],
-      ["Dark Moment", 2, "Both leads sit alone with the loss, believing the relationship is finished for good."],
-      ["Grovel / Grand Gesture", 3, "One lead risks pride or safety to prove the change is real and win the other back."],
-      ["Happily Ever After", 3, "Close on the two together, showing the life the relationship has made possible."],
+      ["Absentation", 1, "A member of the family leaves home, or a death opens the absence the tale needs."],
+      ["Interdiction", 1, "The hero is warned against an action: do not go there, do not open that."],
+      ["Violation", 1, "The interdiction is broken, and the villain enters the story."],
+      ["Villainy or Lack", 1, "The villain causes harm, or the family discovers something vital is missing."],
+      ["Mediation (call to action)", 1, "The misfortune becomes known, and the hero is dispatched or volunteers to set it right."],
+      ["Departure", 2, "The hero leaves home and the tale proper begins."],
+      ["The Donor's Test", 2, "The hero meets a figure who tests, interrogates, or attacks them."],
+      ["Hero's Reaction", 2, "How the hero responds to the donor decides whether they earn what comes next."],
+      ["Receipt of a Magical Agent", 2, "The hero acquires the object, helper, or knowledge that makes victory possible."],
+      ["Struggle with the Villain", 2, "Hero and villain meet in direct combat, contest, or a game of wits."],
+      ["Victory", 3, "The villain is defeated, banished, or killed."],
+      ["Liquidation of the Lack", 3, "The original misfortune is undone and what was missing is restored."],
+      ["Return", 3, "The hero sets off for home, sometimes pursued."],
+      ["Reward", 3, "The hero is married, crowned, or otherwise rewarded, and the tale closes."],
+    ],
+  },
+  {
+    id: "panchasandhi",
+    name: "Sanskrit Panchasandhi",
+    tag: "Natyasastra",
+    blurb: "The five junctures of classical Indian drama, from seed to fruition.",
+    beats: [
+      ["Mukha (Opening / seed)", 1, "Plant the seed of the story: the germ of the goal and the first hint of the dramatic question."],
+      ["Pratimukha (Progression)", 1, "The seed sprouts. The goal becomes visible but keeps slipping in and out of reach."],
+      ["Garbha (Development)", 2, "The goal is pursued in earnest, with the outcome hidden and repeatedly in doubt."],
+      ["Vimarsha (Pause / crisis)", 2, "A pause of doubt, temptation, or setback where the goal appears lost."],
+      ["Nirvahana (Conclusion)", 3, "The threads gather and the seed bears fruit, delivering the goal and the resolution together."],
+    ],
+  },
+  {
+    id: "jo-ha-kyu",
+    name: "Jo-ha-kyu",
+    tag: "Pacing",
+    blurb: "Japanese tempo: slow beginning, accelerating break, rapid climax.",
+    beats: [
+      ["Jo (slow beginning)", 1, "Open slowly and deliberately, establishing the world and its rhythm at an unhurried pace."],
+      ["Ha (the break, accelerating)", 2, "Break the established pattern and accelerate, building momentum and disruption."],
+      ["Kyu (rapid climax)", 3, "Rush to a swift climax and end abruptly, faster than the reader expects."],
+    ],
+  },
+  {
+    id: "fantasy-scifi",
+    name: "High Fantasy / Sci-Fi Worldbuilder",
+    tag: "Epic",
+    blurb:
+      "Designed for epic journeys where the lore, the geography, and the societal or magical rules are central to the plot.",
+    beats: [
+      ["The Edge of the Map", 1, "Establish the protagonist's familiar, limited home world and their longing for something larger."],
+      ["The Call of the Unknown", 1, "A mysterious artifact, a message, or an external crisis reveals a massive secret about the wider world."],
+      ["Crossing the Threshold", 1, "Leaving the familiar territory behind, experiencing the immediate visual and physical shift of the new environment."],
+      ["The Laws of the Land", 2, "A chapter dedicated to encountering the magic, technology, or societal laws that govern this new world."],
+      ["The Guide", 2, "Meeting a seasoned traveler, mentor, or local who helps the protagonist navigate the immediate dangers."],
+      ["The Caravan", 2, "Assembling a small, diverse group of allies, each with distinct skills and cultural backgrounds."],
+      ["The First Border Crossing", 2, "Reaching a physical barrier (e.g., a mountain pass, an asteroid belt, a guarded wall) and finding a way through."],
+      ["The Distant Capital", 2, "Arriving at a major hub of power, exposing the complex political conflict or systemic corruption of the world."],
+      ["The Forbidden Knowledge", 2, "Discovering an ancient history, a lost text, or a hidden truth that changes how the protagonist views the entire conflict."],
+      ["The Fracture", 2, "A betrayal or severe ideological disagreement splits the group, leaving the protagonist isolated."],
+      ["The Wilderness Trial", 2, "Surviving the most hostile, raw environment on the map without traditional resources."],
+      ["Reclaiming the Bond", 2, "Reuniting the group or finding new allies, built on a deeper, more honest shared purpose."],
+      ["The Siege", 3, "The antagonist's forces launch a massive, coordinated attack on a stronghold, putting the world's future at risk."],
+      ["The Heart of the Conflict", 3, "Entering the deepest, most dangerous part of the antagonist's domain to stop the threat at its source."],
+      ["The Great Shift", 3, "Dismantling the old system or defeating the threat, causing a permanent change in the balance of the world."],
+      ["The Journey Home", 3, "Returning to the starting point, realizing that while home is the same, the protagonist has changed entirely."],
+    ],
+  },
+  {
+    id: "adventure",
+    name: "Adventure / The Quest",
+    tag: "Adventure",
+    blurb:
+      "A classic journey narrative where the plot relies on physical travel, collecting keys or clues, and overcoming distinct environmental hazards.",
+    beats: [
+      ["The Map in the Attic", 1, "The protagonist discovers an old map, a journal, or an ancient coordinate pointing to a legendary prize."],
+      ["Securing the Funding", 1, "Finding a patron, buying supplies, or hiring a guide to make the expedition possible."],
+      ["The Rival Expedition", 1, "Introduce a competing group with better funding and ruthless methods who are also chasing the prize."],
+      ["The Gate", 1, "Arriving at the entrance of the uncharted territory (e.g., a jungle wall, a deep sea trench, a hidden valley)."],
+      ["Nature's Hazard", 2, "Facing a major, non-human threat (e.g., a storm, a rockslide, wild animals) that tests the team's endurance."],
+      ["The First Key", 2, "Finding the first artifact or solving the first environmental riddle needed to unlock the final location."],
+      ["The Campfire", 2, "A quiet chapter of rest, where the characters share their true motivations for joining the dangerous journey."],
+      ["The Rival Skirmish", 2, "A direct clash with the competing expedition, resulting in lost supplies or captured allies."],
+      ["The Lost Landmark", 2, "Locating a legendary waypoint or ruin that confirms the map was real all along."],
+      ["The Trial of Character", 2, "A hazard where a character must choose between saving an ally or chasing the prize, testing their morality."],
+      ["The Gateway", 3, "Arriving at the entrance of the temple, tomb, or wreck where the prize is sealed."],
+      ["The Ancient Trap", 3, "Bypassing a series of mechanical or environmental puzzles designed to keep intruders out."],
+      ["The Treasure Chamber", 3, "Finding the physical prize, immediately followed by the arrival of the rival expedition demanding it."],
+      ["The Collapse", 3, "Triggering a self-destruct mechanism or structural collapse, forcing a chaotic, high-stakes escape as the ruins fall around them."],
+      ["The True Worth", 3, "Escaping with your lives (and maybe a fraction of the gold), realizing the journey and the bonds built were the real reward."],
+    ],
+  },
+  {
+    id: "dystopian",
+    name: "Dystopian / Societal Rebellion",
+    tag: "Dystopian",
+    blurb:
+      "A citizen living under an oppressive, highly controlled regime gradually wakes to the corruption and fights to dismantle the system.",
+    beats: [
+      ["The Grind", 1, "Establish the oppressive status quo. Show the protagonist's daily compromises to survive under the regime's watchful eye."],
+      ["The Spark", 1, "A minor infraction or a chance encounter with an illegal act of defiance opens the protagonist's eyes to a different way of living."],
+      ["The Summons", 1, "The regime notices the protagonist's slight deviation from the norm, or forces them into a role that compromises their morality."],
+      ["The Underground", 1, "The protagonist makes contact with a hidden network of dissenters, finding a community of like-minded rebels."],
+      ["The Double Life", 2, "Balancing absolute compliance during the day with covert acts of rebellion or gathering intelligence at night."],
+      ["The Crackdown", 2, "The authority tightens its grip on the population, increasing surveillance and making the protagonist's double life highly dangerous."],
+      ["The Choice", 2, "A sudden crisis forces the protagonist to commit fully to the rebellion, abandoning their remaining safety and comfort."],
+      ["The Infiltration", 2, "Sneaking into a highly restricted sector, government database, or elite zone to steal critical data or resources."],
+      ["The Terrible Truth", 2, "Learning the actual, horrifying scale of the regime's control, history, or true source of power."],
+      ["The Betrayal", 2, "A close ally sells the protagonist out to the authorities, or the regime turns a trusted friend against them."],
+      ["The Round-Up", 3, "The protagonist is captured, interrogated, or forced to watch the public destruction of their rebel cell."],
+      ["The Breakout", 3, "Escaping captivity by exploiting a systemic blind spot in the regime's automated security or rigid bureaucracy."],
+      ["The Broadcast", 3, "Bypassing the state's communication blocks to broadcast the stolen truth directly to the general population."],
+      ["The Fall", 3, "The spark of public outrage causes a massive riot or strike, allowing the protagonist to confront the local authority figure directly."],
+      ["The Uncharted Future", 3, "The immediate regime is fractured. The protagonist looks out at a chaotic but genuinely free society."],
+    ],
+  },
+  {
+    id: "first-contact",
+    name: "First Contact / The Cosmic Enigma",
+    tag: "First contact",
+    blurb:
+      "The discovery of, and interaction with, an alien entity, artifact, or intelligence that challenges humanity's understanding of physics and reality.",
+    beats: [
+      ["The Signal", 1, "An inexplicable transmission, anomalous reading, or physical object disrupts normal scientific and military operations."],
+      ["The Mobilization", 1, "The protagonist, a specialist, is drafted into a highly classified international task force to study the anomaly."],
+      ["The Approach", 1, "Nearing the artifact or entity, experiencing the physical and sensory distortions caused by its presence."],
+      ["The Interface", 1, "The first direct attempt to communicate, realizing that human language and standard mathematics are completely useless."],
+      ["The Breakthrough", 2, "Decoding the very first basic pattern, gesture, or rule of the entity's method of communication."],
+      ["Divergent Views", 2, "A deep split develops within the leadership: the military advocates for containment, while scientists push for open dialogue."],
+      ["The Shift", 2, "The entity suddenly changes its behavior, triggering global panic and environmental fluctuations."],
+      ["The Quarantine", 2, "Government forces lock down the research site, trapping the protagonist inside with the entity as communication with the outside cuts out."],
+      ["The Mind-Bend", 2, "The protagonist experiences a psychological, sensory, or temporal shift caused by direct exposure to the entity's language or power."],
+      ["The Escalation", 2, "Hostile external military action triggers a defensive reaction from the entity, demonstrating its devastating capabilities."],
+      ["The Sacrifice", 3, "A key ally risks their life to stop human forces from launching an all-out attack, buying the protagonist time to communicate."],
+      ["The Direct Union", 3, "The protagonist enters the entity's core or establishes a direct, neural link to bypass the physical barriers."],
+      ["The Revelation", 3, "Understanding the entity's true purpose: it is not an invader, but a warning system, a monument, or an invitation."],
+      ["Defusing the Crisis", 3, "Using the newly gained understanding to stop the human forces from destroying themselves."],
+      ["The Paradigm Shift", 3, "The entity departs or settles into its new role, leaving humanity with a permanently altered view of the universe."],
+    ],
+  },
+  {
+    id: "time-loop",
+    name: "The Temporal Paradox / Time Loop",
+    tag: "Time loop",
+    blurb:
+      "The protagonist manipulates time or becomes trapped in a loop, navigating causality, preventing a timeline collapse, and making peace with inevitable loss.",
+    beats: [
+      ["The Anchor", 1, "Establish the protagonist's current timeline and the core regret, obsession, or research that drives their focus on temporal manipulation."],
+      ["The Breach", 1, "The first displacement event occurs, breaking the natural flow of time and sending the protagonist to a different point in history."],
+      ["The Altered Present", 1, "Returning to find immediate, subtle differences in the present timeline that only the protagonist remembers."],
+      ["The Warning", 1, "Finding a physical artifact, a message, or an alternate version of themselves that warns against further timeline interference."],
+      ["The Correction", 2, "Attempting a targeted trip to fix the initial divergence, only to trigger a much larger, more dangerous shift in history."],
+      ["The Fracture", 2, "The timeline begins to splinter, causing localized physical anomalies, repeating events, or rapid historical decay."],
+      ["The Enforcer", 2, "A temporal defense mechanism, a paradox-eating entity, or an agency tasked with protecting the timeline begins hunting the protagonist."],
+      ["The Desperate Jump", 2, "Escaping the immediate threat by jumping blindly into a radically different era or a dead-end timeline."],
+      ["The Origin", 2, "Uncovering the true origin of the temporal anomaly or discovering the hidden architect who initiated the loop."],
+      ["The Locked Event", 2, "Realizing a specific tragedy or historical event is a fixed point that cannot be altered without destroying reality."],
+      ["The Sacrifice Play", 3, "A trusted ally or an alternate version of the protagonist must be left behind or erased to keep the timeline from collapsing."],
+      ["The Collapse", 3, "The paradox reaches critical mass, causing different eras of history to bleed into the protagonist's immediate physical surroundings."],
+      ["The Source Intersection", 3, "Confronting the antagonist or the past self who initiated the cycle at the exact physical location of the original breach."],
+      ["Closing the Loop", 3, "Making the final, painful choice to break the cycle, accepting the permanent loss of a timeline or a loved one."],
+      ["The New Stream", 3, "The timeline stabilizes. The protagonist exists in a restored world, carrying the memory of histories that no longer exist."],
     ],
   },
   {
@@ -225,31 +374,6 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
       ["The Final Confrontation", 3, "A direct, high-tension physical or intellectual showdown where the protagonist must use everything they have learned."],
       ["Disarming the Threat", 3, "Stopping the clock, exposing the conspiracy to the public, or neutralizing the immediate danger."],
       ["The New Normal", 3, "The immediate aftermath, showing how the protagonist lives now that the shadow is finally gone."],
-    ],
-  },
-  {
-    id: "fantasy-scifi",
-    name: "High Fantasy / Sci-Fi Worldbuilder",
-    tag: "Epic",
-    blurb:
-      "Designed for epic journeys where the lore, the geography, and the societal or magical rules are central to the plot.",
-    beats: [
-      ["The Edge of the Map", 1, "Establish the protagonist's familiar, limited home world and their longing for something larger."],
-      ["The Call of the Unknown", 1, "A mysterious artifact, a message, or an external crisis reveals a massive secret about the wider world."],
-      ["Crossing the Threshold", 1, "Leaving the familiar territory behind, experiencing the immediate visual and physical shift of the new environment."],
-      ["The Laws of the Land", 2, "A chapter dedicated to encountering the magic, technology, or societal laws that govern this new world."],
-      ["The Guide", 2, "Meeting a seasoned traveler, mentor, or local who helps the protagonist navigate the immediate dangers."],
-      ["The Caravan", 2, "Assembling a small, diverse group of allies, each with distinct skills and cultural backgrounds."],
-      ["The First Border Crossing", 2, "Reaching a physical barrier (e.g., a mountain pass, an asteroid belt, a guarded wall) and finding a way through."],
-      ["The Distant Capital", 2, "Arriving at a major hub of power, exposing the complex political conflict or systemic corruption of the world."],
-      ["The Forbidden Knowledge", 2, "Discovering an ancient history, a lost text, or a hidden truth that changes how the protagonist views the entire conflict."],
-      ["The Fracture", 2, "A betrayal or severe ideological disagreement splits the group, leaving the protagonist isolated."],
-      ["The Wilderness Trial", 2, "Surviving the most hostile, raw environment on the map without traditional resources."],
-      ["Reclaiming the Bond", 2, "Reuniting the group or finding new allies, built on a deeper, more honest shared purpose."],
-      ["The Siege", 3, "The antagonist's forces launch a massive, coordinated attack on a stronghold, putting the world's future at risk."],
-      ["The Heart of the Conflict", 3, "Entering the deepest, most dangerous part of the antagonist's domain to stop the threat at its source."],
-      ["The Great Shift", 3, "Dismantling the old system or defeating the threat, causing a permanent change in the balance of the world."],
-      ["The Journey Home", 3, "Returning to the starting point, realizing that while home is the same, the protagonist has changed entirely."],
     ],
   },
   {
@@ -301,73 +425,19 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
     ],
   },
   {
-    id: "adventure",
-    name: "Adventure / The Quest",
-    tag: "Adventure",
-    blurb:
-      "A classic journey narrative where the plot relies on physical travel, collecting keys or clues, and overcoming distinct environmental hazards.",
+    id: "romance",
+    name: "Romance Beat Sheet",
+    tag: "Genre",
+    blurb: "Meet, spark, rupture, grand gesture, HEA.",
     beats: [
-      ["The Map in the Attic", 1, "The protagonist discovers an old map, a journal, or an ancient coordinate pointing to a legendary prize."],
-      ["Securing the Funding", 1, "Finding a patron, buying supplies, or hiring a guide to make the expedition possible."],
-      ["The Rival Expedition", 1, "Introduce a competing group with better funding and ruthless methods who are also chasing the prize."],
-      ["The Gate", 1, "Arriving at the entrance of the uncharted territory (e.g., a jungle wall, a deep sea trench, a hidden valley)."],
-      ["Nature's Hazard", 2, "Facing a major, non-human threat (e.g., a storm, a rockslide, wild animals) that tests the team's endurance."],
-      ["The First Key", 2, "Finding the first artifact or solving the first environmental riddle needed to unlock the final location."],
-      ["The Campfire", 2, "A quiet chapter of rest, where the characters share their true motivations for joining the dangerous journey."],
-      ["The Rival Skirmish", 2, "A direct clash with the competing expedition, resulting in lost supplies or captured allies."],
-      ["The Lost Landmark", 2, "Locating a legendary waypoint or ruin that confirms the map was real all along."],
-      ["The Trial of Character", 2, "A hazard where a character must choose between saving an ally or chasing the prize, testing their morality."],
-      ["The Gateway", 3, "Arriving at the entrance of the temple, tomb, or wreck where the prize is sealed."],
-      ["The Ancient Trap", 3, "Bypassing a series of mechanical or environmental puzzles designed to keep intruders out."],
-      ["The Treasure Chamber", 3, "Finding the physical prize, immediately followed by the arrival of the rival expedition demanding it."],
-      ["The Collapse", 3, "Triggering a self-destruct mechanism or structural collapse, forcing a chaotic, high-stakes escape as the ruins fall around them."],
-      ["The True Worth", 3, "Escaping with your lives (and maybe a fraction of the gold), realizing the journey and the bonds built were the real reward."],
-    ],
-  },
-  {
-    id: "propp",
-    name: "Propp's Morphology",
-    tag: "Folktale",
-    blurb: "Propp's recurring folktale functions, in their fixed order.",
-    beats: [
-      ["Absentation", 1, "A member of the family leaves home, or a death opens the absence the tale needs."],
-      ["Interdiction", 1, "The hero is warned against an action: do not go there, do not open that."],
-      ["Violation", 1, "The interdiction is broken, and the villain enters the story."],
-      ["Villainy or Lack", 1, "The villain causes harm, or the family discovers something vital is missing."],
-      ["Mediation (call to action)", 1, "The misfortune becomes known, and the hero is dispatched or volunteers to set it right."],
-      ["Departure", 2, "The hero leaves home and the tale proper begins."],
-      ["The Donor's Test", 2, "The hero meets a figure who tests, interrogates, or attacks them."],
-      ["Hero's Reaction", 2, "How the hero responds to the donor decides whether they earn what comes next."],
-      ["Receipt of a Magical Agent", 2, "The hero acquires the object, helper, or knowledge that makes victory possible."],
-      ["Struggle with the Villain", 2, "Hero and villain meet in direct combat, contest, or a game of wits."],
-      ["Victory", 3, "The villain is defeated, banished, or killed."],
-      ["Liquidation of the Lack", 3, "The original misfortune is undone and what was missing is restored."],
-      ["Return", 3, "The hero sets off for home, sometimes pursued."],
-      ["Reward", 3, "The hero is married, crowned, or otherwise rewarded, and the tale closes."],
-    ],
-  },
-  {
-    id: "panchasandhi",
-    name: "Sanskrit Panchasandhi",
-    tag: "Natyasastra",
-    blurb: "The five junctures of classical Indian drama, from seed to fruition.",
-    beats: [
-      ["Mukha (Opening / seed)", 1, "Plant the seed of the story: the germ of the goal and the first hint of the dramatic question."],
-      ["Pratimukha (Progression)", 1, "The seed sprouts. The goal becomes visible but keeps slipping in and out of reach."],
-      ["Garbha (Development)", 2, "The goal is pursued in earnest, with the outcome hidden and repeatedly in doubt."],
-      ["Vimarsha (Pause / crisis)", 2, "A pause of doubt, temptation, or setback where the goal appears lost."],
-      ["Nirvahana (Conclusion)", 3, "The threads gather and the seed bears fruit, delivering the goal and the resolution together."],
-    ],
-  },
-  {
-    id: "jo-ha-kyu",
-    name: "Jo-ha-kyu",
-    tag: "Pacing",
-    blurb: "Japanese tempo: slow beginning, accelerating break, rapid climax.",
-    beats: [
-      ["Jo (slow beginning)", 1, "Open slowly and deliberately, establishing the world and its rhythm at an unhurried pace."],
-      ["Ha (the break, accelerating)", 2, "Break the established pattern and accelerate, building momentum and disruption."],
-      ["Kyu (rapid climax)", 3, "Rush to a swift climax and end abruptly, faster than the reader expects."],
+      ["Meet Cute", 1, "The two leads collide for the first time in a way that sparks friction, charm, or both."],
+      ["No Way / Adhesion", 1, "Establish why they cannot be together, and the circumstance that forces them into proximity anyway."],
+      ["Falling in Love", 2, "The leads lower their guard through shared time, small intimacies, and growing attraction."],
+      ["Midpoint of Love", 2, "A high point of connection that raises what both of them now stand to lose."],
+      ["The Rupture", 2, "The secret, the lie, or the outside force that pulls the leads apart."],
+      ["Dark Moment", 2, "Both leads sit alone with the loss, believing the relationship is finished for good."],
+      ["Grovel / Grand Gesture", 3, "One lead risks pride or safety to prove the change is real and win the other back."],
+      ["Happily Ever After", 3, "Close on the two together, showing the life the relationship has made possible."],
     ],
   },
   {
@@ -594,24 +664,27 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
 /** Which facets each template belongs to (keyed by id). Kept beside the raw
  *  list so memberships are easy to retune; merged onto TEMPLATES below. */
 const GROUP_MEMBERSHIP: Record<string, string[]> = {
-  blank: ["Foundational"],
-  "three-act": ["Foundational"],
-  stc: ["Foundational", "Screenwriting"],
-  "hero-vogler": ["Screenwriting", "Myth & journey"],
-  "hero-campbell": ["Myth & journey"],
-  "story-circle": ["Foundational", "Screenwriting", "Myth & journey"],
-  "story-grid": ["Screenwriting"],
-  kishotenketsu: ["World traditions"],
-  romance: ["Genre"],
+  blank: ["Structure"],
+  "three-act": ["Structure"],
+  stc: ["Structure"],
+  "hero-vogler": ["Structure"],
+  "hero-campbell": ["Structure"],
+  "story-circle": ["Structure"],
+  "story-grid": ["Structure"],
+  kishotenketsu: ["Structure"],
+  propp: ["Structure"],
+  panchasandhi: ["Structure"],
+  "jo-ha-kyu": ["Structure"],
+  "fantasy-scifi": ["Genre"],
+  adventure: ["Genre"],
+  dystopian: ["Genre"],
+  "first-contact": ["Genre"],
+  "time-loop": ["Genre"],
   mystery: ["Genre"],
   thriller: ["Genre"],
-  "fantasy-scifi": ["Genre"],
   heist: ["Genre"],
   horror: ["Genre"],
-  adventure: ["Genre"],
-  propp: ["Myth & journey", "World traditions"],
-  panchasandhi: ["World traditions"],
-  "jo-ha-kyu": ["World traditions"],
+  romance: ["Genre"],
   "bio-transformation": ["Life story"],
   "bio-innovator": ["Life story"],
   "bio-rags-to-riches": ["Life story"],
