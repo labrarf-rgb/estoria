@@ -9,7 +9,7 @@ import {
   type WorldCategory,
   type WorldEntry,
 } from "@/types";
-import { displaySummary, resolveTitle } from "@/lib/drafts";
+import { displaySummary } from "@/lib/drafts";
 import { CARD_W, CARD_H } from "@/lib/layout";
 
 const CONN_LABEL: Record<ConnType, string> = {
@@ -42,8 +42,10 @@ export function roman(a: number): string {
 /**
  * Build Obsidian-vault-ready markdown: characters become [[wikilinks]],
  * chapters are grouped under Act headings, scenes carry their but/therefore tags.
+ * Renders the active version's board (`doc.chapters` — versions are standalone
+ * forks, and only the active one is loaded at the top level).
  */
-export function buildMarkdown(doc: StoryDoc, draftId: string = doc.activeDraftId): string {
+export function buildMarkdown(doc: StoryDoc): string {
   const title = doc.projectTitle || "Untitled Voyage";
   const total = doc.chapters.reduce((a, c) => a + c.words, 0);
   const charName = (id: string) => doc.characters.find((c) => c.id === id)?.name ?? id;
@@ -89,7 +91,7 @@ export function buildMarkdown(doc: StoryDoc, draftId: string = doc.activeDraftId
     doc.chapters
       .filter((c) => c.act === a)
       .forEach((c) => {
-        md += `\n### ${c.num}. ${resolveTitle(c, draftId)}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c, draftId)}\n\n**Scenes**\n`;
+        md += `\n### ${c.num}. ${c.title}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c)}\n\n**Scenes**\n`;
         c.scenes.forEach((s, j) => {
           const conn =
             j < c.scenes.length - 1 && c.sceneLinks[j]
@@ -530,6 +532,7 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
     chapters,
     links,
     storyNotes: "",
+    draftData: {},
     bookData: {},
   };
 

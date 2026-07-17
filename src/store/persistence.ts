@@ -1,4 +1,13 @@
-import { MAIN_DRAFT_ID, SCHEMA_VERSION, type Chapter, type StoryDoc } from "@/types";
+import {
+  MAIN_DRAFT_ID,
+  SCHEMA_VERSION,
+  type BookData,
+  type Chapter,
+  type ChapterLink,
+  type DraftVersion,
+  type StoryDoc,
+  type VersionData,
+} from "@/types";
 
 /**
  * StorageAdapter — the single seam between Estoria and where stories live.
@@ -165,15 +174,74 @@ export function downloadProjectFile(doc: StoryDoc): void {
 }
 
 /**
+ * Thrown when a file was written by a newer app than this one. Callers must
+ * surface it (not overwrite the file) — an older app writing a newer file
+ * would silently drop the fields it doesn't understand.
+ */
+export class SchemaTooNewError extends Error {
+  constructor(fileVersion: number) {
+    super(
+      `This project was saved by a newer version of Estoria (schema ${fileVersion}; ` +
+        `this app reads up to ${SCHEMA_VERSION}). Update the app before opening it.`
+    );
+    this.name = "SchemaTooNewError";
+  }
+}
+
+/** The pre-v4 per-chapter version overlay: title/summary overrides keyed by draft id. */
+type LegacyOverrides = Record<string, { title?: string; summary?: string }>;
+
+/**
+ * v4 migration: versions used to be an overlay (per-chapter title/summary
+ * `overrides` on one shared board); now each version is a standalone fork.
+ * Materialize every draft into a full board: base chapters + that draft's
+ * overrides applied. The active draft's board goes to the top level, the rest
+ * into `draftData`. What the user *saw* per version before is exactly what each
+ * fork contains after — nothing visible changes at the moment of migration.
+ */
+function materializeLegacyVersions(
+  chapters: Chapter[],
+  links: ChapterLink[],
+  storyNotes: string,
+  drafts: DraftVersion[],
+  activeDraftId: string
+): VersionData & { draftData: Record<string, VersionData> } {
+  const boardFor = (draftId: string): VersionData => ({
+    chapters: chapters.map((c) => {
+      const { overrides, ...base } = c as Chapter & { overrides?: LegacyOverrides };
+      const o = draftId !== MAIN_DRAFT_ID ? overrides?.[draftId] : undefined;
+      return {
+        ...base,
+        ...(o?.title != null ? { title: o.title } : {}),
+        ...(o?.summary != null ? { summary: o.summary } : {}),
+      };
+    }),
+    links: links.map((l) => ({ ...l })),
+    storyNotes,
+  });
+
+  const draftData: Record<string, VersionData> = {};
+  for (const d of drafts) {
+    if (d.id !== activeDraftId) draftData[d.id] = boardFor(d.id);
+  }
+  return { ...boardFor(activeDraftId), draftData };
+}
+
+/**
  * Coerce a parsed project file into a complete, current-schema StoryDoc.
- * Older exports (pre-v3: no books/bookData/drafts) and hand-edited files get
- * every missing field defaulted instead of crashing the first component that
- * reads it. Throws if the input isn't recognizably an Estoria project.
+ * Older exports (pre-v3: no books/bookData/drafts; pre-v4: overlay-style
+ * versions) and hand-edited files get every missing field defaulted or
+ * converted instead of crashing the first component that reads it. Throws if
+ * the input isn't recognizably an Estoria project, or (`SchemaTooNewError`)
+ * if it comes from a newer app.
  */
 export function normalizeDoc(raw: unknown): StoryDoc {
   const d = raw as Partial<StoryDoc> | null;
   if (!d || typeof d !== "object" || !Array.isArray(d.chapters)) {
     throw new Error("Not a valid Estoria project file.");
+  }
+  if (typeof d.schemaVersion === "number" && d.schemaVersion > SCHEMA_VERSION) {
+    throw new SchemaTooNewError(d.schemaVersion);
   }
 
   const title = typeof d.projectTitle === "string" && d.projectTitle ? d.projectTitle : "Untitled Story";
@@ -226,6 +294,51 @@ export function normalizeDoc(raw: unknown): StoryDoc {
       ? d.activeDraftId
       : drafts[0].id;
 
+  const links = Array.isArray(d.links) ? d.links : [];
+  const storyNotes = typeof d.storyNotes === "string" ? d.storyNotes : "";
+
+  // Versions: v4+ docs carry standalone forks in `draftData`; older docs carry
+  // overlay overrides, materialized into forks here.
+  const stripLegacy = (cs: Chapter[]): Chapter[] =>
+    cs.map((c) => {
+      const { overrides: _drop, ...rest } = c as Chapter & { overrides?: LegacyOverrides };
+      return rest;
+    });
+  const board =
+    d.draftData && typeof d.draftData === "object"
+      ? {
+          chapters: stripLegacy(chapters),
+          links,
+          storyNotes,
+          draftData: d.draftData as Record<string, VersionData>,
+        }
+      : materializeLegacyVersions(chapters, links, storyNotes, drafts, activeDraftId);
+
+  const rawBookData =
+    d.bookData && typeof d.bookData === "object"
+      ? (d.bookData as Record<string, Partial<BookData> | null>)
+      : {};
+  const bookData: Record<string, BookData> = {};
+  for (const [id, b] of Object.entries(rawBookData)) {
+    if (!b || typeof b !== "object") continue;
+    const bChapters = Array.isArray(b.chapters) ? b.chapters : [];
+    const bLinks = Array.isArray(b.links) ? b.links : [];
+    const bNotes = typeof b.storyNotes === "string" ? b.storyNotes : "";
+    const bDrafts =
+      Array.isArray(b.drafts) && b.drafts.length
+        ? b.drafts
+        : [{ id: MAIN_DRAFT_ID, name: "Main draft" }];
+    const bActive =
+      typeof b.activeDraftId === "string" && bDrafts.some((dr) => dr.id === b.activeDraftId)
+        ? b.activeDraftId
+        : bDrafts[0].id;
+    const bBoard =
+      b.draftData && typeof b.draftData === "object"
+        ? { chapters: stripLegacy(bChapters), links: bLinks, storyNotes: bNotes, draftData: b.draftData }
+        : materializeLegacyVersions(bChapters, bLinks, bNotes, bDrafts, bActive);
+    bookData[id] = { ...bBoard, drafts: bDrafts, activeDraftId: bActive };
+  }
+
   return {
     schemaVersion: SCHEMA_VERSION,
     id: typeof d.id === "string" && d.id ? d.id : `story-${Date.now().toString(36)}`,
@@ -242,10 +355,11 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     books,
     bookLinks: Array.isArray(d.bookLinks) ? d.bookLinks : [],
     activeBookId,
-    chapters,
-    links: Array.isArray(d.links) ? d.links : [],
-    storyNotes: typeof d.storyNotes === "string" ? d.storyNotes : "",
-    bookData: d.bookData && typeof d.bookData === "object" ? d.bookData : {},
+    chapters: board.chapters,
+    links: board.links,
+    storyNotes: board.storyNotes,
+    draftData: board.draftData,
+    bookData,
   };
 }
 

@@ -30,9 +30,11 @@ running app.
 - **Character / World entry** — rich reference records.
 - **Series** — optional multi-book planning layer above the current book, with its
   own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
-- **Draft / version** — **per book**: each book has its own named versions; a
-  chapter carries per-version `title`/`summary` overrides (the `main` version is
-  the base text). The version selector is hidden on the series map.
+- **Draft / version** — **per book**: each book has its own named versions, and
+  each version is a **standalone fork** of the whole board (chapters, scenes,
+  connectors, statuses, notes, layout). Creating a version deep-copies the
+  current one; edits never leak between versions. The series bible (characters/
+  world/assets) stays shared. The version selector is hidden on the series map.
 - **Project** — an independent `StoryDoc` (a standalone book or a whole series).
   Multiple projects live side by side in a library; you switch, create, delete,
   and merge them.
@@ -124,7 +126,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | --- | --- | --- | --- |
 | Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; double-click opens detail. |
 | Board | Reorder chapters | ✅ | Board: drop a card on another → confirm → resequences **and** auto-arranges so threads stay clean. Timeline: drag to reorder with live reflow. Connector chain rebuilt to follow the new order. |
-| Board | Connectors (therefore/but/and) | ✅ | SVG curves, colored by type, alt-draft aware. |
+| Board | Connectors (therefore/but/and) | ✅ | SVG curves, colored by type, per-version (each version forks its own links). |
 | Board | Auto-arrange | ✅ | Decaying-jitter grid, floored so it approaches straight but never a rigid lattice. |
 | Board | Add chapter | ✅ | |
 | Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
@@ -145,7 +147,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Series | Planner view + mode toggle | ✅ | Read view; add/edit book to do. |
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. |
 | App | Light/dark theme | ✅ | |
-| App | Drafts (main/alt) | ✅ | Toggle swaps titles/summaries/alt connectors. |
+| App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Project title editing | ⬜ | Field exists; no UI to rename yet. |
@@ -1837,3 +1839,112 @@ most of the session went there.
   typecheck` clean. All 27 pre-existing cards diffed byte-identical against the
   previous HEAD after the block moves. Built and deployed to GitHub Pages + the
   portfolio site.
+
+### 2026-07-17 (Session 36) — Versioning review: what "version" actually does
+
+No code changed this session — a read-through of how versioning works, because
+its behaviour didn't match expectations. The short of it: **a version is an
+override layer over two fields, not a snapshot.** Findings, so the gap between the
+name and the mechanism is on record:
+
+- **A version holds no story content.** `DraftVersion` ([types.ts:43](../src/types.ts:43))
+  is just `{id, name}`. The only per-version data anywhere is on each chapter:
+  `overrides?: Record<string, { title?: string; summary?: string }>`
+  ([types.ts:150](../src/types.ts:150)). So a version can differ from `main` in
+  **chapter title and chapter summary, and nothing else** — scenes, scene
+  connections, status, word count, notes, characters, world refs, pinned refs,
+  board positions and chapter connectors are stored once and shared by every
+  version. Switching versions re-renders exactly two text fields per chapter.
+- **A new version is not a copy.** `addDraft` ([useStore.ts:1371](../src/store/useStore.ts:1371))
+  adds an empty override map, so a fresh version starts as a passthrough to `main`
+  and only diverges where you retype a title or summary. Consequence: **editing
+  `main` afterward also changes every other version**, for every field not
+  overridden (i.e. most of them). This is the likely source of the surprise.
+- **The docs oversold it.** The §3 feature table (lines 127 and 148 in this file)
+  claims connectors are "alt-draft aware" and the toggle "swaps
+  titles/summaries/alt connectors". There is no draft field on
+  `ChapterLink`; `Board` reads `doc.links` unfiltered and uses `draftId` only to
+  resolve display titles and the reorder-confirm text. **Per-draft connectors were
+  never built** — the two "alt-draft aware / alt connectors" claims are aspirational,
+  not implemented.
+- **An override can't be reverted from the UI.** `resolveTitle` treats any non-null
+  override as authoritative ([drafts.ts:5](../src/lib/drafts.ts:5)) and
+  `editChapterText` writes on every keystroke ([useStore.ts:642](../src/store/useStore.ts:642)).
+  Clearing the field stores `""` (non-null), giving a blank title rather than
+  falling back to `main`. The only way back to base text is deleting the version.
+- **Export/sync flatten versions away.** `buildMarkdown` resolves the *active*
+  version into plain text ([markdown.ts:92](../src/lib/markdown.ts:92)) and the
+  parser rebuilds a doc with only `Main draft` ([markdown.ts:510](../src/lib/markdown.ts:510)),
+  so a markdown round-trip collapses the active version into `main` and drops the
+  rest — consistent with the "just the active version syncs" decision (§ Sync), but
+  worth stating. Sync diffs the whole `overrides` map as one field
+  ([sync.ts:499](../src/lib/sync.ts:499)).
+- **Versions are per book.** `drafts`/`activeDraftId` live in `BookData` and are
+  stashed/restored on `switchBook`, so the version list changes entirely when the
+  active book changes (as intended since Session 8).
+- **Unrelated: `SCHEMA_VERSION = 3`** ([types.ts:13](../src/types.ts:13)) is the
+  persisted-doc shape, not a user version. The `migrate` hook
+  ([useStore.ts:1491](../src/store/useStore.ts:1491)) doesn't migrate — on any bump
+  it **discards the persisted doc and loads `sampleStory`**, keeping only `theme`.
+  If a schema bump ever wiped local work, that's why.
+- **Smallest honest fix if versions should be snapshots:** make `addDraft`
+  deep-copy the chapters into a real per-version board instead of widening the
+  override map field by field. Not done here — flagged for a decision, since it's a
+  model change with sync/markdown implications, not a bug fix.
+
+### 2026-07-17 (Session 36b) — Versions become standalone forks (schema v4)
+
+Implemented the decision from the review above, per the user's answers: a
+version is a **full fork of the book's board**, the series bible stays
+**shared**, and the project file keeps **all versions in one `.estoria.json`**
+(markdown export still renders just the active version). Local-only for now —
+**not pushed / not deployed** pending the user's OK, and the Android app needs
+the matching schema before cross-app sync resumes.
+
+- **Model (`SCHEMA_VERSION` 3 → 4).** New `VersionData {chapters, links,
+  storyNotes}`. The active version's board lives at the top level (unchanged for
+  canvas components); inactive versions are stashed in `doc.draftData` /
+  `BookData.draftData`, mirroring the `bookData` pattern for books.
+  `Chapter.overrides` is gone.
+- **Store.** `addDraft` deep-copies the current board (`structuredClone`) — the
+  fork becomes active, the original is stashed. `setActiveDraft` stashes/restores
+  whole boards (keeps the chapter modal open when the id exists in both, since
+  fork copies share chapter ids). `deleteDraft` of the active version falls back
+  to `main`. `editChapterText` writes chapters directly (no overlay).
+  `switchBook`/`addBook`/`mergeProjectIntoSeries` carry `draftData` via new
+  `stashActiveBook`/`emptyBookData` helpers.
+- **Real migration, at last.** The zustand `migrate` hook no longer wipes to
+  `sampleStory` on a version bump: it runs `normalizeDoc` over the doc **and
+  every `projectStash` entry** (dropping only individually-corrupt ones).
+  `normalizeDoc` converts v3 overlay versions by materializing each draft as
+  base-chapters + that draft's overrides (`materializeLegacyVersions`), for the
+  top-level book and every `bookData` entry. What the user saw per version
+  before is byte-for-byte what each fork contains after.
+- **Schema guard.** `normalizeDoc` throws `SchemaTooNewError` when a file's
+  `schemaVersion` exceeds the app's; `readCanonical`/`restoreFromFile` re-throw
+  it un-masked so sync surfaces "update the app" instead of lossily overwriting
+  a newer file's fields.
+- **Sync diff.** Versions compare as one pseudo-item ("Draft versions differ")
+  across all books, like connections; the `overrides` field label is gone. Note:
+  the first sync after updating recomputes fingerprints on the converted shape,
+  so a genuinely-diverged file shows as a conflict (not a fast-forward) once.
+- **UI copy.** Delete-version confirm now says the version's chapters are
+  deleted and others unaffected; the chapter-modal badge reads "changes stay in
+  this version". Reorder-confirm and move-picker titles read `c.title` directly;
+  `resolveTitle`/`resolveSummary` are deleted (`displaySummary(c)` keeps the
+  first-scene fallback). `buildMarkdown(doc)` lost its `draftId` param — the
+  active board *is* the version.
+- **Sample story** now ships the "Alt ending" as a real fork (built
+  programmatically from the main board, c8 retitled "The Drowned Return").
+- **Verified in-browser** (dev server, seeded a v3 store with overrides, a
+  stashed book with its own alt version, and a stashed second project):
+  migration produced v4 with all forks materialized and overrides stripped,
+  nothing wiped; added a chapter in Alt → Main untouched; edited Main's title →
+  Alt untouched; "+ Add version" forked Alt's 3 chapters; deleting the active
+  fork fell back to Main with Alt intact; state survived reload; fresh
+  (cleared) storage loads the sample with its alt fork. No console errors;
+  `npm run build` clean.
+- **Caveats on record:** pre-v4 cross-version bleed (scene/structure edits made
+  while a non-main version was active) is baked into every fork — only pre-bleed
+  backups can recover it. A v4 file is a one-way door for older apps; the guard
+  refuses reads, and the Android app must not sync until it speaks v4.

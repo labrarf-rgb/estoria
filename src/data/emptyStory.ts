@@ -30,6 +30,7 @@ export function emptyStory(): StoryDoc {
     chapters: [],
     links: [],
     storyNotes: "",
+    draftData: {},
     bookData: {},
   };
 }

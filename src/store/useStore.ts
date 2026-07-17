@@ -4,6 +4,7 @@ import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
   type Asset,
+  type BookData,
   type Chapter,
   type Character,
   type ConnType,
@@ -12,6 +13,7 @@ import {
   type StoryDoc,
   type WorldEntry,
 } from "@/types";
+import { activeVersionData, cloneVersionData } from "@/lib/drafts";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -26,7 +28,7 @@ import {
   type TimelineOrient,
 } from "@/lib/layout";
 import { TEMPLATES } from "@/lib/templates";
-import { zustandStorage } from "@/store/persistence";
+import { normalizeDoc, zustandStorage } from "@/store/persistence";
 import type { RefView } from "@/components/ui/ViewToggle";
 
 export type View = "board" | "timeline";
@@ -273,6 +275,25 @@ const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
   return arr.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
 };
 
+/** Snapshot the active book's full board (all versions) for stashing in `bookData`. */
+const stashActiveBook = (doc: StoryDoc): BookData => ({
+  chapters: doc.chapters,
+  links: doc.links,
+  storyNotes: doc.storyNotes,
+  drafts: doc.drafts,
+  activeDraftId: doc.activeDraftId,
+  draftData: doc.draftData,
+});
+
+const emptyBookData = (): BookData => ({
+  chapters: [],
+  links: [],
+  storyNotes: "",
+  drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
+  activeDraftId: MAIN_DRAFT_ID,
+  draftData: {},
+});
+
 /** Renumber chapters sequentially (1..n) after add/delete. */
 /** Estimated visible scene-canvas width for the chapter modal in the given
  *  mode — used to lay out chapters whose modal isn't (or isn't yet) open,
@@ -447,25 +468,12 @@ export const useStore = create<StoreState>()(
           if (!source || !target) return s;
 
           // Each source book + its board data (active book lives at the top level).
-          const defaultDrafts = () => [{ id: MAIN_DRAFT_ID, name: "Main draft" }];
           const sourceBooks = source.books.map((b) => ({
             meta: b,
             data:
               b.id === source.activeBookId
-                ? {
-                    chapters: source.chapters,
-                    links: source.links,
-                    storyNotes: source.storyNotes,
-                    drafts: source.drafts,
-                    activeDraftId: source.activeDraftId,
-                  }
-                : source.bookData[b.id] ?? {
-                    chapters: [],
-                    links: [],
-                    storyNotes: "",
-                    drafts: defaultDrafts(),
-                    activeDraftId: MAIN_DRAFT_ID,
-                  },
+                ? stashActiveBook(source)
+                : source.bookData[b.id] ?? emptyBookData(),
           }));
 
           const newBookData = { ...target.bookData };
@@ -475,8 +483,9 @@ export const useStore = create<StoreState>()(
               chapters: data.chapters,
               links: data.links,
               storyNotes: data.storyNotes,
-              drafts: data.drafts ?? defaultDrafts(),
+              drafts: data.drafts ?? [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: data.activeDraftId ?? MAIN_DRAFT_ID,
+              draftData: data.draftData ?? {},
             };
             return {
               ...meta,
@@ -637,24 +646,15 @@ export const useStore = create<StoreState>()(
           },
         })),
 
-      // Draft-aware: edits to the main draft change the base; edits to any other
-      // draft are stored as per-chapter overrides.
+      // Versions are standalone forks, so text edits always write the chapter
+      // directly — only the active version's board is loaded.
       editChapterText: (id, patch) =>
-        set((s) => {
-          const d = s.doc.activeDraftId;
-          return {
-            doc: {
-              ...s.doc,
-              chapters: s.doc.chapters.map((c) => {
-                if (c.id !== id) return c;
-                if (d === MAIN_DRAFT_ID) return { ...c, ...patch };
-                const overrides = { ...(c.overrides || {}) };
-                overrides[d] = { ...(overrides[d] || {}), ...patch };
-                return { ...c, overrides };
-              }),
-            },
-          };
-        }),
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          },
+        })),
 
       toggleChapterChar: (id, charId) =>
         set((s) => ({
@@ -1029,23 +1029,8 @@ export const useStore = create<StoreState>()(
       switchBook: (id) =>
         set((s) => {
           if (id === s.doc.activeBookId) return { showSeries: false };
-          const stash = {
-            ...s.doc.bookData,
-            [s.doc.activeBookId]: {
-              chapters: s.doc.chapters,
-              links: s.doc.links,
-              storyNotes: s.doc.storyNotes,
-              drafts: s.doc.drafts,
-              activeDraftId: s.doc.activeDraftId,
-            },
-          };
-          const load = stash[id] ?? {
-            chapters: [],
-            links: [],
-            storyNotes: "",
-            drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
-            activeDraftId: MAIN_DRAFT_ID,
-          };
+          const stash = { ...s.doc.bookData, [s.doc.activeBookId]: stashActiveBook(s.doc) };
+          const load = stash[id] ?? emptyBookData();
           const rest = { ...stash };
           delete rest[id];
           return {
@@ -1057,6 +1042,7 @@ export const useStore = create<StoreState>()(
               storyNotes: load.storyNotes,
               drafts: load.drafts ?? [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: load.activeDraftId ?? MAIN_DRAFT_ID,
+              draftData: load.draftData ?? {},
               bookData: rest,
             },
             openCh: null,
@@ -1077,16 +1063,7 @@ export const useStore = create<StoreState>()(
       addBook: () =>
         set((s) => {
           const id = uid("b");
-          const stash = {
-            ...s.doc.bookData,
-            [s.doc.activeBookId]: {
-              chapters: s.doc.chapters,
-              links: s.doc.links,
-              storyNotes: s.doc.storyNotes,
-              drafts: s.doc.drafts,
-              activeDraftId: s.doc.activeDraftId,
-            },
-          };
+          const stash = { ...s.doc.bookData, [s.doc.activeBookId]: stashActiveBook(s.doc) };
           const lastX = Math.max(80, ...s.doc.books.map((b) => b.x ?? 80));
           return {
             doc: {
@@ -1109,6 +1086,7 @@ export const useStore = create<StoreState>()(
               storyNotes: "",
               drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: MAIN_DRAFT_ID,
+              draftData: {},
               bookData: stash,
             },
             openCh: null,
@@ -1368,20 +1346,51 @@ export const useStore = create<StoreState>()(
         })),
 
       // ---- drafts / versions ----
+      // Each version is a standalone fork of the board: creating one deep-copies
+      // the current board, and switching stashes/restores whole boards (same
+      // pattern as switchBook). Edits never leak between versions.
       addDraft: (name) =>
         set((s) => {
           const id = uid("d");
           const n = s.doc.drafts.length;
+          const fork = cloneVersionData(activeVersionData(s.doc));
           return {
             doc: {
               ...s.doc,
               drafts: s.doc.drafts.concat({ id, name: name || `Version ${n}` }),
               activeDraftId: id,
+              // The fork becomes the active board; the old active version keeps
+              // the original objects in the stash.
+              chapters: fork.chapters,
+              links: fork.links,
+              storyNotes: fork.storyNotes,
+              draftData: { ...s.doc.draftData, [s.doc.activeDraftId]: activeVersionData(s.doc) },
             },
           };
         }),
 
-      setActiveDraft: (id) => set((s) => ({ doc: { ...s.doc, activeDraftId: id } })),
+      setActiveDraft: (id) =>
+        set((s) => {
+          if (id === s.doc.activeDraftId || !s.doc.drafts.some((d) => d.id === id)) return s;
+          const stash = { ...s.doc.draftData, [s.doc.activeDraftId]: activeVersionData(s.doc) };
+          // A missing stash entry should never happen; keeping the current board
+          // (old passthrough behaviour) beats showing an empty one.
+          const load = stash[id] ?? activeVersionData(s.doc);
+          delete stash[id];
+          return {
+            doc: {
+              ...s.doc,
+              activeDraftId: id,
+              chapters: load.chapters,
+              links: load.links,
+              storyNotes: load.storyNotes,
+              draftData: stash,
+            },
+            // Chapter ids survive a fork, so keep the modal open when it exists
+            // in the loaded version too.
+            openCh: s.openCh && load.chapters.some((c) => c.id === s.openCh) ? s.openCh : null,
+          };
+        }),
 
       renameDraft: (id, name) =>
         set((s) => ({
@@ -1391,18 +1400,26 @@ export const useStore = create<StoreState>()(
       deleteDraft: (id) =>
         set((s) => {
           if (id === MAIN_DRAFT_ID) return s;
+          const drafts = s.doc.drafts.filter((d) => d.id !== id);
+          const draftData = { ...s.doc.draftData };
+          delete draftData[id];
+          if (s.doc.activeDraftId !== id) {
+            return { doc: { ...s.doc, drafts, draftData } };
+          }
+          // Deleting the active version: fall back to the main draft's board.
+          const load = draftData[MAIN_DRAFT_ID] ?? activeVersionData(s.doc);
+          delete draftData[MAIN_DRAFT_ID];
           return {
             doc: {
               ...s.doc,
-              drafts: s.doc.drafts.filter((d) => d.id !== id),
-              activeDraftId: s.doc.activeDraftId === id ? MAIN_DRAFT_ID : s.doc.activeDraftId,
-              chapters: s.doc.chapters.map((c) => {
-                if (!c.overrides || !c.overrides[id]) return c;
-                const overrides = { ...c.overrides };
-                delete overrides[id];
-                return { ...c, overrides };
-              }),
+              drafts,
+              activeDraftId: MAIN_DRAFT_ID,
+              chapters: load.chapters,
+              links: load.links,
+              storyNotes: load.storyNotes,
+              draftData,
             },
+            openCh: s.openCh && load.chapters.some((c) => c.id === s.openCh) ? s.openCh : null,
           };
         }),
 
@@ -1486,14 +1503,30 @@ export const useStore = create<StoreState>()(
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
       }),
-      // On a schema bump, discard the old persisted document rather than risk
-      // reading a shape that no longer matches the model.
+      // On a schema bump, convert the persisted document (and every stashed
+      // project) through `normalizeDoc`, which understands all older shapes.
+      // Discarding is the last resort, only for docs that fail to convert.
       migrate: (persisted: unknown, version: number) => {
-        const p = (persisted as { theme?: Theme }) ?? {};
-        if (version < SCHEMA_VERSION) {
+        if (version >= SCHEMA_VERSION) return persisted as never;
+        const p = (persisted as { doc?: unknown; projectStash?: unknown; theme?: Theme }) ?? {};
+        try {
+          const doc = normalizeDoc(p.doc);
+          const projectStash: Record<string, StoryDoc> = {};
+          const rawStash =
+            p.projectStash && typeof p.projectStash === "object"
+              ? (p.projectStash as Record<string, unknown>)
+              : {};
+          for (const [id, raw] of Object.entries(rawStash)) {
+            try {
+              projectStash[id] = normalizeDoc(raw);
+            } catch {
+              // Drop only the unreadable stashed project, keep the rest.
+            }
+          }
+          return { ...(persisted as object), doc, projectStash } as never;
+        } catch {
           return { doc: sampleStory, theme: p.theme ?? "light", view: "board" as View };
         }
-        return persisted as never;
       },
     }
   )

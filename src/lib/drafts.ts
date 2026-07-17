@@ -1,22 +1,23 @@
-import { MAIN_DRAFT_ID, type Chapter } from "@/types";
+import type { Chapter, StoryDoc, VersionData } from "@/types";
 
-/** Resolve a chapter's title for the active draft, falling back to the base. */
-export function resolveTitle(c: Chapter, draftId: string): string {
-  if (draftId !== MAIN_DRAFT_ID && c.overrides?.[draftId]?.title != null) {
-    return c.overrides[draftId].title!;
-  }
-  return c.title;
-}
-
-/** Resolve a chapter's summary for the active draft (no scene fallback). */
-export function resolveSummary(c: Chapter, draftId: string): string {
-  if (draftId !== MAIN_DRAFT_ID && c.overrides?.[draftId]?.summary != null) {
-    return c.overrides[draftId].summary!;
-  }
-  return c.summary ?? "";
-}
+/**
+ * Versions are standalone forks: the active version's board lives at
+ * `doc.chapters`/`links`/`storyNotes`, inactive versions are stashed in
+ * `doc.draftData`. There is no override layer to resolve — a chapter's
+ * `title`/`summary` are always the real text for the version being viewed.
+ */
 
 /** Summary for display, falling back to the first scene when empty. */
-export function displaySummary(c: Chapter, draftId: string): string {
-  return resolveSummary(c, draftId) || c.scenes[0] || "";
+export function displaySummary(c: Chapter): string {
+  return c.summary || c.scenes[0] || "";
+}
+
+/** Snapshot the active version's board (by reference — for stashing). */
+export function activeVersionData(doc: StoryDoc): VersionData {
+  return { chapters: doc.chapters, links: doc.links, storyNotes: doc.storyNotes };
+}
+
+/** Deep-copy a version's board so a fork can diverge without sharing state. */
+export function cloneVersionData(v: VersionData): VersionData {
+  return structuredClone(v);
 }

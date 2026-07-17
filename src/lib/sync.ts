@@ -1,5 +1,5 @@
 import type { StoryDoc } from "@/types";
-import { normalizeDoc, slugify, stampModified } from "@/store/persistence";
+import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import {
   fileStamp,
   forgetBackupDir,
@@ -134,7 +134,10 @@ async function readCanonical(dir: BackupDirHandle, fileName: string): Promise<St
   }
   try {
     return normalizeDoc(JSON.parse(text));
-  } catch {
+  } catch (e) {
+    // A too-new file must surface as exactly that — syncing over it from an
+    // older app would silently drop the fields this app doesn't know.
+    if (e instanceof SchemaTooNewError) throw e;
     throw new Error(`"${fileName}" exists but couldn't be read as an Estoria project.`);
   }
 }
@@ -431,7 +434,8 @@ export function restoreFromFile(
     try {
       const text = await (await (await dir.getFileHandle(fileName)).getFile()).text();
       restored = normalizeDoc(JSON.parse(text));
-    } catch {
+    } catch (e) {
+      if (e instanceof SchemaTooNewError) throw e;
       throw new Error(`"${fileName}" couldn't be read as an Estoria project.`);
     }
     const receipt = await writeRotatingBackup(dir, current);
@@ -496,7 +500,6 @@ const FIELD_LABELS: Record<string, string> = {
   storyNotes: "story notes",
   desc: "description",
   cat: "category",
-  overrides: "draft overrides",
 };
 
 function changedFields<T extends object>(mine: T, theirs: T): string[] {
@@ -600,6 +603,18 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
   if (!sameJson(connectionsOf(mine), connectionsOf(theirs))) {
     differing++;
     lines.push("Chapter connections (therefore / but / and) differ");
+  }
+  total++; // draft versions (standalone forks), compared as one pseudo-item across all books
+  const versionsOf = (d: StoryDoc) => ({
+    drafts: d.drafts,
+    draftData: d.draftData,
+    stashed: Object.fromEntries(
+      Object.entries(d.bookData).map(([id, b]) => [id, { drafts: b.drafts, draftData: b.draftData }])
+    ),
+  });
+  if (!sameJson(versionsOf(mine), versionsOf(theirs))) {
+    differing++;
+    lines.push("Draft versions differ");
   }
   if (!lines.length) {
     // The hash said the docs differ, so something outside the reported

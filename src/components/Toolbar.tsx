@@ -172,7 +172,7 @@ export function Toolbar() {
                     onClick={() =>
                       askConfirm({
                         message: `Delete the "${d.name}" version?`,
-                        detail: "Its title and summary overrides will be removed.",
+                        detail: "This version's chapters and edits will be deleted. Other versions are not affected.",
                         danger: true,
                         onConfirm: () => deleteDraft(d.id),
                       })

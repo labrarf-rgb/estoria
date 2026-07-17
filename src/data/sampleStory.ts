@@ -255,12 +255,6 @@ export const sampleStory: StoryDoc = {
       id: "c8", num: 8, act: 3, status: "idea", title: "The True North", words: 4500,
       x: 2160, y: 252, chars: ["wren", "sela", "pip", "bram"],
       summary: "Wren reaches the harbor and decides what home is worth.",
-      overrides: {
-        alt: {
-          title: "The Drowned Return",
-          summary: "Wren reaches the harbor only to choose the sea over the shore.",
-        },
-      },
       scenes: [
         "Wren sails into the harbor that shouldn't exist.",
         "She faces Sela on the impossible quay.",
@@ -280,6 +274,9 @@ export const sampleStory: StoryDoc = {
     { fromId: "c7", toId: "c8", type: "therefore" },
   ],
 
+  // Filled in below — the alt version forks the main board.
+  draftData: {},
+
   bookData: {
     b2: {
       chapters: [],
@@ -287,6 +284,7 @@ export const sampleStory: StoryDoc = {
       storyNotes: "",
       drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
       activeDraftId: MAIN_DRAFT_ID,
+      draftData: {},
     },
     b3: {
       chapters: [],
@@ -294,6 +292,25 @@ export const sampleStory: StoryDoc = {
       storyNotes: "",
       drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
       activeDraftId: MAIN_DRAFT_ID,
+      draftData: {},
     },
+  },
+};
+
+// The "Alt ending" version is a standalone fork of the main board, differing
+// only in the last chapter's title and summary.
+sampleStory.draftData = {
+  alt: {
+    chapters: sampleStory.chapters.map((c) =>
+      c.id === "c8"
+        ? {
+            ...c,
+            title: "The Drowned Return",
+            summary: "Wren reaches the harbor only to choose the sea over the shore.",
+          }
+        : c
+    ),
+    links: sampleStory.links.map((l) => ({ ...l })),
+    storyNotes: sampleStory.storyNotes,
   },
 };

@@ -10,7 +10,7 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
@@ -43,6 +43,19 @@ export interface Asset {
 export interface DraftVersion {
   id: string;
   name: string;
+}
+
+/**
+ * The full board contents of one draft version — a standalone fork. Creating a
+ * version deep-copies the active board, so versions diverge freely and edits
+ * never leak between them. The active version's content lives at the top level
+ * (`chapters`/`links`/`storyNotes`); inactive versions are stashed in
+ * `draftData`, mirroring how inactive books are stashed in `bookData`.
+ */
+export interface VersionData {
+  chapters: Chapter[];
+  links: ChapterLink[];
+  storyNotes: string;
 }
 
 export type ChapterStatus = "done" | "draft" | "idea";
@@ -113,6 +126,8 @@ export interface BookData {
   storyNotes: string;
   drafts: DraftVersion[];
   activeDraftId: string;
+  /** Stashed boards for this book's inactive versions, keyed by draft id. */
+  draftData: Record<string, VersionData>;
 }
 
 /** A free position on a canvas. */
@@ -147,8 +162,6 @@ export interface Chapter {
   /** Free positions of scene nodes inside the detail canvas. */
   scenePos?: Vec2[];
   refs: PinnedRef[];
-  /** Per-draft text overrides, keyed by draft id (title/summary only). */
-  overrides?: Record<string, { title?: string; summary?: string }>;
 }
 
 /** A connector between two chapters on the board. */
@@ -172,7 +185,8 @@ export interface StoryDoc {
    */
   modifiedAt?: string;
 
-  // Drafts / versions.
+  // Drafts / versions (per book; these describe the active book, like
+  // `chapters` below). Each version is a standalone fork of the board.
   drafts: DraftVersion[];
   activeDraftId: string;
 
@@ -186,10 +200,14 @@ export interface StoryDoc {
   bookLinks: BookLink[];
   activeBookId: string;
 
-  // Active book working set (top-level for simple canvas components).
+  // Active book + active version working set (top-level for simple canvas
+  // components).
   chapters: Chapter[];
   links: ChapterLink[];
   storyNotes: string;
+
+  // Stashed boards for the active book's inactive versions, keyed by draft id.
+  draftData: Record<string, VersionData>;
 
   // Stashed boards for inactive books, keyed by book id.
   bookData: Record<string, BookData>;

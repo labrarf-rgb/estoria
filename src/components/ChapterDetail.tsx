@@ -5,7 +5,6 @@ import { RefList } from "@/components/ui/RefList";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
-import { resolveSummary, resolveTitle } from "@/lib/drafts";
 import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -355,13 +354,13 @@ export function ChapterDetail() {
           </span>
           <div className="min-w-0 flex-1">
             <input
-              value={resolveTitle(ch, draftId)}
+              value={ch.title}
               onChange={(e) => editChapterText(ch.id, { title: e.target.value })}
               placeholder="Chapter title"
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
             />
             <textarea
-              value={resolveSummary(ch, draftId)}
+              value={ch.summary ?? ""}
               onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
               placeholder="One-line chapter summary..."
               rows={1}
@@ -369,7 +368,7 @@ export function ChapterDetail() {
             />
             {draftId !== MAIN_DRAFT_ID && (
               <div className="mt-[4px] text-[10.5px] font-semibold uppercase tracking-wide text-but">
-                Editing {draftName} · title &amp; summary differ from main
+                Editing {draftName} · changes stay in this version
               </div>
             )}
 
@@ -673,7 +672,7 @@ export function ChapterDetail() {
               Move to which chapter?
             </span>
             {otherChapters.map((c) => {
-              const title = resolveTitle(c, draftId);
+              const title = c.title;
               return (
                 <button
                   key={c.id}

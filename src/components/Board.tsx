@@ -8,7 +8,7 @@ import {
   timelineChapterPositions,
   type Camera,
 } from "@/lib/layout";
-import { displaySummary, resolveTitle } from "@/lib/drafts";
+import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import type { Chapter, ConnType } from "@/types";
 
@@ -35,7 +35,6 @@ export function Board() {
   const doc = useStore((s) => s.doc);
   const view = useStore((s) => s.view);
   const orient = useStore((s) => s.timelineOrient);
-  const draftId = useStore((s) => s.doc.activeDraftId);
   const zoom = useStore((s) => s.zoom);
   const panX = useStore((s) => s.panX);
   const panY = useStore((s) => s.panY);
@@ -154,11 +153,10 @@ export function Board() {
           const dragged = chapters.find((c) => c.id === draggedId);
           const target = chapters.find((c) => c.id === targetId);
           if (dragged && target) {
-            const draftId = useStore.getState().doc.activeDraftId;
             const after = dragged.x > target.x;
             askConfirm({
               message: "Reorder chapters?",
-              detail: `"${resolveTitle(dragged, draftId)}" will move ${after ? "after" : "before"} "${resolveTitle(target, draftId)}", and the board will re-arrange to match.`,
+              detail: `"${dragged.title}" will move ${after ? "after" : "before"} "${target.title}", and the board will re-arrange to match.`,
               confirmLabel: "Reorder",
               onConfirm: () => {
                 reorderChapter(draggedId, target.id, after);
@@ -347,8 +345,8 @@ export function Board() {
   };
 
   const charById = (id: string) => doc.characters.find((c) => c.id === id);
-  const titleOf = (c: Chapter) => resolveTitle(c, draftId);
-  const summaryOf = (c: Chapter) => displaySummary(c, draftId);
+  const titleOf = (c: Chapter) => c.title;
+  const summaryOf = (c: Chapter) => displaySummary(c);
 
   return (
     <div
