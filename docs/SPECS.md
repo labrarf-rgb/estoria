@@ -1897,9 +1897,11 @@ name and the mechanism is on record:
 Implemented the decision from the review above, per the user's answers: a
 version is a **full fork of the book's board**, the series bible stays
 **shared**, and the project file keeps **all versions in one `.estoria.json`**
-(markdown export still renders just the active version). Local-only for now —
-**not pushed / not deployed** pending the user's OK, and the Android app needs
-the matching schema before cross-app sync resumes.
+(markdown export still renders just the active version). Pushed to GitHub
+(Pages auto-deploys) and synced to the portfolio site later the same day, with
+the user's OK. The Android app still needs the matching schema before cross-app
+sync resumes — step-by-step port instructions were written to
+`/Users/rfcl/AndroidStudioProjects/Estoria-aa/OPUS-TASK-schema-v4-versions.md`.
 
 - **Model (`SCHEMA_VERSION` 3 → 4).** New `VersionData {chapters, links,
   storyNotes}`. The active version's board lives at the top level (unchanged for
