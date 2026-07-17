@@ -138,7 +138,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 26 structures + blank starter (27 template cards), incl. 9 life-story arcs and 7 genre beat sheets with per-chapter prompts; facet filter bar. |
+| Templates | Insert / replace skeletons | ✅ | 26 structures + blank starter (27 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 7 genre beat sheets; facet filter bar. |
 | Import | AI prompt + file scan | 🟡 | Prompt copy + summary work; **parsing markdown into the doc** not yet implemented. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
@@ -1748,3 +1748,36 @@ were assigned here along each template's narrative curve.
   tags/blurbs/beat counts; a live Replace with Thriller built its 15 chapters in
   order onto the board with each prompt as the card subtitle. `npm run typecheck`
   clean. Built and deployed to GitHub Pages + the portfolio site.
+
+### 2026-07-16 (Session 34) — Per-chapter prompts for the 12 older templates
+
+The library had split into two eras: every template added in Sessions 31–33 carried
+a writing prompt on each beat, while none of the original structures had a single
+one. An audit of all 27 cards found 13 with zero prompts and blurbs less than half
+the length of the newer ones. This session closes that gap.
+
+- **109 prompts across 12 templates**, written to match the voice of the existing
+  genre/life-story entries (one sentence, verb-first, third-person protagonist):
+  Three-Act (8), Save the Cat (15), Hero's Journey Vogler (12) and Campbell (17),
+  Story Circle (8), Story Grid (6), Kishotenketsu (4), Romance (8), Mystery (9),
+  Propp (14), Panchasandhi (5), Jo-ha-kyu (3).
+- **Single Blank Chapter stays bare** by design — its blurb promises a start from
+  scratch, and a prompt on its one beat works against that. It is now the only
+  card without prompts; every other structure is at 100% coverage.
+- Pure data, same as Session 33: existing `[title, act, summary]` `TemplateBeat`
+  shape, no component or store changes. Beat titles untouched, including the
+  Story Circle parentheticals (`You (comfort zone)`), which stay because the
+  romanized World-traditions titles (`Ki`, `Jo`, `Mukha`) need their glosses and
+  keeping them consistent beat stripping them from the one English set.
+- Dropped the stale "(used by the life-story templates)" clause from the
+  `templates.ts` docstring — the genre templates broke that claim in Session 33.
+- **Considered and deferred**: renaming `beats` → `chapters`. The word is Snyder's,
+  generalized onto 18 traditions that used stages/functions/junctures/movements,
+  and it points down the hierarchy while `useStore` maps each beat *up* to a whole
+  chapter. Only one user-facing use (`TemplatesModal.tsx` "N beats") against 37 in
+  templates.ts. Also open: the generic `"Genre"` tag on Romance/Mystery, and the
+  count-duplicating tags (`"15 beats"`, `"12 stages"`, `"17 stages"`, `"8 steps"`).
+- Verified in-browser: a live Replace with Three-Act built all 8 chapters in order
+  with each prompt as the card subtitle, correctly sorted into acts; no console
+  errors. `npm run typecheck` clean. Built and deployed to GitHub Pages + the
+  portfolio site.
