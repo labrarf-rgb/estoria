@@ -3,10 +3,11 @@ import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
-import type { PinnedRef } from "@/types";
+import { countAllAssetLinks } from "@/lib/refs";
 
 export function NotesPanel() {
   const show = useStore((s) => s.showNotes);
+  const doc = useStore((s) => s.doc);
   const notes = useStore((s) => s.doc.storyNotes);
   const assets = useStore((s) => s.doc.assets);
   const activeBook = useStore((s) => s.doc.books.find((b) => b.id === s.doc.activeBookId));
@@ -21,6 +22,9 @@ export function NotesPanel() {
   const toggleTextarea = useStore((s) => s.toggleTextarea);
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
+  // One walk of the doc for every asset's link count (used by the caption and
+  // the delete confirm), instead of re-walking once per asset per render.
+  const linkCounts = countAllAssetLinks(doc);
 
   return (
     <Scrim onClose={close} z={55}>
@@ -60,10 +64,27 @@ export function NotesPanel() {
               <ViewToggle view={libView} onChange={setLibView} />
             </div>
             <RefList
-              refs={assets as PinnedRef[]}
+              refs={assets}
               onAdd={(kind) => addAsset(kind)}
               onUpdate={(id, patch) => updateAsset(id, patch)}
               onDelete={(id) => deleteAsset(id)}
+              deletePrompt={(r) => {
+                const n = linkCounts.get(r.id) ?? 0;
+                return {
+                  message: `Delete this ${r.kind === "IMAGE" ? "image" : "note"} everywhere?`,
+                  // "places" spans versions and books (matching the delete sweep),
+                  // so say so — a bare count reads like chapters.
+                  detail:
+                    n > 0
+                      ? `It is pinned in ${n} place${n === 1 ? "" : "s"} across your versions and books.`
+                      : "It isn't pinned anywhere.",
+                  danger: true,
+                };
+              }}
+              caption={(r) => {
+                const n = linkCounts.get(r.id) ?? 0;
+                return n > 0 ? `${n} pin${n === 1 ? "" : "s"} across versions & books` : "Not pinned yet";
+              }}
               view={libView}
             />
           </div>

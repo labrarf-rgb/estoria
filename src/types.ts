@@ -10,24 +10,24 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
 
 export type RefKind = "IMAGE" | "NOTE";
 
-/** A pinned reference on a chapter or world entry. */
+/**
+ * A pinned reference on a chapter or world entry. Since schema v5 a ref is a
+ * pure *link* to a shared `Asset` — it carries no content of its own, so the
+ * asset is the single source of truth and can never go stale in a stashed
+ * book/version we don't cheaply sweep. Content edits go through `updateAsset`;
+ * a ref only records "this asset is pinned here" (`id` is the link's own id,
+ * unique within its list, so the same asset can be pinned once per location).
+ */
 export interface PinnedRef {
   id: string;
-  kind: RefKind;
-  label: string;
-  /** Note text (for NOTE refs). */
-  body?: string;
-  /** Image data URL (for IMAGE refs uploaded by the user). */
-  src?: string;
-  /** When set, this ref mirrors a shared book-level asset. */
-  assetId?: string;
+  assetId: string;
 }
 
 /** A shared, book-level note or image that can be linked into many chapters. */

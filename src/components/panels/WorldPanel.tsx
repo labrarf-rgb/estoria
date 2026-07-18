@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
+import { resolveRefs } from "@/lib/refs";
 import type { WorldCategory } from "@/types";
 
 const CATEGORIES: WorldCategory[] = ["Place", "Faction", "Lore", "Event"];
@@ -10,6 +13,7 @@ const CATEGORIES: WorldCategory[] = ["Place", "Faction", "Lore", "Event"];
 export function WorldPanel() {
   const show = useStore((s) => s.showWorld);
   const world = useStore((s) => s.doc.world);
+  const assets = useStore((s) => s.doc.assets);
   const sel = useStore((s) => s.selWorld);
   const setPanel = useStore((s) => s.setPanel);
   const selectWorld = useStore((s) => s.selectWorld);
@@ -17,9 +21,12 @@ export function WorldPanel() {
   const updateWorldEntry = useStore((s) => s.updateWorldEntry);
   const deleteWorldEntry = useStore((s) => s.deleteWorldEntry);
   const addWorldRef = useStore((s) => s.addWorldRef);
-  const updateWorldRef = useStore((s) => s.updateWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
+  const linkAssetToWorld = useStore((s) => s.linkAssetToWorld);
+  const updateAsset = useStore((s) => s.updateAsset);
   const askConfirm = useStore((s) => s.askConfirm);
+  // Which world entry currently has the "link book asset" picker open.
+  const [linkFor, setLinkFor] = useState<string | null>(null);
   const refView = useStore((s) => s.refView);
   const setRefView = useStore((s) => s.setRefView);
   const descExpanded = useStore((s) => s.textareaExpanded.worldDesc);
@@ -126,12 +133,32 @@ export function WorldPanel() {
                         <ViewToggle view={refView} onChange={setRefView} />
                       </div>
                       <RefList
-                        refs={w.refs}
+                        refs={resolveRefs(w.refs, assets)}
                         onAdd={(kind) => addWorldRef(w.id, kind)}
-                        onUpdate={(refId, patch) => updateWorldRef(w.id, refId, patch)}
+                        onUpdate={(refId, patch) => {
+                          // Content edits write through to the shared asset.
+                          const link = w.refs.find((r) => r.id === refId);
+                          if (link) updateAsset(link.assetId, patch);
+                        }}
                         onDelete={(refId) => deleteWorldRef(w.id, refId)}
+                        deletePrompt={() => ({
+                          message: "Remove from this world entry?",
+                          detail: "It stays in the shared library.",
+                        })}
+                        onLink={() => setLinkFor((v) => (v === w.id ? null : w.id))}
+                        linkLabel="Link book asset"
                         view={refView}
                       />
+                      {linkFor === w.id && (
+                        <AssetLinkPicker
+                          assets={assets}
+                          linkedAssetIds={new Set(w.refs.map((r) => r.assetId))}
+                          onPick={(assetId) => {
+                            linkAssetToWorld(w.id, assetId);
+                            setLinkFor(null);
+                          }}
+                        />
+                      )}
                     </div>
                     <button
                       onClick={() =>

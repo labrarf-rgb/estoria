@@ -1950,3 +1950,135 @@ sync resumes — step-by-step port instructions were written to
   while a non-main version was active) is baked into every fork — only pre-bleed
   backups can recover it. A v4 file is a one-way door for older apps; the guard
   refuses reads, and the Android app must not sync until it speaks v4.
+
+### 2026-07-18 (Session 37) — Decision: asset-backed pinned references (schema v5); task written for Opus
+
+No code changed — a design session with the user on chapter/world pinned refs.
+Full findings and step-by-step implementation instructions are in
+`docs/REVIEW-FINDINGS.md`, section "Task — Asset-backed pinned references
+(schema v5)". Decisions locked:
+
+- **Every note/image added in a chapter's pinned refs or on a world entry is
+  created as a shared book Asset and auto-linked** — no more standalone refs.
+- **Asset links become live write-through** (today `linkAssetToChapter` takes a
+  snapshot copy; editing either side diverges silently).
+- **Existing standalone refs migrate into assets** — `SCHEMA_VERSION` 4 → **5**,
+  `PinnedRef` slims to `{id, assetId}`. Real migration via `normalizeDoc`
+  (Session 36b machinery); fork copies dedupe by ref-id + content; diverged
+  snapshots are preserved as separate assets (no data loss, no guessing which
+  side is newer).
+- **World entries included**, and the World panel gains the link-asset picker.
+- **Remove from chapter = unlink only; delete from library = unpin everywhere**
+  (confirm shows usage count; sweep covers all stashed books/versions).
+- Production impact: in-place migration on first load after deploy, nothing
+  wiped; disk files stay v4 until the first Sync (which backs up first and
+  never clobbers silently); v5 is a one-way door for older apps — **the Android
+  port target moves v4 → v5** (update the Android repo's task file).
+
+### 2026-07-18 (Session 38) — Asset-backed pinned references shipped (schema v5)
+
+Built the Session 37 task (`docs/REVIEW-FINDINGS.md`, "Task — Asset-backed
+pinned references"). Pinned refs are now pure links into the shared asset pool;
+all items in that task are marked ✅ there.
+
+- **Model** (`types.ts`): `SCHEMA_VERSION` 4 → **5**; `PinnedRef` slimmed to
+  `{ id, assetId }` (content fields deleted). `Asset` unchanged.
+- **Store** (`useStore.ts`): `addChapterRef`/`addWorldRef` now mint a shared
+  asset first, then pin a link. `updateChapterRef`/`updateWorldRef` **deleted**
+  (content edits go through `updateAsset` — live write-through). `linkAssetTo-
+  Chapter` appends a link and no-ops if already linked; added `linkAssetToWorld`.
+  `deleteAsset` sweeps all five ref locations via `removeAssetLinks` then drops
+  the asset.
+- **New lib** (`lib/refs.ts`): `resolveRefs`, `countAssetLinks`,
+  `removeAssetLinks` — each walks all five ref locations (active board,
+  `draftData`, `bookData` + its nested `draftData`, world). Same
+  missed-a-stash lesson as §9 item 5.
+- **UI**: `RefList` now renders resolved items and takes a caller-supplied
+  `deletePrompt` + optional `caption`. Chapter/World route edits to
+  `updateAsset` and deletes to *unlink* ("Remove from this chapter/world entry?
+  It stays in the shared library.", not danger); the library deletes the asset
+  ("Delete this note everywhere? …pinned in N places.", danger) and shows a
+  "Linked in N places" caption. New shared `ui/AssetLinkPicker.tsx` used by both
+  ChapterDetail and the World panel (which previously had no picker); already-
+  linked assets render disabled.
+- **Migration** (`persistence.ts` → `normalizeDoc` → `migrateRefsToAssets`):
+  runs last (after v3→v4 materialization), idempotent. Standalone → new asset;
+  fork copies dedupe by ref-id + content (one asset shared across forks);
+  diverged snapshots preserved as separate assets (no data loss); dangling
+  links rescued or dropped. The Session 36b `migrate` hook needed no change.
+- **Data/export**: `sampleStory.ts` rewritten born-v5 (13 assets, links with
+  stable ids) so a fresh load never runs migration; `markdown.ts` resolves the
+  `**Pinned:**` labels through `doc.assets`, skipping unresolved.
+
+Verified (dev server): `typecheck` + `build` clean. Migration exercised on a
+crafted v4 store (standalone note+image, a diverged snapshot, world refs, a
+version fork with duplicate-id copies, a stashed book, a second `projectStash`
+project) → reload produced 6 assets exactly, fork copies deduped to ONE asset
+each (linked in 2 places), the diverged snapshot preserved as its own asset, the
+stashed project migrated independently, 0 malformed/dangling refs, no console
+errors. Live UI: refs resolve and render; editing a note in the chapter modal
+wrote through to the shared asset with no copy (asset count unchanged, ref stayed
+`{id, assetId}`); the link picker lists the library with already-linked assets
+disabled.
+
+**Production impact / cross-app** (as decided in Session 37, unchanged): first
+open after deploy migrates localStorage in place, nothing wiped; disk files stay
+v4 until the first Sync (backs up first, never clobbers silently); `Schema-
+TooNewError` keeps v4 apps from mangling a v5 file. **The Android port target
+moves v4 → v5** — update the Android repo's `OPUS-TASK` file; no Android code was
+touched from here.
+
+### 2026-07-18 (Session 39) — Review fixes for the Session 38 asset-ref work
+
+Fixed all four items from the Session 38 code review (`docs/REVIEW-FINDINGS.md`,
+"Code review — Session 38 work"); all marked ✅ there.
+
+- **1 (robustness, pre-deploy):** `migrateRefsToAssets` walked `draftData`
+  un-defensively — a malformed version entry (`null`, or `chapters` not an
+  array; `draftData` is passed through un-normalized) threw, and the persist
+  `migrate` catch-all then replaced the ENTIRE store with the sample. Made
+  `convertChapters`/`convertVersions` tolerant: a non-array `chapters` → `[]`, a
+  non-object version entry → an emptied `{chapters:[],links:[],storyNotes:""}`.
+  One bad entry now degrades to that entry, never the whole doc. Well-formed
+  docs are byte-identical.
+- **2:** the "Linked in N places" caption only rendered in list view; added it
+  to both card cells (NOTE + IMAGE) in `RefList`. Absent when no `caption` prop.
+- **3:** replaced per-asset `countAssetLinks(doc, id)` (walked the whole doc
+  once per asset per render) with a single-walk `countAllAssetLinks(doc):
+  Map<assetId, count>` built once per `NotesPanel` render; deleted the old
+  single-asset walker (only NotesPanel used it).
+- **4 (wording):** the count spans all five sweep locations (versions + books),
+  so a bare "N places" read like N chapters. Reworded honestly — caption "N pins
+  across versions & books", confirm detail "…pinned in N places across your
+  versions and books." What is counted is unchanged (still agrees with the
+  delete sweep).
+
+Verified (dev server): `typecheck` + `build` clean. **Item 1:** seeded a v4
+store whose `draftData` held a valid fork + a `null` entry + `{chapters:"oops",
+links:null,storyNotes:42}`, plus a stashed book with a nested `{chapters:null}`
+version → reload did NOT wipe to sample (`projectTitle` preserved), the valid
+fork migrated intact, bad entries emptied, 0 dangling, no console errors; a
+separate clean-store migration reproduced the Session 38 numbers exactly (fork
+dedupe + diverged snapshot unchanged). **Item 2/4:** Notes library in card view
+shows the caption on all 13 cells with the new wording.
+
+### 2026-07-18 (Session 38 review) — Code review of the v5 asset-refs work
+
+Review-only pass over the uncommitted Session 38 changes (findings +
+instructions for Opus in `docs/REVIEW-FINDINGS.md`, "Session 38 work" section;
+all four items open). The implementation is sound and faithful to the Session
+37 task; cross-file tracing (sync diff, project merge, export, persist/migrate)
+found no stale consumers of the deleted ref content fields; typecheck + build
+clean.
+
+1. **Fix before deploy:** a malformed `draftData` entry crashes
+   `migrateRefsToAssets`, and inside the one-time localStorage migration the
+   migrate hook's catch-all then **wipes everything to the sample story** —
+   guard the walk so a bad version entry is dropped, not fatal.
+2. "Linked in N places" caption renders only in the library's list view, not
+   card view.
+3. `countAssetLinks` runs per asset per Notes-panel render (O(assets × doc)) —
+   build one count map per render instead.
+4. *(Wording, ask user)* the count treats each version fork as a "place", so
+   one pin + one fork reads "Linked in 2 places" — rephrase without changing
+   what is counted.

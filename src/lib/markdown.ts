@@ -99,8 +99,14 @@ export function buildMarkdown(doc: StoryDoc): string {
               : "";
           md += `${j + 1}. ${s}${conn}\n`;
         });
-        if (c.refs.length) {
-          md += `\n**Pinned:** ${c.refs.map((r) => `[[${r.label}]]`).join(", ")}\n`;
+        // Refs are pure links since v5 — resolve each label through the shared
+        // asset pool, skipping any that no longer resolve.
+        const pinned = c.refs
+          .map((r) => doc.assets.find((a) => a.id === r.assetId))
+          .filter((a): a is (typeof doc.assets)[number] => a != null)
+          .map((a) => `[[${a.label}]]`);
+        if (pinned.length) {
+          md += `\n**Pinned:** ${pinned.join(", ")}\n`;
         }
         md += `**Characters:** ${c.chars.map((id) => `[[${charName(id)}]]`).join(", ")}\n`;
       });

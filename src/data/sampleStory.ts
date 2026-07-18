@@ -91,8 +91,8 @@ export const sampleStory: StoryDoc = {
       desc: "A tide-flooded port built on the drowned bones of an older one.",
       notes: "Streets renumber themselves at high water; locals navigate by smell and habit.",
       refs: [
-        { id: "r-w1-1", kind: "IMAGE", label: "City skyline" },
-        { id: "r-w1-2", kind: "NOTE", label: "Tide schedule", body: "High water at dawn and dusk." },
+        { id: "r-w1-1", assetId: "a-w1-1" },
+        { id: "r-w1-2", assetId: "a-w1-2" },
       ],
     },
     {
@@ -101,7 +101,7 @@ export const sampleStory: StoryDoc = {
       name: "The False Harbor",
       desc: "A sheltered harbor that appears only on Wren's mother's map.",
       notes: "Safe, until it isn't. The walls remember who enters.",
-      refs: [{ id: "r-w2-1", kind: "NOTE", label: "Rules of the harbor", body: "" }],
+      refs: [{ id: "r-w2-1", assetId: "a-w2-1" }],
     },
     {
       id: "w3",
@@ -117,10 +117,26 @@ export const sampleStory: StoryDoc = {
       name: "Living Maps",
       desc: "Charts inked with tide-salt that quietly redraw themselves.",
       notes: "Only a handful of cartographers can still read them; fewer can draw one.",
-      refs: [{ id: "r-w4-1", kind: "IMAGE", label: "Salt-ink sample" }],
+      refs: [{ id: "r-w4-1", assetId: "a-w4-1" }],
     },
   ],
-  assets: [],
+  // Shared library. Every chapter/world ref links one of these (schema v5) — the
+  // sample is born-canonical so a fresh load never exercises migration.
+  assets: [
+    { id: "a-w1-1", kind: "IMAGE", label: "City skyline" },
+    { id: "a-w1-2", kind: "NOTE", label: "Tide schedule", body: "High water at dawn and dusk." },
+    { id: "a-w2-1", kind: "NOTE", label: "Rules of the harbor", body: "" },
+    { id: "a-w4-1", kind: "IMAGE", label: "Salt-ink sample" },
+    { id: "a-c1-1", kind: "IMAGE", label: "Tide-chart sketch" },
+    { id: "a-c1-2", kind: "NOTE", label: "Map symbology key", body: "Anchor = safe; gull = warning." },
+    { id: "a-c2-1", kind: "NOTE", label: "Cellar floorplan", body: "" },
+    { id: "a-c3-1", kind: "IMAGE", label: "Sela reference" },
+    { id: "a-c4-1", kind: "NOTE", label: "Barge crew notes", body: "" },
+    { id: "a-c5-1", kind: "IMAGE", label: "Harbor matte" },
+    { id: "a-c5-2", kind: "NOTE", label: "Who betrays whom", body: "" },
+    { id: "a-c7-1", kind: "NOTE", label: "Bram backstory", body: "" },
+    { id: "a-c8-1", kind: "IMAGE", label: "Final harbor" },
+  ],
 
   books: [
     {
@@ -178,8 +194,8 @@ export const sampleStory: StoryDoc = {
       ],
       sceneLinks: ["but", "therefore"],
       refs: [
-        { id: "r-c1-1", kind: "IMAGE", label: "Tide-chart sketch" },
-        { id: "r-c1-2", kind: "NOTE", label: "Map symbology key", body: "Anchor = safe; gull = warning." },
+        { id: "r-c1-1", assetId: "a-c1-1" },
+        { id: "r-c1-2", assetId: "a-c1-2" },
       ],
     },
     {
@@ -191,7 +207,7 @@ export const sampleStory: StoryDoc = {
         "Bram drags her out before the tide takes the shop.",
       ],
       sceneLinks: ["therefore", "but"],
-      refs: [{ id: "r-c2-1", kind: "NOTE", label: "Cellar floorplan", body: "" }],
+      refs: [{ id: "r-c2-1", assetId: "a-c2-1" }],
     },
     {
       id: "c3", num: 3, act: 1, status: "draft", title: "The Mentor's Shadow", words: 3100,
@@ -202,7 +218,7 @@ export const sampleStory: StoryDoc = {
         "Wren refuses and burns the only copy she'll admit to.",
       ],
       sceneLinks: ["therefore", "but"],
-      refs: [{ id: "r-c3-1", kind: "IMAGE", label: "Sela reference" }],
+      refs: [{ id: "r-c3-1", assetId: "a-c3-1" }],
     },
     {
       id: "c4", num: 4, act: 2, status: "draft", title: "Crossing the Salt", words: 3600,
@@ -213,7 +229,7 @@ export const sampleStory: StoryDoc = {
         "A storm strands them on an uncharted bar.",
       ],
       sceneLinks: ["and", "therefore"],
-      refs: [{ id: "r-c4-1", kind: "NOTE", label: "Barge crew notes", body: "" }],
+      refs: [{ id: "r-c4-1", assetId: "a-c4-1" }],
     },
     {
       id: "c5", num: 5, act: 2, status: "idea", title: "The False Harbor", words: 4100,
@@ -225,8 +241,8 @@ export const sampleStory: StoryDoc = {
       ],
       sceneLinks: ["but", "therefore"],
       refs: [
-        { id: "r-c5-1", kind: "IMAGE", label: "Harbor matte" },
-        { id: "r-c5-2", kind: "NOTE", label: "Who betrays whom", body: "" },
+        { id: "r-c5-1", assetId: "a-c5-1" },
+        { id: "r-c5-2", assetId: "a-c5-2" },
       ],
     },
     {
@@ -249,7 +265,7 @@ export const sampleStory: StoryDoc = {
         "Wren is left alone with the map and a choice.",
       ],
       sceneLinks: ["but", "but"],
-      refs: [{ id: "r-c7-1", kind: "NOTE", label: "Bram backstory", body: "" }],
+      refs: [{ id: "r-c7-1", assetId: "a-c7-1" }],
     },
     {
       id: "c8", num: 8, act: 3, status: "idea", title: "The True North", words: 4500,
@@ -261,7 +277,7 @@ export const sampleStory: StoryDoc = {
         "She redraws the map, and the coastline with it.",
       ],
       sceneLinks: ["therefore", "therefore"],
-      refs: [{ id: "r-c8-1", kind: "IMAGE", label: "Final harbor" }],
+      refs: [{ id: "r-c8-1", assetId: "a-c8-1" }],
     },
   ],
   links: [

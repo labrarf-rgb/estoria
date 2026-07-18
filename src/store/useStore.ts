@@ -8,12 +8,12 @@ import {
   type Chapter,
   type Character,
   type ConnType,
-  type PinnedRef,
   type RefKind,
   type StoryDoc,
   type WorldEntry,
 } from "@/types";
 import { activeVersionData, cloneVersionData } from "@/lib/drafts";
+import { removeAssetLinks } from "@/lib/refs";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -163,9 +163,8 @@ interface StoreState extends UiState {
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
-  // ---- chapter refs ----
+  // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind) => void;
-  updateChapterRef: (chId: string, refId: string, patch: Partial<PinnedRef>) => void;
   deleteChapterRef: (chId: string, refId: string) => void;
   linkAssetToChapter: (chId: string, assetId: string) => void;
 
@@ -203,8 +202,8 @@ interface StoreState extends UiState {
   updateWorldEntry: (id: string, patch: Partial<WorldEntry>) => void;
   deleteWorldEntry: (id: string) => void;
   addWorldRef: (wId: string, kind: RefKind) => void;
-  updateWorldRef: (wId: string, refId: string, patch: Partial<PinnedRef>) => void;
   deleteWorldRef: (wId: string, refId: string) => void;
+  linkAssetToWorld: (wId: string, assetId: string) => void;
 
   // ---- shared assets ----
   addAsset: (kind: RefKind) => string;
@@ -880,39 +879,30 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      // ---- chapter refs ----
+      // ---- chapter refs (pure links into the shared asset pool) ----
+      // Adding a note/image creates a shared Asset first, then pins a link to it
+      // — one pool of linkable content, no orphan per-chapter copies.
       addChapterRef: (chId, kind) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            chapters: s.doc.chapters.map((c) =>
-              c.id === chId
-                ? {
-                    ...c,
-                    refs: c.refs.concat({
-                      id: uid("r"),
-                      kind,
-                      label: "",
-                      body: kind === "NOTE" ? "" : undefined,
-                    }),
-                  }
-                : c
-            ),
-          },
-        })),
+        set((s) => {
+          const assetId = uid("a");
+          const asset: Asset = {
+            id: assetId,
+            kind,
+            label: "",
+            body: kind === "NOTE" ? "" : undefined,
+          };
+          return {
+            doc: {
+              ...s.doc,
+              assets: s.doc.assets.concat(asset),
+              chapters: s.doc.chapters.map((c) =>
+                c.id === chId ? { ...c, refs: c.refs.concat({ id: uid("r"), assetId }) } : c
+              ),
+            },
+          };
+        }),
 
-      updateChapterRef: (chId, refId, patch) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            chapters: s.doc.chapters.map((c) =>
-              c.id === chId
-                ? { ...c, refs: c.refs.map((r) => (r.id === refId ? { ...r, ...patch } : r)) }
-                : c
-            ),
-          },
-        })),
-
+      // Unlink only — the asset survives in the library.
       deleteChapterRef: (chId, refId) =>
         set((s) => ({
           doc: {
@@ -925,26 +915,15 @@ export const useStore = create<StoreState>()(
 
       linkAssetToChapter: (chId, assetId) =>
         set((s) => {
-          const asset = s.doc.assets.find((a) => a.id === assetId);
-          if (!asset) return s;
+          if (!s.doc.assets.some((a) => a.id === assetId)) return s;
           return {
             doc: {
               ...s.doc,
-              chapters: s.doc.chapters.map((c) =>
-                c.id === chId
-                  ? {
-                      ...c,
-                      refs: c.refs.concat({
-                        id: uid("r"),
-                        kind: asset.kind,
-                        label: asset.label,
-                        body: asset.body,
-                        src: asset.src,
-                        assetId: asset.id,
-                      }),
-                    }
-                  : c
-              ),
+              chapters: s.doc.chapters.map((c) => {
+                if (c.id !== chId) return c;
+                if (c.refs.some((r) => r.assetId === assetId)) return c; // already linked
+                return { ...c, refs: c.refs.concat({ id: uid("r"), assetId }) };
+              }),
             },
           };
         }),
@@ -1276,38 +1255,28 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      // World-entry refs mirror chapter refs: create the shared asset, pin a link.
       addWorldRef: (wId, kind) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            world: s.doc.world.map((w) =>
-              w.id === wId
-                ? {
-                    ...w,
-                    refs: w.refs.concat({
-                      id: uid("r"),
-                      kind,
-                      label: "",
-                      body: kind === "NOTE" ? "" : undefined,
-                    }),
-                  }
-                : w
-            ),
-          },
-        })),
+        set((s) => {
+          const assetId = uid("a");
+          const asset: Asset = {
+            id: assetId,
+            kind,
+            label: "",
+            body: kind === "NOTE" ? "" : undefined,
+          };
+          return {
+            doc: {
+              ...s.doc,
+              assets: s.doc.assets.concat(asset),
+              world: s.doc.world.map((w) =>
+                w.id === wId ? { ...w, refs: w.refs.concat({ id: uid("r"), assetId }) } : w
+              ),
+            },
+          };
+        }),
 
-      updateWorldRef: (wId, refId, patch) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            world: s.doc.world.map((w) =>
-              w.id === wId
-                ? { ...w, refs: w.refs.map((r) => (r.id === refId ? { ...r, ...patch } : r)) }
-                : w
-            ),
-          },
-        })),
-
+      // Unlink only — the asset survives in the library.
       deleteWorldRef: (wId, refId) =>
         set((s) => ({
           doc: {
@@ -1317,6 +1286,21 @@ export const useStore = create<StoreState>()(
             ),
           },
         })),
+
+      linkAssetToWorld: (wId, assetId) =>
+        set((s) => {
+          if (!s.doc.assets.some((a) => a.id === assetId)) return s;
+          return {
+            doc: {
+              ...s.doc,
+              world: s.doc.world.map((w) => {
+                if (w.id !== wId) return w;
+                if (w.refs.some((r) => r.assetId === assetId)) return w; // already linked
+                return { ...w, refs: w.refs.concat({ id: uid("r"), assetId }) };
+              }),
+            },
+          };
+        }),
 
       // ---- shared assets ----
       addAsset: (kind) => {
@@ -1340,10 +1324,15 @@ export const useStore = create<StoreState>()(
           doc: { ...s.doc, assets: s.doc.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)) },
         })),
 
+      // Deleting a library asset unpins it EVERYWHERE — active board, stashed
+      // versions, stashed books and their versions, and world entries — then
+      // drops the asset. Missing a location would leave dangling links (the
+      // same lesson SPECS §9 item 5 records for deleteCharacter).
       deleteAsset: (id) =>
-        set((s) => ({
-          doc: { ...s.doc, assets: s.doc.assets.filter((a) => a.id !== id) },
-        })),
+        set((s) => {
+          const swept = removeAssetLinks(s.doc, id);
+          return { doc: { ...swept, assets: swept.assets.filter((a) => a.id !== id) } };
+        }),
 
       // ---- drafts / versions ----
       // Each version is a standalone fork of the board: creating one deep-copies

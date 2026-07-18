@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
+import { resolveRefs } from "@/lib/refs";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
@@ -40,9 +42,9 @@ export function ChapterDetail() {
   const cycleSceneLink = useStore((s) => s.cycleSceneLink);
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
-  const updateChapterRef = useStore((s) => s.updateChapterRef);
   const deleteChapterRef = useStore((s) => s.deleteChapterRef);
   const linkAssetToChapter = useStore((s) => s.linkAssetToChapter);
+  const updateAsset = useStore((s) => s.updateAsset);
   const addCharacter = useStore((s) => s.addCharacter);
   const addWorldEntry = useStore((s) => s.addWorldEntry);
   const askConfirm = useStore((s) => s.askConfirm);
@@ -908,41 +910,31 @@ export function ChapterDetail() {
           {!collapsed.refs && (
           <>
           <RefList
-            refs={ch.refs}
+            refs={resolveRefs(ch.refs, doc.assets)}
             onAdd={(kind) => addChapterRef(ch.id, kind)}
-            onUpdate={(refId, patch) => updateChapterRef(ch.id, refId, patch)}
+            onUpdate={(refId, patch) => {
+              // Content edits write through to the shared asset this ref links.
+              const link = ch.refs.find((r) => r.id === refId);
+              if (link) updateAsset(link.assetId, patch);
+            }}
             onDelete={(refId) => deleteChapterRef(ch.id, refId)}
+            deletePrompt={() => ({
+              message: "Remove from this chapter?",
+              detail: "It stays in the shared library.",
+            })}
             onLink={() => setLinkOpen((v) => !v)}
             linkLabel="Link book asset"
             view={refView}
           />
           {linkOpen && (
-            <div className="mt-3 rounded-xl border border-rule bg-card p-3">
-              <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-wide text-faint">
-                Link from the shared library
-              </div>
-              {doc.assets.length === 0 ? (
-                <div className="text-[12px] text-faint">
-                  No book assets yet. Add notes or images in the Notes panel&apos;s shared library.
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-[7px]">
-                  {doc.assets.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => {
-                        linkAssetToChapter(ch.id, a.id);
-                        setLinkOpen(false);
-                      }}
-                      className="rounded-lg border border-rule bg-panel px-[10px] py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                    >
-                      {a.kind === "IMAGE" ? "🖼 " : "📝 "}
-                      {a.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <AssetLinkPicker
+              assets={doc.assets}
+              linkedAssetIds={new Set(ch.refs.map((r) => r.assetId))}
+              onPick={(assetId) => {
+                linkAssetToChapter(ch.id, assetId);
+                setLinkOpen(false);
+              }}
+            />
           )}
           </>
           )}

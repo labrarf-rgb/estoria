@@ -1,10 +1,13 @@
 import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
+  type Asset,
   type BookData,
   type Chapter,
   type ChapterLink,
   type DraftVersion,
+  type PinnedRef,
+  type RefKind,
   type StoryDoc,
   type VersionData,
 } from "@/types";
@@ -228,6 +231,146 @@ function materializeLegacyVersions(
 }
 
 /**
+ * A pre-v5 ref, as it exists on disk: it carried its own content
+ * (`kind`/`label`/`body`/`src`) and an optional `assetId` snapshot link. v5 refs
+ * are pure `{ id, assetId }` links; this is the shape we read *from* to migrate.
+ */
+interface LegacyRef {
+  id?: string;
+  kind?: RefKind;
+  label?: string;
+  body?: string;
+  src?: string;
+  assetId?: string;
+}
+
+// Fresh ids minted during migration. A counter keeps them unique within one
+// normalize pass without colliding with the store's runtime uid() ids.
+let migSeq = 0;
+const migId = (prefix: string) => `${prefix}-mig-${Date.now().toString(36)}-${(migSeq++).toString(36)}`;
+
+/**
+ * Schema v4 → v5: pinned refs stop carrying content and become pure links into
+ * the doc-level `assets` pool. Walk every ref in all five locations (active
+ * chapters, `draftData`, `bookData` incl. its nested `draftData`, and world
+ * entries) and, for each:
+ *
+ *  - **Standalone** (no `assetId`): create an Asset from its content, link to it.
+ *  - **Fork-copy dedupe**: version forks duplicated ref *objects with identical
+ *    ids*. Dedupe key is `ref.id` + content, so identical copies collapse to ONE
+ *    shared asset while a fork that was edited after forking (same id, diverged
+ *    content) becomes its own asset. Never dedupe by content alone — that would
+ *    silently merge two unrelated identical notes into one live-linked note.
+ *  - **Already-linked snapshot** (`assetId` set, asset exists): content equal →
+ *    just slim to `{ id, assetId }`. Content diverged (either side edited after
+ *    linking; we can't know which is newer) → preserve the ref's content as a
+ *    NEW asset, no data loss.
+ *  - **Dangling `assetId`** (asset missing): has content → new asset; else drop.
+ *
+ * Idempotent: a v5 doc's refs already have no content, so each resolves to its
+ * existing asset unchanged. Runs last, after v3→v4 version materialization.
+ */
+function migrateRefsToAssets(doc: StoryDoc): StoryDoc {
+  const assets: Asset[] = doc.assets.map((a) => ({ ...a }));
+  const assetById = new Map(assets.map((a) => [a.id, a]));
+  const minted = new Map<string, string>(); // `${refId} ${content}` -> assetId
+
+  const contentKey = (r: { kind?: RefKind; label?: string; body?: string; src?: string }) =>
+    JSON.stringify([r.kind === "IMAGE" ? "IMAGE" : "NOTE", r.label ?? "", r.body ?? "", r.src ?? ""]);
+
+  const mint = (r: LegacyRef, refId: string): string => {
+    const key = `${refId} ${contentKey(r)}`;
+    const hit = minted.get(key);
+    if (hit) return hit;
+    const id = migId("a");
+    const kind: RefKind = r.kind === "IMAGE" ? "IMAGE" : "NOTE";
+    const asset: Asset = {
+      id,
+      kind,
+      label: r.label ?? "",
+      ...(kind === "NOTE" ? { body: r.body ?? "" } : {}),
+      ...(r.src !== undefined ? { src: r.src } : {}),
+    };
+    assets.push(asset);
+    assetById.set(id, asset);
+    minted.set(key, id);
+    return id;
+  };
+
+  const convert = (raw: LegacyRef): PinnedRef | null => {
+    const refId = raw.id ?? migId("r");
+    const hasContent =
+      raw.kind !== undefined ||
+      raw.label !== undefined ||
+      raw.body !== undefined ||
+      raw.src !== undefined;
+    if (raw.assetId) {
+      const asset = assetById.get(raw.assetId);
+      if (asset) {
+        // Equal (or already a pure v5 link) → keep the link as-is.
+        if (!hasContent || contentKey(raw) === contentKey(asset)) {
+          return { id: refId, assetId: raw.assetId };
+        }
+        // Diverged snapshot → preserve the ref's content as its own new asset.
+        return { id: refId, assetId: mint(raw, refId) };
+      }
+      // Dangling link: rescue any cached content, otherwise drop the ref.
+      return hasContent ? { id: refId, assetId: mint(raw, refId) } : null;
+    }
+    // Standalone ref → new asset. (A contentless standalone can't be preserved.)
+    return hasContent ? { id: refId, assetId: mint(raw, refId) } : null;
+  };
+
+  const convertRefs = (refs: unknown): PinnedRef[] =>
+    (Array.isArray(refs) ? (refs as LegacyRef[]) : [])
+      .map(convert)
+      .filter((r): r is PinnedRef => r !== null);
+
+  // Defensive walks: this runs inside the one-time v4→v5 migration, where a
+  // throw is caught by the persist `migrate` hook and replaces the ENTIRE store
+  // (active doc + every stash) with the sample. A single malformed version entry
+  // — `draftData` is passed through un-normalized, so hand-edited/foreign blobs
+  // can carry `null` or a non-array `chapters` — must degrade to that one entry
+  // being emptied, never sink the whole doc. Well-formed docs are unaffected.
+  const convertChapters = (chapters: unknown): Chapter[] =>
+    (Array.isArray(chapters) ? (chapters as Chapter[]) : []).map((c) => ({
+      ...(c as object),
+      refs: convertRefs((c as { refs?: unknown })?.refs),
+    })) as Chapter[];
+  const convertVersions = (dd: unknown): Record<string, VersionData> => {
+    if (!dd || typeof dd !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(dd as Record<string, unknown>).map(([id, v]) => {
+        const version = (v && typeof v === "object" ? v : {}) as Partial<VersionData>;
+        return [
+          id,
+          {
+            ...version,
+            chapters: convertChapters(version.chapters),
+            links: Array.isArray(version.links) ? version.links : [],
+            storyNotes: typeof version.storyNotes === "string" ? version.storyNotes : "",
+          },
+        ];
+      })
+    );
+  };
+
+  return {
+    ...doc,
+    assets,
+    chapters: convertChapters(doc.chapters),
+    draftData: convertVersions(doc.draftData),
+    bookData: Object.fromEntries(
+      Object.entries(doc.bookData).map(([id, b]) => [
+        id,
+        { ...b, chapters: convertChapters(b.chapters), draftData: convertVersions(b.draftData) },
+      ])
+    ),
+    world: doc.world.map((w) => ({ ...w, refs: convertRefs(w.refs) })),
+  };
+}
+
+/**
  * Coerce a parsed project file into a complete, current-schema StoryDoc.
  * Older exports (pre-v3: no books/bookData/drafts; pre-v4: overlay-style
  * versions) and hand-edited files get every missing field defaulted or
@@ -339,7 +482,7 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     bookData[id] = { ...bBoard, drafts: bDrafts, activeDraftId: bActive };
   }
 
-  return {
+  const normalized: StoryDoc = {
     schemaVersion: SCHEMA_VERSION,
     id: typeof d.id === "string" && d.id ? d.id : `story-${Date.now().toString(36)}`,
     projectTitle: title,
@@ -361,6 +504,10 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     draftData: board.draftData,
     bookData,
   };
+
+  // v4 → v5: refs become pure links into the shared asset pool. Runs last, so
+  // v3-overlay docs have already been materialized into v4 forks (order matters).
+  return migrateRefsToAssets(normalized);
 }
 
 /** Parse a project file picked from disk. Throws on malformed/unrecognized files. */

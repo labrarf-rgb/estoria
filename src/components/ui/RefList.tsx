@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { readFileAsDataURL } from "@/lib/files";
-import type { PinnedRef, RefKind } from "@/types";
+import type { RefKind } from "@/types";
+import type { ResolvedRef } from "@/lib/refs";
 import type { RefView } from "@/components/ui/ViewToggle";
 
 /**
  * Editable collection of pinned references (notes + uploadable images). Reused by
  * the chapter detail, the World panel, and the notes/assets library.
+ *
+ * Since schema v5 the list is "dumb": it renders **resolved** items (content
+ * pulled from the shared asset each ref links to) and reports edits/removals by
+ * the item's `id`. The callers decide what an edit or a removal *means* — chapter
+ * and world callers route `onUpdate` to `updateAsset` (live write-through) and
+ * `onDelete` to an unlink; the library routes them straight to the asset.
+ * `deletePrompt` lets each caller phrase its own confirm (unlink vs. delete).
  *
  * Two layouts, chosen by `view`:
  *  - "card": a wrap grid of fixed-size cells (default).
@@ -20,32 +28,39 @@ export function RefList({
   onDelete,
   onLink,
   linkLabel = "Link asset",
+  deletePrompt,
+  caption,
   view = "list",
 }: {
-  refs: PinnedRef[];
+  refs: ResolvedRef[];
   onAdd: (kind: RefKind) => void;
-  onUpdate: (refId: string, patch: Partial<PinnedRef>) => void;
-  onDelete: (refId: string) => void;
+  onUpdate: (id: string, patch: Partial<Pick<ResolvedRef, "label" | "body" | "src">>) => void;
+  onDelete: (id: string) => void;
   onLink?: () => void;
   linkLabel?: string;
+  /** Per-item confirm copy; defaults to a plain danger "Delete this note/image?". */
+  deletePrompt?: (r: ResolvedRef) => { message: string; detail?: string; danger?: boolean };
+  /** Optional small muted line under each item (e.g. "Linked in 3 places"). */
+  caption?: (r: ResolvedRef) => string | undefined;
   view?: RefView;
 }) {
   const openLightbox = useStore((s) => s.openLightbox);
   const askConfirm = useStore((s) => s.askConfirm);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const upload = async (refId: string, file: File | undefined) => {
+  const upload = async (id: string, file: File | undefined) => {
     if (!file) return;
     const src = await readFileAsDataURL(file);
-    onUpdate(refId, { src, label: file.name.replace(/\.[^.]+$/, "") });
+    onUpdate(id, { src, label: file.name.replace(/\.[^.]+$/, "") });
   };
 
-  const confirmDelete = (r: PinnedRef) =>
-    askConfirm({
+  const confirmDelete = (r: ResolvedRef) => {
+    const prompt = deletePrompt?.(r) ?? {
       message: `Delete this ${r.kind === "IMAGE" ? "image" : "note"}?`,
       danger: true,
-      onConfirm: () => onDelete(r.id),
-    });
+    };
+    askConfirm({ ...prompt, onConfirm: () => onDelete(r.id) });
+  };
 
   const addButtons = () => (
     <>
@@ -83,6 +98,7 @@ export function RefList({
           const open = openId === r.id;
           const snippet =
             r.kind === "IMAGE" ? "Image" : (r.body ?? "").trim() || "Empty note";
+          const cap = caption?.(r);
           return (
             <div key={r.id} className="rounded-[10px] border border-rule bg-card">
               <div className="group flex items-center gap-[10px] px-[12px] py-[9px]">
@@ -95,6 +111,7 @@ export function RefList({
                     {r.label || (r.kind === "IMAGE" ? "Untitled image" : "Untitled note")}
                   </div>
                   <div className="truncate text-[11.5px] text-soft">{snippet}</div>
+                  {cap && <div className="truncate text-[10.5px] text-faint">{cap}</div>}
                 </button>
                 <button
                   onClick={() => setOpenId(open ? null : r.id)}
@@ -116,7 +133,7 @@ export function RefList({
                     <button
                       onClick={() => confirmDelete(r)}
                       className="shrink-0 text-[12px] text-faint hover:text-but"
-                      title="Delete"
+                      title="Remove"
                     >
                       ✕
                     </button>
@@ -194,10 +211,13 @@ export function RefList({
               onChange={(e) => onUpdate(r.id, { label: e.target.value })}
               className="mt-[5px] h-[20px] w-full shrink-0 bg-transparent text-[11.5px] font-medium text-ink outline-none"
             />
+            {caption?.(r) && (
+              <div className="shrink-0 truncate text-[10.5px] text-faint">{caption(r)}</div>
+            )}
             <button
               onClick={() => confirmDelete(r)}
               className="absolute right-[5px] top-[5px] hidden h-[20px] w-[20px] items-center justify-center rounded-md bg-black/45 text-[11px] text-white group-hover:flex"
-              title="Delete"
+              title="Remove"
             >
               ✕
             </button>
@@ -219,10 +239,13 @@ export function RefList({
               placeholder="Note..."
               className="flex-1 resize-none bg-transparent text-[12px] leading-[1.45] text-soft outline-none placeholder:text-faint"
             />
+            {caption?.(r) && (
+              <div className="shrink-0 truncate text-[10.5px] text-faint">{caption(r)}</div>
+            )}
             <button
               onClick={() => confirmDelete(r)}
               className="absolute right-[7px] top-[7px] hidden text-[12px] text-faint hover:text-but group-hover:block"
-              title="Delete"
+              title="Remove"
             >
               ✕
             </button>
