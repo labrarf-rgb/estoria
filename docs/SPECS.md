@@ -511,7 +511,7 @@ with a session-log entry.
    Fix: bridge the two neighbors (same idea as `reorderChapter`'s rebuild).
 5. ✅ **Fixed 2026-07-01 (Session 20)**; **re-fixed 2026-07-18 (Session 40)**
    — Session 20's sweep only covered `chapters` + `bookData[*].chapters`;
-   schema v4 (Session established `draftData` version forks) added two more
+   schema v4 (Session 36b established `draftData` version forks) added two more
    chapter locations that were never swept. See Session 40 entry below. Both
    deletes now sweep the active book's chapters *and* every stashed
    `bookData[*]` book, in both the active version and every `draftData[*]`
@@ -2117,7 +2117,7 @@ Task written by an Android-repo review session
 (`SONNET-TASK-fork-sweep-deletes.md`, now deleted). Characters and world
 entries are series-level; chapters that reference them (`chars`/`worldRefs`)
 live in **four** board locations since schema v4 added `draftData` version
-forks (Session 798a8ca): `doc.chapters`, `doc.draftData[*].chapters`,
+forks (Session 36b, commit 798a8ca): `doc.chapters`, `doc.draftData[*].chapters`,
 `doc.bookData[*].chapters`, `doc.bookData[*].draftData[*].chapters`. Both
 deletes (fixed for locations 1 and 3 back in Session 20, §9 item 5) were never
 updated for the two `draftData` layers added later — a leftover from when
