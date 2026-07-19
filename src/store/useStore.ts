@@ -14,6 +14,7 @@ import {
 } from "@/types";
 import { activeVersionData, cloneVersionData } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
+import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -1188,24 +1189,10 @@ export const useStore = create<StoreState>()(
         })),
 
       deleteCharacter: (id) =>
-        set((s) => {
-          // Characters are series-level: drop the id from the active book's
-          // chapters AND every stashed book, or inactive books keep dangling ids.
-          const sweep = (chs: Chapter[]) =>
-            chs.map((c) => (c.chars.includes(id) ? { ...c, chars: c.chars.filter((x) => x !== id) } : c));
-          const bookData = Object.fromEntries(
-            Object.entries(s.doc.bookData).map(([bid, b]) => [bid, { ...b, chapters: sweep(b.chapters) }])
-          );
-          return {
-            doc: {
-              ...s.doc,
-              characters: s.doc.characters.filter((c) => c.id !== id),
-              chapters: sweep(s.doc.chapters),
-              bookData,
-            },
-            selChar: s.selChar === id ? null : s.selChar,
-          };
-        }),
+        set((s) => ({
+          doc: deleteCharacterDoc(s.doc, id),
+          selChar: s.selChar === id ? null : s.selChar,
+        })),
 
       // ---- world ----
       addWorldEntry: () =>
@@ -1234,26 +1221,10 @@ export const useStore = create<StoreState>()(
         })),
 
       deleteWorldEntry: (id) =>
-        set((s) => {
-          // Like deleteCharacter: clear the id from chapter worldRefs in the
-          // active book and every stashed book.
-          const sweep = (chs: Chapter[]) =>
-            chs.map((c) =>
-              c.worldRefs?.includes(id) ? { ...c, worldRefs: c.worldRefs.filter((x) => x !== id) } : c
-            );
-          const bookData = Object.fromEntries(
-            Object.entries(s.doc.bookData).map(([bid, b]) => [bid, { ...b, chapters: sweep(b.chapters) }])
-          );
-          return {
-            doc: {
-              ...s.doc,
-              world: s.doc.world.filter((w) => w.id !== id),
-              chapters: sweep(s.doc.chapters),
-              bookData,
-            },
-            selWorld: s.selWorld === id ? null : s.selWorld,
-          };
-        }),
+        set((s) => ({
+          doc: deleteWorldEntryDoc(s.doc, id),
+          selWorld: s.selWorld === id ? null : s.selWorld,
+        })),
 
       // World-entry refs mirror chapter refs: create the shared asset, pin a link.
       addWorldRef: (wId, kind) =>

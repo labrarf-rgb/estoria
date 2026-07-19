@@ -509,9 +509,13 @@ with a session-log entry.
    touching the deleted chapter are filtered out but the neighbors are never
    re-joined, leaving a permanent gap in the therefore-chain on the board.
    Fix: bridge the two neighbors (same idea as `reorderChapter`'s rebuild).
-5. ✅ **Fixed 2026-07-01 (Session 20)** — both deletes now sweep the active
-   book's chapters *and* every stashed `bookData[*]` book; world deletes clear
-   `worldRefs` too. *Original finding:*
+5. ✅ **Fixed 2026-07-01 (Session 20)**; **re-fixed 2026-07-18 (Session 40)**
+   — Session 20's sweep only covered `chapters` + `bookData[*].chapters`;
+   schema v4 (Session established `draftData` version forks) added two more
+   chapter locations that were never swept. See Session 40 entry below. Both
+   deletes now sweep the active book's chapters *and* every stashed
+   `bookData[*]` book, in both the active version and every `draftData[*]`
+   fork; world deletes clear `worldRefs` too. *Original finding:*
    **`deleteCharacter` / `deleteWorldEntry` leave dangling ids.**
    `deleteCharacter` cleans only the *active* book's chapters — chapters
    stashed in `bookData` (inactive books) keep the deleted id in `chars`.
@@ -2082,3 +2086,61 @@ clean.
 4. *(Wording, ask user)* the count treats each version fork as a "place", so
    one pin + one fork reads "Linked in 2 places" — rephrase without changing
    what is counted.
+
+### 2026-07-18 (Session 39b) — Android v5 port task written (feature parity + file compatibility)
+
+No web code changed. Wrote the step-by-step Android port instructions to
+`/Users/rfcl/AndroidStudioProjects/Estoria-aa/OPUS-TASK-schema-v5-asset-refs.md`
+(same pattern as the v4 task, which is ✅ complete there as of 2026-07-17).
+Scope surveyed in the Android repo first: it still implements v4 snapshot-copy
+semantics (standalone `addChapterRef`/`addWorldRef`, snapshot
+`linkAssetToChapter`, `updateChapterRef`/`updateWorldRef`, no delete sweep, no
+world link picker) — all mapped file-by-file in the task. Highlights:
+
+- Model bump to 5 with legacy ref fields readable-never-rewritten (the
+  `overrides` precedent); guard moves to >5 (verify it uses the constant).
+- Faithful `migrateRefsToAssets` port **including the Session 39 defensive
+  walk**; five-location walkers (`Refs.kt` = web `lib/refs.ts`); asset-first
+  adds, write-through, unlink-vs-delete-everywhere semantics; world picker;
+  library caption/confirm using the Session 39 wording ("N pins across
+  versions & books"); Markdown `**Pinned:**` resolved via assets.
+- **Determinism caveat on record:** minted migration ids are time-based, so
+  both apps converting the same pre-v5 file independently yields differing
+  asset ids → one accepted one-time sync conflict; canonical flow is web
+  converts/writes v5, Android reads v5.
+- Until the port lands, Android's existing >4 guard correctly refuses v5 files
+  — cross-app sync stays paused, nothing can be mangled.
+
+### 2026-07-18 (Session 40) — deleteCharacter/deleteWorldEntry: sweep version forks (parity with Android)
+
+Task written by an Android-repo review session
+(`SONNET-TASK-fork-sweep-deletes.md`, now deleted). Characters and world
+entries are series-level; chapters that reference them (`chars`/`worldRefs`)
+live in **four** board locations since schema v4 added `draftData` version
+forks (Session 798a8ca): `doc.chapters`, `doc.draftData[*].chapters`,
+`doc.bookData[*].chapters`, `doc.bookData[*].draftData[*].chapters`. Both
+deletes (fixed for locations 1 and 3 back in Session 20, §9 item 5) were never
+updated for the two `draftData` layers added later — a leftover from when
+versions were overlays, not forks. Dangling ids in a fork are invisible
+(renders skip missing ids, `normalizeDoc` doesn't prune) but permanent, and
+the Android app's `lib/Entities.kt` already swept all four locations (fixed
+there 2026-07-18), so the same delete on phone vs. desktop produced
+byte-different docs — a false **Diverged** conflict on sync.
+
+Fix: extracted `deleteCharacterDoc`/`deleteWorldEntryDoc` to new
+`src/lib/entities.ts`, sharing a `mapEveryChapter` walker over all four
+locations (same shape as `removeAssetLinks` in `lib/refs.ts`, which already
+covers all four for asset refs + world). Sweeps only touch chapters where the
+id is actually present (`includes(id) ? copy : c` guard) so untouched
+chapters' bytes don't churn; emptied lists stay `[]`, not deleted keys. The
+store's `deleteCharacter`/`deleteWorldEntry` actions now just call the lib
+function and reset `selChar`/`selWorld` — no doc-shape logic left inline.
+
+Verified (dev server, `estoria:store:v1` inspected via devtools console): the
+bundled sample doc's "Alt ending" version fork had `wren` in every chapter's
+`chars`; deleting Wren Calloway from the Characters panel removed `wren` from
+`doc.characters` **and** from every `draftData.alt.chapters[*].chars`
+(confirmed via `JSON.stringify(doc).includes('"wren"') === false`) — the exact
+gap this closes. `typecheck` and `build` both clean. Closes the divergence the
+Android repo logged 2026-07-18; both apps now produce identical docs from the
+same delete.
