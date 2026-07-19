@@ -30,3 +30,13 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 | `npm run build` | Typecheck + production build to `dist/` |
 | `npm run typecheck` | Types only |
 | `npm run preview` | Serve the production build |
+| `npm run deploy` | Build + publish to www.labrarf.com/estoria, then verify the deployed commit is live (refuses a dirty tree) |
+
+## Versioning / confirming a deploy
+
+The release number is `version` in `package.json`. A **production** build stamps
+the git commit and build time into the app (About dialog) and writes
+`dist/version.json`. `npm run deploy` publishes and then polls the live site
+until `/estoria/version.json` reports the commit you deployed — so you get an
+explicit "✓ live" that the build you committed is what prod is serving. Dev
+builds show `dev` instead of a commit (a running dev server isn't a release).

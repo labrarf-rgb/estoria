@@ -9,9 +9,15 @@ export function AboutModal() {
   if (!show) return null;
   const close = () => setPanel("showAbout", false);
 
-  // Compact UTC build stamp (e.g. "2026-07-18 14:32 UTC") — changes every build,
-  // so it confirms which deployed bundle is actually loaded.
-  const buildLabel = __BUILD_TIME__.slice(0, 16).replace("T", " ") + " UTC";
+  // Build stamp. `build` increments on every commit, so this changes for every
+  // change you deploy — compare it (or the SHA) against what you shipped to
+  // confirm the website is serving your latest build. Injected into index.html
+  // by the estoria-build-info plugin: fresh per load in dev, frozen in prod.
+  const b = window.__ESTORIA_BUILD__;
+  const stamp = b
+    ? `v${b.version} · build ${b.build} · ${b.commit}` +
+      (b.builtAt ? ` · ${b.builtAt.slice(0, 16).replace("T", " ")} UTC` : "")
+    : "build info unavailable";
 
   return (
     <Scrim onClose={close} z={70} center>
@@ -30,9 +36,7 @@ export function AboutModal() {
               app through a shared folder (footer → Sync).
             </div>
             <div className="text-faint">Project file format: .estoria.json (schema v{SCHEMA_VERSION})</div>
-            <div className="text-faint">
-              Version {__APP_VERSION__} ({__GIT_COMMIT__}) · build {buildLabel}
-            </div>
+            <div className="text-faint">{stamp}</div>
           </div>
           <div className="mt-[14px] text-[12.5px] text-soft">
             Built by{" "}

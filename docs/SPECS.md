@@ -2186,3 +2186,38 @@ time via `providers.exec` at configuration time and exposes them as
 them. Compiles clean; generated `BuildConfig` confirmed. **Each app shows its
 own repo's commit — they intentionally differ** (each proves its own platform's
 build). Documented on the Android side in `ESTORIA-ANDROID.md` Session 17.
+
+### 2026-07-19 (Session 42) — Build stamp reworked to an auto-incrementing number
+
+**Supersedes Session 41's mechanism.** Two rounds of feedback reframed the goal:
+what's actually wanted is a number that (a) **changes on every change** with no
+manual bump, and (b) confirms the exact committed build reached prod (the
+website is where writing happens). Session 41's raw SHA changed per commit but
+didn't read as a "number," and a manual `package.json` version (briefly
+considered) doesn't change per change at all. Landing point:
+
+- **Build number = `git rev-list --count HEAD`** — a monotonic integer that
+  ticks up on every commit (…59 → 60 → 61…). Paired with the short SHA
+  (`-dev` when the tree is dirty) and build time. Semver `version` stays as the
+  human release label. About shows: `v0.1.0 · build 60 · 014dd82 · <ts> UTC`.
+- **Injected into `index.html`, not `define`d.** A small Vite plugin
+  (`estoria-build-info`) writes `window.__ESTORIA_BUILD__` via
+  `transformIndexHtml`. That hook runs **per request in dev** (so a long-running
+  dev server is never stale — the exact bug that kicked this off) and **once,
+  frozen, in a prod build** (so `index.html` and `version.json` agree). The old
+  `__APP_VERSION__` / `__GIT_COMMIT__` / `__BUILD_TIME__` globals are gone;
+  `Window.__ESTORIA_BUILD__` typed in `vite-env.d.ts`.
+- **`dist/version.json`** (`{version, build, commit, builtAt}`) is emitted on
+  prod builds as a cache-bustable manifest for deploy verification.
+- **`npm run deploy`** (`scripts/deploy.sh`) is the whole loop: refuses a dirty
+  tree (prod must carry a real commit), builds, `rsync`s into the portfolio
+  repo, commits + pushes it, then polls `…/estoria/version.json` until prod
+  reports the shipped `commit` — an explicit "✓ live" that your approved build
+  is what the website serves. Replaces the old `sync:portfolio` script.
+
+**Android parity (Session 18):** same `v… · build N · sha · time` line, where
+`build N` = commit count and now also drives `versionCode`. Separate repo, so
+its count differs from the web app's — expected.
+
+Verified: dev About shows `build 60` and refreshes on reload (fresh per-request
+injection confirmed via `window.__ESTORIA_BUILD__`); `typecheck` clean.
