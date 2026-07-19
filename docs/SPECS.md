@@ -2144,3 +2144,45 @@ bundled sample doc's "Alt ending" version fork had `wren` in every chapter's
 gap this closes. `typecheck` and `build` both clean. Closes the divergence the
 Android repo logged 2026-07-18; both apps now produce identical docs from the
 same delete.
+
+### 2026-07-18 (Session 41) — Version + build stamping in About dialog
+
+**Why.** Deploys go local build → `rsync` into the portfolio repo → GitHub
+Pages, where CDN/browser caching can leave it unclear whether a given push
+actually loaded. There was no way to confirm which build is live from inside
+the running app. Same problem on Android after an install.
+
+**What.** File → About Estoria now shows a stamp line under the schema line:
+
+> `Version 0.1.0 (30913f9) · build 2026-07-19 03:21 UTC`
+
+- **Version** — from `version` in `package.json` (single source of truth).
+- **Git short SHA** — auto-derived, so every commit changes it with no manual
+  bump. Gets a **`-dev`** suffix when the working tree is dirty and falls back
+  to `unknown` if git isn't available (e.g. a source tarball). A clean release
+  build shows the bare SHA, so `-dev` on the live site means an uncommitted
+  build slipped out.
+- **Build time** — stamped every `vite build` (and dev-server start), UTC. It
+  changes on **every** build, so a fresh timestamp confirms the new bundle
+  loaded even when the version/SHA didn't change — the actual "did the push
+  land" signal.
+
+**Mechanism.** `vite.config.ts` injects three compile-time globals via
+`define`: `__APP_VERSION__` (reads `package.json`), `__GIT_COMMIT__`
+(`git rev-parse --short HEAD`, dirtiness from `git status --porcelain`), and
+`__BUILD_TIME__` (`new Date().toISOString()`). Declared in
+[`src/vite-env.d.ts`](../src/vite-env.d.ts); rendered by
+[`AboutModal.tsx`](../src/components/modals/AboutModal.tsx) (the timestamp is
+sliced to `YYYY-MM-DD HH:mm` + ` UTC`). **Because the SHA is read at build
+time, build from the committed tip** or releases carry a `-dev` suffix. Verified
+in the dev preview (About dialog showed the stamp; `typecheck` clean).
+
+**Android parity (same session, `Estoria-aa` repo).** The companion app's
+About dialog got the same `Version <v> (<sha>) · build <ts>` line. Kotlin can't
+read git at runtime, so `app/build.gradle.kts` derives the SHA/dirty flag/build
+time via `providers.exec` at configuration time and exposes them as
+`BuildConfig.GIT_COMMIT` / `BuildConfig.BUILD_TIME` (needs
+`buildFeatures { buildConfig = true }`); `AboutDialog` in `AppRoot.kt` renders
+them. Compiles clean; generated `BuildConfig` confirmed. **Each app shows its
+own repo's commit — they intentionally differ** (each proves its own platform's
+build). Documented on the Android side in `ESTORIA-ANDROID.md` Session 17.

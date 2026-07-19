@@ -9,6 +9,10 @@ export function AboutModal() {
   if (!show) return null;
   const close = () => setPanel("showAbout", false);
 
+  // Compact UTC build stamp (e.g. "2026-07-18 14:32 UTC") — changes every build,
+  // so it confirms which deployed bundle is actually loaded.
+  const buildLabel = __BUILD_TIME__.slice(0, 16).replace("T", " ") + " UTC";
+
   return (
     <Scrim onClose={close} z={70} center>
       <div
@@ -26,6 +30,9 @@ export function AboutModal() {
               app through a shared folder (footer → Sync).
             </div>
             <div className="text-faint">Project file format: .estoria.json (schema v{SCHEMA_VERSION})</div>
+            <div className="text-faint">
+              Version {__APP_VERSION__} ({__GIT_COMMIT__}) · build {buildLabel}
+            </div>
           </div>
           <div className="mt-[14px] text-[12.5px] text-soft">
             Built by{" "}
