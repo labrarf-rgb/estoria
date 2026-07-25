@@ -65,8 +65,9 @@ export function buildMarkdown(doc: StoryDoc): string {
     md += `\n## Story Notes\n\n${doc.storyNotes.trim()}\n`;
   }
 
-  // Character and World sections mirror the import-prompt schema, so an
-  // exported file round-trips through parseImportMarkdown without loss.
+  // Character and World sections mirror the import-prompt schema, so the cast,
+  // world, chapters and scenes of an exported file re-import through
+  // parseImportMarkdown. Assets, story notes and series data are not re-read.
   md += "\n## Characters\n\n";
   doc.characters.forEach((c) => {
     md += `- **[[${c.name}]]** — ${c.role}${c.type ? ` | ${c.type}` : ""}\n`;
@@ -252,7 +253,9 @@ function parseCharacters(body: string[]): Character[] {
   let cur: Character | null = null;
   let colorIdx = 0;
   for (const raw of body) {
-    const top = raw.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:[—–-]\s*(.*))?$/);
+    // Separator after the name may be a dash *or* a colon — AIs drift between
+    // `- **Name** — role` and `- **Name**: role`.
+    const top = raw.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:[—–:-]\s*(.*))?$/);
     if (top && !/^\s/.test(raw)) {
       const name = clean(top[1]);
       let role = "Supporting";
@@ -377,7 +380,10 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
         summary = summary ? `${summary} ${clean(quote[1])}` : clean(quote[1]);
         continue;
       }
-      const charLine = t.match(/^characters?:\s*(.*)$/i);
+      // Tolerate emphasis around the label on either side of the colon:
+      // `Characters:`, `**Characters:**` (what buildMarkdown writes), `_Characters_:`.
+      // Matched before scenes so a bulleted cast line never lands as a scene.
+      const charLine = t.match(/^(?:[-*+]\s+)?[_*]{0,2}characters?[_*]{0,2}\s*:[_*]{0,2}\s*(.*)$/i);
       if (charLine) {
         charLine[1]
           .split(/[,;]/)
@@ -386,12 +392,15 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
           .forEach((n) => charNames.push(n));
         continue;
       }
-      if (/^scenes?:?$/i.test(t)) continue;
-      const sceneM = t.match(/^\d+[.)]\s+(.*)$/);
+      if (/^[_*]{0,2}scenes?[_*]{0,2}\s*:?[_*]{0,2}\s*$/i.test(t)) continue;
+      // Bullets count as scenes too — AIs drift from `1.` to `-` freely, and
+      // ignoring them silently emptied the chapter.
+      const sceneM = t.match(/^(?:\d+[.)]|[-*+])\s+(.*)$/);
       if (sceneM) {
         let text = sceneM[1].trim();
         let link: ConnType = "therefore";
-        const tag = text.match(/\((therefore|but|and)\)\s*$/i);
+        // The tag may be wrapped in emphasis: `(but)`, `_(but)_`, `**(but)**`.
+        const tag = text.match(/[_*]{0,2}\((therefore|but|and)\)[_*]{0,2}\s*$/i);
         if (tag) {
           link = tag[1].toLowerCase() as ConnType;
           text = text.slice(0, tag.index).trim();
