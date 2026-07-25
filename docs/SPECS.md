@@ -141,7 +141,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
 | Templates | Insert / replace skeletons | ✅ | 29 structures + blank starter (30 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 10 genre beat sheets; facet filter bar. |
-| Import | AI prompt + file scan | 🟡 | Prompt copy + summary work; **parsing markdown into the doc** not yet implemented. |
+| Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
 | Series | Planner view + mode toggle | ✅ | Read view; add/edit book to do. |
@@ -2221,3 +2221,71 @@ its count differs from the web app's — expected.
 
 Verified: dev About shows `build 60` and refreshes on reload (fresh per-request
 injection confirmed via `window.__ESTORIA_BUILD__`); `typecheck` clean.
+
+### 2026-07-25 (Session 43) — Import parser: tolerate AI drift, fix the export round-trip
+
+**Why.** An audit of the import feature confirmed it still works end-to-end (the
+parser was kept in sync through the v4 version forks and v5 asset changes, so
+nothing broke underneath it), but surfaced four **pre-existing tolerance gaps**.
+All four fail the same way: the file looks valid, the import reports success,
+and data is silently dropped with no warning. Two of them mean **Estoria's own
+markdown export did not re-import cleanly.**
+
+**Fixed** — all in [`markdown.ts`](../src/lib/markdown.ts):
+
+1. **Scene tags wrapped in emphasis.** The tag regex required a bare
+   `(therefore)` at end of line, but `buildMarkdown` writes `_(therefore)_`.
+   Every link type therefore defaulted to `therefore` and the literal `_(…)_`
+   stayed glued to the scene text. Now matches `(but)`, `_(but)_`, `**(but)**`.
+2. **`**Characters:**` cast label.** The parser needed a bare `Characters:`
+   prefix; the export writes `**Characters:** [[Ann]], [[Bob]]`, so chapter
+   casts imported empty. Now tolerates emphasis on either side of the colon
+   (`Characters:`, `**Characters:**`, `_Characters_:`) plus a bullet prefix.
+   The `Scenes:` label skip got the same treatment, so the export's `**Scenes**`
+   is recognized as a label rather than ignored by luck.
+3. **Bullet scenes.** `- A scene` instead of `1. A scene` matched nothing, so
+   the chapter imported with the single placeholder `"New scene."`. AIs drift to
+   bullets freely. Now accepts `-`, `*`, `+` alongside `1.` / `1)`.
+4. **`- **Name**: role`.** Only the em/en-dash and hyphen separators were
+   matched, so a colon dropped the **entire** Characters section (0 characters,
+   no warning). Colon now accepted.
+
+**Ordering note.** The cast-line match must stay *ahead* of the scene match in
+the chapter loop — now that bullets are scenes, a bulleted `- Characters: …`
+line would otherwise land as a scene.
+
+**Comment corrected, not deleted.** [`markdown.ts:68`](../src/lib/markdown.ts)
+claimed exports "round-trip through `parseImportMarkdown` without loss." After
+fixes 1 and 2 the cast, world, chapters and scenes genuinely do re-import — but
+**assets, story notes and series data are still not re-read**, so the original
+claim was, and would have remained, wrong. The comment now says which parts
+survive. Note the Export modal only advertises Obsidian vault export, so no
+user-facing promise was ever broken.
+
+**Verified.** `typecheck` clean, plus a 22-assertion harness run against the
+real compiled module (esbuild bundle, no mocks) over three fixtures: an AI-drift
+file exercising all four gaps, a canonical numbered/dash file to catch
+regressions, and a full `buildMarkdown` → `parseImportMarkdown` round trip. All
+pass; stashing the fixes fails 6. **Caveat:** the round-trip assertions compare
+export-then-import against the source doc, so pre-fix they passed *trivially*
+(both sides degraded to `["New scene."]` identically). They only became
+meaningful once fix 3 landed — the drift fixture is what actually holds the
+line. Not verified through the browser UI: the in-app browser has no
+file-upload tool, so a drag-drop import isn't drivable there.
+
+**Known gaps, deliberately left** (ranked, from the same audit):
+
+- **Validation only counts chapters.**
+  [`ImportModal.tsx:31`](../src/components/modals/ImportModal.tsx) errors only
+  when `chapters === 0`. Fixes 1 and 3 remove the main route to "3 chapters, 0
+  real scenes," but a file yielding **0 characters still reports success**.
+- **Acts past V in non-arabic form.** `## Act VI` falls back to a sequence
+  counter — [`parseActNumber`](../src/lib/markdown.ts) maps only i–v. This
+  affects **Estoria's own export**, which writes roman numerals.
+- **Success card below the fold.** At a 720px-tall window the card renders past
+  the modal's scroll with no auto-scroll, so a successful import can look like
+  nothing happened.
+- **`summarizeImport` is dead code.** Exported at
+  [`markdown.ts:177`](../src/lib/markdown.ts) with no callers — the modal uses
+  the summary returned by `parseImportMarkdown`. It carries its own,
+  now-divergent, scene-counting regex (`^\d+\.\s+`, still numeric-only).
