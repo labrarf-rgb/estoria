@@ -68,9 +68,10 @@ What cloud adds later (and only then do we pay for it): **auth** and
 
 **Decided 2026-07-01:** the cloud backend is the user's **own Google Drive**
 (`GoogleDriveStorageAdapter`), with **Sign in with Google** for auth — see §8.
-⚠️ Known issue: the current `zustandStorage` shim **bypasses the adapter on
-read** and **double-writes on save** — this must be fixed before any cloud
-adapter can work (see §9, item 1).
+The seam is ready for it: since Session 20 both reads and writes go through
+`activeAdapter` (async rehydrate, single debounced write path, save failures
+surfaced in the footer). Still to do before a Drive adapter: widen
+`StorageAdapter` to per-project granularity (§9 item 1).
 
 ---
 
@@ -79,30 +80,49 @@ adapter can work (see §9, item 1).
 ```
 estoria/
 ├─ index.html                 # Vite entry, loads Google Fonts
-├─ vite.config.ts             # React + Tailwind plugins, "@/" → src alias
+├─ vite.config.ts             # React + Tailwind plugins, "@/" alias, build-info +
+│                             #   version.json plugins (§ Session 42)
 ├─ tsconfig*.json             # app + node TS projects
+├─ scripts/deploy.sh          # `npm run deploy`: build → portfolio repo → verify live
 ├─ docs/SPECS.md              # ← you are here
+├─ docs/REVIEW-FINDINGS.md    # archived Session 29 code review (all items fixed)
 ├─ Story Mapping WebApp Prototype/   # design reference (not built on)
 └─ src/
    ├─ main.tsx                # React root
    ├─ App.tsx                 # layout: Toolbar + Board + overlays; theme effect
    ├─ index.css               # Tailwind import + design tokens (@theme)
    ├─ types.ts                # StoryDoc and all model types  ← single source of truth
-   ├─ data/sampleStory.ts     # "The Drowned Map" default document
+   ├─ vite-env.d.ts           # Window.__ESTORIA_BUILD__ typing
+   ├─ data/
+   │  ├─ sampleStory.ts       # "The Drowned Map" default document
+   │  └─ emptyStory.ts        # blank document for a new project
    ├─ store/
    │  ├─ useStore.ts          # Zustand store: doc + UI state + all actions
-   │  └─ persistence.ts       # StorageAdapter, zustand storage shim, file save/load
+   │  └─ persistence.ts       # StorageAdapter, debounced storage shim, normalizeDoc,
+   │                          #   save-status pub/sub, file save/load
    ├─ lib/
    │  ├─ layout.ts            # board/timeline layout, auto-arrange, fit-to-content
-   │  ├─ markdown.ts          # export builder, import prompt + scan
-   │  └─ templates.ts         # story-structure skeletons
+   │  ├─ markdown.ts          # export builder, import prompt + parser
+   │  ├─ templates.ts         # story-structure skeletons (30 cards, 3 facets)
+   │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, file history
+   │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
+   │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
+   │  ├─ entities.ts          # character/world lookup helpers
+   │  ├─ refs.ts              # asset-backed pinned-ref resolution (schema v5)
+   │  └─ files.ts             # file → data URL reading
    └─ components/
-      ├─ Toolbar.tsx
-      ├─ Board.tsx            # canvas: pan/zoom/drag, cards, connectors
+      ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
+      ├─ Board.tsx            # canvas: pan/zoom/drag, cards, connectors, timeline
+      ├─ SeriesMap.tsx        # series-level board: book cards + links
       ├─ ChapterDetail.tsx    # chapter modal: scene flow + act controls
-      ├─ ui/Overlay.tsx       # Scrim / CloseButton / stop() primitives
+      ├─ Footer.tsx           # autosave status, Sync button, folder icon
+      ├─ SyncHistoryPopover.tsx / SyncFileList.tsx   # file history + restore
+      ├─ Welcome.tsx · Lightbox.tsx · ConfirmDialog.tsx
+      ├─ ui/                  # Overlay (Scrim/CloseButton/stop), Popover, RefList,
+      │                       #   ViewToggle, ExpandableTextarea, AssetLinkPicker
       ├─ panels/              # CharactersPanel, WorldPanel, NotesPanel (right drawers)
-      └─ modals/              # ExportModal, TemplatesModal, ImportModal, SeriesModal
+      └─ modals/              # Export, Import, Templates, Projects, NewBook,
+                              #   Backups, SyncConflict, About
 ```
 
 ### Conventions
@@ -134,23 +154,24 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline). |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
-| Detail | Pinned refs | 🟡 | Add note/image works; **renaming a ref label** still to do. |
-| Characters | List + expand detail | ✅ | Read view complete. |
-| Characters | Add | 🟡 | Adds a stub; **inline editing of fields** to do. |
+| Detail | Pinned refs | ✅ | Add/link/rename/delete note + image refs; asset-backed since v5 (`RefList` writes through `updateAsset`). |
+| Characters | List + expand detail | ✅ | |
+| Characters | Add / inline edit | ✅ | New entries start empty (Session 27); every field editable in the panel. |
 | World | List + expand detail | ✅ | |
-| World | Add / edit / refs | 🟡 | Add stub; editing + ref add to do. |
+| World | Add / edit / refs | ✅ | Name/category/desc/notes inline; refs via the shared `RefList`. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
 | Templates | Insert / replace skeletons | ✅ | 29 structures + blank starter (30 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 10 genre beat sheets; facet filter bar. |
 | Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
-| Export | Project file (.json) | ✅ | Save; **load/open** still to wire into UI. |
-| Series | Planner view + mode toggle | ✅ | Read view; add/edit book to do. |
+| Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |
+| Series | Planner view + mode toggle | ✅ | Book cards editable in place (title, premise, status, cover, link labels). |
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. |
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
-| Persist | Project title editing | ⬜ | Field exists; no UI to rename yet. |
+| Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
+| App | Version / build stamp | ✅ | About shows `v… · build N · sha · time` from `window.__ESTORIA_BUILD__`; `npm run deploy` verifies the commit is live (Sessions 41–42). |
 
 ---
 
@@ -161,7 +182,12 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build to dist/
 npm run typecheck  # types only
+npm run preview    # serve the production build
+npm run deploy     # build + publish to www.labrarf.com/estoria, then verify it's live
 ```
+
+`deploy` refuses a dirty tree — commit first, so the SHA prod reports is real.
+See §8 "Deploy runbook".
 
 Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 (`.vscode/extensions.json`) for Tailwind IntelliSense + ESLint/Prettier.
@@ -190,7 +216,9 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 > **It is not part of this repo's roadmap and does not add web work** — it is
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
-> - The Android app reads/writes the **same `.estoria.json` (schema v3)**. Any
+> - The Android app reads/writes the **same `.estoria.json` (currently schema
+>   v5 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
+>   v5 = asset-backed pinned refs)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
@@ -408,7 +436,8 @@ extensions that go beyond the original to-do.** The web behavior is now:
 ### Hosting migration (updated 2026-07-02 — see Session 22)
 
 - **The embed is now a same-origin copy.** The built app is synced into the
-  portfolio repo (`Portfolio-Website/estoria/`, via `npm run sync:portfolio`)
+  portfolio repo (`Portfolio-Website/estoria/`, via `npm run deploy` — the old
+  `sync:portfolio` script it replaced in Session 42)
   and served at **www.labrarf.com/estoria/**; `estoria-app.html` iframes
   `/estoria/`. Reason: Chromium blocks the File System Access pickers
   (backup folder) in cross-origin iframes with no `allow` delegation, so the
@@ -427,15 +456,27 @@ extensions that go beyond the original to-do.** The web behavior is now:
   origin(s) — settle hosting before the Drive adapter so OAuth is set up once.
   With the same-origin copy, that origin is `https://www.labrarf.com`.
 
-#### Deploy runbook — always verify the Pages deploy after `sync:portfolio`
+#### Deploy runbook — `npm run deploy` (updated Session 42)
 
-Publishing an embed change is **two repos**: (1) commit/push the source repo,
-then (2) `npm run sync:portfolio` (builds + `rsync -a --delete dist/ →
-Portfolio-Website/estoria/`) and commit/push the **portfolio** repo. Pushing
-the portfolio repo triggers its `pages-build-deployment` Action, which is what
-actually publishes `www.labrarf.com/estoria/`.
+Publishing is still **two repos**, but `scripts/deploy.sh` now drives the whole
+loop and verifies the result, so the manual steps below are only what it does
+under the hood (and what to fall back on when Pages misbehaves):
 
-- **`sync:portfolio` uses `rsync --delete`**, so it removes the old
+1. Refuse a dirty tree — commit and push the source repo first, so the SHA
+   stamped into the build is a real commit.
+2. `npm run build` — stamps `window.__ESTORIA_BUILD__` + writes
+   `dist/version.json`.
+3. `rsync -a --delete dist/ → Portfolio-Website/estoria/`, then commit + push
+   the **portfolio** repo. That push triggers its `pages-build-deployment`
+   Action, which is what actually publishes `www.labrarf.com/estoria/`.
+4. Poll `…/estoria/version.json` (cache-busted) for up to ~5 min until prod
+   reports HEAD's commit → `✓ <sha> is live`. A timeout means Pages is still
+   building; re-run to re-check.
+
+Step 4 is the point of the script — it replaces the old "compare asset hashes
+by hand" check below, which stays here as the manual fallback:
+
+- **The rsync uses `--delete`**, so it removes the old
   content-hashed `assets/index-*.{js,css}` and writes new ones. If the Pages
   deploy then fails or stalls, Pages keeps serving the **last successful**
   (old) build — so the site looks unchanged even though the repo is correct.
@@ -575,10 +616,13 @@ with a session-log entry.
     every autosave/export and is the main localStorage-quota risk. Plan: store
     image blobs separately (IndexedDB locally / own Drive files later),
     reference by id. Coordinate with the Drive adapter design (§8).
-14. **Cosmetic**: delete-chapter confirm shows the base `ch.title` rather than
-    the draft-resolved title; `ChapterDetail` subscribes to the whole `doc`
+14. **Perf (cosmetic)**: `ChapterDetail` subscribes to the whole `doc`
     (every keystroke re-renders the full modal — fine at current scale, use
     narrower selectors if it ever feels sluggish).
+    *(The other half of this item — "delete-chapter confirm shows the base
+    `ch.title` rather than the draft-resolved title" — is moot since schema v4
+    (Session 36b): versions are standalone forks, so `ch.title` **is** the
+    active version's title. No override layer left to resolve.)*
 
 ---
 
@@ -2289,3 +2333,49 @@ file-upload tool, so a drag-drop import isn't drivable there.
   [`markdown.ts:177`](../src/lib/markdown.ts) with no callers — the modal uses
   the summary returned by `parseImportMarkdown`. It carries its own,
   now-divergent, scene-counting regex (`^\d+\.\s+`, still numeric-only).
+
+### 2026-07-25 (Session 44) — Doc/code drift audit: §§2–9 realigned (no code changes)
+
+Read the reference sections of this file against `src/` and fixed everything
+that no longer described the code. The session log below was left untouched —
+it's a dated record, not a description of the present. **Docs only; no source
+files changed.**
+
+- **§2** — dropped the ⚠️ "`zustandStorage` bypasses the adapter / double-writes"
+  warning. That was fixed in Session 20 and §9 item 1 already said so, so the
+  two sections contradicted each other. Replaced with what's actually left
+  before a Drive adapter (per-project `StorageAdapter` granularity).
+- **§3 project layout** — the tree was the Session-1 scaffold. It still listed
+  `SeriesModal`, deleted back in Session 4 when the series map replaced the
+  planner modal, and omitted ~20 files that do exist: six `lib/`
+  modules (`sync`, `backup`, `drafts`, `entities`, `refs`, `files`), seven
+  modals, `Footer`/`SeriesMap`/`Welcome`/`Lightbox`/`ConfirmDialog`/the sync
+  popover, the whole `ui/` set, `data/emptyStory.ts`, `scripts/deploy.sh` and
+  `docs/REVIEW-FINDINGS.md`. Rewritten from the real tree.
+- **§4 feature status** — six rows claimed work that has since shipped, and
+  three of them contradicted §6's own "✅ done" roadmap entries: ref-label
+  renaming (`RefList` edits labels through `updateAsset`), character inline
+  editing, world editing + refs, open-project-from-disk ("Open file…" in the
+  Projects modal), series book editing, and project renaming (`EditableName` in
+  the toolbar). Added a row for the version/build stamp (Sessions 41–42).
+  Verified-still-accurate and deliberately left as-is: timeline fit-to-view
+  (board-only), import validation counting chapters only, template counts
+  (30 cards = 29 + blank, 9 life-story, 10 genre, 3 facets).
+- **§5** — added `preview` and `deploy`; the file documented four of the six
+  scripts in `package.json`.
+- **§6 cross-project note** — said Android shares "schema **v3**". It's **v5**
+  (`SCHEMA_VERSION` in `types.ts`); v4 and v5 both landed after that note was
+  written, which made the cross-app compatibility warning read as weaker than
+  it is. Now points at the constant.
+- **§8** — the deploy runbook still described `npm run sync:portfolio`, removed
+  in Session 42. Rewritten around `npm run deploy`, keeping the Pages-verify
+  and stuck-deploy lore as the manual fallback.
+- **§9 item 14** — half of it ("confirm shows the base `ch.title` rather than
+  the draft-resolved title") became moot at schema v4, when versions became
+  standalone forks and the override layer disappeared. Marked moot; the
+  `ChapterDetail`-subscribes-to-whole-`doc` half stands.
+- **Checked, no change needed:** §9 items 12 (wheel zoom still origin-anchored,
+  `Board.tsx` `onWheel` scales without a cursor correction), 13 (images still
+  inline data URLs) and 11 (export still active-book-only) are all still true.
+  `README.md` matches `package.json` and the stack. `REVIEW-FINDINGS.md` is
+  explicitly an archived Session-29 record and needs no upkeep.
