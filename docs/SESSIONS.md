@@ -1046,7 +1046,7 @@ user wants the labrarf.com URL kept — so the embed itself moved same-origin.
 
 ### 2026-07-11 (Session 30) — Review fixes for the Session 29 move-scenes work
 
-Code review of `df7261e` (findings + instructions in `docs/REVIEW-FINDINGS.md`,
+Code review of `df7261e` (findings + instructions in `docs/archives/REVIEW-FINDINGS.md`,
 all five now fixed and the doc marked accordingly):
 
 - **≥1-scene invariant** (`useStore.ts`, `moveScenesToChapter`): moving ALL
@@ -1113,7 +1113,7 @@ Templates" Google Doc):
 ### 2026-07-11 (Session 31 review) — Code review of the Session 31 work
 
 Review-only pass over the uncommitted Session 31 changes (findings +
-instructions for Opus in `docs/REVIEW-FINDINGS.md`, "Session 31 work" section;
+instructions for Opus in `docs/archives/REVIEW-FINDINGS.md`, "Session 31 work" section;
 all items open):
 
 1. **Scroll effect fires on every card expand/reopen, not just add-character**
@@ -1132,7 +1132,7 @@ in `CharactersPanel` is valid, typecheck clean.
 
 ### 2026-07-11 (Session 32) — Templates facet filter + responsive grid; Session 31 review closed
 
-Implemented the Session 31 review (`docs/REVIEW-FINDINGS.md`, "Session 31 work"),
+Implemented the Session 31 review (`docs/archives/REVIEW-FINDINGS.md`, "Session 31 work"),
 all four items now resolved. Items 1 (scroll `block: "nearest"`), 2 (doc "16
 structures + blank starter" wording), and 4 (import-prompt act cap reworded) were
 already in the working tree from Session 31; this session added item 3.
@@ -1385,7 +1385,7 @@ sync resumes — step-by-step port instructions were written to
 
 No code changed — a design session with the user on chapter/world pinned refs.
 Full findings and step-by-step implementation instructions are in
-`docs/REVIEW-FINDINGS.md`, section "Task — Asset-backed pinned references
+`docs/archives/REVIEW-FINDINGS.md`, section "Task — Asset-backed pinned references
 (schema v5)". Decisions locked:
 
 - **Every note/image added in a chapter's pinned refs or on a world entry is
@@ -1407,7 +1407,7 @@ Full findings and step-by-step implementation instructions are in
 
 ### 2026-07-18 (Session 38) — Asset-backed pinned references shipped (schema v5)
 
-Built the Session 37 task (`docs/REVIEW-FINDINGS.md`, "Task — Asset-backed
+Built the Session 37 task (`docs/archives/REVIEW-FINDINGS.md`, "Task — Asset-backed
 pinned references"). Pinned refs are now pure links into the shared asset pool;
 all items in that task are marked ✅ there.
 
@@ -1460,7 +1460,7 @@ touched from here.
 
 ### 2026-07-18 (Session 39) — Review fixes for the Session 38 asset-ref work
 
-Fixed all four items from the Session 38 code review (`docs/REVIEW-FINDINGS.md`,
+Fixed all four items from the Session 38 code review (`docs/archives/REVIEW-FINDINGS.md`,
 "Code review — Session 38 work"); all marked ✅ there.
 
 - **1 (robustness, pre-deploy):** `migrateRefsToAssets` walked `draftData`
@@ -1495,7 +1495,7 @@ shows the caption on all 13 cells with the new wording.
 ### 2026-07-18 (Session 38 review) — Code review of the v5 asset-refs work
 
 Review-only pass over the uncommitted Session 38 changes (findings +
-instructions for Opus in `docs/REVIEW-FINDINGS.md`, "Session 38 work" section;
+instructions for Opus in `docs/archives/REVIEW-FINDINGS.md`, "Session 38 work" section;
 all four items open). The implementation is sound and faithful to the Session
 37 task; cross-file tracing (sync diff, project merge, export, persist/migrate)
 found no stale consumers of the deleted ref content fields; typecheck + build
@@ -1733,7 +1733,7 @@ files changed.**
   modules (`sync`, `backup`, `drafts`, `entities`, `refs`, `files`), seven
   modals, `Footer`/`SeriesMap`/`Welcome`/`Lightbox`/`ConfirmDialog`/the sync
   popover, the whole `ui/` set, `data/emptyStory.ts`, `scripts/deploy.sh` and
-  `docs/REVIEW-FINDINGS.md`. Rewritten from the real tree.
+  `docs/archives/REVIEW-FINDINGS.md`. Rewritten from the real tree.
 - **§4 feature status** — six rows claimed work that has since shipped, and
   three of them contradicted §6's own "✅ done" roadmap entries: ref-label
   renaming (`RefList` edits labels through `updateAsset`), character inline
@@ -1794,3 +1794,36 @@ completed reviews, marked as such at the top, so it's left as written rather
 than retro-edited. Source-comment references (`docs/SPECS.md §8`, `SPECS §9
 item 5`) are all section refs and remain valid, since the numbered sections
 stayed in SPECS.md.
+
+### 2026-07-25 (Session 46) — REVIEW-FINDINGS moved to docs/archives/
+
+Closing out the docs pass. Audited what's left in `docs/` against this log:
+
+- **`README.md` stays** — different job (front door: what it is, `npm install`,
+  stack, where to go next). No overlap with SPECS.
+- **`REVIEW-FINDINGS.md` has no forward purpose.** It's four concatenated,
+  fully-closed documents: the Session 29 review (fixed Session 30), the
+  Session 31 review (fixed Sessions 31–32), the v5 asset-refs task brief
+  (built Session 38), and the Session 38 review (fixed Session 39). Every
+  outcome is already in this log, and Session 37 above carries the full v5
+  decision list including the production-migration note the brief asked to
+  have copied across. What's *only* in that file is pre-fix forensics —
+  repro steps, rejected alternatives, one-time verify instructions, and line
+  numbers against `df7261e` / `d4faa44` / `49abc79` that went stale long ago.
+
+**Not merged into this log** — deliberately. Folding 645 lines of stale
+pre-fix diagnostics in here would re-bloat the file Session 45 just separated
+out, and would duplicate outcomes that are already recorded above in better
+form. Moved instead:
+
+- `docs/REVIEW-FINDINGS.md` → **`docs/archives/REVIEW-FINDINGS.md`**, with a
+  file-level banner saying every item is closed, that line numbers are frozen
+  against the named commits, and that its "log the session in `docs/SPECS.md`"
+  instruction now means `SESSIONS.md`. The name read like open findings when
+  nothing in it is open.
+- Its 7 relative links into `src/` re-based one level deeper; the 8 path
+  references to it in this log were rewritten to the new location. **That's a
+  mechanical path fix, not a rewrite of history** — the entries' wording is
+  untouched, they just point where the file actually is now.
+- The §3 tree in SPECS.md now shows `docs/archives/` as a folder for closed
+  records, so future ones have an obvious home.

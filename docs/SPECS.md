@@ -90,7 +90,8 @@ estoria/
 ├─ scripts/deploy.sh          # `npm run deploy`: build → portfolio repo → verify live
 ├─ docs/SPECS.md              # ← you are here: current state, §§1-9
 ├─ docs/SESSIONS.md           # dated session log (history; §N refs point here)
-├─ docs/REVIEW-FINDINGS.md    # archived Session 29 code review (all items fixed)
+├─ docs/archives/            # closed records — read for background, don't work from
+│  └─ REVIEW-FINDINGS.md     #   3 code reviews + 1 task brief, all items closed
 ├─ Story Mapping WebApp Prototype/   # design reference (not built on)
 └─ src/
    ├─ main.tsx                # React root

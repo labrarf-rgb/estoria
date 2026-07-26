@@ -1,3 +1,19 @@
+> # ARCHIVE — nothing here is outstanding
+>
+> Three completed code reviews and one completed task brief, 2026-07-11 →
+> 2026-07-18. **Every item in this file is closed.** Kept for the reasoning —
+> why each fix was chosen, and what was rejected — not as a to-do list.
+>
+> Read it for background on a past decision; do not work from it. Line numbers
+> and file paths are frozen against the commits named in each section
+> (`df7261e`, `d4faa44`, `49abc79`) and are stale against `main`. What actually
+> shipped is recorded in [`../SESSIONS.md`](../SESSIONS.md) (Sessions 30, 32,
+> 38, 39); current state is [`../SPECS.md`](../SPECS.md). Where this file says
+> "log the session in `docs/SPECS.md`", that convention now means
+> `docs/SESSIONS.md`.
+
+---
+
 # Code review — Session 29 commit `df7261e` (move scenes between chapters, card meta redesign)
 
 Reviewed 2026-07-11. **Status: all five items fixed and verified in-browser on
@@ -309,16 +325,16 @@ item 4 are where the risk lives.
 
 ## Current-state findings (verified 2026-07-18 against `main` @ `49abc79`)
 
-- `PinnedRef` ([types.ts:21](../src/types.ts)) carries content fields
+- `PinnedRef` ([types.ts:21](../../src/types.ts)) carries content fields
   (`kind`/`label`/`body`/`src`) plus optional `assetId`. `Asset`
-  ([types.ts:34](../src/types.ts)) is the same shape minus `assetId`.
-- `linkAssetToChapter` ([useStore.ts:926](../src/store/useStore.ts)) **copies**
+  ([types.ts:34](../../src/types.ts)) is the same shape minus `assetId`.
+- `linkAssetToChapter` ([useStore.ts:926](../../src/store/useStore.ts)) **copies**
   the asset's content into a new ref tagged `assetId`. `updateAsset` does NOT
   propagate to those copies, and `updateChapterRef` does not write back — the
   "link" is cosmetic today.
-- Standalone adds: `addChapterRef` ([useStore.ts:884](../src/store/useStore.ts)),
+- Standalone adds: `addChapterRef` ([useStore.ts:884](../../src/store/useStore.ts)),
   `addWorldRef` (~line 1287). The World panel passes no `onLink` to `RefList`.
-- `RefList` ([ui/RefList.tsx](../src/components/ui/RefList.tsx)) is the one
+- `RefList` ([ui/RefList.tsx](../../src/components/ui/RefList.tsx)) is the one
   shared editor, used by ChapterDetail (refs), WorldPanel (per-entry refs), and
   NotesPanel (which passes `assets as PinnedRef[]` — the cast works because the
   shapes coincide today; it will stop compiling after the model change, which is
@@ -336,10 +352,10 @@ item 4 are where the risk lives.
   ref *objects with the same ids* into `draftData`. Migration must not turn one
   note that exists in three version forks into three assets (see item 4).
 - Markdown export emits the pinned line from the ref itself:
-  `[[r.label]]` ([markdown.ts:103](../src/lib/markdown.ts)) — must resolve via
+  `[[r.label]]` ([markdown.ts:103](../../src/lib/markdown.ts)) — must resolve via
   the asset after the change. The importer creates `refs: []`/`assets: []` and
   needs no change.
-- `normalizeDoc` ([persistence.ts:238](../src/store/persistence.ts)) is the
+- `normalizeDoc` ([persistence.ts:238](../../src/store/persistence.ts)) is the
   single migration home (files + localStorage both route through it since
   Session 36b) and already throws `SchemaTooNewError` for files newer than the
   app. `sampleStory.ts` has standalone refs on chapters AND world entries with
