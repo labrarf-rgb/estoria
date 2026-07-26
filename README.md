@@ -18,6 +18,7 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 ## Where things are
 
 - **Full spec, architecture & decisions:** [`docs/SPECS.md`](docs/SPECS.md) — read this first.
+- **Session history:** [`docs/SESSIONS.md`](docs/SESSIONS.md) — dated log of what changed when.
 - **Data model:** [`src/types.ts`](src/types.ts)
 - **State + actions:** [`src/store/useStore.ts`](src/store/useStore.ts)
 - **Design reference:** `Story Mapping WebApp Prototype/` (static mock, not the app)
