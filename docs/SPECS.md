@@ -115,6 +115,8 @@ estoria/
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ entities.ts          # character/world lookup helpers
    │  ├─ refs.ts              # asset-backed pinned-ref resolution (schema v5)
+   │  ├─ prune.ts             # sweep records left with no content in them
+   │  ├─ ids.ts               # uid() — shared by the store and draft records
    │  └─ files.ts             # file → data URL reading
    └─ components/
       ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
@@ -161,6 +163,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | ✅ | Add/link/rename/delete note + image refs; asset-backed since v5 (`RefList` writes through `updateAsset`). |
+| App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** ("Delete character", "Delete entry", "Delete" in the shared library — the confirm there names the blast radius ("…everywhere?")). `RefList`'s `removeMode` prop picks which. |
+| App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / Image" open a **draft** card that isn't in `doc` — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
 | Characters | List + expand detail | ✅ | |
 | Characters | Add / inline edit | ✅ | New entries start empty (Session 27); every field editable in the panel. |
 | World | List + expand detail | ✅ | |

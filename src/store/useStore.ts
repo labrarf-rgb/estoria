@@ -15,6 +15,8 @@ import {
 import { activeVersionData, cloneVersionData } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
+import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
+import { uid } from "@/lib/ids";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -76,6 +78,14 @@ interface UiState {
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
+  /**
+   * A blank character / world entry the user has opened but not yet typed into.
+   * Transient and NOT persisted: it lives here rather than in `doc` precisely so
+   * that an untouched record is never saved, exported or offered in a picker.
+   * Committed into `doc` by the first keystroke; see `updateCharDraft`.
+   */
+  charDraft: Character | null;
+  worldDraft: WorldEntry | null;
   /** Image data URL currently shown full-screen, or null. */
   lightbox: string | null;
   /** False until the user has chosen sample-vs-fresh on first launch. */
@@ -165,7 +175,7 @@ interface StoreState extends UiState {
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
   // ---- chapter refs (pure links into the shared asset pool) ----
-  addChapterRef: (chId: string, kind: RefKind) => void;
+  addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
   deleteChapterRef: (chId: string, refId: string) => void;
   linkAssetToChapter: (chId: string, assetId: string) => void;
 
@@ -194,20 +204,28 @@ interface StoreState extends UiState {
   deleteBookLink: (id: string) => void;
 
   // ---- characters ----
-  addCharacter: () => void;
+  // "+ Add character" starts a DRAFT — a blank card that isn't in the document.
+  // The record is created by the first keystroke (`updateCharDraft`), so nothing
+  // is ever saved, listed or castable until it has content.
+  startCharDraft: () => void;
+  updateCharDraft: (patch: Partial<Character>) => void;
+  discardCharDraft: () => void;
   updateCharacter: (id: string, patch: Partial<Character>) => void;
   deleteCharacter: (id: string) => void;
 
   // ---- world ----
-  addWorldEntry: () => void;
+  startWorldDraft: () => void;
+  updateWorldDraft: (patch: Partial<WorldEntry>) => void;
+  discardWorldDraft: () => void;
   updateWorldEntry: (id: string, patch: Partial<WorldEntry>) => void;
   deleteWorldEntry: (id: string) => void;
-  addWorldRef: (wId: string, kind: RefKind) => void;
+  /** `refId` lets the caller pre-assign the link id it already rendered a draft under. */
+  addWorldRef: (wId: string, kind: RefKind, refId?: string) => void;
   deleteWorldRef: (wId: string, refId: string) => void;
   linkAssetToWorld: (wId: string, assetId: string) => void;
 
   // ---- shared assets ----
-  addAsset: (kind: RefKind) => string;
+  addAsset: (kind: RefKind, id?: string) => string;
   updateAsset: (id: string, patch: Partial<Asset>) => void;
   deleteAsset: (id: string) => void;
 
@@ -267,12 +285,29 @@ const CHAR_PALETTE = [
   "oklch(0.60 0.11 100)",
 ];
 
-const uid = (prefix: string) =>
-  `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-
 const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
   const seen = new Set<string>();
   return arr.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
+};
+
+/** Panels whose "+ Add …" buttons open a blank card the user may never fill in. */
+const EDITING_PANELS = new Set<PanelKey>(["showChars", "showWorld", "showNotes"]);
+
+/**
+ * State patch that sweeps records with no content left in them (see
+ * `lib/prune.ts`). Returns `null` when there's nothing to prune, so a close that
+ * changes nothing leaves the doc reference — and with it the autosave and the
+ * sync fingerprint — untouched.
+ */
+const prunedState = (s: StoreState): Partial<StoreState> | null => {
+  const doc = pruneEmptyEntries(s.doc);
+  if (doc === s.doc) return null;
+  return {
+    doc,
+    // A pruned record must not stay selected — the panel would reopen on nothing.
+    selChar: doc.characters.some((c) => c.id === s.selChar) ? s.selChar : null,
+    selWorld: doc.world.some((w) => w.id === s.selWorld) ? s.selWorld : null,
+  };
 };
 
 /** Snapshot the active book's full board (all versions) for stashing in `bookData`. */
@@ -337,6 +372,8 @@ const initialUi: UiState = {
   selChar: null,
   selWorld: null,
   selBook: null,
+  charDraft: null,
+  worldDraft: null,
   lightbox: null,
   onboarded: false,
   chapterSectionsCollapsed: { chars: false, world: false, notes: false, refs: false },
@@ -883,7 +920,7 @@ export const useStore = create<StoreState>()(
       // ---- chapter refs (pure links into the shared asset pool) ----
       // Adding a note/image creates a shared Asset first, then pins a link to it
       // — one pool of linkable content, no orphan per-chapter copies.
-      addChapterRef: (chId, kind) =>
+      addChapterRef: (chId, kind, refId) =>
         set((s) => {
           const assetId = uid("a");
           const asset: Asset = {
@@ -897,7 +934,7 @@ export const useStore = create<StoreState>()(
               ...s.doc,
               assets: s.doc.assets.concat(asset),
               chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? { ...c, refs: c.refs.concat({ id: uid("r"), assetId }) } : c
+                c.id === chId ? { ...c, refs: c.refs.concat({ id: refId ?? uid("r"), assetId }) } : c
               ),
             },
           };
@@ -1154,10 +1191,12 @@ export const useStore = create<StoreState>()(
         })),
 
       // ---- characters ----
-      addCharacter: () =>
+      // The draft is held outside `doc` and carries the id it will keep, so the
+      // keystroke that commits it doesn't remount the card being typed into.
+      startCharDraft: () =>
         set((s) => {
           const id = uid("p");
-          const next: Character = {
+          const draft: Character = {
             id,
             name: "",
             role: "",
@@ -1173,12 +1212,28 @@ export const useStore = create<StoreState>()(
             need: "",
             notes: "",
           };
+          return { charDraft: draft, selChar: id, showChars: true };
+        }),
+
+      // Still blank → keep editing the draft. First real content → it becomes a
+      // character, appended last, which is where the draft card already renders.
+      updateCharDraft: (patch) =>
+        set((s) => {
+          if (!s.charDraft) return s;
+          const merged = { ...s.charDraft, ...patch };
+          if (isCharacterEmpty(merged)) return { charDraft: merged };
           return {
-            doc: { ...s.doc, characters: s.doc.characters.concat(next) },
-            selChar: id,
-            showChars: true,
+            charDraft: null,
+            doc: { ...s.doc, characters: s.doc.characters.concat(merged) },
+            selChar: merged.id,
           };
         }),
+
+      discardCharDraft: () =>
+        set((s) => ({
+          charDraft: null,
+          selChar: s.selChar === s.charDraft?.id ? null : s.selChar,
+        })),
 
       updateCharacter: (id, patch) =>
         set((s) => ({
@@ -1195,25 +1250,34 @@ export const useStore = create<StoreState>()(
         })),
 
       // ---- world ----
-      addWorldEntry: () =>
-        set((s) => {
+      // Same deferred-creation shape as the character draft above.
+      startWorldDraft: () =>
+        set(() => {
           const id = uid("w");
           return {
-            doc: {
-              ...s.doc,
-              world: s.doc.world.concat({
-                id,
-                cat: "Lore",
-                name: "",
-                desc: "",
-                notes: "",
-                refs: [],
-              }),
-            },
+            worldDraft: { id, cat: "Lore", name: "", desc: "", notes: "", refs: [] },
             selWorld: id,
             showWorld: true,
           };
         }),
+
+      updateWorldDraft: (patch) =>
+        set((s) => {
+          if (!s.worldDraft) return s;
+          const merged = { ...s.worldDraft, ...patch };
+          if (isWorldEntryEmpty(merged)) return { worldDraft: merged };
+          return {
+            worldDraft: null,
+            doc: { ...s.doc, world: s.doc.world.concat(merged) },
+            selWorld: merged.id,
+          };
+        }),
+
+      discardWorldDraft: () =>
+        set((s) => ({
+          worldDraft: null,
+          selWorld: s.selWorld === s.worldDraft?.id ? null : s.selWorld,
+        })),
 
       updateWorldEntry: (id, patch) =>
         set((s) => ({
@@ -1227,7 +1291,7 @@ export const useStore = create<StoreState>()(
         })),
 
       // World-entry refs mirror chapter refs: create the shared asset, pin a link.
-      addWorldRef: (wId, kind) =>
+      addWorldRef: (wId, kind, refId) =>
         set((s) => {
           const assetId = uid("a");
           const asset: Asset = {
@@ -1241,7 +1305,7 @@ export const useStore = create<StoreState>()(
               ...s.doc,
               assets: s.doc.assets.concat(asset),
               world: s.doc.world.map((w) =>
-                w.id === wId ? { ...w, refs: w.refs.concat({ id: uid("r"), assetId }) } : w
+                w.id === wId ? { ...w, refs: w.refs.concat({ id: refId ?? uid("r"), assetId }) } : w
               ),
             },
           };
@@ -1274,8 +1338,8 @@ export const useStore = create<StoreState>()(
         }),
 
       // ---- shared assets ----
-      addAsset: (kind) => {
-        const id = uid("a");
+      addAsset: (kind, presetId) => {
+        const id = presetId ?? uid("a");
         set((s) => ({
           doc: {
             ...s.doc,
@@ -1409,11 +1473,20 @@ export const useStore = create<StoreState>()(
             },
           };
         }),
-      closeChapter: () => set({ openCh: null }),
+      // Closing the chapter drops any note/image ref left with nothing in it.
+      closeChapter: () => set((s) => ({ openCh: null, ...prunedState(s) })),
       toggleNewMenu: () => set((s) => ({ newMenu: !s.newMenu })),
       closeNewMenu: () => set({ newMenu: false }),
       setPanel: (panel, open) =>
-        set({ [panel]: open, newMenu: false } as Pick<StoreState, PanelKey> & { newMenu: boolean }),
+        set((s) => ({
+          [panel]: open,
+          newMenu: false,
+          // Leaving an editing panel drops its untouched draft card, and sweeps
+          // any record that was emptied out (or predates deferred creation).
+          ...(open || !EDITING_PANELS.has(panel)
+            ? null
+            : { charDraft: null, worldDraft: null, ...prunedState(s) }),
+        }) as Partial<StoreState>),
       toggleChapterSection: (section) =>
         set((s) => ({
           chapterSectionsCollapsed: {

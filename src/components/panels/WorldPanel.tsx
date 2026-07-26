@@ -6,7 +6,7 @@ import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { resolveRefs } from "@/lib/refs";
-import type { WorldCategory } from "@/types";
+import type { WorldCategory, WorldEntry } from "@/types";
 
 const CATEGORIES: WorldCategory[] = ["Place", "Faction", "Lore", "Event"];
 
@@ -17,7 +17,11 @@ export function WorldPanel() {
   const sel = useStore((s) => s.selWorld);
   const setPanel = useStore((s) => s.setPanel);
   const selectWorld = useStore((s) => s.selectWorld);
-  const addWorldEntry = useStore((s) => s.addWorldEntry);
+  // The blank card from "+ Add world entry" — not an entry yet (see the store).
+  const draft = useStore((s) => s.worldDraft);
+  const startDraft = useStore((s) => s.startWorldDraft);
+  const updateDraft = useStore((s) => s.updateWorldDraft);
+  const discardDraft = useStore((s) => s.discardWorldDraft);
   const updateWorldEntry = useStore((s) => s.updateWorldEntry);
   const deleteWorldEntry = useStore((s) => s.deleteWorldEntry);
   const addWorldRef = useStore((s) => s.addWorldRef);
@@ -52,18 +56,25 @@ export function WorldPanel() {
           <CloseButton onClick={close} />
         </div>
         <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
-          {world.map((w) => {
+          {/* The draft renders last, exactly where it will land once committed —
+              same id, same position, so typing doesn't remount the card. */}
+          {(draft ? world.concat(draft) : world).map((w) => {
             const open = sel === w.id;
+            const isDraft = w.id === draft?.id;
+            const set = (patch: Partial<WorldEntry>) =>
+              isDraft ? updateDraft(patch) : updateWorldEntry(w.id, patch);
             return (
               <div key={w.id} className="rounded-[13px] border border-rule bg-card p-[14px]">
                 <div className="flex items-center gap-[11px]">
                   <span className="h-[10px] w-[10px] flex-shrink-0 rounded-full bg-soft" />
                   <button onClick={() => selectWorld(w.id)} className="min-w-0 flex-1 text-left">
-                    <div className="font-serif text-[15px] font-semibold text-ink">
-                      {w.name || "Untitled entry"}
+                    <div
+                      className={`font-serif text-[15px] font-semibold ${isDraft ? "text-faint" : "text-ink"}`}
+                    >
+                      {w.name || (isDraft ? "New entry" : "Untitled entry")}
                     </div>
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-                      {w.cat}
+                      {isDraft ? "Nothing saved yet — type anything to add it" : w.cat}
                     </div>
                   </button>
                   <button
@@ -80,7 +91,7 @@ export function WorldPanel() {
                         <Label>Name</Label>
                         <input
                           value={w.name}
-                          onChange={(e) => updateWorldEntry(w.id, { name: e.target.value })}
+                          onChange={(e) => set({ name: e.target.value })}
                           placeholder="e.g. The Drowned City"
                           className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
                         />
@@ -89,9 +100,7 @@ export function WorldPanel() {
                         <Label>Category</Label>
                         <select
                           value={w.cat}
-                          onChange={(e) =>
-                            updateWorldEntry(w.id, { cat: e.target.value as WorldCategory })
-                          }
+                          onChange={(e) => set({ cat: e.target.value as WorldCategory })}
                           className="w-full rounded-lg border border-rule bg-panel px-[8px] py-[6px] text-[12.5px] text-ink outline-none focus:border-faint"
                         >
                           {CATEGORIES.map((c) => (
@@ -106,7 +115,7 @@ export function WorldPanel() {
                       <Label>Description</Label>
                       <ExpandableTextarea
                         value={w.desc}
-                        onChange={(v) => updateWorldEntry(w.id, { desc: v })}
+                        onChange={(v) => set({ desc: v })}
                         placeholder="Describe this piece of the world"
                         expandedHeight="40vh"
                         expanded={descExpanded}
@@ -118,7 +127,7 @@ export function WorldPanel() {
                       <Label>Notes</Label>
                       <ExpandableTextarea
                         value={w.notes}
-                        onChange={(v) => updateWorldEntry(w.id, { notes: v })}
+                        onChange={(v) => set({ notes: v })}
                         placeholder="Extra notes, connections, open questions"
                         expandedHeight="40vh"
                         expanded={notesExpanded}
@@ -126,7 +135,9 @@ export function WorldPanel() {
                         className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
                       />
                     </div>
-                    <div>
+                    {/* A reference has to hang off a saved entry, so this appears
+                        once the draft has content and becomes one. */}
+                    <div className={isDraft ? "hidden" : undefined}>
                       <div className="mb-[5px] flex items-center gap-[10px]">
                         <Label>References</Label>
                         <div className="flex-1" />
@@ -134,7 +145,7 @@ export function WorldPanel() {
                       </div>
                       <RefList
                         refs={resolveRefs(w.refs, assets)}
-                        onAdd={(kind) => addWorldRef(w.id, kind)}
+                        onAdd={(kind, id) => addWorldRef(w.id, kind, id)}
                         onUpdate={(refId, patch) => {
                           // Content edits write through to the shared asset.
                           const link = w.refs.find((r) => r.id === refId);
@@ -144,6 +155,8 @@ export function WorldPanel() {
                         deletePrompt={() => ({
                           message: "Remove from this world entry?",
                           detail: "It stays in the shared library.",
+                          // Not a delete — the button must not say one.
+                          confirmLabel: "Remove",
                         })}
                         onLink={() => setLinkFor((v) => (v === w.id ? null : w.id))}
                         linkLabel="Link book asset"
@@ -162,15 +175,18 @@ export function WorldPanel() {
                     </div>
                     <button
                       onClick={() =>
-                        askConfirm({
-                          message: `Delete "${w.name || "this entry"}"?`,
-                          danger: true,
-                          onConfirm: () => deleteWorldEntry(w.id),
-                        })
+                        // Nothing to confirm on a draft — there's nothing saved to lose.
+                        isDraft
+                          ? discardDraft()
+                          : askConfirm({
+                              message: `Delete "${w.name || "this entry"}"?`,
+                              danger: true,
+                              onConfirm: () => deleteWorldEntry(w.id),
+                            })
                       }
                       className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
                     >
-                      Delete entry
+                      {isDraft ? "Discard" : "Delete entry"}
                     </button>
                   </div>
                 )}
@@ -178,8 +194,9 @@ export function WorldPanel() {
             );
           })}
           <button
-            onClick={addWorldEntry}
-            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink"
+            onClick={startDraft}
+            disabled={!!draft}
+            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft"
           >
             + Add world entry
           </button>

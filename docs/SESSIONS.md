@@ -1827,3 +1827,140 @@ form. Moved instead:
   untouched, they just point where the file actually is now.
 - The §3 tree in SPECS.md now shows `docs/archives/` as a folder for closed
   records, so future ones have an obvious home.
+
+### 2026-07-25 (Session 47) — Nothing is saved until you type into it
+
+**Why.** "+ Add character", "+ Add world entry" and "+ Note / + Image" each
+wrote a real record the instant you clicked. Walk away without typing and that
+placeholder was saved data: autosaved, exported, synced to the phone, and listed
+forever as "Unnamed character" / "Untitled entry" / "Empty note". Worse, the
+blank record was immediately castable — a nameless character showed up in the
+chapter modal's picker as a pickable "Unnamed character" chip.
+
+**The rule the user set:** if nothing was typed into any field, don't save it —
+and don't dignify it with a name like "Unnamed character" before then either. A
+placeholder someone actually wants gets typed ("Unnamed soldier").
+
+**Two layers, and the first one is the real fix.**
+
+**1. Deferred creation — the record doesn't exist until it has content.**
+"+ Add …" now opens a *draft*: a card that renders exactly like the real thing
+but lives outside `doc`. The first keystroke in any field (or first uploaded
+file, for an image) commits it. Nothing blank is ever written, so nothing blank
+can be picked, exported or synced.
+
+- Characters / world entries: `charDraft` / `worldDraft` in the store —
+  transient, deliberately not in `partialize`. `startCharDraft` →
+  `updateCharDraft` (commits when `isCharacterEmpty` goes false) →
+  `discardCharDraft`. The panels render `doc.characters.concat(draft)` so the
+  draft sits last, which is exactly where the committed record lands.
+- Notes / images: the draft lives inside `RefList` itself (local state), so all
+  three surfaces that use it — chapter modal, world entry, shared library —
+  get the behavior at once. On commit it calls `onAdd(kind, id)` then the edit.
+- **The draft carries the id it will keep.** That's what makes the commit
+  invisible: same key, same position, so React reuses the DOM node and the
+  keystroke that creates the record doesn't blur the field you're typing in.
+  Hence `addChapterRef` / `addWorldRef` / `addAsset` gained an optional
+  caller-supplied id, and `uid()` moved to [`lib/ids.ts`](../src/lib/ids.ts) so
+  components can mint one. `RefList`'s `idPrefix` keeps ids self-describing
+  ("r" for ref links, "a" in the library where the item id *is* the asset id).
+- Chapter-modal "+ Create new character" / "+ Create new entry" open a draft in
+  the panel rather than creating a record.
+- A draft world entry hides its References block — a reference has to hang off a
+  saved entry, and it reappears the moment the entry becomes real.
+- **Every draft card carries its own "Discard"** and skips the confirm; there's
+  nothing saved to lose. Character and world cards use the panels' bordered
+  button; note/image drafts get one too (a compact text button in the card-view
+  cell, which is only 150px tall), so the note surfaces match the panels rather
+  than relying on the hover ✕ alone.
+
+**2. A sweeper for records emptied later** — new
+[`src/lib/prune.ts`](../src/lib/prune.ts). Deferred creation stops blanks being
+born; `pruneEmptyEntries(doc)` removes ones that *become* blank (you clear the
+last field) and any left over from before this change. It runs on the same
+closes: `setPanel(panel, false)` for the three editing panels, and
+`closeChapter()`, via a shared `prunedState()` in `useStore.ts` that also clears
+`selChar`/`selWorld` when the selected record was the one removed.
+
+- Blank **assets** are swept first — unpinned everywhere through the existing
+  `removeAssetLinks`, so no dangling refs — which can leave a world entry with
+  no refs and make *it* sweepable in the same pass.
+- Characters and world entries go through `deleteCharacterDoc` /
+  `deleteWorldEntryDoc`, the same helpers the explicit Delete buttons use, so
+  the id is cleared from every chapter in all four board locations. **Being
+  cast in a chapter does not save a blank record** — that was the first cut of
+  this work, and the user rejected it: an empty record says nothing about the
+  chapter it's attached to.
+- Only *content* counts: a character's `color` and a world entry's `cat` are
+  app-chosen defaults, not something the user wrote.
+- Returns the **same doc object** when nothing is sweepable, so a close that
+  changes nothing doesn't dirty the doc — no autosave write, no sync-fingerprint
+  churn.
+
+**Not a cross-app event.** No schema change — this decides whether a record is
+written, never its shape, so the `.estoria.json` contract and the Android app
+are unaffected. Worth mirroring on the phone eventually (same three "+ Add"
+flows), but nothing breaks while it isn't.
+
+**Verified in the dev server** on a freshly loaded sample: "+ Add character"
+leaves `characters` at 4 and shows a greyed "New character — nothing saved yet"
+card; typing "Halden Roe" into it commits on the first keystroke with **all 10
+characters landing and focus retained** (the remount test); same for a world
+draft committed via its Description, whose References block appears only once
+it's real; "+ Note" in the chapter modal writes nothing and leaves nothing
+behind when the modal is closed. Sweeper: Halden Roe cast in chapter 1, then
+name cleared → on panel close the character is gone (5 → 4) **and** chapter 1's
+cast drops 3 → 2, no dangling id. No console errors; typecheck and production
+build clean.
+
+**Formatting note.** A `npx prettier --write` on the touched files reformatted
+large stretches of untouched code (no prettier config in the repo, so defaults
+fought the existing ~100-col hand style). Reverted and the edits re-applied by
+hand — the diff is only the change.
+
+### 2026-07-25 (Session 47b) — One meaning per control: ✕ detaches, a word destroys
+
+Follow-up the user called out while testing: removal read inconsistently across
+notes, characters and world entries. Auditing it, there *was* a rule — it just
+had one exception, and the exception was the destructive one.
+
+**The rule already in the code:** an ✕ takes something off the thing you're
+looking at (chapter character chip, chapter world chip, a pinned note in a
+chapter or world entry — all "it stays in the shared library"), while the record
+itself is only destroyed from the panel that owns it, via a labelled button
+("Delete character", "Delete entry").
+
+**The exception:** the shared library in the Notes panel has nothing to detach
+from, so *its* ✕ deleted the asset everywhere — unpinning it from every chapter
+and version. Same glyph, same-looking row, two very different blast radii, with
+nothing to tell them apart but the wording of the confirm dialog.
+
+**What changed:**
+
+- `RefList` gained **`removeMode: "detach" | "destroy"`** (default `detach`).
+  `detach` keeps the ✕ (title now "Remove from here"); `destroy` drops the ✕ and
+  renders a labelled button instead. Only `NotesPanel` passes `destroy`.
+- List view: a bordered **"Delete"** in the expanded row, matching "Delete
+  character" / "Delete entry". The button says just "Delete" (user's call) —
+  the confirm is what spells out the blast radius: "Delete this note
+  everywhere? / It is pinned in N places across your versions and books."
+- Card view: the cells are a fixed 164x150, and 13 permanent "Delete" labels in
+  a grid is noise — so it **takes over the caption's line on hover**.
+  A word, on the card you're pointing at, with no extra line and no reflow.
+- **Detach confirms now say "Remove", not "Delete".** `confirmLabel` already
+  existed (SeriesMap uses it) but the ref prompts never set it, so "Remove from
+  this chapter?" sat above a red **Delete** button. `RefList`'s `deletePrompt`
+  type is now `Omit<ConfirmRequest, "onConfirm">` so callers can reach the whole
+  confirm API instead of a hand-copied subset.
+
+**Deliberately not changed:** the confirm asymmetry — unlinking a note asks,
+pulling a character out of a chapter doesn't — noted for the user, left alone as
+taste rather than hazard.
+
+**Verified in the dev server:** library list view has zero inline ✕ and one
+"Delete" per expanded row; card view shows none at rest and swaps the
+caption for the label on the hovered card only; the World panel still shows the
+✕ (title "Remove from here") whose confirm now reads "Remove from this world
+entry? / It stays in the shared library." over a **Remove** button; the library's
+confirm still reads "Delete this image everywhere? / It is pinned in 1 place…"
+over a red **Delete**. Cancelling leaves all 13 assets intact. No console errors.

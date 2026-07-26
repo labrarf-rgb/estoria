@@ -45,8 +45,8 @@ export function ChapterDetail() {
   const deleteChapterRef = useStore((s) => s.deleteChapterRef);
   const linkAssetToChapter = useStore((s) => s.linkAssetToChapter);
   const updateAsset = useStore((s) => s.updateAsset);
-  const addCharacter = useStore((s) => s.addCharacter);
-  const addWorldEntry = useStore((s) => s.addWorldEntry);
+  const startCharDraft = useStore((s) => s.startCharDraft);
+  const startWorldDraft = useStore((s) => s.startWorldDraft);
   const askConfirm = useStore((s) => s.askConfirm);
   const collapsed = useStore((s) => s.chapterSectionsCollapsed);
   const toggleSection = useStore((s) => s.toggleChapterSection);
@@ -518,7 +518,7 @@ export function ChapterDetail() {
                     <span className="text-[12px] text-faint">Everyone is already in this chapter.</span>
                   )}
                   <button
-                    onClick={() => addCharacter()}
+                    onClick={() => startCharDraft()}
                     className="rounded-full border border-dashed border-line px-[10px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
                   >
                     + Create new character
@@ -590,7 +590,7 @@ export function ChapterDetail() {
                     <span className="text-[12px] text-faint">Every world entry is already added.</span>
                   )}
                   <button
-                    onClick={() => addWorldEntry()}
+                    onClick={() => startWorldDraft()}
                     className="rounded-full border border-dashed border-line px-[10px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink"
                   >
                     + Create new entry
@@ -911,7 +911,7 @@ export function ChapterDetail() {
           <>
           <RefList
             refs={resolveRefs(ch.refs, doc.assets)}
-            onAdd={(kind) => addChapterRef(ch.id, kind)}
+            onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
             onUpdate={(refId, patch) => {
               // Content edits write through to the shared asset this ref links.
               const link = ch.refs.find((r) => r.id === refId);
@@ -921,6 +921,8 @@ export function ChapterDetail() {
             deletePrompt={() => ({
               message: "Remove from this chapter?",
               detail: "It stays in the shared library.",
+              // Not a delete — the button must not say one.
+              confirmLabel: "Remove",
             })}
             onLink={() => setLinkOpen((v) => !v)}
             linkLabel="Link book asset"

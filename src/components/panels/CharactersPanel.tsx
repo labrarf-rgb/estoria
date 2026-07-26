@@ -9,10 +9,14 @@ export function CharactersPanel() {
   const sel = useStore((s) => s.selChar);
   const setPanel = useStore((s) => s.setPanel);
   const selectChar = useStore((s) => s.selectChar);
-  const addCharacter = useStore((s) => s.addCharacter);
   const updateCharacter = useStore((s) => s.updateCharacter);
   const deleteCharacter = useStore((s) => s.deleteCharacter);
   const askConfirm = useStore((s) => s.askConfirm);
+  // The blank card from "+ Add character" — not a character yet (see the store).
+  const draft = useStore((s) => s.charDraft);
+  const startDraft = useStore((s) => s.startCharDraft);
+  const updateDraft = useStore((s) => s.updateCharDraft);
+  const discardDraft = useStore((s) => s.discardCharDraft);
 
   // Scroll the selected character's card into view whenever the selection
   // changes — e.g. after "+ Create new character" from the chapter modal, which
@@ -48,9 +52,13 @@ export function CharactersPanel() {
           <CloseButton onClick={close} />
         </div>
         <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
-          {doc.characters.map((p) => {
+          {/* The draft renders last, exactly where it will land once committed —
+              same id, same position, so typing doesn't remount the card. */}
+          {(draft ? doc.characters.concat(draft) : doc.characters).map((p) => {
             const open = sel === p.id;
-            const set = (patch: Partial<Character>) => updateCharacter(p.id, patch);
+            const isDraft = p.id === draft?.id;
+            const set = (patch: Partial<Character>) =>
+              isDraft ? updateDraft(patch) : updateCharacter(p.id, patch);
             return (
               <div
                 key={p.id}
@@ -65,11 +73,15 @@ export function CharactersPanel() {
                     {p.initials || "?"}
                   </span>
                   <button onClick={() => selectChar(p.id)} className="min-w-0 flex-1 text-left">
-                    <div className="font-serif text-[15px] font-semibold text-ink">
-                      {p.name || "Unnamed character"}
+                    <div
+                      className={`font-serif text-[15px] font-semibold ${isDraft ? "text-faint" : "text-ink"}`}
+                    >
+                      {p.name || (isDraft ? "New character" : "Unnamed character")}
                     </div>
                     <div className="text-[11.5px] font-medium text-soft">
-                      {p.role || "No role"} · in {chapterCount(p.id)} chapters
+                      {isDraft
+                        ? "Nothing saved yet — type anything to add them"
+                        : `${p.role || "No role"} · in ${chapterCount(p.id)} chapters`}
                     </div>
                   </button>
                   <button
@@ -148,16 +160,19 @@ export function CharactersPanel() {
                     )}
                     <button
                       onClick={() =>
-                        askConfirm({
-                          message: `Delete ${p.name || "this character"}?`,
-                          detail: "They will be removed from every chapter they appear in.",
-                          danger: true,
-                          onConfirm: () => deleteCharacter(p.id),
-                        })
+                        // Nothing to confirm on a draft — there's nothing saved to lose.
+                        isDraft
+                          ? discardDraft()
+                          : askConfirm({
+                              message: `Delete ${p.name || "this character"}?`,
+                              detail: "They will be removed from every chapter they appear in.",
+                              danger: true,
+                              onConfirm: () => deleteCharacter(p.id),
+                            })
                       }
                       className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
                     >
-                      Delete character
+                      {isDraft ? "Discard" : "Delete character"}
                     </button>
                   </div>
                 )}
@@ -165,8 +180,9 @@ export function CharactersPanel() {
             );
           })}
           <button
-            onClick={addCharacter}
-            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink"
+            onClick={startDraft}
+            disabled={!!draft}
+            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft"
           >
             + Add character
           </button>

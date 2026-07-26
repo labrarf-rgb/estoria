@@ -65,9 +65,13 @@ export function NotesPanel() {
             </div>
             <RefList
               refs={assets}
-              onAdd={(kind) => addAsset(kind)}
+              onAdd={(kind, id) => addAsset(kind, id)}
+              idPrefix="a"
               onUpdate={(id, patch) => updateAsset(id, patch)}
               onDelete={(id) => deleteAsset(id)}
+              // The library owns the asset — removal here is the irreversible
+              // one, so it gets a labelled button rather than the detach ✕.
+              removeMode="destroy"
               deletePrompt={(r) => {
                 const n = linkCounts.get(r.id) ?? 0;
                 return {
