@@ -28,10 +28,16 @@ running app.
 
 - **Chapter** — a card on the board: number, act, status, title, summary, word
   count, the characters in it, an ordered list of **scenes**, and pinned refs.
+  **Click a card to open it** (drag still drags; a press that doesn't move is a
+  click).
 - **Scene** — a beat inside a chapter. Consecutive scenes are joined by a
   **connector** typed `therefore` (causal), `but` (conflict), or `and` (parallel).
 - **Chapter link** — a connector between two chapters on the board, same 3 types.
 - **Character / World entry** — rich reference records.
+- **Asset** — a shared, book-level **note, image or to-do list** in one pool,
+  linkable ("pinned") into any number of chapters and world entries. Each surface
+  keeps its **own pin order**, independent of the library's order. An asset can be
+  **archived**: unpinned everywhere and retired from the library, restorable.
 - **Series** — optional multi-book planning layer above the current book, with its
   own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
 - **Draft / version** — **per book**: each book has its own named versions, and
@@ -95,7 +101,7 @@ estoria/
 ├─ Story Mapping WebApp Prototype/   # design reference (not built on)
 └─ src/
    ├─ main.tsx                # React root
-   ├─ App.tsx                 # layout: Toolbar + Board + overlays; theme effect
+   ├─ App.tsx                 # layout: Toolbar + Board + Footer + overlays; theme effect
    ├─ index.css               # Tailwind import + design tokens (@theme)
    ├─ types.ts                # StoryDoc and all model types  ← single source of truth
    ├─ vite-env.d.ts           # Window.__ESTORIA_BUILD__ typing
@@ -114,7 +120,9 @@ estoria/
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ entities.ts          # character/world lookup helpers
-   │  ├─ refs.ts              # asset-backed pinned-ref resolution (schema v5)
+   │  ├─ refs.ts              # asset-backed pinned-ref resolution (schema v5), link
+   │  │                       #   counting, `findAssetPins` (every place an asset is
+   │  │                       #   pinned, across books + versions)
    │  ├─ prune.ts             # sweep records left with no content in them
    │  ├─ ids.ts               # uid() — shared by the store and draft records
    │  └─ files.ts             # file → data URL reading
@@ -126,9 +134,11 @@ estoria/
       ├─ Footer.tsx           # autosave status, Sync button, folder icon
       ├─ SyncHistoryPopover.tsx / SyncFileList.tsx   # file history + restore
       ├─ Welcome.tsx · Lightbox.tsx · ConfirmDialog.tsx
-      ├─ ui/                  # Overlay (Scrim/CloseButton/stop), Popover, RefList,
-      │                       #   ViewToggle, ExpandableTextarea, AssetLinkPicker
-      ├─ panels/              # CharactersPanel, WorldPanel, NotesPanel (right drawers)
+      ├─ ui/                  # Overlay (Scrim/Drawer/SizeButton/CloseButton/stop),
+      │                       #   Popover, RefList, ViewToggle, ExpandableTextarea,
+      │                       #   AssetLinkPicker
+      ├─ panels/              # CharactersPanel, WorldPanel, NotesPanel — modal
+      │                       #   `Drawer`s, one at a time (§4 "Panel sizes")
       └─ modals/              # Export, Import, Templates, Projects, NewBook,
                               #   Backups, SyncConflict, About
 ```
@@ -152,17 +162,22 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Area | Feature | Status | Notes |
 | --- | --- | --- | --- |
-| Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; double-click opens detail. |
+| Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; **a click opens the chapter** (board + timeline) — a press that moves is a drag, a press that doesn't is a click, and a click that jiggled puts the card back. The chapter modal ignores backdrop dismissals for 400ms after opening so the old double-click habit can't close it on the way in. |
 | Board | Reorder chapters | ✅ | Board: drop a card on another → confirm → resequences **and** auto-arranges so threads stay clean. Timeline: drag to reorder with live reflow. Connector chain rebuilt to follow the new order. |
 | Board | Connectors (therefore/but/and) | ✅ | SVG curves, colored by type, per-version (each version forks its own links). |
 | Board | Auto-arrange | ✅ | Decaying-jitter grid, floored so it approaches straight but never a rigid lattice. |
 | Board | Add chapter | ✅ | |
 | Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
+| Detail | Scene layout remembered per canvas size | ✅ | The expanded and collapsed canvases fit different column counts, so each keeps **its own layout** (`scenePos` / `scenePosCompact`, v6). Toggling size swaps layouts instead of re-arranging — which is what used to throw the arrangement away. Auto-arrange tidies only the size you're looking at; structural edits keep both in step. |
 | Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline). |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
-| Detail | Pinned refs | ✅ | Add/link/rename/delete note + image refs; asset-backed since v5 (`RefList` writes through `updateAsset`). |
+| Detail | Pinned refs | ✅ | Add/link/rename/delete note, image + to-do refs; asset-backed since v5. Content edits write through the store (`updateChapterRefAsset` / `updateWorldRefAsset`) rather than a caller-resolved `updateAsset` — resolving `refId → asset` from a render closure dropped keystrokes typed in the moments right after a draft committed. |
+| App | Reorder pinned resources | ✅ | Grip-drag rows (pointer-based, like every other drag in the app) **or type a position number** — in the shared library, on a chapter, and on a world entry. Each surface owns its order: `reorderAsset` (counts non-archived, leaves archived slots alone) / `reorderChapterRef` / `reorderWorldRef`. |
+| Notes | Where a note is pinned + jump | ✅ | Expanding a library item lists every pin as a button, in the same compact form as a character's "Appears in" — just `Ch N ↗`, with the chapter name in the tooltip. Pins outside the loaded board are **grouped** under one small "Book · Version" heading rather than repeating the location on each chip. Clicking switches book and version through the normal stashing actions, closes the panel and opens the chapter (`jumpToChapter`); world pins sit under a "World" heading and open the World panel on that entry (`jumpToWorldEntry`). Data from `findAssetPins`. |
+| Notes | Archive / restore | ✅ | Archiving **unpins everywhere first** (same five-location sweep as delete), then flags `archived` — so an archived asset is attached to nothing. Hidden from the library and the link picker, listed under "Archived · N" with Restore (comes back unpinned; the confirm says so before you commit) and a plain Delete. |
+| Notes | To-do lists as a pinnable resource | ✅ | Schema v6 `TODO` asset with `items[{id,text,done}]`: checkboxes, add/remove tasks, Enter adds the next one, "N/M done" in the row and library caption, pinnable into chapters and world entries like a note. Exported as real markdown checkboxes (`- [x]`), blank lines omitted. The add row reads **+ Note · + To-do · + Image** everywhere `RefList` appears. |
 | App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** — "Delete character", "Delete entry", and plain "Delete" in the shared library, where the confirm is what names the blast radius: "Delete this note everywhere?". `RefList`'s `removeMode` prop picks which affordance a list gets; only the library passes `destroy`. |
 | App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / Image" open a **draft** card that isn't in `doc` — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
 | Characters | List + expand detail | ✅ | |
@@ -176,6 +191,9 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |
 | Series | Planner view + mode toggle | ✅ | Book cards editable in place (title, premise, status, cover, link labels). |
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. |
+| App | Panel sizes | ✅ | Characters / World / Notes render through the shared **`Drawer`** in two sizes, toggled by an Expand/Collapse button and remembered (`panelExpanded`): **side panel** — the 460px right-hand column behind the usual dimmed `Scrim`, so the app behind it is greyed out and inert and a backdrop click closes it; **full screen** — the same panel filling the viewport, content capped at 1180px and centred. |
+| App | One panel at a time | ✅ | The scrim covers the toolbar, so a second panel is unreachable by pointer — a click there closes the open one instead. `setPanel` also enforces it in state for the paths that open a panel from *inside* another surface (a draft started from the chapter modal, a note's world-pin jump), and re-opening the panel you're already in deliberately does **not** sweep the draft you're typing into. |
+| Characters / World | Appears in → jump to chapter | ✅ | A character's "Appears in" chips, and a matching list on world entries, are buttons: clicking closes the panel and opens that chapter (`jumpToChapter`). Scoped to the loaded board, matching the "in N chapters" line above them — unlike a note's pin list, which spans books and versions because the asset library does. |
 | App | Light/dark theme | ✅ | |
 | App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
@@ -227,10 +245,23 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
 > - The Android app reads/writes the **same `.estoria.json` (currently schema
->   v5 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
->   v5 = asset-backed pinned refs)**. Any
+>   v6 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
+>   v5 = asset-backed pinned refs, v6 = `TODO` assets + `archived` + per-mode
+>   scene layout)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
+> - **⚠️ OPEN CROSS-APP EVENT — v6 (2026-07-26).** The web app now writes schema
+>   6. An app that reads up to v5 must refuse a v6 file rather than drop what it
+>   doesn't understand (that's what `SchemaTooNewError` is for here), so **until
+>   the Android side is updated it will decline files this app has written** and
+>   cross-app Sync is effectively one-directional. What v6 adds, all additive:
+>   `Asset.kind` gains `"TODO"` with `items: [{ id, text, done }]`;
+>   `Asset.archived?: boolean` (an archived asset is unpinned everywhere by
+>   construction, so a reader can treat it as library-hidden and nothing else);
+>   `Chapter.scenePosCompact?: Vec2[]`, the collapsed-canvas twin of `scenePos`
+>   (safe to ignore, or to mirror if the phone ever grows two canvas sizes). An
+>   unknown `kind` should degrade to a note, which is what `normalizeAssets` in
+>   `store/persistence.ts` does here.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
 >   both apps (same Google identity, one Drive file). Decisions made for the web
 >   OAuth/Drive setup should not preclude a second (Android) OAuth client under

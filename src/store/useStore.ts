@@ -10,6 +10,7 @@ import {
   type ConnType,
   type RefKind,
   type StoryDoc,
+  type Vec2,
   type WorldEntry,
 } from "@/types";
 import { activeVersionData, cloneVersionData } from "@/lib/drafts";
@@ -98,6 +99,13 @@ interface UiState {
   textareaExpanded: Record<TextareaKey, boolean>;
   /** Chapter-modal scene-flow canvas size (persisted). */
   sceneFlowExpanded: boolean;
+  /**
+   * Right-hand panel size (Characters / World / Notes), persisted and shared by
+   * all three. `false` = the 460px drawer, which leaves the board beside it live
+   * (no scrim, so you can pan, drag and open chapters while it's open); `true` =
+   * full screen, covering the canvas.
+   */
+  panelExpanded: boolean;
 }
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
@@ -177,6 +185,10 @@ interface StoreState extends UiState {
   // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
   deleteChapterRef: (chId: string, refId: string) => void;
+  /** Content edit on a pin, written through to the asset it links (see impl). */
+  updateChapterRefAsset: (chId: string, refId: string, patch: Partial<Asset>) => void;
+  /** Move a pin within this chapter's order — independent of library order. */
+  reorderChapterRef: (chId: string, refId: string, toIdx: number) => void;
   linkAssetToChapter: (chId: string, assetId: string) => void;
 
   // ---- notes ----
@@ -222,12 +234,19 @@ interface StoreState extends UiState {
   /** `refId` lets the caller pre-assign the link id it already rendered a draft under. */
   addWorldRef: (wId: string, kind: RefKind, refId?: string) => void;
   deleteWorldRef: (wId: string, refId: string) => void;
+  updateWorldRefAsset: (wId: string, refId: string, patch: Partial<Asset>) => void;
+  reorderWorldRef: (wId: string, refId: string, toIdx: number) => void;
   linkAssetToWorld: (wId: string, assetId: string) => void;
 
   // ---- shared assets ----
   addAsset: (kind: RefKind, id?: string) => string;
   updateAsset: (id: string, patch: Partial<Asset>) => void;
   deleteAsset: (id: string) => void;
+  /** Move an asset within the library order; `toIdx` counts non-archived assets. */
+  reorderAsset: (id: string, toIdx: number) => void;
+  /** Unpin everywhere, then retire from the library. Reversible via `unarchiveAsset`. */
+  archiveAsset: (id: string) => void;
+  unarchiveAsset: (id: string) => void;
 
   // ---- drafts / versions ----
   addDraft: (name?: string) => void;
@@ -241,6 +260,14 @@ interface StoreState extends UiState {
   setOrient: (o: TimelineOrient) => void;
   setDragId: (id: string | null) => void;
   openChapter: (id: string) => void;
+  /**
+   * Open a chapter that may live in another book or version — the "jump to where
+   * this note is pinned" path. Switches book/version through the normal stashing
+   * actions first, closing any open panel on the way.
+   */
+  jumpToChapter: (bookId: string, draftId: string, chapterId: string) => void;
+  /** Open the World panel with one entry expanded (the world-pin equivalent). */
+  jumpToWorldEntry: (worldId: string) => void;
   closeChapter: () => void;
   toggleNewMenu: () => void;
   closeNewMenu: () => void;
@@ -249,6 +276,7 @@ interface StoreState extends UiState {
   setRefView: (view: RefView) => void;
   toggleTextarea: (key: TextareaKey) => void;
   setSceneFlowExpanded: (expanded: boolean) => void;
+  setPanelExpanded: (expanded: boolean) => void;
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
   selectBook: (id: string | null) => void;
@@ -285,13 +313,38 @@ const CHAR_PALETTE = [
   "oklch(0.60 0.11 100)",
 ];
 
+/** A fresh, contentless asset of the given kind (a to-do starts with no lines). */
+const blankAsset = (id: string, kind: RefKind): Asset => ({
+  id,
+  kind,
+  label: "",
+  ...(kind === "NOTE" ? { body: "" } : {}),
+  ...(kind === "TODO" ? { items: [] } : {}),
+});
+
+/** Move the item with `id` to `toIdx`, clamped. Returns the same array if it can't. */
+const moveById = <T extends { id: string }>(arr: T[], id: string, toIdx: number): T[] => {
+  const from = arr.findIndex((x) => x.id === id);
+  if (from === -1) return arr;
+  const to = Math.max(0, Math.min(Math.floor(toIdx), arr.length - 1));
+  if (to === from) return arr;
+  const next = arr.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+};
+
 const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
   const seen = new Set<string>();
   return arr.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
 };
 
-/** Panels whose "+ Add …" buttons open a blank card the user may never fill in. */
-const EDITING_PANELS = new Set<PanelKey>(["showChars", "showWorld", "showNotes"]);
+/**
+ * The three right-hand panels: they hold the "+ Add …" buttons that open a blank
+ * card the user may never fill in, and only one of them is ever open at a time.
+ */
+const EDITING_PANEL_LIST = ["showChars", "showWorld", "showNotes"] as const satisfies readonly PanelKey[];
+const EDITING_PANELS = new Set<PanelKey>(EDITING_PANEL_LIST);
 
 /**
  * State patch that sweeps records with no content left in them (see
@@ -339,6 +392,33 @@ const sceneBoxWidthEstimate = (expanded: boolean) => {
   return modalW - 44;
 };
 
+/**
+ * Scene positions for BOTH canvas sizes at once.
+ *
+ * The scene flow has an expanded and a collapsed size that fit different column
+ * counts, and each remembers its own layout (`scenePos` / `scenePosCompact`) so
+ * toggling between them no longer has to re-arrange — which is what used to
+ * throw the arrangement away. Every structural change (add/insert/delete/
+ * reorder/move) therefore lays out both: the mode on screen with the column
+ * count the caller measured, the other one with an estimate for its width.
+ */
+const scenePosBoth = (
+  scenes: string[],
+  expanded: boolean,
+  cols?: number
+): Pick<Chapter, "scenePos" | "scenePosCompact"> => {
+  const otherCols = sceneColumnsForWidth(scenes.length, sceneBoxWidthEstimate(!expanded));
+  const active = sceneAutoArrange(scenes, 0, cols);
+  const other = sceneAutoArrange(scenes, 0, otherCols);
+  return expanded
+    ? { scenePos: active, scenePosCompact: other }
+    : { scenePos: other, scenePosCompact: active };
+};
+
+/** The positions field the given canvas size reads and writes. */
+const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
+  expanded ? "scenePos" : "scenePosCompact";
+
 const renumber = (chapters: Chapter[]): Chapter[] =>
   chapters.map((c, i) => ({ ...c, num: i + 1 }));
 
@@ -380,6 +460,7 @@ const initialUi: UiState = {
   refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
+  panelExpanded: false,
 };
 
 export const useStore = create<StoreState>()(
@@ -733,7 +814,7 @@ export const useStore = create<StoreState>()(
               if (c.id !== chId) return c;
               const scenes = c.scenes.concat("");
               const sceneLinks = c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks;
-              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
+              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
             }),
           },
         })),
@@ -749,7 +830,7 @@ export const useStore = create<StoreState>()(
               scenes.splice(idx, 0, "");
               const sceneLinks = c.sceneLinks.slice();
               if (scenes.length > 1) sceneLinks.splice(Math.min(idx, sceneLinks.length), 0, "therefore");
-              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
+              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
             }),
           },
         })),
@@ -774,10 +855,13 @@ export const useStore = create<StoreState>()(
             chapters: s.doc.chapters.map((c) => {
               if (c.id !== chId) return c;
               const scenes = c.scenes.filter((_, i) => i !== idx);
+              // Both layouts drop the deleted slot, so neither goes out of step
+              // with the scene list (a mismatch re-arranges on next open).
               const scenePos = (c.scenePos || []).filter((_, i) => i !== idx);
+              const scenePosCompact = (c.scenePosCompact || []).filter((_, i) => i !== idx);
               const links = c.sceneLinks.slice();
               if (links.length) links.splice(Math.min(idx, links.length - 1), 1);
-              return { ...c, scenes, scenePos, sceneLinks: links };
+              return { ...c, scenes, scenePos, scenePosCompact, sceneLinks: links };
             }),
           },
         })),
@@ -801,7 +885,7 @@ export const useStore = create<StoreState>()(
               if (sceneLinks.length) sceneLinks.splice(Math.min(fromIdx, sceneLinks.length - 1), 1);
               if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "therefore");
 
-              return { ...c, scenes, sceneLinks, scenePos: sceneAutoArrange(scenes, 0, cols) };
+              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
             }),
           },
         })),
@@ -866,7 +950,7 @@ export const useStore = create<StoreState>()(
                     ...c,
                     scenes: srcScenes,
                     sceneLinks: srcLinks,
-                    scenePos: sceneAutoArrange(srcScenes, 0, cols),
+                    ...scenePosBoth(srcScenes, s.sceneFlowExpanded, cols),
                   };
                 if (c.id === toChId)
                   return {
@@ -875,9 +959,9 @@ export const useStore = create<StoreState>()(
                     sceneLinks: toLinks,
                     // Width-fitted like openChapter, so the destination doesn't
                     // keep a cramped count-heuristic grid when later opened.
-                    scenePos: sceneAutoArrange(
+                    ...scenePosBoth(
                       toScenes,
-                      0,
+                      s.sceneFlowExpanded,
                       sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(s.sceneFlowExpanded))
                     ),
                   };
@@ -903,15 +987,19 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      // Auto-arrange tidies the size you're looking at. The other size keeps its
+      // own layout, so arranging the collapsed canvas can't disturb how the
+      // expanded one was laid out (and vice versa).
       arrangeScenes: (chId, reset = false, cols) =>
         set((s) => {
           const n = reset ? 0 : s.sceneArrangeN;
+          const key = scenePosKey(s.sceneFlowExpanded);
           return {
             sceneArrangeN: n + 1,
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? { ...c, scenePos: sceneAutoArrange(c.scenes, n, cols) } : c
+                c.id === chId ? { ...c, [key]: sceneAutoArrange(c.scenes, n, cols) } : c
               ),
             },
           };
@@ -923,16 +1011,10 @@ export const useStore = create<StoreState>()(
       addChapterRef: (chId, kind, refId) =>
         set((s) => {
           const assetId = uid("a");
-          const asset: Asset = {
-            id: assetId,
-            kind,
-            label: "",
-            body: kind === "NOTE" ? "" : undefined,
-          };
           return {
             doc: {
               ...s.doc,
-              assets: s.doc.assets.concat(asset),
+              assets: s.doc.assets.concat(blankAsset(assetId, kind)),
               chapters: s.doc.chapters.map((c) =>
                 c.id === chId ? { ...c, refs: c.refs.concat({ id: refId ?? uid("r"), assetId }) } : c
               ),
@@ -947,6 +1029,40 @@ export const useStore = create<StoreState>()(
             ...s.doc,
             chapters: s.doc.chapters.map((c) =>
               c.id === chId ? { ...c, refs: c.refs.filter((r) => r.id !== refId) } : c
+            ),
+          },
+        })),
+
+      /**
+       * Edit the asset a chapter's pin links to, resolving `refId → assetId`
+       * **inside** `set` — i.e. against current state.
+       *
+       * This has to be the store's job. A caller resolving the link from its own
+       * render closure dropped keystrokes typed in the moments right after
+       * "+ Note" / "+ To-do" committed a draft: the brand-new link doesn't exist
+       * in the render those events were dispatched against, so the lookup missed
+       * and the edit went nowhere.
+       */
+      updateChapterRefAsset: (chId, refId, patch) =>
+        set((s) => {
+          const link = s.doc.chapters.find((c) => c.id === chId)?.refs.find((r) => r.id === refId);
+          if (!link) return s;
+          return {
+            doc: {
+              ...s.doc,
+              assets: s.doc.assets.map((a) => (a.id === link.assetId ? { ...a, ...patch } : a)),
+            },
+          };
+        }),
+
+      // A chapter's pin order is its own `refs` array, independent of the shared
+      // library's order — the same note can sit first here and last there.
+      reorderChapterRef: (chId, refId, toIdx) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) =>
+              c.id === chId ? { ...c, refs: moveById(c.refs, refId, toIdx) } : c
             ),
           },
         })),
@@ -1212,7 +1328,9 @@ export const useStore = create<StoreState>()(
             need: "",
             notes: "",
           };
-          return { charDraft: draft, selChar: id, showChars: true };
+          // Opened from the chapter modal as well as the panel itself, so it
+          // closes the other two rather than stacking on one of them.
+          return { charDraft: draft, selChar: id, showChars: true, showWorld: false, showNotes: false };
         }),
 
       // Still blank → keep editing the draft. First real content → it becomes a
@@ -1258,6 +1376,8 @@ export const useStore = create<StoreState>()(
             worldDraft: { id, cat: "Lore", name: "", desc: "", notes: "", refs: [] },
             selWorld: id,
             showWorld: true,
+            showChars: false,
+            showNotes: false,
           };
         }),
 
@@ -1294,16 +1414,10 @@ export const useStore = create<StoreState>()(
       addWorldRef: (wId, kind, refId) =>
         set((s) => {
           const assetId = uid("a");
-          const asset: Asset = {
-            id: assetId,
-            kind,
-            label: "",
-            body: kind === "NOTE" ? "" : undefined,
-          };
           return {
             doc: {
               ...s.doc,
-              assets: s.doc.assets.concat(asset),
+              assets: s.doc.assets.concat(blankAsset(assetId, kind)),
               world: s.doc.world.map((w) =>
                 w.id === wId ? { ...w, refs: w.refs.concat({ id: refId ?? uid("r"), assetId }) } : w
               ),
@@ -1318,6 +1432,29 @@ export const useStore = create<StoreState>()(
             ...s.doc,
             world: s.doc.world.map((w) =>
               w.id === wId ? { ...w, refs: w.refs.filter((r) => r.id !== refId) } : w
+            ),
+          },
+        })),
+
+      // Same fresh-state lookup as `updateChapterRefAsset`, for world entries.
+      updateWorldRefAsset: (wId, refId, patch) =>
+        set((s) => {
+          const link = s.doc.world.find((w) => w.id === wId)?.refs.find((r) => r.id === refId);
+          if (!link) return s;
+          return {
+            doc: {
+              ...s.doc,
+              assets: s.doc.assets.map((a) => (a.id === link.assetId ? { ...a, ...patch } : a)),
+            },
+          };
+        }),
+
+      reorderWorldRef: (wId, refId, toIdx) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            world: s.doc.world.map((w) =>
+              w.id === wId ? { ...w, refs: moveById(w.refs, refId, toIdx) } : w
             ),
           },
         })),
@@ -1341,15 +1478,7 @@ export const useStore = create<StoreState>()(
       addAsset: (kind, presetId) => {
         const id = presetId ?? uid("a");
         set((s) => ({
-          doc: {
-            ...s.doc,
-            assets: s.doc.assets.concat({
-              id,
-              kind,
-              label: "",
-              body: kind === "NOTE" ? "" : undefined,
-            }),
-          },
+          doc: { ...s.doc, assets: s.doc.assets.concat(blankAsset(id, kind)) },
         }));
         return id;
       },
@@ -1357,6 +1486,55 @@ export const useStore = create<StoreState>()(
       updateAsset: (id, patch) =>
         set((s) => ({
           doc: { ...s.doc, assets: s.doc.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)) },
+        })),
+
+      /**
+       * Reorder the shared library. `toIdx` counts the *visible* (non-archived)
+       * assets, because that's the list the user is dragging in — archived assets
+       * keep their exact slots in the array, so archiving something never
+       * silently reshuffles the library order around it.
+       */
+      reorderAsset: (id, toIdx) =>
+        set((s) => {
+          const assets = s.doc.assets;
+          const slots = assets.reduce<number[]>((acc, a, i) => (a.archived ? acc : acc.concat(i)), []);
+          const visible = slots.map((i) => assets[i]);
+          const moved = moveById(visible, id, toIdx);
+          if (moved === visible) return s;
+          const next = assets.slice();
+          slots.forEach((slot, k) => (next[slot] = moved[k]));
+          return { doc: { ...s.doc, assets: next } };
+        }),
+
+      /**
+       * Archiving retires a note/image/to-do from the library: it is unpinned
+       * EVERYWHERE first (the same five-location sweep a delete does), then
+       * flagged. So an archived asset is attached to nothing — it survives only
+       * so it can be restored, and it's hidden from the library and link picker
+       * until it is. Restoring brings it back unpinned; the pins are not
+       * remembered, which the archive confirm says out loud.
+       */
+      archiveAsset: (id) =>
+        set((s) => {
+          const swept = removeAssetLinks(s.doc, id);
+          return {
+            doc: {
+              ...swept,
+              assets: swept.assets.map((a) => (a.id === id ? { ...a, archived: true } : a)),
+            },
+          };
+        }),
+
+      unarchiveAsset: (id) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            assets: s.doc.assets.map((a) => {
+              if (a.id !== id) return a;
+              const { archived: _drop, ...rest } = a;
+              return rest;
+            }),
+          },
         })),
 
       // Deleting a library asset unpins it EVERYWHERE — active board, stashed
@@ -1454,39 +1632,95 @@ export const useStore = create<StoreState>()(
       setDragId: (id) => set({ dragId: id }),
       openChapter: (id) =>
         set((s) => {
-          // Estimate the visible scene-canvas width for the current mode so a
-          // freshly-laid-out chapter fills it (~5 columns expanded, ~3 collapsed).
-          const boxW = sceneBoxWidthEstimate(s.sceneFlowExpanded);
+          // Lay out whichever of the two canvas sizes has no usable layout yet
+          // (a pre-v6 chapter has only the expanded one; a brand-new chapter has
+          // neither), estimating each mode's visible width so it fills the space
+          // — ~5 columns expanded, ~3 collapsed. An existing layout is left
+          // exactly as the user arranged it.
+          const layout = (scenes: string[], expanded: boolean) =>
+            sceneAutoArrange(
+              scenes,
+              0,
+              sceneColumnsForWidth(scenes.length, sceneBoxWidthEstimate(expanded))
+            );
           return {
             openCh: id,
             sceneArrangeN: 0,
             doc: {
               ...s.doc,
-              chapters: s.doc.chapters.map((c) =>
-                c.id === id && (!c.scenePos || c.scenePos.length !== c.scenes.length)
-                  ? {
-                      ...c,
-                      scenePos: sceneAutoArrange(c.scenes, 0, sceneColumnsForWidth(c.scenes.length, boxW)),
-                    }
-                  : c
-              ),
+              chapters: s.doc.chapters.map((c) => {
+                if (c.id !== id) return c;
+                const laidOut = (p?: Vec2[]) => !!p && p.length === c.scenes.length;
+                if (laidOut(c.scenePos) && laidOut(c.scenePosCompact)) return c;
+                return {
+                  ...c,
+                  ...(laidOut(c.scenePos) ? null : { scenePos: layout(c.scenes, true) }),
+                  ...(laidOut(c.scenePosCompact) ? null : { scenePosCompact: layout(c.scenes, false) }),
+                };
+              }),
             },
           };
         }),
+      // Jumping to a pin can cross a book and a version boundary, so it reuses
+      // `switchBook`/`setActiveDraft` rather than reaching into the doc — those
+      // are the actions that stash the board being left behind. Panels close
+      // through `setPanel` so their blank-draft sweep still runs.
+      jumpToChapter: (bookId, draftId, chapterId) => {
+        const st = useStore.getState();
+        for (const key of ["showNotes", "showWorld", "showChars"] as PanelKey[]) {
+          if (st[key]) st.setPanel(key, false);
+        }
+        if (bookId !== useStore.getState().doc.activeBookId) {
+          useStore.getState().switchBook(bookId);
+        }
+        if (draftId && draftId !== useStore.getState().doc.activeDraftId) {
+          useStore.getState().setActiveDraft(draftId);
+        }
+        // A pin can go stale between render and click (another version deleted,
+        // say) — land on the board rather than opening a modal on nothing.
+        set({ level: "book", view: "board" });
+        if (useStore.getState().doc.chapters.some((c) => c.id === chapterId)) {
+          useStore.getState().openChapter(chapterId);
+        }
+      },
+
+      jumpToWorldEntry: (worldId) => {
+        // Through setPanel so the panel being left still gets its draft sweep,
+        // and so the one-panel-at-a-time rule is applied in one place.
+        useStore.getState().setPanel("showWorld", true);
+        set({ selWorld: worldId });
+      },
+
       // Closing the chapter drops any note/image ref left with nothing in it.
       closeChapter: () => set((s) => ({ openCh: null, ...prunedState(s) })),
       toggleNewMenu: () => set((s) => ({ newMenu: !s.newMenu })),
       closeNewMenu: () => set({ newMenu: false }),
       setPanel: (panel, open) =>
-        set((s) => ({
-          [panel]: open,
-          newMenu: false,
+        set((s) => {
+          const editing = EDITING_PANELS.has(panel);
+          // One editing panel at a time. The scrim already makes a second one
+          // unreachable by pointer (it covers the toolbar), so this is here to
+          // keep the invariant true for the paths that open a panel from *inside*
+          // another surface — a draft started from the chapter modal, a pin jump
+          // handing off from Notes to World.
+          const closeOthers =
+            open && editing ? { showChars: false, showWorld: false, showNotes: false } : null;
           // Leaving an editing panel drops its untouched draft card, and sweeps
           // any record that was emptied out (or predates deferred creation).
-          ...(open || !EDITING_PANELS.has(panel)
-            ? null
-            : { charDraft: null, worldDraft: null, ...prunedState(s) }),
-        }) as Partial<StoreState>),
+          // Only when a panel that WAS open is now closing — re-opening the panel
+          // you're already in must not throw away the draft you're typing into.
+          const left = editing
+            ? open
+              ? EDITING_PANEL_LIST.some((k) => k !== panel && s[k])
+              : s[panel]
+            : false;
+          return {
+            ...closeOthers,
+            [panel]: open,
+            newMenu: false,
+            ...(left ? { charDraft: null, worldDraft: null, ...prunedState(s) } : null),
+          } as Partial<StoreState>;
+        }),
       toggleChapterSection: (section) =>
         set((s) => ({
           chapterSectionsCollapsed: {
@@ -1500,6 +1734,7 @@ export const useStore = create<StoreState>()(
           textareaExpanded: { ...s.textareaExpanded, [key]: !s.textareaExpanded[key] },
         })),
       setSceneFlowExpanded: (expanded) => set({ sceneFlowExpanded: expanded }),
+      setPanelExpanded: (expanded) => set({ panelExpanded: expanded }),
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
       selectBook: (id) => set((s) => ({ selBook: s.selBook === id ? null : id })),
@@ -1535,6 +1770,7 @@ export const useStore = create<StoreState>()(
         refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
+        panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed
       // project) through `normalizeDoc`, which understands all older shapes.

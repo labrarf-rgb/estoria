@@ -41,9 +41,19 @@ export function pruneEmptyEntries(doc: StoryDoc): StoryDoc {
   return next;
 }
 
-/** A note/image the user never titled, wrote in, or uploaded to. */
+/**
+ * A note/image/to-do the user never titled, wrote in, uploaded to, or listed a
+ * task in. A to-do's blank lines don't count as content for the same reason a
+ * character's app-assigned colour doesn't: only what the user actually typed
+ * makes a record worth keeping.
+ */
 export function isAssetEmpty(a: Asset): boolean {
-  return !a.label.trim() && !(a.body ?? "").trim() && !(a.src ?? "").trim();
+  return (
+    !a.label.trim() &&
+    !(a.body ?? "").trim() &&
+    !(a.src ?? "").trim() &&
+    !(a.items ?? []).some((i) => i.text.trim())
+  );
 }
 
 /** Every text field blank — `color` is app-assigned, so it doesn't count. */

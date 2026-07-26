@@ -10,12 +10,24 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
 
-export type RefKind = "IMAGE" | "NOTE";
+/**
+ * What a pinnable resource *is*. `TODO` arrived in schema v6 — a checklist that
+ * lives in the same shared pool as notes and images, so it can be pinned to a
+ * chapter or a world entry exactly like they can.
+ */
+export type RefKind = "IMAGE" | "NOTE" | "TODO";
+
+/** One line of a `TODO` asset's checklist. */
+export interface TodoItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 
 /**
  * A pinned reference on a chapter or world entry. Since schema v5 a ref is a
@@ -30,13 +42,22 @@ export interface PinnedRef {
   assetId: string;
 }
 
-/** A shared, book-level note or image that can be linked into many chapters. */
+/** A shared, book-level note, image or checklist that can be linked into many chapters. */
 export interface Asset {
   id: string;
   kind: RefKind;
   label: string;
   body?: string;
   src?: string;
+  /** Checklist lines — `TODO` assets only. */
+  items?: TodoItem[];
+  /**
+   * Archived (v6): retired from the shared library. Archiving **unpins the asset
+   * everywhere** first, so an archived asset is by definition attached to
+   * nothing — it stays in the pool only so it can be restored, and it is hidden
+   * from the library list and the link picker until it is.
+   */
+  archived?: boolean;
 }
 
 /** A named draft / version of the story. The "main" draft is the base text. */
@@ -159,8 +180,19 @@ export interface Chapter {
   scenes: string[];
   /** Link type between scene i and i+1 (length = scenes.length - 1). */
   sceneLinks: ConnType[];
-  /** Free positions of scene nodes inside the detail canvas. */
+  /**
+   * Scene-node positions inside the detail canvas, for the **expanded** scene
+   * flow. The canvas has two sizes, and each remembers its own layout — see
+   * `scenePosCompact`.
+   */
   scenePos?: Vec2[];
+  /**
+   * Scene-node positions for the **collapsed** scene flow (v6). The two modes
+   * fit different column counts, so one shared layout meant toggling had to
+   * re-arrange, which threw away how the scenes had been laid out. Keeping a
+   * layout per mode is what makes the arrangement survive a toggle.
+   */
+  scenePosCompact?: Vec2[];
   refs: PinnedRef[];
 }
 

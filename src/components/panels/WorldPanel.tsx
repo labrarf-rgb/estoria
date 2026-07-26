@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ViewToggle } from "@/components/ui/ViewToggle";
@@ -26,8 +26,9 @@ export function WorldPanel() {
   const deleteWorldEntry = useStore((s) => s.deleteWorldEntry);
   const addWorldRef = useStore((s) => s.addWorldRef);
   const deleteWorldRef = useStore((s) => s.deleteWorldRef);
+  const reorderWorldRef = useStore((s) => s.reorderWorldRef);
   const linkAssetToWorld = useStore((s) => s.linkAssetToWorld);
-  const updateAsset = useStore((s) => s.updateAsset);
+  const updateWorldRefAsset = useStore((s) => s.updateWorldRefAsset);
   const askConfirm = useStore((s) => s.askConfirm);
   // Which world entry currently has the "link book asset" picker open.
   const [linkFor, setLinkFor] = useState<string | null>(null);
@@ -36,16 +37,26 @@ export function WorldPanel() {
   const descExpanded = useStore((s) => s.textareaExpanded.worldDesc);
   const notesExpanded = useStore((s) => s.textareaExpanded.worldNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
+  const panelExpanded = useStore((s) => s.panelExpanded);
+  const setPanelExpanded = useStore((s) => s.setPanelExpanded);
+  const jumpToChapter = useStore((s) => s.jumpToChapter);
+  const chapters = useStore((s) => s.doc.chapters);
+  const activeBookId = useStore((s) => s.doc.activeBookId);
+  const activeDraftId = useStore((s) => s.doc.activeDraftId);
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
+  // Archived assets are unpinned and retired — never offered for linking.
+  const linkable = assets.filter((a) => !a.archived);
+  /** Chapters of the loaded board that reference this entry. */
+  const appearsIn = (id: string) => chapters.filter((c) => (c.worldRefs ?? []).includes(id));
+  const jumpTo = (chapterId: string) => jumpToChapter(activeBookId, activeDraftId, chapterId);
 
   return (
-    <Scrim onClose={close} z={55}>
-      <div
-        onMouseDown={stop}
-        className="absolute bottom-0 right-0 top-0 w-[440px] overflow-auto border-l border-rule bg-panel shadow-[-20px_0_60px_rgba(0,0,0,0.3)]"
-      >
-        <div className="sticky top-0 z-[2] flex items-center border-b border-rule bg-panel px-[22px] py-5">
+    <Drawer
+      expanded={panelExpanded}
+      onClose={close}
+      header={
+        <div className="flex items-center px-[22px] py-5">
           <div>
             <div className="font-serif text-[18px] font-semibold text-ink">World</div>
             <div className="mt-[2px] text-[11.5px] font-medium text-soft">
@@ -53,9 +64,14 @@ export function WorldPanel() {
             </div>
           </div>
           <div className="flex-1" />
-          <CloseButton onClick={close} />
+          <div className="flex items-center gap-[8px]">
+            <SizeButton expanded={panelExpanded} onClick={() => setPanelExpanded(!panelExpanded)} />
+            <CloseButton onClick={close} />
+          </div>
         </div>
-        <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
+      }
+    >
+      <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
           {/* The draft renders last, exactly where it will land once committed —
               same id, same position, so typing doesn't remount the card. */}
           {(draft ? world.concat(draft) : world).map((w) => {
@@ -135,6 +151,26 @@ export function WorldPanel() {
                         className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
                       />
                     </div>
+                    {/* Where this entry is referenced — each chapter a way in,
+                        like a character's "Appears in" and a note's pin list. */}
+                    {appearsIn(w.id).length > 0 && (
+                      <div>
+                        <Label>Appears in</Label>
+                        <div className="flex flex-wrap gap-[5px]">
+                          {appearsIn(w.id).map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => jumpTo(c.id)}
+                              title={`Open ${c.title || "this chapter"}`}
+                              className="flex items-center gap-[5px] rounded-md border border-rule px-[8px] py-[2px] font-mono text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
+                            >
+                              Ch {c.num}
+                              <span className="text-[10px] text-faint">↗</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {/* A reference has to hang off a saved entry, so this appears
                         once the draft has content and becomes one. */}
                     <div className={isDraft ? "hidden" : undefined}>
@@ -146,12 +182,12 @@ export function WorldPanel() {
                       <RefList
                         refs={resolveRefs(w.refs, assets)}
                         onAdd={(kind, id) => addWorldRef(w.id, kind, id)}
-                        onUpdate={(refId, patch) => {
-                          // Content edits write through to the shared asset.
-                          const link = w.refs.find((r) => r.id === refId);
-                          if (link) updateAsset(link.assetId, patch);
-                        }}
+                        // Content edits write through to the shared asset; the
+                        // store resolves ref → asset against current state.
+                        onUpdate={(refId, patch) => updateWorldRefAsset(w.id, refId, patch)}
                         onDelete={(refId) => deleteWorldRef(w.id, refId)}
+                        // This entry's own pin order, independent of the library's.
+                        onReorder={(refId, toIdx) => reorderWorldRef(w.id, refId, toIdx)}
                         deletePrompt={() => ({
                           message: "Remove from this world entry?",
                           detail: "It stays in the shared library.",
@@ -164,7 +200,7 @@ export function WorldPanel() {
                       />
                       {linkFor === w.id && (
                         <AssetLinkPicker
-                          assets={assets}
+                          assets={linkable}
                           linkedAssetIds={new Set(w.refs.map((r) => r.assetId))}
                           onPick={(assetId) => {
                             linkAssetToWorld(w.id, assetId);
@@ -200,9 +236,8 @@ export function WorldPanel() {
           >
             + Add world entry
           </button>
-        </div>
       </div>
-    </Scrim>
+    </Drawer>
   );
 }
 

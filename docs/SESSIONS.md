@@ -1978,3 +1978,193 @@ blank record created on the phone will quietly disappear the next time the web
 app opens and closes that panel. The file contract is unaffected; only content
 that was empty in both apps' eyes goes away. Worth mirroring deferred creation
 on Android eventually, but nothing breaks in the meantime.
+
+### 2026-07-26 (Session 48) — Pinnable to-dos, archiving, pin-jumping, live canvas beside a panel
+
+Eight user-requested changes in one pass, on `feature/notes-canvas-upgrades`.
+Four shapes of the work were settled with the user up front: remember the scene
+layout **per canvas size** (rather than free placement), panels toggle between
+**side panel and full screen** (rather than a width cycle), to-dos get a **real
+`TODO` asset kind with a schema bump** (rather than a flagged note), and
+archiving **unpins everywhere** (rather than keeping pins).
+
+**Schema v6** (`types.ts`, `normalizeDoc`) — all additive: `RefKind` gains
+`"TODO"` with `Asset.items: TodoItem[]`; `Asset.archived?`;
+`Chapter.scenePosCompact?`. New `normalizeAssets()` coerces every asset into a
+renderable shape on file open (unknown kind → NOTE, `TODO` always has `items`,
+`archived` a real boolean). **This is an open cross-app event — see §6:** Android
+reads v5 and will now refuse files this app writes until it catches up.
+
+**What changed, item by item:**
+
+- **Reorder pinned resources** — grip-drag *or* type a position number, in the
+  library, on a chapter, and on a world entry. Each surface owns its order
+  (`reorderAsset` / `reorderChapterRef` / `reorderWorldRef`); `reorderAsset`
+  counts only non-archived items and leaves archived array slots untouched, so
+  archiving something never reshuffles the order around it. The drag is
+  **pointer-based** (mousedown + window listeners), matching the board, timeline
+  and scene canvas — HTML5 drag-and-drop would have been a second mechanic for
+  the same gesture. Listeners attach in the mousedown handler, not from an effect
+  on the drag state: an effect only runs after the next render, so a drag
+  finished inside one frame would complete before anything was listening.
+- **See more of Notes / World / Characters + keep using the canvas** — one new
+  `Drawer` in `ui/Overlay.tsx` with an Expand/Collapse `SizeButton`
+  (`panelExpanded`, persisted). The default 460px size is now laid out **beside**
+  the canvas in a flex row in `App.tsx`, with no scrim — that single change is
+  what makes the board live while a panel is open, and it stops the panel
+  covering the toolbar and footer. Full screen is a fixed overlay, content capped
+  at 1180px. All three panels moved onto it (their sticky-header + scroll-body
+  markup collapsed into the `Drawer`'s two slots).
+- **Click into a chapter** — a press that doesn't move is a click and opens the
+  chapter, on the board *and* the timeline; a click that jiggled a pixel or two
+  restores the card's position so opening a chapter can never nudge the board.
+  The `onDoubleClick` is gone (by the time a second click lands, the modal is
+  over the card) and the chapter modal now ignores **backdrop** dismissals for
+  400ms after opening, so the old double-click habit can't open-then-close it.
+  Footer hint reworded.
+- **Scene arrangement survives the expand/collapse toggle** — the effect that
+  re-arranged scenes on toggle is deleted. Each canvas size keeps its own layout
+  (`scenePos` expanded / `scenePosCompact` collapsed); toggling swaps between
+  them. `openChapter` lays out only whichever side is missing or stale, so an
+  existing arrangement is never touched; every structural edit writes both via
+  `scenePosBoth`, and auto-arrange writes only the size on screen.
+- **Show where a note is pinned, and jump there** — `findAssetPins()` walks all
+  five ref locations and returns pins ordered board-first, each carrying its book
+  and version. The library lists them as buttons; `jumpToChapter` switches book
+  and version through `switchBook`/`setActiveDraft` (the actions that stash the
+  board being left), closes the panel via `setPanel` so its blank-draft sweep
+  still runs, and opens the chapter — bailing to the board if the pin went stale.
+  World pins open the World panel on that entry.
+- **Archive** — `archiveAsset` reuses `removeAssetLinks` to unpin everywhere,
+  then flags `archived`; the asset drops out of the library list and the link
+  picker and appears under "Archived · N" with Restore and Delete. The confirm
+  states the cost *before* committing ("unpinned from N places… restoring brings
+  back the note, not the pins") because that half isn't undone by a restore.
+- **To-do lists** — a `TODO` asset renders as a checklist in both `RefList`
+  views: tick/untick with strikethrough, add/remove tasks, Enter adds the next
+  one, "N/M done" as the row snippet and library caption. Pinnable and linkable
+  exactly like a note. Markdown export emits real checkboxes under the chapter's
+  **Pinned:** line, skipping blank task lines and closing the list with a blank
+  line so the next bold block still renders.
+
+**Two bugs found and fixed while testing, both pre-existing:**
+
+1. **Typing into a brand-new pinned note/to-do lost characters.** `ChapterDetail`
+   and `WorldPanel` resolved `refId → assetId` from their own render closure, so
+   keystrokes dispatched in the moments right after a draft committed looked up a
+   link that didn't exist in that render and were silently dropped — a 13-char
+   burst landed as an empty label. Resolution moved into the store
+   (`updateChapterRefAsset` / `updateWorldRefAsset`), where the lookup always
+   sees current state.
+2. **A fit measured before the stylesheet applied mirrored the board.** With a
+   0-height viewport, `fitToContent`'s formula goes negative and
+   `scale(-0.17)` flips the whole canvas (reproducible on a dev-server reload).
+   Both fit helpers now return a neutral camera for an unmeasured viewport and
+   floor the zoom at `FIT_ZOOM_MIN`.
+
+**Verified in the dev server** (sample story, 8 chapters, 3 books, 2 versions):
+click-into-chapter on board and timeline; a collapse→expand round trip leaving
+both scene layouts byte-identical while each keeps its own column count (4 vs 3
+for 6 scenes); typed position reorder committing on Enter and on blur; grip-drag
+moving a library row from 13 to 10 to 7; a to-do created, titled in one fast
+burst, two tasks added, one ticked, "1/3 done"; the library note's pin list
+showing both a current-version and an Alt-ending pin, and the cross-version chip
+switching version, closing the panel and opening the chapter in that fork;
+archiving leaving **zero** pins across all five locations, hiding the note from
+the library and the link picker, and listing it with Restore; both panels docked
+side by side with the board panning underneath; markdown export carrying
+`- [x] Cut the harbor exposition`; and a reload confirming schema 6, `TODO`
+items, `archived`, both scene layouts and `panelExpanded` all round-tripping
+through persist. `npm run build` clean throughout. No console errors.
+
+**Not shipped** — on the branch, unpushed and undeployed, awaiting the user's
+call (deploy needs their approval, and the Android side should be aware of the
+v6 event first).
+
+### 2026-07-26 (Session 48b) — Panels go back to modal; jump into a chapter from a character or world entry
+
+Same-session revisions after the user reviewed 48.
+
+- **The docked side panel is reverted.** Session 48 laid the 460px panel out
+  *beside* the canvas with no scrim, so the board stayed live; the user preferred
+  the older look and feel — everything behind a panel dimmed and inert — and
+  asked for that back, **keeping** the Expand size toggle. `Drawer` now wraps
+  both sizes in the usual `Scrim` (side panel = right-hand column over a dimmed
+  backdrop that closes on click; full screen = the same panel filling the
+  viewport, which needs no backdrop of its own), and `App.tsx` is back to
+  Toolbar + canvas + Footer with the panels as overlays.
+- **"One panel at a time" turned out to be a consequence, not a feature.** The
+  user spotted this while reviewing: the scrim is `fixed inset-0` and covers the
+  toolbar, so clicking Characters while Notes is open never reaches that button —
+  the click lands on the backdrop and closes Notes. Two panels were only ever
+  possible in the docked layout being removed. So nothing was built for it; the
+  invariant is now just asserted in `setPanel` (opening one editing panel clears
+  the other two) to cover the paths that *aren't* geometry-blocked: a draft
+  started from the chapter modal (`startCharDraft` / `startWorldDraft`) and the
+  Notes panel's world-pin jump, which now routes through `setPanel` so the panel
+  it leaves still gets its blank-draft sweep. One sharp edge handled: the sweep
+  fires only when a panel that **was** open is closing, so re-opening the panel
+  you're already in can't throw away the draft card you're typing into.
+- **Jump into a chapter from a character or a world entry.** The mirror of the
+  notes pin list, in the direction the user asked for (panel → chapter only; the
+  chapter modal's own character/world chips are unchanged). A character's
+  "Appears in" chips were dead `Ch 3` labels — they're now buttons that close the
+  panel and open that chapter. World entries had no usage list at all; they get
+  the same one, built from `chapter.worldRefs`. Both are scoped to the **loaded
+  board**, matching the "in N chapters" line already above them — deliberately
+  narrower than a note's pin list, which spans books and versions because the
+  asset library is series-shared.
+
+**Verified in the dev server:** the backdrop is back (a canvas drag while a panel
+is open pans nothing and closes the panel; the board is full width again with no
+layout displacement); Expand still fills the screen and Collapse returns to the
+460px column; opening a panel in state while another is open leaves exactly one
+panel and one scrim; an untyped world draft survives re-opening its own panel;
+Sela Voss's `Ch 7 ↗` chip opens "The Long Dark" with the panel closed; a world
+entry linked to that chapter shows `APPEARS IN · Ch 7 ↗` and jumps the same way.
+`npm run build` clean. No console errors.
+
+**Still on the branch, unpushed and undeployed** — schema v6 and the open
+cross-app event from Session 48 are unchanged by this revision.
+
+### 2026-07-26 (Session 48c) — Pin chips read like "Appears in"; add-row order; verification sweep
+
+Two small user revisions, plus the verification still owed on 48.
+
+- **A note's "Pinned in" chips are now as short as a character's "Appears in".**
+  They were `03 The Drowned Map` with a trailing `Book · Version`, which the user
+  called "the entire thing". A chip is now just `Ch N ↗` in the same mono style,
+  with the chapter name in the tooltip. The location isn't dropped: pins outside
+  the board on screen are **grouped** under one small "Book · Version" heading
+  (world pins under "World"), so the information survives without repeating
+  itself on every chip.
+- **Add row reordered to + Note · + To-do · + Image** — one change in `RefList`,
+  so it holds in the chapter modal, the World panel and the shared library.
+
+**Verification sweep (dev server), covering what 48 had left unchecked:**
+
+- **v5 → v6 migration on real persisted state.** Rewound the persisted store to
+  `version: 5` (no `scenePosCompact`, no `TODO`, no `archived`) and reloaded:
+  `migrate` → `normalizeDoc` ran, all 8 chapters and 13 assets survived with
+  kinds intact, store re-persisted at v6. The `scenePosCompact` backfill is
+  **lazy** — only the chapter you open gains a layout, so a migration doesn't
+  rewrite the whole doc.
+- **Archive.** Confirm reads "It will be unpinned from 1 place and moved to the
+  archive. Restoring it later brings back the note, not the pins." Archiving
+  swept the pin (a *world-entry* pin, so the cross-location sweep is exercised),
+  removed it from the library grid, raised "Archived · 1", and kept the record.
+  It is **absent from the link picker** (12 of 13 assets offered). **Restore**
+  clears the flag, returns it to the library, and leaves it unpinned.
+- **To-do end to end.** Draft commits on the first keystroke and pins itself;
+  tasks add, tick and persist; row/caption read "1/2 done"; markdown export
+  emits `**To-do — Ch1 revision list**` followed by `- [x]` / `- [ ]`.
+- **Reordering.** Typed position works in the shared library (14 to 1) and on a
+  chapter's pins (verified in 48); commits on Enter or blur.
+- **Cleanup:** the dev-server localStorage was snapshotted before these
+  destructive tests and restored byte-for-byte afterwards (13,583 bytes, original
+  asset order, no to-dos, no archived items, no stray keys). One stray mutation
+  along the way (a probe selector that matched an existing note's title field
+  instead of the new to-do's) was undone by that restore.
+
+`npm run build` clean. No console errors. Still on the branch, unpushed and
+undeployed.

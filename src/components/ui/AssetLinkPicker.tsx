@@ -3,8 +3,10 @@ import type { Asset } from "@/types";
 /**
  * The "Link from the shared library" chooser, shared by the chapter detail and
  * the World panel. Lists every book asset as a pick-to-link chip; assets already
- * pinned in the current location are shown disabled so the same note/image is
- * never double-linked. Rendered only while open — the caller owns the toggle.
+ * pinned in the current location are shown disabled so the same note/image/to-do
+ * is never double-linked. Callers pass the linkable assets only — archived ones
+ * are filtered out before they get here. Rendered only while open — the caller
+ * owns the toggle.
  */
 export function AssetLinkPicker({
   assets,
@@ -37,8 +39,13 @@ export function AssetLinkPicker({
                 className="rounded-lg border border-rule bg-panel px-[10px] py-[6px] text-[12px] font-medium text-ink hover:border-faint disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-rule"
                 title={linked ? "Already linked here" : undefined}
               >
-                {a.kind === "IMAGE" ? "🖼 " : "📝 "}
-                {a.label || (a.kind === "IMAGE" ? "Untitled image" : "Untitled note")}
+                {a.kind === "IMAGE" ? "🖼 " : a.kind === "TODO" ? "☑ " : "📝 "}
+                {a.label ||
+                  (a.kind === "IMAGE"
+                    ? "Untitled image"
+                    : a.kind === "TODO"
+                      ? "Untitled list"
+                      : "Untitled note")}
                 {linked ? " ✓" : ""}
               </button>
             );

@@ -9,6 +9,7 @@ import {
   type PinnedRef,
   type RefKind,
   type StoryDoc,
+  type TodoItem,
   type VersionData,
 } from "@/types";
 
@@ -371,6 +372,50 @@ function migrateRefsToAssets(doc: StoryDoc): StoryDoc {
 }
 
 /**
+ * Schema v5 → v6: assets gained a third `kind` (`TODO`, with `items`) and an
+ * `archived` flag. Nothing to convert — v5 assets are valid v6 assets — but a
+ * file can still arrive malformed or from a *newer* app's unknown kind, so every
+ * asset is coerced into a shape the UI can render:
+ *
+ *  - unknown/missing `kind` → `NOTE` (a note renders anything with a label+body,
+ *    so an unrecognized resource degrades to readable text rather than a blank).
+ *  - `TODO` always has an `items` array, with each line given an id/text/done.
+ *  - `archived` is a real boolean or absent, never a stray truthy value.
+ */
+function normalizeAssets(raw: unknown): Asset[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((a, i): Asset[] => {
+    if (!a || typeof a !== "object") return [];
+    const p = a as Partial<Asset>;
+    const kind: RefKind = p.kind === "IMAGE" || p.kind === "TODO" ? p.kind : "NOTE";
+    const items =
+      kind === "TODO"
+        ? (Array.isArray(p.items) ? p.items : []).flatMap((it, j): TodoItem[] => {
+            if (!it || typeof it !== "object") return [];
+            const t = it as Partial<TodoItem>;
+            return [
+              {
+                id: typeof t?.id === "string" && t.id ? t.id : `t-file-${i}-${j}`,
+                text: typeof t?.text === "string" ? t.text : "",
+                done: !!t?.done,
+              },
+            ];
+          })
+        : undefined;
+    return [
+      {
+        ...p,
+        id: typeof p.id === "string" && p.id ? p.id : `a-file-${i}`,
+        kind,
+        label: typeof p.label === "string" ? p.label : "",
+        ...(items ? { items } : {}),
+        ...(p.archived ? { archived: true } : {}),
+      } as Asset,
+    ];
+  });
+}
+
+/**
  * Coerce a parsed project file into a complete, current-schema StoryDoc.
  * Older exports (pre-v3: no books/bookData/drafts; pre-v4: overlay-style
  * versions) and hand-edited files get every missing field defaulted or
@@ -494,7 +539,7 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     activeDraftId,
     characters: Array.isArray(d.characters) ? d.characters : [],
     world: Array.isArray(d.world) ? d.world : [],
-    assets: Array.isArray(d.assets) ? d.assets : [],
+    assets: normalizeAssets(d.assets),
     books,
     bookLinks: Array.isArray(d.bookLinks) ? d.bookLinks : [],
     activeBookId,

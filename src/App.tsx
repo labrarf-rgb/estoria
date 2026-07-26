@@ -41,6 +41,8 @@ export function App() {
       <Footer />
 
       {openCh && !onSeriesMap && <ChapterDetail />}
+      {/* Side panels are modal overlays: the app behind them is dimmed and
+          inert, one panel at a time (see `Drawer`). */}
       <CharactersPanel />
       <WorldPanel />
       <NotesPanel />

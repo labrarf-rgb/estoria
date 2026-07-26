@@ -43,8 +43,9 @@ export function ChapterDetail() {
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
   const deleteChapterRef = useStore((s) => s.deleteChapterRef);
+  const reorderChapterRef = useStore((s) => s.reorderChapterRef);
   const linkAssetToChapter = useStore((s) => s.linkAssetToChapter);
-  const updateAsset = useStore((s) => s.updateAsset);
+  const updateChapterRefAsset = useStore((s) => s.updateChapterRefAsset);
   const startCharDraft = useStore((s) => s.startCharDraft);
   const startWorldDraft = useStore((s) => s.startWorldDraft);
   const askConfirm = useStore((s) => s.askConfirm);
@@ -172,21 +173,11 @@ export function ChapterDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!drag]);
 
-  // Reflow scenes to the new column count when the user toggles expand/collapse:
-  // the visible width changes (~5 wide expanded, ~3 collapsed), so a fixed layout
-  // would overflow or leave the canvas sparse. Only fires on an actual toggle, so
-  // it never clobbers manual drags on open or when switching chapters.
-  const prevExpanded = useRef<boolean | null>(null);
-  useEffect(() => {
-    const id = chIdRef.current;
-    if (id && prevExpanded.current !== null && prevExpanded.current !== expanded) {
-      const w = sceneBoxRef.current?.clientWidth ?? 0;
-      const n = doc.chapters.find((c) => c.id === id)?.scenes.length ?? 0;
-      arrangeScenes(id, false, sceneColumnsForWidth(n, w));
-    }
-    prevExpanded.current = expanded;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded]);
+  // Each canvas size keeps its own layout (`scenePos` expanded /
+  // `scenePosCompact` collapsed), so toggling just swaps to the other one —
+  // it no longer re-arranges, which is what used to throw away the arrangement
+  // you'd made. A size is only auto-arranged when it has no layout yet, which
+  // `openChapter` handles on the way in.
 
   // Leaving a chapter (prev/next nav or close) cancels an in-progress move.
   useEffect(() => {
@@ -195,6 +186,19 @@ export function ChapterDetail() {
     setDestPickerOpen(false);
     setMoveDest(null);
   }, [openCh]);
+
+  // A single click on a card opens this modal, so the second click of a
+  // double-click — the habit from when double-click was the way in — lands on
+  // the backdrop that just appeared. Backdrop dismissals are ignored for a
+  // moment after opening so that habit doesn't close the modal instantly.
+  const openedAt = useRef(0);
+  useEffect(() => {
+    openedAt.current = Date.now();
+  }, [openCh]);
+  const closeFromScrim = () => {
+    if (Date.now() - openedAt.current < 400) return;
+    closeChapter();
+  };
 
   if (!ch) return null;
 
@@ -206,7 +210,9 @@ export function ChapterDetail() {
 
   const draftId = doc.activeDraftId;
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
-  const positions = ch.scenePos ?? [];
+  // The layout belonging to the size on screen. Falling back to the other one
+  // covers the frame between a size toggle and the store catching up.
+  const positions = (expanded ? ch.scenePos : ch.scenePosCompact) ?? ch.scenePos ?? [];
   const boxW = sceneBoxRef.current?.clientWidth ?? 0;
 
   // While dragging, build a preview layout: the moved (or not-yet-created)
@@ -342,7 +348,7 @@ export function ChapterDetail() {
 
   return (
     <>
-    <Scrim onClose={closeChapter} z={50} center>
+    <Scrim onClose={closeFromScrim} z={50} center>
       <div
         onMouseDown={stop}
         className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
@@ -912,12 +918,14 @@ export function ChapterDetail() {
           <RefList
             refs={resolveRefs(ch.refs, doc.assets)}
             onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
-            onUpdate={(refId, patch) => {
-              // Content edits write through to the shared asset this ref links.
-              const link = ch.refs.find((r) => r.id === refId);
-              if (link) updateAsset(link.assetId, patch);
-            }}
+            // Content edits write through to the shared asset this ref links.
+            // The store resolves ref → asset, so a burst of typing right after a
+            // draft commits can't be dropped against a stale render.
+            onUpdate={(refId, patch) => updateChapterRefAsset(ch.id, refId, patch)}
             onDelete={(refId) => deleteChapterRef(ch.id, refId)}
+            // This chapter's pin order — the shared library has its own, so the
+            // same note can sit first here and anywhere there.
+            onReorder={(refId, toIdx) => reorderChapterRef(ch.id, refId, toIdx)}
             deletePrompt={() => ({
               message: "Remove from this chapter?",
               detail: "It stays in the shared library.",
@@ -930,7 +938,8 @@ export function ChapterDetail() {
           />
           {linkOpen && (
             <AssetLinkPicker
-              assets={doc.assets}
+              // Archived assets are retired — not offered for pinning.
+              assets={doc.assets.filter((a) => !a.archived)}
               linkedAssetIds={new Set(ch.refs.map((r) => r.assetId))}
               onPick={(assetId) => {
                 linkAssetToChapter(ch.id, assetId);

@@ -215,7 +215,7 @@ export function Footer() {
   const hint =
     view === "timeline"
       ? "Scroll to pan the timeline · use the arrows to flip orientation"
-      : "Double-click a chapter to map its scenes · drag to rearrange · scroll to zoom";
+      : "Click a chapter to map its scenes · drag to rearrange · scroll to zoom";
 
   return (
     <div className="flex items-center gap-3 border-t border-rule bg-panel px-4 py-[6px] text-[11px] font-medium text-faint">

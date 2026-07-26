@@ -68,13 +68,18 @@ export function Board() {
   // all stay in lockstep with the pointer during a fast real drag.
   const dragRaf = useRef<number | null>(null);
   const pendingDragPos = useRef<{ x: number; y: number } | null>(null);
+  // Every press on a card starts a drag, so a press that never moves is how a
+  // *click* is detected: on release it opens the chapter instead of dropping the
+  // card. A few pixels of hand-shake still counts as a click, hence the slop.
+  const movedRef = useRef(false);
+  const CLICK_SLOP = 4;
 
   // Timeline-only drag-to-reorder: positions there are purely derived from
   // array order (no stored x/y), so dragging live-splices a preview order and
   // everyone — including the dragged card — reflows to the resulting
   // sequential slots. Board (map) view keeps free placement; dropping a card
   // onto another there just offers a reorder via confirmation (see onUp).
-  const timelineDrag = useRef<{ id: string; fromIdx: number } | null>(null);
+  const timelineDrag = useRef<{ id: string; fromIdx: number; mx: number; my: number } | null>(null);
   const [timelineDragId, setTimelineDragId] = useState<string | null>(null);
   const [timelineOverIdx, setTimelineOverIdx] = useState<number | null>(null);
   const timelineOverRef = useRef<number | null>(null);
@@ -84,6 +89,11 @@ export function Board() {
   // Pointer drag (chapters), timeline reorder, and background pan — via window listeners.
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
+      const anchor = drag.current ?? timelineDrag.current;
+      if (anchor && !movedRef.current) {
+        movedRef.current =
+          Math.abs(e.clientX - anchor.mx) > CLICK_SLOP || Math.abs(e.clientY - anchor.my) > CLICK_SLOP;
+      }
       if (drag.current) {
         const z = cam.current.zoom;
         const nx = drag.current.ox + (e.clientX - drag.current.mx) / z;
@@ -140,14 +150,21 @@ export function Board() {
           cancelAnimationFrame(dragRaf.current);
           dragRaf.current = null;
         }
+        const click = !movedRef.current;
         if (pendingDragPos.current) {
-          moveChapter(drag.current.id, pendingDragPos.current.x, pendingDragPos.current.y);
+          // A click that jiggled a pixel or two puts the card back where it was
+          // — clicking into a chapter must never nudge the board.
+          const { x, y } = click
+            ? { x: drag.current.ox, y: drag.current.oy }
+            : pendingDragPos.current;
+          moveChapter(drag.current.id, x, y);
           pendingDragPos.current = null;
         }
         const draggedId = drag.current.id;
-        const targetId = dropTargetRef.current;
+        const targetId = click ? null : dropTargetRef.current;
         drag.current = null;
         setDragId(null);
+        if (click) openChapter(draggedId);
         if (targetId) {
           const chapters = useStore.getState().doc.chapters;
           const dragged = chapters.find((c) => c.id === draggedId);
@@ -174,6 +191,17 @@ export function Board() {
         const chapters = useStore.getState().doc.chapters;
         const others = chapters.filter((c) => c.id !== id);
         const clamped = Math.max(0, Math.min(finalIdx, others.length));
+        // Same click-vs-drag split as the board: a press that didn't move opens
+        // the chapter rather than resequencing it into its own slot.
+        if (!movedRef.current) {
+          timelineDrag.current = null;
+          timelineOverRef.current = null;
+          setTimelineDragId(null);
+          setTimelineOverIdx(null);
+          pan.current = null;
+          openChapter(id);
+          return;
+        }
         if (others.length) {
           const targetId = clamped < others.length ? others[clamped].id : others[others.length - 1].id;
           reorderChapter(id, targetId, clamped >= others.length);
@@ -192,7 +220,16 @@ export function Board() {
       window.removeEventListener("mouseup", onUp);
       if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
     };
-  }, [moveChapter, reorderChapter, autoArrangeBoard, setCamera, setDragId, askConfirm, orient]);
+  }, [
+    moveChapter,
+    reorderChapter,
+    autoArrangeBoard,
+    setCamera,
+    setDragId,
+    askConfirm,
+    openChapter,
+    orient,
+  ]);
 
   // Wheel: zoom on the board, scroll-pan on the timeline.
   useEffect(() => {
@@ -328,9 +365,10 @@ export function Board() {
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
     e.stopPropagation();
     e.preventDefault();
+    movedRef.current = false;
     if (isTimeline) {
       const fromIdx = doc.chapters.findIndex((c) => c.id === ch.id);
-      timelineDrag.current = { id: ch.id, fromIdx };
+      timelineDrag.current = { id: ch.id, fromIdx, mx: e.clientX, my: e.clientY };
       timelineOverRef.current = fromIdx;
       setTimelineDragId(ch.id);
       setTimelineOverIdx(fromIdx);
@@ -435,8 +473,10 @@ export function Board() {
           return (
             <div
               key={c.id}
+              // A click opens the chapter (see `onUp`); no double-click handler,
+              // because by the time a second click lands the modal is already
+              // over the card.
               onMouseDown={(e) => onCardDown(e, c)}
-              onDoubleClick={() => openChapter(c.id)}
               style={{
                 position: "absolute",
                 left: p.x,

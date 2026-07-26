@@ -30,6 +30,12 @@ export const GRID_MARGIN = 28;
 export const FIT_PAD = 36;
 /** Largest zoom fit-to-content will use — keeps small boards from oversizing. */
 export const FIT_ZOOM_MAX = 1.05;
+/**
+ * Floor for a fitted zoom. A viewport smaller than the padding makes the fit
+ * formula go negative, and a negative scale() mirrors the whole board — which is
+ * exactly what a fit measured before the stylesheet has applied used to do.
+ */
+const FIT_ZOOM_MIN = 0.05;
 
 /**
  * Choose the column count that makes the arranged grid fill the visible board
@@ -191,7 +197,9 @@ export function fitBooksToContent(
   vpH: number,
   pad = FIT_PAD
 ): Camera {
-  if (books.length === 0) return { zoom: 1, panX: pad, panY: pad };
+  // Nothing to fit, or nothing to fit *into* (an unmeasured viewport) — leave the
+  // camera neutral rather than deriving a garbage one.
+  if (books.length === 0 || vpW <= 0 || vpH <= 0) return { zoom: 1, panX: pad, panY: pad };
   const xs = books.map((b) => b.x);
   const ys = books.map((b) => b.y);
   const minX = Math.min(...xs);
@@ -200,7 +208,7 @@ export function fitBooksToContent(
   const maxY = Math.max(...ys) + BOOK_H;
   const cw = maxX - minX;
   const ch = maxY - minY;
-  const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
+  const zoom = Math.max(FIT_ZOOM_MIN, Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX));
   return {
     zoom,
     panX: (vpW - cw * zoom) / 2 - minX * zoom,
@@ -233,7 +241,8 @@ export function fitToContent(
   vpH: number,
   pad = FIT_PAD
 ): Camera {
-  if (chapters.length === 0) return { zoom: 1, panX: pad, panY: pad };
+  // See `fitBooksToContent`: an unmeasured viewport gets a neutral camera.
+  if (chapters.length === 0 || vpW <= 0 || vpH <= 0) return { zoom: 1, panX: pad, panY: pad };
   const xs = chapters.map((c) => c.x);
   const ys = chapters.map((c) => c.y);
   const minX = Math.min(...xs);
@@ -242,7 +251,7 @@ export function fitToContent(
   const maxY = Math.max(...ys) + CARD_H;
   const cw = maxX - minX;
   const ch = maxY - minY;
-  const zoom = Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX);
+  const zoom = Math.max(FIT_ZOOM_MIN, Math.min((vpW - pad * 2) / cw, (vpH - pad * 2) / ch, FIT_ZOOM_MAX));
   return {
     zoom,
     panX: (vpW - cw * zoom) / 2 - minX * zoom,

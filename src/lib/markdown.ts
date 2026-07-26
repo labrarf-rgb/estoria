@@ -102,13 +102,27 @@ export function buildMarkdown(doc: StoryDoc): string {
         });
         // Refs are pure links since v5 — resolve each label through the shared
         // asset pool, skipping any that no longer resolve.
-        const pinned = c.refs
+        const pinnedAssets = c.refs
           .map((r) => doc.assets.find((a) => a.id === r.assetId))
-          .filter((a): a is (typeof doc.assets)[number] => a != null)
-          .map((a) => `[[${a.label}]]`);
-        if (pinned.length) {
-          md += `\n**Pinned:** ${pinned.join(", ")}\n`;
+          .filter((a): a is (typeof doc.assets)[number] => a != null);
+        if (pinnedAssets.length) {
+          md += `\n**Pinned:** ${pinnedAssets.map((a) => `[[${a.label}]]`).join(", ")}\n`;
         }
+        // A pinned to-do's lines go out as real markdown checkboxes — the one
+        // pinned resource whose *content* is worth carrying into the vault,
+        // where it stays tickable (Obsidian renders these as live checklists).
+        pinnedAssets.forEach((a) => {
+          if (a.kind !== "TODO") return;
+          // Empty lines are scaffolding the user hasn't filled in, not tasks.
+          const tasks = (a.items ?? []).filter((it) => it.text.trim());
+          if (tasks.length === 0) return;
+          md += `\n**To-do — ${a.label || "Untitled list"}**\n`;
+          tasks.forEach((it) => {
+            md += `- [${it.done ? "x" : " "}] ${it.text}\n`;
+          });
+          // Blank line so the list closes before the next bold block.
+          md += "\n";
+        });
         md += `**Characters:** ${c.chars.map((id) => `[[${charName(id)}]]`).join(", ")}\n`;
       });
   });
