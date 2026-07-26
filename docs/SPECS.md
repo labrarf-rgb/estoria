@@ -120,7 +120,8 @@ estoria/
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ entities.ts          # character/world lookup helpers
-   │  ├─ refs.ts              # asset-backed pinned-ref resolution (schema v5), link
+   │  ├─ refs.ts              # asset-backed pinned-ref resolution (asset-backed
+   │  │                       #   since v5; resolves to-do `items` too), link
    │  │                       #   counting, `findAssetPins` (every place an asset is
    │  │                       #   pinned, across books + versions)
    │  ├─ prune.ts             # sweep records left with no content in them
@@ -179,7 +180,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Notes | Archive / restore | ✅ | Archiving **unpins everywhere first** (same five-location sweep as delete), then flags `archived` — so an archived asset is attached to nothing. Hidden from the library and the link picker, listed under "Archived · N" with Restore (comes back unpinned; the confirm says so before you commit) and a plain Delete. |
 | Notes | To-do lists as a pinnable resource | ✅ | Schema v6 `TODO` asset with `items[{id,text,done}]`: checkboxes, add/remove tasks, Enter adds the next one, "N/M done" in the row and library caption, pinnable into chapters and world entries like a note. Exported as real markdown checkboxes (`- [x]`), blank lines omitted. The add row reads **+ Note · + To-do · + Image** everywhere `RefList` appears. |
 | App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** — "Delete character", "Delete entry", and plain "Delete" in the shared library, where the confirm is what names the blast radius: "Delete this note everywhere?". `RefList`'s `removeMode` prop picks which affordance a list gets; only the library passes `destroy`. |
-| App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / Image" open a **draft** card that isn't in `doc` — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
+| App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / To-do / Image" open a **draft** card that isn't in `doc` (a to-do counts as typed on its title *or* a task's text) — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
 | Characters | List + expand detail | ✅ | |
 | Characters | Add / inline edit | ✅ | "+ Add character" opens a blank **draft** card; the character exists once you type (Session 47, superseding Session 27's "new entries start empty"). Every field editable in the panel. |
 | World | List + expand detail | ✅ | |

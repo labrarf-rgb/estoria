@@ -2168,3 +2168,40 @@ Two small user revisions, plus the verification still owed on 48.
 
 `npm run build` clean. No console errors. Still on the branch, unpushed and
 undeployed.
+
+### 2026-07-26 (Session 48 ship) — Shipped to prod
+
+`f2ccc94` — "Pinnable to-dos, archiving, pin-jumping, and one-click chapters".
+Merged fast-forward into `main`, pushed `main` and
+`feature/notes-canvas-upgrades` to GitHub, then `npm run deploy`:
+portfolio commit `cdf5698`, and prod confirmed serving `f2ccc94` at
+https://www.labrarf.com/estoria on the 5th poll.
+
+**Schema v6 is now live on the web.** The open cross-app event in SPECS §6
+stands: until the Android app reads v6 it will refuse files this app writes
+(`SchemaTooNewError` is the guard), so cross-app Sync is one-directional in the
+meantime. Nothing about the file contract changed beyond the three additive
+fields.
+
+**Spec drift found in the post-ship review** (§4 rows and §3 tree checked line by
+line against the code):
+
+- "Nothing saved until typed" still listed only "Note / Image" as the draft-
+  opening buttons — corrected to include To-do, with the rule that a to-do counts
+  as typed on its title *or* a task's text (`isAssetEmpty`).
+- The `refs.ts` line in the §3 tree said "(schema v5)" without noting that
+  `ResolvedRef` now carries a to-do's `items`.
+- Everything else matched: the board row already describes click-to-open and the
+  400ms backdrop guard, scene layout per canvas size, the modal `Drawer` and
+  one-panel-at-a-time, reorder/pins/archive/to-do rows, and the v6 block in §6.
+
+**Tooling hazard worth knowing about (pre-existing, not introduced by this
+work):** `src/store/persistence.ts` contains two literal NUL bytes — one in a
+comment, one in the map key built by the v5 ref-to-asset migration
+(`refId` + NUL + `contentKey(r)`). They are deliberate delimiters and compile
+fine, but they make `grep` and `ripgrep` classify the file as **binary**, so
+searches over it return nothing *silently* — which is exactly what happened
+during this review until a byte-level check caught it. Writing them as
+backslash-u escapes would keep the runtime string identical and make the file
+searchable again; left alone for now rather than slipping a code change into a
+finished ship.
