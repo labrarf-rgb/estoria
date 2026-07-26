@@ -2245,3 +2245,23 @@ grip/typed-number pair without ever committing to *where* on the row they sit,
 so nothing it said became false. Updated it anyway now that the placement is a
 deliberate decision rather than an accident, including the draft-row spacer. The
 `RefList` header comment gained the same note.
+
+### 2026-07-26 (Session 49 ship) — Shipped to prod
+
+`3ededa1` — "The position number moves to the head of the pinned-resource row".
+Pushed `main` to GitHub, then `npm run deploy`: portfolio commit `e46ad44`, and
+prod confirmed serving `3ededa1` (build 72) at https://www.labrarf.com/estoria
+on the 5th poll.
+
+Prod was verified by endpoint rather than by clicking through it: `version.json`
+reports `3ededa1`, and the bundle it serves (`index-BJc314wI.js`) is the same
+hash the local build of that commit produced — so the code checked in the browser
+is byte-identical to what's live. Deliberate choice, since the only way to *see*
+this particular change on prod is to open the notes library and switch it to list
+view, and `refView` is a persisted preference — the check would have quietly
+changed a real setting in the real writing environment to confirm a one-line move.
+
+No open drift. The §4 "Reorder pinned resources" row now records the placement
+and the draft-row spacer; nothing else in §3 or §4 touches the row's internal
+layout. The `persistence.ts` NUL-byte grep hazard noted in the Session 48 ship
+is still there, still untouched.
