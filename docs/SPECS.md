@@ -241,7 +241,10 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 
 > **Cross-project note — an Android companion app is planned (not built here).**
 > A **separate** native Kotlin/Compose app is planned (decided 2026-07-02); its
-> own spec lives at `/Users/rfcl/AndroidStudioProjects/Estoria-aa/ESTORIA-ANDROID.md`.
+> own spec lives at `/Users/rfcl/AndroidStudioProjects/Estoria-aa/docs/SPECS.md`
+> (with its session log beside it in `docs/SESSIONS.md`; the old single-file
+> `ESTORIA-ANDROID.md` path this note used to give no longer exists). The v6
+> brief written for that side is its **§3.1**.
 > **It is not part of this repo's roadmap and does not add web work** — it is
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
@@ -260,7 +263,13 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   `Asset.archived?: boolean` (an archived asset is unpinned everywhere by
 >   construction, so a reader can treat it as library-hidden and nothing else);
 >   `Chapter.scenePosCompact?: Vec2[]`, the collapsed-canvas twin of `scenePos`
->   (safe to ignore, or to mirror if the phone ever grows two canvas sizes). An
+>   (safe to ignore, or to mirror if the phone ever grows two canvas sizes).
+>   **The brief for that work is written up in the Android repo itself** —
+>   `Estoria-aa/docs/SPECS.md` §3.1 plus a dated `docs/SESSIONS.md` entry
+>   (2026-07-26), including the finding that the phone needs little more than
+>   `SCHEMA_VERSION = 6`: its `ExtrasSerializer` passthrough and raw-JSON asset
+>   handling already preserve the new fields, and `RefKind` is a value class over
+>   `String`, so `"TODO"` decodes without crashing. An
 >   unknown `kind` should degrade to a note, which is what `normalizeAssets` in
 >   `store/persistence.ts` does here.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
