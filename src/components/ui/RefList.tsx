@@ -36,8 +36,9 @@ import type { RefView } from "@/components/ui/ViewToggle";
  * into.
  *
  * `onReorder` turns on ordering: a grip to drag rows into place in list view, and
- * a typed position number in both views. Each surface owns its own order (a
- * chapter's pin order is not the library's), so the caller decides what moving
+ * a typed position number in both views. Both live at the head of the row/cell,
+ * so the two ways to move something sit together. Each surface owns its own order
+ * (a chapter's pin order is not the library's), so the caller decides what moving
  * means — see `reorderAsset` / `reorderChapterRef` / `reorderWorldRef`.
  *
  * Two layouts, chosen by `view`:
@@ -390,6 +391,13 @@ export function RefList({
                     ⠿
                   </span>
                 )}
+                {/* The number sits with the grip, left of the icon: both views
+                    now lead with position, and the two ordering controls read as
+                    one pair instead of sitting at opposite ends of the row. */}
+                {position(r)}
+                {/* The draft row has neither grip nor number — without this it
+                    would hang left of every saved row above it. */}
+                {onReorder && isDraft && <span className="w-[56px] shrink-0" />}
                 <span className="text-[13px]">{ICON[r.kind]}</span>
                 <button
                   onClick={() => setOpenId(open ? null : r.id)}
@@ -403,7 +411,6 @@ export function RefList({
                   <div className="truncate text-[11.5px] text-soft">{snippet}</div>
                   {cap && <div className="truncate text-[10.5px] text-faint">{cap}</div>}
                 </button>
-                {position(r)}
                 <button
                   onClick={() => setOpenId(open ? null : r.id)}
                   className="text-[12px] font-medium text-faint"

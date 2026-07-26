@@ -2205,3 +2205,43 @@ during this review until a byte-level check caught it. Writing them as
 backslash-u escapes would keep the runtime string identical and make the file
 searchable again; left alone for now rather than slipping a code change into a
 finished ship.
+
+---
+
+### 2026-07-26 (Session 49) — The position number moves to the head of the row
+
+**Ask:** in the notes library and the chapter modal, move a pinned resource's
+position number from the right of the row (beside the expand caret) to the left,
+between the grab handle and the kind icon. Question first: big lift or quick?
+
+**Quick — and it was one line, because the surface is shared.** The notes
+library, the chapter modal's Pinned references, and a world entry's refs all
+render the same `RefList`, so the list-view row is written once. The change is
+`{position(r)}` moving from after the title button to before `ICON[r.kind]`.
+Card view already led with the number, so this makes the two views agree rather
+than inventing a new arrangement.
+
+Row is now: `⠿ grip · [n] · 📝 icon · title/snippet · ▾`.
+
+**The one real wrinkle: the draft row.** The grip and the number both render
+only for saved items (`onReorder && !isDraft`, and `position()` returns null for
+the draft). With the number on the right that cost nothing, but on the left it
+left the "New note" draft's icon hanging 56px to the left of every row above it.
+Fixed with an explicit spacer of exactly that width. Verified by measurement
+rather than by eye: `getBoundingClientRect().left` on the icon reads **918 on
+saved rows and 918 on the draft row**.
+
+Two things checked and found to be non-issues:
+
+- **Width.** Two-digit positions (the library seed runs to 13) fit the existing
+  30px box, and the chapter modal's list is far wider than the 460px panel's, so
+  nothing truncates on either surface.
+- **Behaviour.** `PositionInput` and the `onCommit` wiring weren't touched. Typed
+  a `1` into row 2 of a chapter's pins — rows swapped — then moved it back, so
+  the dev-server doc is as it was. `npx tsc -b --noEmit` clean, no console errors.
+
+**Spec drift.** None found — the §4 "Reorder pinned resources" row described the
+grip/typed-number pair without ever committing to *where* on the row they sit,
+so nothing it said became false. Updated it anyway now that the placement is a
+deliberate decision rather than an accident, including the draft-row spacer. The
+`RefList` header comment gained the same note.
