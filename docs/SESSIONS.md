@@ -1964,3 +1964,17 @@ caption for the label on the hovered card only; the World panel still shows the
 entry? / It stays in the shared library." over a **Remove** button; the library's
 confirm still reads "Delete this image everywhere? / It is pinned in 1 place…"
 over a red **Delete**. Cancelling leaves all 13 assets intact. No console errors.
+
+**Shipped** as `d6f4413`, pushed to origin and deployed — `npm run deploy`
+verified prod reporting that commit at www.labrarf.com/estoria. The push also
+carried three doc-only commits (9d0a43d, 7a7aa29, 31af6ae) that had been sitting
+unpushed since Sessions 44-46.
+
+**No schema change.** Drafts live in transient store state, never in `doc`, and
+`SCHEMA_VERSION` is untouched — so this is *not* a cross-app compatibility event
+(§6). One behavioural divergence to be aware of on the Android side: the web app
+now sweeps blank characters / world entries / assets when a panel closes, so a
+blank record created on the phone will quietly disappear the next time the web
+app opens and closes that panel. The file contract is unaffected; only content
+that was empty in both apps' eyes goes away. Worth mirroring deferred creation
+on Android eventually, but nothing breaks in the meantime.

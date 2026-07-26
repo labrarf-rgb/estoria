@@ -163,10 +163,10 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | ✅ | Add/link/rename/delete note + image refs; asset-backed since v5 (`RefList` writes through `updateAsset`). |
-| App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** ("Delete character", "Delete entry", "Delete" in the shared library — the confirm there names the blast radius ("…everywhere?")). `RefList`'s `removeMode` prop picks which. |
+| App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** — "Delete character", "Delete entry", and plain "Delete" in the shared library, where the confirm is what names the blast radius: "Delete this note everywhere?". `RefList`'s `removeMode` prop picks which affordance a list gets; only the library passes `destroy`. |
 | App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / Image" open a **draft** card that isn't in `doc` — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
 | Characters | List + expand detail | ✅ | |
-| Characters | Add / inline edit | ✅ | New entries start empty (Session 27); every field editable in the panel. |
+| Characters | Add / inline edit | ✅ | "+ Add character" opens a blank **draft** card; the character exists once you type (Session 47, superseding Session 27's "new entries start empty"). Every field editable in the panel. |
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | ✅ | Name/category/desc/notes inline; refs via the shared `RefList`. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
