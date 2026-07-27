@@ -2442,3 +2442,30 @@ chapter never updates. Take a screenshot first to force a paint, then measure.
 the same way the timeline pane used to (`sceneColumnsForWidth` fits columns
 against a fixed `SCENE_W`). Applying the elastic sizing there is nearly free now
 that `sceneGrid` exists, but it changes an existing surface and wasn't asked for.
+
+### 2026-07-27 (Session 51 ship) — Shipped to prod
+
+- `7527b48` on `main` (fast-forwarded from `feature/timeline-scene-review`,
+  branch pushed too), portfolio deploy commit `31f0fac`.
+- `npm run deploy` verified it: prod served the previous build (`94a780d`) for
+  seven polls, then reported `7527b48` — **✓ live at
+  https://www.labrarf.com/estoria**.
+- **SPECS reviewed against the code before shipping** (§4 timeline rows, §2
+  component map, §6 cross-app note, §6 roadmap item 4). Two drifts found and
+  fixed in the same commit:
+  - The "scene grid fits the space" row quoted **prototype** measurements
+    (833px pane → 293px wasted) as if they came from the shipped view. Re-measured
+    on the real thing — a 1256px pane renders a 1211px canvas, 96%, 333px nodes —
+    and the row now attributes the prototype figure as the design measurement and
+    quotes the shipped one separately.
+  - The "read the story continuously" row claimed the rail keeps the curved
+    chapter links without saying that the **vertical** rail routes them down the
+    column instead of looping out to the sides. Understated a real visual
+    difference from the board; now stated, with the reason (the board's sweep
+    needs ~2× a card's width) and the 52px rail gap that exists to hold them.
+- Checked the rest of §4 for claims this change could have falsified: the series
+  map's own book timeline (§4 "Series | Add book / reorder") still drags to
+  reorder with live reflow — `SeriesMap` and `timelineBookPositions` were not
+  touched, so that row still holds even though the *chapter* timeline lost the
+  same gesture. §3's series-level "story-map and timeline" line likewise still
+  describes the series surface, not this one.
