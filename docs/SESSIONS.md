@@ -2469,3 +2469,36 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   touched, so that row still holds even though the *chapter* timeline lost the
   same gesture. §3's series-level "story-map and timeline" line likewise still
   describes the series surface, not this one.
+
+### 2026-07-27 (Session 52) — Cast stack stops overflowing the card
+
+- Reported from a screenshot: a chapter with a dozen characters ran its avatar
+  row straight off the right edge of the board card. Arithmetic backs it up —
+  twelve 22px chips overlapped at -6px need ~198px, and a 244px card leaves only
+  ~160px beside the number badge and status dot.
+- The stack now fills **at most 7 slots**; past that the seventh becomes a muted
+  `+n` counter (`--soft` background, `--bg` text, so it reads as a count rather
+  than another character) with the hidden names in its tooltip. The split is
+  shared — `lib/chips.ts` (`CHIP_SLOTS`, `chipSplit`, `chipRestLabel`) — and both
+  `Board` and `Timeline` call it, so the two surfaces cap identically.
+- **Why 7:** the budget belongs to the *narrowest* card, which is the horizontal
+  rail's 234px one, not the board's 244px. Sizing to the board would have let the
+  rail overflow again.
+- Verified in the dev preview by seeding a 14-character cast into localStorage:
+  board (90% and 52% zoom), vertical rail and horizontal rail all render 6 chips
+  + `+8` inside the card. Measured rather than eyeballed — the stack is
+  right-aligned by a `flex-1` spacer, so overflow shows up on the *left*, and
+  there the row still had **99px of clearance** before the status dot. Checked
+  light and dark; the sample data was restored afterwards.
+- **SPECS reviewed against the code:** §4 "Board | Card meta redesign" was the
+  one row this touches and it described the avatars without any cap, so it now
+  states the 7-slot budget, the `+n` chip and why the number comes from the rail.
+  §2's `lib/` tree gained `chips.ts`. No other drift — the change adds no state,
+  no schema, and nothing in §5/§6 speaks to card headers.
+
+### 2026-07-27 (Session 52 ship) — Shipped to prod
+
+- `113100e` on `main` (pushed to origin), portfolio deploy commit `8a62f0c`.
+- `npm run deploy` verified it: prod served the previous build (`7527b48`) for
+  six polls, then reported `113100e` — **✓ live at
+  https://www.labrarf.com/estoria**.
