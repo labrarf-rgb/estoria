@@ -115,7 +115,7 @@ estoria/
    ├─ lib/
    │  ├─ layout.ts            # board/timeline layout, auto-arrange, fit-to-content
    │  ├─ markdown.ts          # export builder, import prompt + parser
-   │  ├─ templates.ts         # story-structure skeletons (30 cards, 3 facets)
+   │  ├─ templates.ts         # story-structure skeletons (34 cards, 3 facets)
    │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, file history
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
@@ -186,7 +186,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | ✅ | Name/category/desc/notes inline; refs via the shared `RefList`. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 29 structures + blank starter (30 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 10 genre beat sheets; facet filter bar. |
+| Templates | Insert / replace skeletons | ✅ | 33 structures + blank starter (34 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 14 genre beat sheets (4 of them magical realism, Session 50); facet filter bar. |
 | Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |

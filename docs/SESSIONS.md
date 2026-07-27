@@ -2284,3 +2284,43 @@ this exact case as the example, plus a note that unexplained text in that block
 is usually a version name.
 
 Docs only, no code change.
+
+### 2026-07-26 (Session 50) — Four magical-realism templates
+
+Added the four templates from the "Magical Realism Templates" guide to
+`lib/templates.ts`, taking the library from 30 cards to **34**: The Generational
+Saga, The Domestic Metaphor, The Urban Dream-Logic, The Historical Haunting.
+Fifteen beats each, blurbs and per-chapter prompts taken from the guide.
+
+Three judgement calls, none of them in the source doc:
+
+- **Facet.** All four go in **Genre** (10 → 14). They carry a premise, which is
+  what separates Genre from the shape-only Structure facet. Within the Genre run
+  they sit **directly after the three speculative-fiction cards** (Dystopian,
+  First Contact, Time Loop — the ones `6b8c4d9` added), ahead of Mystery, so the
+  guide-sourced genre families stay contiguous. `RAW_TEMPLATES` order is the
+  display order, and `GROUP_MEMBERSHIP` is kept in the same order to match.
+- **Tag.** One shared `Magical realism` chip rather than four distinct ones. The
+  names ("The Domestic Metaphor") don't say magical realism on their own, so the
+  chip is the only thing marking them as a family; `mystery` and `romance`
+  already share a `Genre` chip, so a repeated tag is not new.
+- **Acts.** The guide gives beats but no act breaks — same as the biography and
+  speculative-fiction guides before it — so acts are assigned here, cut where the
+  story's footing changes: 4/6/5 for Generational Saga, Domestic Metaphor and
+  Historical Haunting; **4/7/4** for Urban Dream-Logic, whose act 3 starts at
+  "The Core Realization" (the point the protagonist can actually resolve the
+  dream world) rather than at the guide's midpoint-ish "Guide's Departure". The
+  header comment now records that acts are ours, not the guides'.
+
+Verified in the dev server, not just by typecheck: filter bar reads **34
+templates** on All and **14** on Genre, all four cards render with the shared
+chip and "15 beats", and Insert on The Generational Saga wrote 15 chapters whose
+acts read 1,1,1,1,2,2,2,2,2,2,3,3,3,3,3 in the persisted doc. After the reorder,
+the rendered card list reads positions **17–20** for the four, between Time Loop
+(16) and Mystery (21). `npx tsc -b --noEmit` clean, no console errors.
+
+**Spec drift.** Two stale counts fixed in the same pass: the §3 file-tree line
+for `templates.ts` (30 → 34 cards) and the §4 Templates row ("29 structures +
+blank starter" → 33, and 10 → 14 genre beat sheets).
+
+Not deployed — code and docs only, nothing pushed.

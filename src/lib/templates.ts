@@ -8,7 +8,11 @@
  * compendium (Snyder, Campbell, Vogler, Harmon, Coyne, Kishotenketsu, Propp,
  * Natyasastra, Jo-ha-kyu); life-story templates from the "Biography and
  * Autobiography Story Mapping Templates" guide; speculative-fiction templates
- * from the "Speculative Fiction Story Mapping Templates" guide.
+ * from the "Speculative Fiction Story Mapping Templates" guide; the four
+ * magical-realism templates from the "Magical Realism Templates" guide.
+ *
+ * Source guides give beats and blurbs but not act breaks — acts are assigned
+ * here, cutting where the story's footing actually changes.
  */
 export type TemplateBeat = [title: string, act: number, summary?: string];
 
@@ -333,6 +337,102 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
       ["The Source Intersection", 3, "Confronting the antagonist or the past self who initiated the cycle at the exact physical location of the original breach."],
       ["Closing the Loop", 3, "Making the final, painful choice to break the cycle, accepting the permanent loss of a timeline or a loved one."],
       ["The New Stream", 3, "The timeline stabilizes. The protagonist exists in a restored world, carrying the memory of histories that no longer exist."],
+    ],
+  },
+  {
+    id: "mr-generational",
+    name: "The Generational Saga",
+    tag: "Magical realism",
+    blurb:
+      "Built for stories where magical events are treated as ordinary daily occurrences, following a family, village, or house through cycles of grandeur, repetition, and decay.",
+    beats: [
+      ["The Isolated World", 1, "Establish the unique setting and show how the supernatural is part of everyday routine."],
+      ["The Founding Myth", 1, "Detail the origin story, ancestral curse, or extraordinary event that established the family or community."],
+      ["The Outside Intrusion", 1, "Introduce an outsider, a strange invention, or an odd visitor from the modern world who alters the local balance."],
+      ["The Domestic Miracle", 1, "Show a major magical event handled with complete casualness by the locals."],
+      ["The Repeating Passion", 2, "A new character falls into an intense, obsessive commitment that mirrors an ancestor's exact path."],
+      ["The Omen", 2, "A local prophet, an old manuscript, or a recurring sign predicts a specific downfall or destiny."],
+      ["The Political Intrusion", 2, "External politics, wars, or corporate interests invade the isolated community, forcing real world conflict onto the mythic setting."],
+      ["The Golden Era", 2, "The house, business, or village reaches its peak of wealth, population, or supernatural activity."],
+      ["The Broken Taboo", 2, "A violation of family rules, a tragic death, or a severe betrayal breaks the momentum and starts a slow decline."],
+      ["Echoes of the Past", 2, "The younger generation repeats the exact mistakes, names, or habits of their predecessors."],
+      ["Living with Ghosts", 3, "The boundary between the living and the dead thins out completely, with past generations walking the halls alongside the present."],
+      ["The Solitude", 3, "The characters turn inward, isolating themselves as the outside world moves on and leaves them behind."],
+      ["Encroaching Wilds", 3, "Nature, decay, or forgetfulness begins taking over the physical space."],
+      ["Reading the Records", 3, "The last descendant finally deciphers the ancient prophecy, hidden record, or secret history that explains their existence."],
+      ["The Erasure", 3, "The foretold ending occurs, sweeping away the town or house and sealing its history into legend."],
+    ],
+  },
+  {
+    id: "mr-domestic",
+    name: "The Domestic Metaphor",
+    tag: "Magical realism",
+    blurb:
+      "Focuses on intense emotional states physically altering the immediate environment, where domestic tasks, cooking, or craft carry supernatural force against rigid family duty.",
+    beats: [
+      ["The Kitchen Rules", 1, "Establish the strict domestic rules, family expectations, and the subtle way intense feelings manifest in daily tasks."],
+      ["The Forbidden Spark", 1, "Introduce a deep attraction or ambition that violates family tradition and cannot be openly expressed."],
+      ["The Substituted Marriage", 1, "The loved one marries a sibling or close relative to remain near the household, creating constant proximity."],
+      ["Infused Creation", 1, "Repressed emotions physically seep into food, clothing, or art, causing anyone who consumes or touches it to feel the exact same grief or longing."],
+      ["The Matriarch's Iron Grip", 2, "Detail the tyrant or authority figure enforcing order, tradition, and punishments to suppress rebellion."],
+      ["The Physical Sickness", 2, "Unexpressed desire or anger turns into physical ailments, strange weather around the house, or localized plagues."],
+      ["The Secret Sanctuary", 2, "Discovering a hidden room, late-night routine, or quiet ally inside the domestic space to keep the spark alive."],
+      ["The Respectable Alternative", 2, "A safe, acceptable suitor or path enters from the outside world, offering an easy escape without passion."],
+      ["The Phantom Pressure", 2, "Guilt and ghostly warnings from ancestors enforce the social order, making escape feel morally impossible."],
+      ["The Boiling Point", 2, "An outburst of raw emotion causes a direct, physical disruption in the home, breaking a piece of the property or injuring the status quo."],
+      ["The Tyrant's Fall", 3, "The decline or death of the controlling authority figure, leaving a sudden power vacuum in the home."],
+      ["Lingering Traditions", 3, "The protagonist realizes that old habits and internalized guilt continue to block freedom even after the tyrant is gone."],
+      ["The Reckoning", 3, "Confronting remaining family members to demand total personal autonomy and break the old rules."],
+      ["The Conflagration", 3, "A final, destructive expression of passion where emotional intensity physically transforms or destroys the domestic space."],
+      ["The Legacy Recipe", 3, "Establish the long-term aftermath, showing how the story and its magical craft are passed down to future generations."],
+    ],
+  },
+  {
+    id: "mr-urban-dream",
+    name: "The Urban Dream-Logic",
+    tag: "Magical realism",
+    blurb:
+      "An ordinary, slightly detached protagonist in a modern city stumbles through a portal or bizarre errand into a surreal parallel reality to address an internal void.",
+    beats: [
+      ["The Quiet Void", 1, "Establish the protagonist's mundane city routine, highlighting a quiet sense of loneliness or detachment."],
+      ["The Missing Object", 1, "A cat vanishes, a strange phone call arrives, or an item disappears, forcing the protagonist out of their normal pattern."],
+      ["The Odd Stranger", 1, "Meeting an eccentric, cryptic guide who operates by bizarre rules and claims to know the protagonist's history."],
+      ["Slipping Through the Cracks", 1, "Finding an overlooked physical space in the city (a hidden alley, a dry well, a missing floor in an elevator) that defies logic."],
+      ["The Surreal Task", 2, "Accepting an absurd, illogical assignment or errand that feels necessary despite making no rational sense."],
+      ["Parallel Tracks", 2, "Introduce a secondary storyline or character whose odd journey mirrors the protagonist's internal struggle."],
+      ["Talking Animals and Omens", 2, "Encountering animals, spirits, or objects that speak directly to the protagonist's buried memories."],
+      ["The Dream Intrusion", 2, "Dreams and physical reality begin to blur, leaving physical marks or injuries on the waking body."],
+      ["The Shadow Self", 2, "Facing a bizarre, menacing figure who embodies the protagonist's worst fears or guilt."],
+      ["Deep Labyrinth", 2, "Entering the deepest part of the surreal world, where linear time stops and space folds in on itself."],
+      ["The Guide's Departure", 2, "The eccentric guide or helper vanishes, leaving the protagonist to navigate the weird logic alone."],
+      ["The Core Realization", 3, "Uncovering the specific past trauma, loss, or emotional void that summoned this surreal landscape."],
+      ["Closing the Rift", 3, "Completing the surreal task and resolving the logic of the dream world."],
+      ["Waking Up", 3, "Stepping back through the portal onto a concrete, ordinary city street where normal time resumes."],
+      ["Quiet Resumption", 3, "Return to everyday city life, changed on the inside while the outside world remains completely oblivious."],
+    ],
+  },
+  {
+    id: "mr-haunting",
+    name: "The Historical Haunting",
+    tag: "Magical realism",
+    blurb:
+      "A physical, supernatural entity manifests directly from collective or historical trauma, entering a household to force a confrontation with a buried past.",
+    beats: [
+      ["The Troubled House", 1, "Establish a home living alongside a spiteful, quiet supernatural presence that everyone has learned to tolerate."],
+      ["The Repressed Past", 1, "Show the characters actively avoiding a specific historical tragedy or horrific event from their earlier years."],
+      ["Taking Flesh", 1, "The memory or spirit takes solid, physical form as a living person and walks out of the woods or water into the house."],
+      ["Unquestioned Acceptance", 1, "The household takes the stranger in, ignoring glaring physical anomalies out of deep guilt and desire for comfort."],
+      ["Parasitic Comfort", 2, "The entity demands increasing attention, food, and emotional devotion, slowly draining the household."],
+      ["Unlocking the Memory", 2, "Flashback to the historical reality, revealing the exact traumatic choice that birthed the ghost."],
+      ["The Divided Household", 2, "Tension escalates between those who want to keep feeding the spirit and those who see its destructive nature."],
+      ["The Entity Takes Control", 2, "The supernatural visitor becomes an absolute tyrant in the home, trapping the inhabitants in a cycle of penance."],
+      ["Isolation from the Community", 2, "Neighbors and friends notice the toxicity and step back, leaving the household completely cut off."],
+      ["Physical Collapse", 2, "The physical house and the inhabitants' health deteriorate under the unceasing weight of unaddressed grief."],
+      ["The Outside Eye", 3, "An outsider or community elder sees the danger from the street and realizes the past has taken physical form."],
+      ["Gathering the Neighbors", 3, "The community mobilizes, recognizing that this historical trauma belongs to all of them, not just one house."],
+      ["The Gathering at the Door", 3, "The community surrounds the house to confront the entity through shared presence, memory, and voice."],
+      ["The Exorcism of Truth", 3, "Speaking the full, unvarnished truth of the history out loud, causing the physical entity to dissolve."],
+      ["The Empty Space", 3, "The ghost is gone, leaving the survivors to clean the physical debris and begin real healing together."],
     ],
   },
   {
@@ -680,6 +780,10 @@ const GROUP_MEMBERSHIP: Record<string, string[]> = {
   dystopian: ["Genre"],
   "first-contact": ["Genre"],
   "time-loop": ["Genre"],
+  "mr-generational": ["Genre"],
+  "mr-domestic": ["Genre"],
+  "mr-urban-dream": ["Genre"],
+  "mr-haunting": ["Genre"],
   mystery: ["Genre"],
   thriller: ["Genre"],
   heist: ["Genre"],
