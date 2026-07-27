@@ -2265,3 +2265,22 @@ No open drift. The §4 "Reorder pinned resources" row now records the placement
 and the draft-row spacer; nothing else in §3 or §4 touches the row's internal
 layout. The `persistence.ts` NUL-byte grep hazard noted in the Session 48 ship
 is still there, still untouched.
+
+### 2026-07-26 (Session 49b) — "Template addition" in the Pinned-in block
+
+A note in the shared library showed an unexplained line between "Pinned in" and
+the Archive/Delete buttons, reading "Template addition". Not a bug: it is the
+**group heading naming where a pin lives**, and "Template addition" was a draft
+version the user had created. `groupPins` puts pins outside the loaded board
+under one small heading instead of repeating the location on every chip, and
+`pinWhere` builds that heading from the version's name (prefixed with the book
+title only when there's more than one book).
+
+The behaviour was already specced — but the §4 row wrote the heading as
+`"Book · Version"` in quotes, which reads like a literal fixed label rather than
+a slot filled with the user's own names. That phrasing is what made the line look
+like stray chrome. Row rewritten to say the heading *is* the user's names, with
+this exact case as the example, plus a note that unexplained text in that block
+is usually a version name.
+
+Docs only, no code change.
