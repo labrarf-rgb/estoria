@@ -2352,3 +2352,93 @@ Structure / Genre / Life story and still an exact partition (11 / 14 / 9 = 34),
 so the `TEMPLATE_GROUPS` comment about the facets partitioning the library holds.
 The `persistence.ts` NUL-byte grep hazard carried since the Session 48 ship is
 still there, still untouched.
+
+### 2026-07-27 (Session 51) — Timeline becomes a reading surface
+
+**Goal, in the user's words:** update the Timeline so the story can be reviewed
+continuously, with the scenes visible. Scoped by the user to the **web app only**
+— not the Android companion.
+
+**Design settled by mockup, not by argument.** The first two attempts were wrong
+and were thrown away rather than defended: (1) scenes inlined into taller chapter
+cards, (2) a scene *list* pane beside the timeline. What the user actually wanted
+was the timeline **unchanged as a chapter index**, with a second pane showing each
+chapter's **scene flow board** — the same canvas the chapter modal draws. Building
+a throwaway HTML mockup against the real design tokens is what surfaced that in
+three rounds instead of three rebuilds.
+
+- **New `components/Timeline.tsx`** — the whole view, a plain scrolling document
+  with no camera. A chapter **rail** (left when vertical, top when horizontal)
+  beside a **scene pane**. Rail keeps the existing chapter cards, act bands and
+  the curved type-coloured chapter links. Pane renders each chapter's scene flow:
+  dotted ground, elastic nodes, curved connectors, therefore/but/and pills at the
+  curve midpoints. Two-way scroll sync — the pane's scroll moves the rail's active
+  ring and pulls the rail along; a rail click jumps the pane.
+- **`layout.ts` — `sceneGrid()`**, elastic. Track count is chosen against a
+  *minimum* node size and the nodes then grow into the remainder (clamped by
+  `TL_NODE_MIN/MAX_*`). Measured before/after on the same 833px pane: **65% → 96%**
+  of the width used, and an 11-scene chapter went from one 1880px column to five
+  columns 504px tall. Fills row-major when vertical and column-major when
+  horizontal, so beats advance along the axis the pane scrolls.
+  `sceneAutoArrange` is untouched — it produces the *persisted* modal layout and
+  must stay on its fixed grid.
+- **`Board.tsx` is map-only now.** Deleted the timeline branch it had been
+  carrying: `isTimeline`, the `timelineDrag` state and its reorder-on-drop block,
+  the wheel scroll-pan branch, the act bands, the derived-position preview, and the
+  refit-on-return effect (returning from the timeline now remounts `Board`, which
+  already fits on mount). `timelineChapterPositions` and `layoutPositions` deleted
+  with it; `timelineBookPositions` stays — the series map still uses it.
+- **Timeline reordering removed, on the user's instruction.** Worth naming as a
+  real loss: drag-to-reorder-with-live-reflow only existed there. Board
+  drop-to-reorder still covers the capability. The view's purpose is now reading.
+- **Opening a scene:** clicking a scene node calls `openChapterAtScene`, which
+  routes through `openChapter` (so the modal's per-mode scene layouts are still
+  seeded) and leaves a one-shot `focusScene` marker. `ChapterDetail` consumes it
+  on open — scrolls that node into view, focuses its textarea, flashes the border,
+  clears the marker. Rail cards *jump* rather than open, so a scene-less chapter's
+  empty canvas is itself the way in.
+- **Curves, not rules.** The user asked to keep the timeline's existing curved
+  chapter links. Kept, in their type colours. One compromise worth knowing: the
+  board's edge-to-edge sweep needs roughly twice a card's width in horizontal
+  room, which a fixed-width rail hasn't got, so the **vertical** rail routes the
+  same cubic down the column (bottom edge → top edge) instead of looping out to
+  the sides. The horizontal rail has the room and keeps the board's exact shape.
+  Card gaps in the rail are 52px because the curves are drawn in them.
+- Zoom control hidden in timeline view (no camera to report); footer hint reworded.
+
+**Why this is safe to keep off Android:** it is presentation over data that
+already exists. No new `StoryDoc` fields, no schema bump, and `focusScene` is
+transient UI state — outside `doc` and outside `partialize`, so it never reaches
+`.estoria.json`. Recorded in §6's cross-app note.
+
+**Verified:** `npm run typecheck` clean. In the running app: both orientations
+render; rail links draw in type colour; scroll sync tracks the correct chapter in
+each orientation; clicking chapter 7 / scene 2 opened the modal with that
+textarea focused and ringed. Two caveats on the verification — the sync handler
+was exercised by dispatching scroll events with real geometry rather than by a
+physical scroll gesture (the Browser pane stopped accepting the gesture tool
+mid-session, and synthetic wheel events don't scroll), and everything was checked
+against the sample story, not a large real book.
+
+**Follow-up the same session — wrap connectors were clipped.** Reported as "the
+lines connecting the scenes get cut off at the very left and right cards". Cause:
+`sceneConnector` used one shape for every link, so at a **row wrap** (last node of
+a row → first of the next) the control offsets were derived from a horizontal
+delta of a whole row's width, putting them far outside the canvas, where the
+`overflow-hidden` rounded border cut them. Only reproducible at widths where a
+chapter actually wraps, which is why the first pass at 1600px looked fine. Fixed
+by routing a wrap through the empty gutter instead — down out of the bottom edge
+and into the top edge of the next row (mirrored for column-fill) — so the curve
+stays contained. In-line links keep the original shape. Verified by measuring
+every path's box against its canvas: **0 of 16 clipped** in both orientations.
+
+**Note for future verification in this harness:** when the Browser pane is
+backgrounded, `document.hidden` is true and rAF is throttled off, so
+**ResizeObserver callbacks and scroll events never fire**. That looks exactly
+like a broken resize/scroll-sync bug — canvases keep a stale width, the active
+chapter never updates. Take a screenshot first to force a paint, then measure.
+
+**Not done, deliberately:** the chapter modal's own canvas still strands space
+the same way the timeline pane used to (`sceneColumnsForWidth` fits columns
+against a fixed `SCENE_W`). Applying the elastic sizing there is nearly free now
+that `sceneGrid` exists, but it changes an existing surface and wasn't asked for.

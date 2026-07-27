@@ -214,7 +214,7 @@ export function Footer() {
 
   const hint =
     view === "timeline"
-      ? "Scroll to pan the timeline · use the arrows to flip orientation"
+      ? "Read the story straight through · click a chapter to jump, a scene to edit it · use the arrows to flip orientation"
       : "Click a chapter to map its scenes · drag to rearrange · scroll to zoom";
 
   return (

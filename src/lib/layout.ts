@@ -1,4 +1,4 @@
-import type { Chapter, StoryDoc, Vec2 } from "@/types";
+import type { Chapter, Vec2 } from "@/types";
 
 /** Card dimensions on the board. */
 export const CARD_W = 244;
@@ -98,37 +98,6 @@ export function autoArrange(chapters: Chapter[], arrangeN: number, cols = 4): Ar
 
 export type TimelineOrient = "vertical" | "horizontal";
 
-/**
- * Sequential timeline positions for an arbitrary chapter list (not just
- * `doc.chapters` in its current order) — takes an act-grouped extra gap
- * between groups. Standalone so a live drag-reorder preview can feed it a
- * candidate order without mutating the store.
- */
-export function timelineChapterPositions(
-  chapters: { id: string; act: number }[],
-  orient: TimelineOrient
-): { id: string; x: number; y: number }[] {
-  const out: { id: string; x: number; y: number }[] = [];
-  if (orient === "vertical") {
-    let y = 64;
-    const colX = 300;
-    chapters.forEach((c, i) => {
-      if (i > 0 && c.act !== chapters[i - 1].act) y += 54;
-      out.push({ id: c.id, x: colX, y });
-      y += CARD_H + 72;
-    });
-  } else {
-    const y = 214;
-    let x = 60;
-    chapters.forEach((c, i) => {
-      if (i > 0 && c.act !== chapters[i - 1].act) x += 46;
-      out.push({ id: c.id, x, y });
-      x += 286;
-    });
-  }
-  return out;
-}
-
 /** Sequential timeline positions for an arbitrary book list — no act grouping. */
 export function timelineBookPositions(
   books: { id: string }[],
@@ -216,18 +185,6 @@ export function fitBooksToContent(
   };
 }
 
-/** Positions for each chapter, by current view. Returns {id,x,y} list. */
-export function layoutPositions(
-  doc: StoryDoc,
-  view: "board" | "timeline",
-  orient: TimelineOrient
-): { id: string; x: number; y: number }[] {
-  if (view !== "timeline") {
-    return doc.chapters.map((c) => ({ id: c.id, x: c.x, y: c.y }));
-  }
-  return timelineChapterPositions(doc.chapters, orient);
-}
-
 export interface Camera {
   zoom: number;
   panX: number;
@@ -299,6 +256,96 @@ export function sceneAutoArrange(scenes: string[], _arrangeN: number, cols?: num
     const row = Math.floor(i / c0);
     return { x: m + col * (SCENE_W + gx), y: m + row * (SCENE_H + gy) };
   });
+}
+
+/**
+ * Which way a scene grid fills: `row` runs across then wraps down (the chapter
+ * modal's reading order), `column` runs down then wraps right — so in the
+ * timeline's scene pane a chapter's beats always advance along the axis the
+ * pane itself scrolls.
+ */
+export type SceneFill = "row" | "column";
+
+/**
+ * Size bounds for the timeline pane's elastic scene nodes. Choosing a track
+ * count against a *fixed* node size strands every leftover pixel (a 833px pane
+ * fitted one 208px column and wasted 293px), so the track count is chosen
+ * against the minimum and the nodes then grow into the remainder. The maxima
+ * stop a two-scene chapter from inflating into billboards.
+ */
+export const TL_NODE_MIN_W = 176;
+export const TL_NODE_MAX_W = 340;
+export const TL_NODE_MIN_H = 112;
+export const TL_NODE_MAX_H = 208;
+/**
+ * Column gap when scenes stack (`column` fill). Consecutive beats are then
+ * vertically adjacent, so their connector pill sits in the *row* gap and the
+ * columns no longer need the full `SCENE_GAP_X` pill clearance.
+ */
+export const TL_GAP_X_STACKED = 64;
+
+export interface SceneGrid {
+  positions: Vec2[];
+  nodeW: number;
+  nodeH: number;
+  gapX: number;
+  gapY: number;
+  /** Total canvas extent, margins included. */
+  width: number;
+  height: number;
+}
+
+/** Most tracks that fit `avail` at the minimum node size. */
+function fitTracks(n: number, avail: number, minSize: number, gap: number): number {
+  let t = 1;
+  for (let k = 1; k <= n; k++) {
+    if (SCENE_MARGIN * 2 + k * minSize + (k - 1) * gap <= avail) t = k;
+    else break;
+  }
+  return Math.max(1, Math.min(n, t));
+}
+
+/** Node size that divides `avail` across `tracks`, clamped to [min, max]. */
+function fitSize(tracks: number, avail: number, gap: number, min: number, max: number): number {
+  const s = (avail - SCENE_MARGIN * 2 - (tracks - 1) * gap) / tracks;
+  return Math.max(min, Math.min(max, Math.floor(s)));
+}
+
+/**
+ * Lay a chapter's scenes onto a grid sized to the space actually available,
+ * for the timeline's scene pane. The nodes are elastic (see `TL_NODE_MIN_W`),
+ * so the canvas fills the pane instead of leaving a fixed-size grid adrift in
+ * it. Distinct from `sceneAutoArrange`, which produces the *persisted* layout
+ * for the chapter modal and must stay on its fixed grid.
+ */
+export function sceneGrid(count: number, availW: number, availH: number, fill: SceneFill): SceneGrid {
+  const n = Math.max(0, count);
+  const row = fill === "row";
+  const gapX = row ? SCENE_GAP_X : TL_GAP_X_STACKED;
+  const gapY = SCENE_GAP_Y;
+  const tracks = row
+    ? fitTracks(n, availW, TL_NODE_MIN_W, gapX)
+    : fitTracks(n, availH, TL_NODE_MIN_H, gapY);
+  const nodeW = row ? fitSize(tracks, availW, gapX, TL_NODE_MIN_W, TL_NODE_MAX_W) : SCENE_W;
+  const nodeH = row ? SCENE_H : fitSize(tracks, availH, gapY, TL_NODE_MIN_H, TL_NODE_MAX_H);
+
+  const positions: Vec2[] = Array.from({ length: n }, (_, i) => {
+    const col = row ? i % tracks : Math.floor(i / tracks);
+    const r = row ? Math.floor(i / tracks) : i % tracks;
+    return { x: SCENE_MARGIN + col * (nodeW + gapX), y: SCENE_MARGIN + r * (nodeH + gapY) };
+  });
+
+  const cols = row ? Math.min(tracks, n) : Math.ceil(n / tracks);
+  const rows = row ? Math.ceil(n / tracks) : Math.min(tracks, n);
+  return {
+    positions,
+    nodeW,
+    nodeH,
+    gapX,
+    gapY,
+    width: SCENE_MARGIN * 2 + Math.max(1, cols) * nodeW + Math.max(0, cols - 1) * gapX,
+    height: SCENE_MARGIN * 2 + Math.max(1, rows) * nodeH + Math.max(0, rows - 1) * gapY,
+  };
 }
 
 /**

@@ -78,6 +78,9 @@ export function Toolbar() {
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
   const activeDraft = doc.drafts.find((d) => d.id === doc.activeDraftId);
   const onSeriesMap = doc.seriesMode && level === "series";
+  // The book timeline is a scrolling surface with no camera, so a zoom readout
+  // there would report a number that controls nothing.
+  const showZoom = !onSeriesMap && view !== "timeline";
   const bookStat = `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words · ${doc.chapters.length} chapters`;
 
   const seg = "px-3 py-[6px] rounded-[7px] text-[12px] font-medium cursor-pointer whitespace-nowrap";
@@ -377,7 +380,7 @@ export function Toolbar() {
             ⋯
           </button>
           <Popover anchorRef={moreBtnRef} open={moreMenu} onClose={() => setMoreMenu(false)} align="right" width={200}>
-            {!onSeriesMap && (
+            {showZoom && (
               <div className="flex items-center justify-between px-[8px] py-[6px]">
                 <span className="text-[12px] font-medium text-soft">Zoom</span>
                 <div className="flex items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
@@ -400,7 +403,7 @@ export function Toolbar() {
         </div>
       ) : (
         <>
-          {!onSeriesMap && (
+          {showZoom && (
             <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
               <button
                 onClick={zoomOut}

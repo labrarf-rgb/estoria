@@ -1,15 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
-import {
-  CARD_W,
-  CARD_H,
-  fitToContent,
-  layoutPositions,
-  timelineChapterPositions,
-  type Camera,
-} from "@/lib/layout";
+import { CARD_W, CARD_H, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
-import { roman } from "@/lib/markdown";
 import type { Chapter, ConnType } from "@/types";
 
 const CONN_COLOR: Record<ConnType, string> = {
@@ -31,10 +23,13 @@ function connectorPath(a: { x: number; y: number }, b: { x: number; y: number })
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
+/**
+ * The book's story map: free-placed chapter cards on a pan/zoom canvas. The
+ * timeline is a separate surface (see `Timeline`), so everything here is
+ * map-only — no orientation, no derived positions.
+ */
 export function Board() {
   const doc = useStore((s) => s.doc);
-  const view = useStore((s) => s.view);
-  const orient = useStore((s) => s.timelineOrient);
   const zoom = useStore((s) => s.zoom);
   const panX = useStore((s) => s.panX);
   const panY = useStore((s) => s.panY);
@@ -74,22 +69,10 @@ export function Board() {
   const movedRef = useRef(false);
   const CLICK_SLOP = 4;
 
-  // Timeline-only drag-to-reorder: positions there are purely derived from
-  // array order (no stored x/y), so dragging live-splices a preview order and
-  // everyone — including the dragged card — reflows to the resulting
-  // sequential slots. Board (map) view keeps free placement; dropping a card
-  // onto another there just offers a reorder via confirmation (see onUp).
-  const timelineDrag = useRef<{ id: string; fromIdx: number; mx: number; my: number } | null>(null);
-  const [timelineDragId, setTimelineDragId] = useState<string | null>(null);
-  const [timelineOverIdx, setTimelineOverIdx] = useState<number | null>(null);
-  const timelineOverRef = useRef<number | null>(null);
-
-  const isTimeline = view === "timeline";
-
-  // Pointer drag (chapters), timeline reorder, and background pan — via window listeners.
+  // Pointer drag (chapters) and background pan — via window listeners.
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const anchor = drag.current ?? timelineDrag.current;
+      const anchor = drag.current;
       if (anchor && !movedRef.current) {
         movedRef.current =
           Math.abs(e.clientX - anchor.mx) > CLICK_SLOP || Math.abs(e.clientY - anchor.my) > CLICK_SLOP;
@@ -118,22 +101,6 @@ export function Board() {
               setDropTargetId(hitId);
             }
           });
-        }
-      } else if (timelineDrag.current) {
-        const vp = viewportRef.current;
-        if (!vp) return;
-        const rect = vp.getBoundingClientRect();
-        const c = cam.current;
-        const wx = (e.clientX - rect.left - c.panX) / c.zoom;
-        const wy = (e.clientY - rect.top - c.panY) / c.zoom;
-        const primary = orient === "vertical" ? wy : wx;
-        const chapters = useStore.getState().doc.chapters;
-        const others = chapters.filter((ch) => ch.id !== timelineDrag.current!.id);
-        const otherPos = timelineChapterPositions(others, orient);
-        const rank = otherPos.filter((p) => (orient === "vertical" ? p.y : p.x) < primary).length;
-        if (timelineOverRef.current !== rank) {
-          timelineOverRef.current = rank;
-          setTimelineOverIdx(rank);
         }
       } else if (pan.current) {
         setCamera({
@@ -185,32 +152,6 @@ export function Board() {
         dropTargetRef.current = null;
         setDropTargetId(null);
       }
-      if (timelineDrag.current) {
-        const { id, fromIdx } = timelineDrag.current;
-        const finalIdx = timelineOverRef.current ?? fromIdx;
-        const chapters = useStore.getState().doc.chapters;
-        const others = chapters.filter((c) => c.id !== id);
-        const clamped = Math.max(0, Math.min(finalIdx, others.length));
-        // Same click-vs-drag split as the board: a press that didn't move opens
-        // the chapter rather than resequencing it into its own slot.
-        if (!movedRef.current) {
-          timelineDrag.current = null;
-          timelineOverRef.current = null;
-          setTimelineDragId(null);
-          setTimelineOverIdx(null);
-          pan.current = null;
-          openChapter(id);
-          return;
-        }
-        if (others.length) {
-          const targetId = clamped < others.length ? others[clamped].id : others[others.length - 1].id;
-          reorderChapter(id, targetId, clamped >= others.length);
-        }
-        timelineDrag.current = null;
-        timelineOverRef.current = null;
-        setTimelineDragId(null);
-        setTimelineOverIdx(null);
-      }
       pan.current = null;
     };
     window.addEventListener("mousemove", onMove);
@@ -220,35 +161,20 @@ export function Board() {
       window.removeEventListener("mouseup", onUp);
       if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
     };
-  }, [
-    moveChapter,
-    reorderChapter,
-    autoArrangeBoard,
-    setCamera,
-    setDragId,
-    askConfirm,
-    openChapter,
-    orient,
-  ]);
+  }, [moveChapter, reorderChapter, autoArrangeBoard, setCamera, setDragId, askConfirm, openChapter]);
 
-  // Wheel: zoom on the board, scroll-pan on the timeline.
+  // Wheel zooms the map.
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const c = cam.current;
-      if (isTimeline) {
-        if (orient === "vertical") setCamera({ panY: c.panY - e.deltaY });
-        else setCamera({ panX: c.panX - (e.deltaY + e.deltaX) });
-      } else {
-        const f = e.deltaY < 0 ? 1.08 : 0.925;
-        setCamera({ zoom: Math.min(1.8, Math.max(0.34, c.zoom * f)) });
-      }
+      const f = e.deltaY < 0 ? 1.08 : 0.925;
+      setCamera({ zoom: Math.min(1.8, Math.max(0.34, cam.current.zoom * f)) });
     };
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, [isTimeline, orient, setCamera]);
+  }, [setCamera]);
 
   // Keep the store's board size current so auto-arrange can size to the viewport.
   useEffect(() => {
@@ -269,7 +195,7 @@ export function Board() {
   const prevCount = useRef(doc.chapters.length);
   useEffect(() => {
     const vp = viewportRef.current;
-    if (!vp || view !== "board") return;
+    if (!vp) return;
     setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
     prevCount.current = doc.chapters.length;
     // Re-fit on mount and on project/book change only.
@@ -281,7 +207,7 @@ export function Board() {
     const n = doc.chapters.length;
     const grew = n > prevCount.current;
     prevCount.current = n;
-    if (!grew || view !== "board") return;
+    if (!grew) return;
     const vp = viewportRef.current;
     if (!vp) return;
     const last = doc.chapters[n - 1];
@@ -294,86 +220,25 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.chapters.length]);
 
-  // Returning to the board from the timeline: snap back to the cards (the
-  // timeline's scroll position would otherwise leave the board looking empty).
-  const prevView = useRef(view);
-  useEffect(() => {
-    const was = prevView.current;
-    prevView.current = view;
-    if (view === "board" && was === "timeline") {
-      const vp = viewportRef.current;
-      if (vp) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-
   // Auto-arrange also fits the arranged grid to the visible board, so the result
   // is always on-screen. (The grid/jitter behaviour itself is unchanged.)
   const prevArrange = useRef(arrangeN);
   useEffect(() => {
     const grew = arrangeN > prevArrange.current;
     prevArrange.current = arrangeN;
-    if (!grew || view !== "board") return;
+    if (!grew) return;
     const vp = viewportRef.current;
     if (vp) setCamera(fitToContent(doc.chapters, vp.clientWidth, vp.clientHeight));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arrangeN]);
 
-  const isVert = isTimeline && orient === "vertical";
-  let pos = layoutPositions(doc, view, orient);
-  if (isTimeline && timelineDragId && timelineOverIdx !== null) {
-    const dragged = doc.chapters.find((c) => c.id === timelineDragId);
-    const others = doc.chapters.filter((c) => c.id !== timelineDragId);
-    if (dragged) {
-      const preview = others.slice();
-      preview.splice(Math.max(0, Math.min(timelineOverIdx, others.length)), 0, dragged);
-      pos = timelineChapterPositions(preview, orient);
-    }
-  }
   const posById: Record<string, { x: number; y: number }> = {};
-  pos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
-
-  // In timeline view, draw a band behind each Act so the grouping is visible.
-  const actBands = (() => {
-    if (!isTimeline) return [] as {
-      act: number;
-      left: number;
-      top: number;
-      width: number;
-      height: number;
-    }[];
-    const groups: { act: number; ids: string[] }[] = [];
-    doc.chapters.forEach((c) => {
-      const last = groups[groups.length - 1];
-      if (last && last.act === c.act) last.ids.push(c.id);
-      else groups.push({ act: c.act, ids: [c.id] });
-    });
-    return groups.map((g) => {
-      const ps = g.ids.map((id) => posById[id]).filter(Boolean);
-      const xs = ps.map((p) => p.x);
-      const ys = ps.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs) + CARD_W;
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys) + CARD_H;
-      return isVert
-        ? { act: g.act, left: minX - 22, top: minY - 34, width: CARD_W + 44, height: maxY - minY + 34 + 18 }
-        : { act: g.act, left: minX - 20, top: minY - 38, width: maxX - minX + 40, height: CARD_H + 38 + 18 };
-    });
-  })();
+  doc.chapters.forEach((c) => (posById[c.id] = { x: c.x, y: c.y }));
 
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
     e.stopPropagation();
     e.preventDefault();
     movedRef.current = false;
-    if (isTimeline) {
-      const fromIdx = doc.chapters.findIndex((c) => c.id === ch.id);
-      timelineDrag.current = { id: ch.id, fromIdx, mx: e.clientX, my: e.clientY };
-      timelineOverRef.current = fromIdx;
-      setTimelineDragId(ch.id);
-      setTimelineOverIdx(fromIdx);
-      return;
-    }
     drag.current = { id: ch.id, mx: e.clientX, my: e.clientY, ox: ch.x, oy: ch.y };
     setDragId(ch.id);
   };
@@ -405,43 +270,6 @@ export function Board() {
           transformOrigin: "0 0",
         }}
       >
-        {/* Act bands (timeline only) */}
-        {actBands.map((b, i) => (
-          <div
-            key={`act-${i}`}
-            style={{
-              position: "absolute",
-              left: b.left,
-              top: b.top,
-              width: b.width,
-              height: b.height,
-              border: "1.5px dashed var(--line)",
-              borderRadius: 16,
-              background: "var(--panel)",
-              opacity: 0.55,
-              zIndex: 0,
-            }}
-          />
-        ))}
-        {actBands.map((b, i) => (
-          <div
-            key={`act-label-${i}`}
-            style={{
-              position: "absolute",
-              left: b.left + 12,
-              top: b.top + 8,
-              zIndex: 1,
-              font: "600 11px 'Hanken Grotesk'",
-              letterSpacing: ".08em",
-              textTransform: "uppercase",
-              color: "var(--faint)",
-              pointerEvents: "none",
-            }}
-          >
-            Act {roman(b.act)}
-          </div>
-        ))}
-
         {/* Connectors */}
         <svg
           width={6000}
@@ -483,11 +311,10 @@ export function Board() {
                 top: p.y,
                 width: CARD_W,
                 minHeight: CARD_H,
-                cursor: dragId === c.id || timelineDragId === c.id ? "grabbing" : "grab",
-                zIndex: dragId === c.id || timelineDragId === c.id ? 20 : 5,
-                transform: !isTimeline && c.rot ? `rotate(${c.rot}deg)` : "none",
+                cursor: dragId === c.id ? "grabbing" : "grab",
+                zIndex: dragId === c.id ? 20 : 5,
+                transform: c.rot ? `rotate(${c.rot}deg)` : "none",
                 transformOrigin: "center center",
-                transition: isTimeline ? "left 150ms ease-out, top 150ms ease-out" : undefined,
               }}
             >
               <div
@@ -497,7 +324,7 @@ export function Board() {
                   boxShadow:
                     dropTargetId === c.id
                       ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent), var(--shadow)"
-                      : dragId === c.id || timelineDragId === c.id
+                      : dragId === c.id
                         ? "0 14px 32px rgba(0,0,0,0.26), var(--shadow)"
                         : "var(--shadow)",
                 }}

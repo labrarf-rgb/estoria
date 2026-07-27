@@ -57,6 +57,8 @@ export function ChapterDetail() {
   const setSceneFlowExpanded = useStore((s) => s.setSceneFlowExpanded);
   const notesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
+  const focusScene = useStore((s) => s.focusScene);
+  const clearFocusScene = useStore((s) => s.clearFocusScene);
 
   const ch = doc.chapters.find((c) => c.id === openCh);
   const chIdRef = useRef<string | null>(null);
@@ -95,6 +97,27 @@ export function ChapterDetail() {
   const dragRef = useRef<SceneDrag | null>(null);
   dragRef.current = drag;
   const addScenePressRef = useRef(false);
+
+  // Landing on a specific scene, from the timeline's scene pane. One-shot: the
+  // marker is consumed as soon as it is applied, so re-renders (and reopening
+  // the same chapter by other routes) don't yank the canvas around again.
+  const [flashIdx, setFlashIdx] = useState<number | null>(null);
+  const chId = ch?.id;
+  const sceneCount = ch?.scenes.length ?? 0;
+  useEffect(() => {
+    if (!chId || !focusScene || focusScene.chapterId !== chId || sceneCount === 0) return;
+    clearFocusScene();
+    const box = sceneBoxRef.current;
+    if (!box) return;
+    const idx = Math.max(0, Math.min(focusScene.index, sceneCount - 1));
+    const node = box.querySelector<HTMLElement>(`[data-scene-idx="${idx}"]`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    node.querySelector("textarea")?.focus();
+    setFlashIdx(idx);
+    const t = setTimeout(() => setFlashIdx(null), 1600);
+    return () => clearTimeout(t);
+  }, [focusScene, chId, sceneCount, clearFocusScene]);
 
   const canvasPoint = (clientX: number, clientY: number) => {
     const box = sceneBoxRef.current;
@@ -768,6 +791,7 @@ export function ChapterDetail() {
               return (
                 <div
                   key={i}
+                  data-scene-idx={i}
                   onMouseDown={(e) => onSceneDown(e, i)}
                   onClick={moveMode ? () => toggleSelected(i) : undefined}
                   className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
@@ -800,9 +824,10 @@ export function ChapterDetail() {
                   <div
                     className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
                     style={
-                      // Inline only when selected — a permanent inline borderColor
-                      // would override the hover:border-faint highlight.
-                      isSelected
+                      // Inline only when selected or freshly jumped to — a
+                      // permanent inline borderColor would override the
+                      // hover:border-faint highlight.
+                      isSelected || flashIdx === i
                         ? {
                             borderColor: "var(--therefore)",
                             boxShadow:

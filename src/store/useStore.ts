@@ -63,6 +63,13 @@ interface UiState {
   boardH: number;
   dragId: string | null;
   openCh: string | null;
+  /**
+   * Scene the chapter modal should land on when it opens — set by clicking a
+   * scene in the timeline's pane, consumed and cleared by the modal. Transient
+   * and NOT persisted: it is a one-shot navigation instruction, never document
+   * content, so it stays out of `doc` and out of the file the Android app reads.
+   */
+  focusScene: { chapterId: string; index: number } | null;
   sceneArrangeN: number;
   newMenu: boolean;
   showChars: boolean;
@@ -260,6 +267,8 @@ interface StoreState extends UiState {
   setOrient: (o: TimelineOrient) => void;
   setDragId: (id: string | null) => void;
   openChapter: (id: string) => void;
+  openChapterAtScene: (id: string, index: number) => void;
+  clearFocusScene: () => void;
   /**
    * Open a chapter that may live in another book or version — the "jump to where
    * this note is pinned" path. Switches book/version through the normal stashing
@@ -436,6 +445,7 @@ const initialUi: UiState = {
   boardH: 0,
   dragId: null,
   openCh: null,
+  focusScene: null,
   sceneArrangeN: 0,
   newMenu: false,
   showChars: false,
@@ -1661,6 +1671,14 @@ export const useStore = create<StoreState>()(
             },
           };
         }),
+      // Opening straight onto a scene (from the timeline's scene pane) goes
+      // through `openChapter` so the modal's per-mode scene layouts are still
+      // seeded, then leaves a one-shot marker for the modal to consume.
+      openChapterAtScene: (id, index) => {
+        useStore.getState().openChapter(id);
+        set({ focusScene: { chapterId: id, index } });
+      },
+      clearFocusScene: () => set({ focusScene: null }),
       // Jumping to a pin can cross a book and a version boundary, so it reuses
       // `switchBook`/`setActiveDraft` rather than reaching into the doc — those
       // are the actions that stash the board being left behind. Panels close
@@ -1692,7 +1710,7 @@ export const useStore = create<StoreState>()(
       },
 
       // Closing the chapter drops any note/image ref left with nothing in it.
-      closeChapter: () => set((s) => ({ openCh: null, ...prunedState(s) })),
+      closeChapter: () => set((s) => ({ openCh: null, focusScene: null, ...prunedState(s) })),
       toggleNewMenu: () => set((s) => ({ newMenu: !s.newMenu })),
       closeNewMenu: () => set({ newMenu: false }),
       setPanel: (panel, open) =>

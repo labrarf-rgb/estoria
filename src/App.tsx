@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { Toolbar } from "@/components/Toolbar";
 import { Board } from "@/components/Board";
+import { Timeline } from "@/components/Timeline";
 import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
 import { ChapterDetail } from "@/components/ChapterDetail";
@@ -24,7 +25,12 @@ export function App() {
   const openCh = useStore((s) => s.openCh);
   const seriesMode = useStore((s) => s.doc.seriesMode);
   const level = useStore((s) => s.level);
+  const view = useStore((s) => s.view);
   const onSeriesMap = seriesMode && level === "series";
+  // The book-level timeline is its own surface (a scrolling rail + scene pane),
+  // not a mode of the board's canvas. The series map still renders its own
+  // timeline of books internally.
+  const onTimeline = !onSeriesMap && view === "timeline";
 
   // Drive theming off the document model via the data-theme attribute.
   useEffect(() => {
@@ -37,7 +43,7 @@ export function App() {
       className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
     >
       <Toolbar />
-      {onSeriesMap ? <SeriesMap /> : <Board />}
+      {onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
       <Footer />
 
       {openCh && !onSeriesMap && <ChapterDetail />}

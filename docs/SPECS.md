@@ -113,7 +113,7 @@ estoria/
    │  └─ persistence.ts       # StorageAdapter, debounced storage shim, normalizeDoc,
    │                          #   save-status pub/sub, file save/load
    ├─ lib/
-   │  ├─ layout.ts            # board/timeline layout, auto-arrange, fit-to-content
+   │  ├─ layout.ts            # board layout, auto-arrange, fit-to-content, scene grids
    │  ├─ markdown.ts          # export builder, import prompt + parser
    │  ├─ templates.ts         # story-structure skeletons (34 cards, 3 facets)
    │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, file history
@@ -129,7 +129,8 @@ estoria/
    │  └─ files.ts             # file → data URL reading
    └─ components/
       ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
-      ├─ Board.tsx            # canvas: pan/zoom/drag, cards, connectors, timeline
+      ├─ Board.tsx            # story map: pan/zoom/drag, cards, connectors
+      ├─ Timeline.tsx         # chapter rail + scene-flow pane (scrolling, no camera)
       ├─ SeriesMap.tsx        # series-level board: book cards + links
       ├─ ChapterDetail.tsx    # chapter modal: scene flow + act controls
       ├─ Footer.tsx           # autosave status, Sync button, folder icon
@@ -163,15 +164,18 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Area | Feature | Status | Notes |
 | --- | --- | --- | --- |
-| Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; **a click opens the chapter** (board + timeline) — a press that moves is a drag, a press that doesn't is a click, and a click that jiggled puts the card back. The chapter modal ignores backdrop dismissals for 400ms after opening so the old double-click habit can't close it on the way in. |
-| Board | Reorder chapters | ✅ | Board: drop a card on another → confirm → resequences **and** auto-arranges so threads stay clean. Timeline: drag to reorder with live reflow. Connector chain rebuilt to follow the new order. |
+| Board | Pan / zoom / drag cards | ✅ | Wheel zooms; drag rearranges; **a click opens the chapter** — a press that moves is a drag, a press that doesn't is a click, and a click that jiggled puts the card back. The chapter modal ignores backdrop dismissals for 400ms after opening so the old double-click habit can't close it on the way in. Map-only since Session 51: the timeline is its own component, so `Board` no longer branches on `view`. |
+| Board | Reorder chapters | ✅ | Drop a card on another → confirm → resequences **and** auto-arranges so threads stay clean. Connector chain rebuilt to follow the new order. **Board only** since Session 51 — the timeline dropped drag-to-reorder when it became a reading surface. |
 | Board | Connectors (therefore/but/and) | ✅ | SVG curves, colored by type, per-version (each version forks its own links). |
 | Board | Auto-arrange | ✅ | Decaying-jitter grid, floored so it approaches straight but never a rigid lattice. |
 | Board | Add chapter | ✅ | |
-| Timeline | Vertical / horizontal layout | 🟡 | Layout + scroll-pan work; fit-to-view on switch not yet wired. |
+| Timeline | Read the story continuously | ✅ | **Session 51, web-app only** (deliberately not mirrored on Android — see §8). A chapter **rail** beside (vertical) or above (horizontal) a **scene pane** that renders each chapter's scene flow, so a book reads start to finish without opening anything. The rail keeps the familiar chapter cards, act bands and curved type-coloured chapter links — though the **vertical** rail routes those curves *down the column* (bottom edge → top edge) rather than looping out to the sides as the board does, because the board's sweep needs about twice a card's width in horizontal room and a fixed-width rail hasn't got it; the horizontal rail keeps the board's exact shape. Card gaps in the rail are wide (52px) because the curves are drawn in them. Which chapter you're on shows twice: an active ring on the rail card and a sticky header in the pane. Scroll sync is two-way — scrolling the pane moves the highlight and pulls the rail along; clicking a rail card jumps the pane. |
+| Timeline | Vertical / horizontal layout | ✅ | The ↓ / → toolbar buttons are unchanged. Vertical puts the rail on the left and fills each scene grid row-major; horizontal puts the rail on top and fills column-major, so beats always advance along the axis the pane scrolls. |
+| Timeline | Scene grid fits the space | ✅ | `sceneGrid` picks its track count against a **minimum** node size (`TL_NODE_MIN_W/H`) and then grows the nodes into the leftover, capped by `TL_NODE_MAX_W/H`. Choosing the count against a *fixed* node size instead strands the remainder — the design prototype measured a 833px pane fitting one 208px column and wasting 293px. Measured on the shipped view: a 1256px pane renders a 1211px canvas (**96%**) with 333px nodes. Re-fits on resize (`ResizeObserver` on the pane) and is computed per chapter, so chapters with different scene counts get different column counts in the same pane. |
+| Timeline | Open a scene for editing | ✅ | Clicking a scene node opens the chapter modal **on that scene** — scrolled into view, textarea focused, border flashed (`focusScene` in the store; transient, never persisted). Rail cards jump rather than open, so a scene-less chapter's empty canvas is itself the way in. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
 | Detail | Scene layout remembered per canvas size | ✅ | The expanded and collapsed canvases fit different column counts, so each keeps **its own layout** (`scenePos` / `scenePosCompact`, v6). Toggling size swaps layouts instead of re-arranging — which is what used to throw the arrangement away. Auto-arrange tidies only the size you're looking at; structural edits keep both in step. |
-| Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline). |
+| Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline rail). |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | ✅ | Add/link/rename/delete note, image + to-do refs; asset-backed since v5. Content edits write through the store (`updateChapterRefAsset` / `updateWorldRefAsset`) rather than a caller-resolved `updateAsset` — resolving `refId → asset` from a render closure dropped keystrokes typed in the moments right after a draft committed. |
@@ -228,8 +232,8 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 1. ~~**Full chapter-detail editing**~~ — ✅ done (Session 2).
 2. ~~**Inline editing for Characters & World**~~ — ✅ done (Session 3).
 3. ~~**Project rename + multi-document picker**~~ — ✅ done (Session 6, Projects modal).
-4. ~~**Timeline act band labels**~~ — ✅ done (Session 8). Fit-to-view on timeline
-   switch still pending (board fit is done).
+4. ~~**Timeline act band labels**~~ — ✅ done (Session 8). The pending "fit-to-view
+   on timeline switch" is moot as of Session 51: the timeline has no camera to fit.
 5. ~~**Markdown import parser**~~ — ✅ done (Session 9). `parseImportMarkdown`.
 6. ~~**Open a project file from disk**~~ — ✅ done (Session 9). "Open file..." in
    the Projects modal. (Drag-drop onto the board still a nice-to-have.)
@@ -272,6 +276,15 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   `String`, so `"TODO"` decodes without crashing. An
 >   unknown `kind` should degrade to a note, which is what `normalizeAssets` in
 >   `store/persistence.ts` does here.
+> - **The Timeline reading view is web-app only (Session 51) — by decision, not
+>   by omission.** The user scoped it to the web app, and it is built so that
+>   choice costs the phone nothing: it is pure presentation over data that
+>   already exists (`Chapter.scenes`, `sceneLinks`, `ChapterLink`), it adds **no
+>   fields to `StoryDoc`**, and its one piece of new state (`focusScene`, "open
+>   the modal on this scene") is transient UI state outside `doc` and outside
+>   `partialize`. So there is **no schema implication and nothing for Android to
+>   match** — a phone that never builds this view reads and writes the same files
+>   as before.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
 >   both apps (same Google identity, one Drive file). Decisions made for the web
 >   OAuth/Drive setup should not preclude a second (Android) OAuth client under
