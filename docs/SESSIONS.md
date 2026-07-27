@@ -2324,3 +2324,31 @@ for `templates.ts` (30 → 34 cards) and the §4 Templates row ("29 structures +
 blank starter" → 33, and 10 → 14 genre beat sheets).
 
 Not deployed — code and docs only, nothing pushed.
+
+### 2026-07-26 (Session 50 ship) — Shipped to prod
+
+`94a780d` — "Add the four magical-realism templates from the guide". Pushed
+`main` to GitHub, then `npm run deploy`: portfolio commit `3873af7`, and prod
+confirmed serving `94a780d` (build 75) at https://www.labrarf.com/estoria on the
+5th poll.
+
+Verified by endpoint rather than by clicking through prod, same as the Session 49
+ship: `version.json` reports `94a780d`, and the served bundle
+(`index-eztoucp3.js`) is **sha256-identical** to the local build of that commit
+(`241cfa36…`). Content checked inside the shipped bundle rather than inferred
+from the hash: all four template names, the shared `Magical realism` tag and the
+`The Core Realization` beat are present, and their byte offsets run Time Loop →
+Generational Saga → Domestic Metaphor → Urban Dream-Logic → Historical Haunting →
+Mystery, so the reorder is what actually shipped. Deliberately not exercised in a
+real browser session — prod is the live writing environment, and opening a
+project there to reach the Templates modal risks touching real data for a change
+whose behaviour is fully determined by static template data.
+
+**Spec drift.** None left open. The two stale counts §3 (`templates.ts` file-tree
+line) and §4 (Templates row) were fixed in `94a780d` itself and now read 34 cards
+/ 33 structures / 14 genre beat sheets, matching `TEMPLATES.length`. Checked the
+rest of §4 for claims this change could have falsified: the facet list is still
+Structure / Genre / Life story and still an exact partition (11 / 14 / 9 = 34),
+so the `TEMPLATE_GROUPS` comment about the facets partitioning the library holds.
+The `persistence.ts` NUL-byte grep hazard carried since the Session 48 ship is
+still there, still untouched.
