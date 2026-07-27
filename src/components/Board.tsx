@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { CARD_W, CARD_H, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
+import { chipRestLabel, chipSplit } from "@/lib/chips";
 import type { Chapter, ConnType } from "@/types";
 
 const CONN_COLOR: Record<ConnType, string> = {
@@ -248,6 +249,7 @@ export function Board() {
   };
 
   const charById = (id: string) => doc.characters.find((c) => c.id === id);
+  const castOf = (c: Chapter) => c.chars.flatMap((id) => charById(id) ?? []);
   const titleOf = (c: Chapter) => c.title;
   const summaryOf = (c: Chapter) => displaySummary(c);
 
@@ -339,20 +341,31 @@ export function Board() {
                   />
                   <div className="flex-1" />
                   <div className="flex items-center pr-[6px]">
-                    {c.chars.map((id) => {
-                      const k = charById(id);
-                      if (!k) return null;
+                    {(() => {
+                      const { shown, rest } = chipSplit(castOf(c));
                       return (
-                        <span
-                          key={id}
-                          className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
-                          style={{ background: k.color }}
-                          title={k.name || undefined}
-                        >
-                          {k.initials || "?"}
-                        </span>
+                        <>
+                          {shown.map((k) => (
+                            <span
+                              key={k.id}
+                              className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
+                              style={{ background: k.color }}
+                              title={k.name || undefined}
+                            >
+                              {k.initials || "?"}
+                            </span>
+                          ))}
+                          {rest.length > 0 && (
+                            <span
+                              className="-mr-[6px] flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-[1.5px] border-card bg-soft px-[4px] text-[9.5px] font-semibold text-bg"
+                              title={chipRestLabel(rest)}
+                            >
+                              +{rest.length}
+                            </span>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
                 <div

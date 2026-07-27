@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { sceneGrid, type SceneFill, type SceneGrid } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
+import { chipRestLabel, chipSplit } from "@/lib/chips";
 import type { Chapter, ConnType, Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -243,6 +244,7 @@ export function Timeline() {
   }, [orient, doc.activeBookId, doc.activeDraftId]);
 
   const charById = (id: string) => doc.characters.find((c) => c.id === id);
+  const castOf = (c: Chapter) => c.chars.flatMap((id) => charById(id) ?? []);
 
   // Act runs, for the dashed bands in the rail.
   const bands: { act: number; items: Chapter[] }[] = [];
@@ -337,20 +339,31 @@ export function Timeline() {
                     />
                     <div className="flex-1" />
                     <div className="flex items-center pr-[6px]">
-                      {c.chars.map((id) => {
-                        const k = charById(id);
-                        if (!k) return null;
+                      {(() => {
+                        const { shown, rest } = chipSplit(castOf(c));
                         return (
-                          <span
-                            key={id}
-                            className="-mr-[6px] flex h-[21px] w-[21px] items-center justify-center rounded-full border-[1.5px] border-card text-[9px] font-semibold text-white"
-                            style={{ background: k.color }}
-                            title={k.name || undefined}
-                          >
-                            {k.initials || "?"}
-                          </span>
+                          <>
+                            {shown.map((k) => (
+                              <span
+                                key={k.id}
+                                className="-mr-[6px] flex h-[21px] w-[21px] items-center justify-center rounded-full border-[1.5px] border-card text-[9px] font-semibold text-white"
+                                style={{ background: k.color }}
+                                title={k.name || undefined}
+                              >
+                                {k.initials || "?"}
+                              </span>
+                            ))}
+                            {rest.length > 0 && (
+                              <span
+                                className="-mr-[6px] flex h-[21px] min-w-[21px] items-center justify-center rounded-full border-[1.5px] border-card bg-soft px-[4px] text-[9px] font-semibold text-bg"
+                                title={chipRestLabel(rest)}
+                              >
+                                +{rest.length}
+                              </span>
+                            )}
+                          </>
                         );
-                      })}
+                      })()}
                     </div>
                   </div>
                   <div

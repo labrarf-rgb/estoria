@@ -120,6 +120,7 @@ estoria/
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ entities.ts          # character/world lookup helpers
+   │  ├─ chips.ts             # how many cast avatars a card shows before "+n"
    │  ├─ refs.ts              # asset-backed pinned-ref resolution (asset-backed
    │  │                       #   since v5; resolves to-do `items` too), link
    │  │                       #   counting, `findAssetPins` (every place an asset is
@@ -175,7 +176,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Timeline | Open a scene for editing | ✅ | Clicking a scene node opens the chapter modal **on that scene** — scrolled into view, textarea focused, border flashed (`focusScene` in the store; transient, never persisted). Rail cards jump rather than open, so a scene-less chapter's empty canvas is itself the way in. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
 | Detail | Scene layout remembered per canvas size | ✅ | The expanded and collapsed canvases fit different column counts, so each keeps **its own layout** (`scenePos` / `scenePosCompact`, v6). Toggling size swaps layouts instead of re-arranging — which is what used to throw the arrangement away. Auto-arrange tidies only the size you're looking at; structural edits keep both in step. |
-| Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline rail). |
+| Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline rail). The avatar stack is **capped at 7 slots** (`lib/chips.ts`) — a bigger cast fills six and turns the seventh into a muted **`+n`** counter, tooltipped with the hidden names, instead of running the row off the card. Seven is the narrowest card's budget (the horizontal rail's 234px), so board and rail cap alike. |
 | Detail | Edit title / summary / status | ✅ | Inline; status picker Idea/Draft/Done. |
 | Detail | Act +/- controls | ✅ | |
 | Detail | Pinned refs | ✅ | Add/link/rename/delete note, image + to-do refs; asset-backed since v5. Content edits write through the store (`updateChapterRefAsset` / `updateWorldRefAsset`) rather than a caller-resolved `updateAsset` — resolving `refId → asset` from a render closure dropped keystrokes typed in the moments right after a draft committed. |
