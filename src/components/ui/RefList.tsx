@@ -147,9 +147,29 @@ export function RefList({
   // Detach fn for an in-flight grip drag, so an unmount mid-drag can't leak
   // window listeners.
   const endGripDrag = useRef<(() => void) | null>(null);
+  // Live registry of the task <input>s, so a task created by Enter can be
+  // focused once it exists. Keyed by task id, not index: inserting shifts every
+  // index below it, and the row we want to reach is the one that just mounted.
+  const taskEls = useRef(new Map<string, HTMLInputElement>());
+  const pendingFocus = useRef<string | null>(null);
   const items = draft ? refs.concat(draft) : refs;
 
   useEffect(() => () => endGripDrag.current?.(), []);
+
+  /**
+   * Move the caret into a task the last render created. Deliberately runs after
+   * *every* render rather than on a dep: a new task can take two renders to
+   * appear (a draft list commits through the store, which re-resolves the refs),
+   * and the id stays pending until the input it names actually exists.
+   */
+  useEffect(() => {
+    const id = pendingFocus.current;
+    if (!id) return;
+    const el = taskEls.current.get(id);
+    if (!el) return;
+    pendingFocus.current = null;
+    el.focus();
+  });
 
   /**
    * Start a grip drag. Listeners are attached here rather than from an effect on
@@ -225,8 +245,21 @@ export function RefList({
 
   // ── Checklist editing (TODO) ───────────────────────────────────────────────
   const itemsOf = (r: ResolvedRef) => r.items ?? [];
-  const addItem = (r: ResolvedRef) =>
-    update(r.id, { items: itemsOf(r).concat({ id: uid("t"), text: "", done: false }) });
+  /**
+   * Add a blank task and put the caret in it. `afterId` is the task Enter was
+   * pressed in — the new one lands directly *below* it, because a list editor
+   * that answers Enter by appending to the bottom sends you somewhere you
+   * weren't looking. "+ Add task" passes nothing and so still appends.
+   */
+  const addItem = (r: ResolvedRef, afterId?: string) => {
+    const list = itemsOf(r);
+    const task = { id: uid("t"), text: "", done: false };
+    const at = afterId ? list.findIndex((i) => i.id === afterId) : -1;
+    const next =
+      at === -1 ? list.concat(task) : list.slice(0, at + 1).concat(task, list.slice(at + 1));
+    pendingFocus.current = task.id;
+    update(r.id, { items: next });
+  };
   const setItemText = (r: ResolvedRef, itemId: string, text: string) =>
     update(r.id, { items: itemsOf(r).map((i) => (i.id === itemId ? { ...i, text } : i)) });
   const toggleItem = (r: ResolvedRef, itemId: string) =>
@@ -307,12 +340,16 @@ export function RefList({
               {it.done ? "✓" : ""}
             </button>
             <input
+              ref={(el) => {
+                if (el) taskEls.current.set(it.id, el);
+                else taskEls.current.delete(it.id);
+              }}
               value={it.text}
               onChange={(e) => setItemText(r, it.id, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addItem(r);
+                  addItem(r, it.id);
                 }
               }}
               placeholder="Task..."

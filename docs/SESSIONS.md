@@ -2502,3 +2502,33 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
 - `npm run deploy` verified it: prod served the previous build (`7527b48`) for
   six polls, then reported `113100e` — **✓ live at
   https://www.labrarf.com/estoria**.
+
+### 2026-07-28 (Session 53) — Enter in a checklist takes the caret with it
+
+- Reported: typing a task and hitting Enter made a new checkbox, but the caret
+  stayed in the task you'd just finished — so the next thing you typed landed at
+  the end of the previous line.
+- Root cause in `RefList`'s `checklist`: Enter called `addItem(r)`, which
+  `concat`ed a blank task onto the **end** of the array and focused nothing. Two
+  bugs in one line — the caret didn't follow, and Enter pressed mid-list put the
+  new row at the bottom instead of below the one you were in.
+- `addItem` now takes the task Enter fired from and splices the new one in right
+  after it; "+ Add task" passes nothing and still appends. A ref map of the task
+  `<input>`s plus a `pendingFocus` id lets an effect focus the row once it
+  mounts. **Why the effect has no dep array:** on a *draft* list the first
+  keystroke commits the asset through the store, so the new task can take two
+  renders to exist — the id stays pending until the input it names is there.
+- Used slices rather than `Array.toSpliced`: that's ES2023 and `tsconfig.app`
+  targets ES2022. Not worth moving the lib for one call.
+- Verified in the dev preview against the sample project, both views: Enter at
+  the end of a 1-task list focused the new row; Enter from row 1 of
+  `alphabeta / gamma` produced `alphabeta / <caret> / gamma` and the typing
+  landed in the middle row; same again in card view. No console errors. The test
+  list was deleted from the sample afterwards.
+- **SPECS reviewed against the code:** §4 "Notes | To-do lists as a pinnable
+  resource" said only "Enter adds the next one", which is now wrong about
+  *where* — it states the insert-below rule, the caret move, and that "+ Add
+  task" still appends. Checked the neighbouring rows for claims this could have
+  falsified: "Nothing saved until typed" still holds (a task created by Enter is
+  blank, so a draft list stays a draft until something is typed into it), and
+  §5's export rule is untouched — blank tasks were already omitted from markdown.
