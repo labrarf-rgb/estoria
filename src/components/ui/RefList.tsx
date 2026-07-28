@@ -147,9 +147,10 @@ export function RefList({
   // Detach fn for an in-flight grip drag, so an unmount mid-drag can't leak
   // window listeners.
   const endGripDrag = useRef<(() => void) | null>(null);
-  // Live registry of the task <input>s, so a task created by Enter can be
-  // focused once it exists. Keyed by task id, not index: inserting shifts every
-  // index below it, and the row we want to reach is the one that just mounted.
+  // Live registry of the task <input>s, so the task Enter creates (or the one
+  // Backspace falls back into) can be focused once the render settles. Keyed by
+  // task id, not index: inserting or removing shifts every index below it, and
+  // the row we want to reach is a specific task, not a position.
   const taskEls = useRef(new Map<string, HTMLInputElement>());
   const pendingFocus = useRef<string | null>(null);
   const items = draft ? refs.concat(draft) : refs;
@@ -157,10 +158,13 @@ export function RefList({
   useEffect(() => () => endGripDrag.current?.(), []);
 
   /**
-   * Move the caret into a task the last render created. Deliberately runs after
-   * *every* render rather than on a dep: a new task can take two renders to
-   * appear (a draft list commits through the store, which re-resolves the refs),
-   * and the id stays pending until the input it names actually exists.
+   * Move the caret into the task the last edit pointed at. Deliberately runs
+   * after *every* render rather than on a dep: a new task can take two renders
+   * to appear (a draft list commits through the store, which re-resolves the
+   * refs), and the id stays pending until the input it names actually exists.
+   *
+   * Always lands at the end of the text — which is what Backspace merging back
+   * into the task above needs, and a no-op on the empty task Enter creates.
    */
   useEffect(() => {
     const id = pendingFocus.current;
@@ -169,6 +173,7 @@ export function RefList({
     if (!el) return;
     pendingFocus.current = null;
     el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
   });
 
   /**
@@ -266,6 +271,25 @@ export function RefList({
     update(r.id, { items: itemsOf(r).map((i) => (i.id === itemId ? { ...i, done: !i.done } : i)) });
   const removeItem = (r: ResolvedRef, itemId: string) =>
     update(r.id, { items: itemsOf(r).filter((i) => i.id !== itemId) });
+  /**
+   * Backspace in an *empty* task deletes it and merges back into the one above,
+   * caret at the end of that line — the undo of the Enter that made it.
+   *
+   * Only when there is a task above: on the first row there is nowhere to merge
+   * into, so Backspace does nothing and the ✕ stays the way to remove it. That
+   * also means a held Backspace can never chew through the whole list — it stops
+   * at the top row instead of deleting it and starting on the next one.
+   *
+   * Returns whether it handled the key, so the caller knows to preventDefault.
+   */
+  const backspaceItem = (r: ResolvedRef, itemId: string) => {
+    const list = itemsOf(r);
+    const at = list.findIndex((i) => i.id === itemId);
+    if (at <= 0) return false;
+    pendingFocus.current = list[at - 1].id;
+    update(r.id, { items: list.filter((i) => i.id !== itemId) });
+    return true;
+  };
 
   const confirmDelete = (r: ResolvedRef) => {
     // Nothing to confirm on a draft — there's nothing saved to lose.
@@ -350,6 +374,12 @@ export function RefList({
                 if (e.key === "Enter") {
                   e.preventDefault();
                   addItem(r, it.id);
+                }
+                // Only on an empty task: with text in the field Backspace has to
+                // stay a plain delete-a-character, or you'd lose the row on the
+                // keystroke that clears the last letter.
+                if (e.key === "Backspace" && it.text === "" && backspaceItem(r, it.id)) {
+                  e.preventDefault();
                 }
               }}
               placeholder="Task..."

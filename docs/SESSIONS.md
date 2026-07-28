@@ -2532,3 +2532,32 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   falsified: "Nothing saved until typed" still holds (a task created by Enter is
   blank, so a draft list stays a draft until something is typed into it), and
   §5's export rule is untouched — blank tasks were already omitted from markdown.
+
+### 2026-07-28 (Session 53b) — Backspace in an empty task removes it
+
+- Follow-on ask from the same session: give the Enter above an undo.
+- `backspaceItem` deletes an empty task and points `pendingFocus` at the task
+  *above*, so the caret merges back into the end of that line. The focus effect
+  now always calls `setSelectionRange(len, len)` — needed for the merge, and a
+  no-op on the blank task Enter creates, so one rule covers both.
+- **Two deliberate no-ops.** Backspace only takes the row when the field is
+  *empty*, or the keystroke that clears the last letter would also lose the row.
+  And it does nothing on the **top** row: there is nothing to merge into, and
+  refusing there is what stops a held Backspace from eating the whole list one
+  row at a time. The ✕ is still how you remove a top or non-empty task.
+  `backspaceItem` returns whether it acted so the handler only calls
+  `preventDefault` when it did — native character deletion is untouched.
+- Verified in the dev preview on a `one / two / three` list, both views: Enter
+  then Backspace on the new blank row restored the list and put the caret at
+  offset 5 of "three"; Backspace with text present removed no row; two
+  Backspaces from an empty middle row deleted it, merged up, then **stopped** on
+  the empty top row. Card view matched. No console errors, test list deleted.
+  (Note for anyone re-running this: the preview's `key` action dispatches key
+  events without native text editing, so plain character-deletion isn't
+  exercised by it — that path is guarded by the `it.text === ""` check, which
+  was confirmed by the row surviving.)
+- **SPECS reviewed against the code:** the same §4 "To-do lists" row now carries
+  the Backspace rule and both no-ops. Re-checked "Remove vs. delete" (§4, App):
+  the ✕-detaches / word-destroys rule is about *assets*, not tasks inside one, so
+  a keyboard shortcut that removes a task doesn't contradict it — and the ✕ on
+  the task row is unchanged either way.
