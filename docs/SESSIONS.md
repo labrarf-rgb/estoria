@@ -2561,3 +2561,12 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   the ✕-detaches / word-destroys rule is about *assets*, not tasks inside one, so
   a keyboard shortcut that removes a task doesn't contradict it — and the ✕ on
   the task row is unchanged either way.
+
+### 2026-07-28 (Session 53 ship) — Shipped to prod
+
+- `7c120f2` on `main` (pushed to origin), portfolio deploy commit `e0f30bb`,
+  build 82.
+- `npm run deploy` verified it: prod served the previous build (`113100e`) for
+  five polls, then reported `7c120f2` — **✓ live at
+  https://www.labrarf.com/estoria**. Confirmed independently:
+  `/estoria/version.json` returns `{"build":"82","commit":"7c120f2"}`.
