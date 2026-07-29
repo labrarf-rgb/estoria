@@ -214,7 +214,7 @@ export function Toolbar() {
               </div>
             ))}
             <div className="px-[8px] pb-[2px] pt-[4px] text-[10px] leading-[1.4] text-faint">
-              ★ marks the main version — the one kept safe from deletion.
+              ★ marks the main version. It's the one that can't be deleted.
             </div>
             <div className="mx-[6px] my-1 h-px bg-rule" />
             <button
