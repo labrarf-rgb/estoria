@@ -59,9 +59,16 @@ export function TemplatesModal() {
               key={t.id}
               className="flex flex-col gap-[9px] rounded-[13px] border border-rule bg-card p-[16px]"
             >
-              <div className="flex items-center gap-[9px]">
-                <span className="font-serif text-[16px] font-semibold text-ink">{t.name}</span>
-                <span className="rounded-full bg-chip px-[8px] py-[3px] text-[9.5px] font-semibold uppercase tracking-wide text-soft">
+              {/* Name left, tag flush right. The tag is pinned rather than
+                  trailing the name so it lands in the same place on every card;
+                  `items-start` keeps it on the name's first line when the name
+                  wraps, and `shrink-0` stops the pill breaking its own text
+                  across two lines when the pair is wider than the column. */}
+              <div className="flex items-start justify-between gap-[9px]">
+                <span className="min-w-0 font-serif text-[16px] font-semibold leading-[1.25] text-ink">
+                  {t.name}
+                </span>
+                <span className="mt-[2px] shrink-0 whitespace-nowrap rounded-full bg-chip px-[8px] py-[3px] text-[9.5px] font-semibold uppercase tracking-wide text-soft">
                   {t.tag}
                 </span>
               </div>
