@@ -45,6 +45,13 @@ running app.
   connectors, statuses, notes, layout). Creating a version deep-copies the
   current one; edits never leak between versions. The series bible (characters/
   world/assets) stays shared. The version selector is hidden on the series map.
+- **Main version** — the version a book treats as canonical, held in
+  `mainDraftId` (v7). It is a **movable marker, not an id**: the star in the
+  version menu moves it, and `MAIN_DRAFT_ID` is only the seed value. The starred
+  version sorts first in the menu, can't be deleted, and is where deleting the
+  version you're on drops you. Nothing else follows it — export, Sync, and the
+  toolbar word count all track the version you're *viewing*, and `+ Add version`
+  forks the board you're reading rather than the starred one.
 - **Project** — an independent `StoryDoc` (a standalone book or a whole series).
   Multiple projects live side by side in a library; you switch, create, delete,
   and merge them.
@@ -191,7 +198,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | World | List + expand detail | ✅ | |
 | World | Add / edit / refs | ✅ | Name/category/desc/notes inline; refs via the shared `RefList`. |
 | Notes | Story notes editor | ✅ | Auto-saved, in export. |
-| Templates | Insert / replace skeletons | ✅ | 33 structures + blank starter (34 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 14 genre beat sheets (4 of them magical realism, Session 50); facet filter bar. |
+| Templates | Insert / replace skeletons | ✅ | 33 structures + blank starter (34 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 14 genre beat sheets (4 of them magical realism, Session 50); facet filter bar. The card's tag pill is **pinned to the right edge**, not trailed after the name (Session 54) — the name is what varies in length, so trailing it put the tag in a different place on every card, and on a two-line name it squeezed the pill until its own text wrapped. `items-start` keeps the tag on the name's first line; `shrink-0` is what stops the pill breaking. |
 | Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. |
 | Export | Markdown (Obsidian) | ✅ | Copy + download. |
 | Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |
@@ -201,7 +208,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | App | One panel at a time | ✅ | The scrim covers the toolbar, so a second panel is unreachable by pointer — a click there closes the open one instead. `setPanel` also enforces it in state for the paths that open a panel from *inside* another surface (a draft started from the chapter modal, a note's world-pin jump), and re-opening the panel you're already in deliberately does **not** sweep the draft you're typing into. |
 | Characters / World | Appears in → jump to chapter | ✅ | A character's "Appears in" chips, and a matching list on world entries, are buttons: clicking closes the panel and opens that chapter (`jumpToChapter`). Scoped to the loaded board, matching the "in N chapters" line above them — unlike a note's pin list, which spans books and versions because the asset library does. |
 | App | Light/dark theme | ✅ | |
-| App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. |
+| App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. **Which version is "main" is chosen by the user** (v7, Session 54) — a star per row in the version menu writes `mainDraftId`. Before this, `"main"` was a hardcoded id fixed at seed time, so a writer whose real book lived in a fork got the amber "changes stay in this version" banner on their actual work and could not delete the empty stub. Promotion is a **relabel only**: no board is copied or swapped, which is what keeps pinned refs (they record a draft id) pointing at the text they were pinned to. The demoted version becomes ordinary and deletable. `resolveMainDraftId` pins the marker to a version that exists, defaulting a missing pointer to the seed id — so pre-v7 files behave exactly as they used to. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
@@ -254,9 +261,9 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
 > - The Android app reads/writes the **same `.estoria.json` (currently schema
->   v6 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
+>   v7 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
 >   v5 = asset-backed pinned refs, v6 = `TODO` assets + `archived` + per-mode
->   scene layout)**. Any
+>   scene layout, v7 = movable `mainDraftId`)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
 > - **⚠️ OPEN CROSS-APP EVENT — v6 (2026-07-26).** The web app now writes schema
@@ -277,6 +284,17 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   `String`, so `"TODO"` decodes without crashing. An
 >   unknown `kind` should degrade to a note, which is what `normalizeAssets` in
 >   `store/persistence.ts` does here.
+> - **⚠️ OPEN CROSS-APP EVENT — v7 (2026-07-28).** The web app now writes schema
+>   7, which stacks on the still-open v6 event above. The addition is one field,
+>   additive and small: `mainDraftId: string` on the document (the active book)
+>   and on every `bookData[*]` entry, naming which version that book treats as
+>   canonical. A reader that ignores it loses only the star; nothing about board
+>   content moves, because promotion never copies or swaps a board. The safe
+>   default for a doc without the field is the seed id `"main"`, falling back to
+>   the first entry in `drafts` — see `resolveMainDraftId` in `lib/drafts.ts`.
+>   A writer that drops the field silently demotes the user's chosen version
+>   back to the seed one, so the phone should carry it through its passthrough
+>   even before it grows UI for it.
 > - **The Timeline reading view is web-app only (Session 51) — by decision, not
 >   by omission.** The user scoped it to the web app, and it is built so that
 >   choice costs the phone nothing: it is pure presentation over data that

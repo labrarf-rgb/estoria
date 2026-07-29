@@ -2570,3 +2570,58 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   five polls, then reported `7c120f2` — **✓ live at
   https://www.labrarf.com/estoria**. Confirmed independently:
   `/estoria/version.json` returns `{"build":"82","commit":"7c120f2"}`.
+
+### 2026-07-28 (Session 54) — You choose which version is main
+
+- **The complaint that started it:** the amber "Editing *X* · changes stay in
+  this version" banner was showing on the user's real writing. `ChapterDetail`
+  keyed it off `draftId !== MAIN_DRAFT_ID`, and `MAIN_DRAFT_ID` is the literal
+  `"main"` — the id the *first* version is seeded with. Renaming never changes an
+  id, so a book whose actual text lived in a fork was permanently flagged as the
+  experiment, while the empty seed version stayed undeletable.
+- **`mainDraftId` is now a movable pointer**, on `StoryDoc` and every `BookData`.
+  A star per row in the version menu calls `setMainDraft`; the three things that
+  used to read the constant (undeletable, fall-back board on delete, banner
+  suppression) read the pointer instead. The starred version also **sorts first**
+  in the menu — display-only, so `doc.drafts` keeps creation order and promoting
+  one doesn't shuffle the rest.
+- **Promotion relabels, it never moves data.** The alternative considered was
+  swapping board contents under a fixed `"main"` id: no schema change, but pinned
+  refs record a `draftId` (`refs.ts`), so every note pinned into either version
+  would have silently pointed at the wrong text. Rejected for that reason.
+- **Deliberately unchanged:** export, cross-app Sync, and the toolbar word count
+  still follow the version you're *viewing*. `+ Add version` also still forks the
+  board you're reading — this was briefly changed to fork from the starred
+  version and the user reverted it: branching off an experiment you're in the
+  middle of is the common case.
+- **Schema 6 → 7, and the bump was load-bearing, not bookkeeping.** First run
+  showed *both* versions un-starred and both deletable. Cause: zustand's `persist`
+  rehydrates the saved doc **raw** — `normalizeDoc` runs only from `migrate`,
+  which only fires when the persisted `version` is below `SCHEMA_VERSION`. Without
+  the bump the pointer was `undefined` forever and no row matched. Worth
+  remembering: **adding a field to `StoryDoc` requires the bump to reach already-
+  saved local state**, whatever it does for files. `resolveMainDraftId` covers the
+  file paths (`normalizeDoc`) and `withMainDraft` the doc-swap paths
+  (`openDoc` / `replaceDoc`), both defaulting a missing pointer to the seed id, so
+  pre-v7 files load exactly as before.
+- **Verified in the dev preview** on the user's own project: star moved and the ✕
+  swapped rows; radio (what you're viewing) stayed put, proving promotion isn't a
+  switch; with main moved to "Alt ending" the banner then appeared on "Main
+  draft" — the inverse proof it follows the pointer; starring "Alt ending" lifted
+  it to the top of the menu. State restored to as-found afterwards. Typecheck and
+  `npm run build` clean, no console errors.
+- **Template tag alignment (same session, unrelated).** The tag pill was the next
+  item in a flex row after the template name, so it began wherever the name ended
+  — a different x-position on all 34 cards — and on a two-line name it was
+  centred against both lines *and* squeezed until pills like "17 STAGES" wrapped
+  inside themselves. Now `justify-between` + `items-start` + `shrink-0`: pinned
+  right, on the name's first line, never wrapping. Checked at 3-, 2- and 1-column
+  widths, plus a measured pass over every pill's height at mobile width to
+  confirm none wraps (zero).
+- **SPECS reviewed against the code:** §2 gains a **Main version** glossary entry
+  (stating what does *not* follow the star, since that's the easy wrong
+  assumption); §4's Drafts row records the movable marker and why promotion
+  doesn't copy boards; §4's Templates row records the pinned tag; the Android
+  cross-app note now reads v7 and carries a **new open cross-app event** beside
+  the still-open v6 one. Re-checked the two older draft passages (§9 items 5 and
+  14) — both still true, versions are still standalone forks.
