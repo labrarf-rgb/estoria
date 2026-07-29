@@ -51,7 +51,7 @@ export function BackupsModal() {
               Backups &amp; conflict copies
             </div>
             <div className="mt-[2px] text-[12px] text-soft">
-              This project's files in your Estoria folder. Restoring is undoable — your
+              This project's files in your Estoria folder. Restoring is undoable, your
               current version is backed up first.
             </div>
           </div>
@@ -77,7 +77,7 @@ export function BackupsModal() {
               active={show}
               reloadKey={reloadKey}
               onRestored={(fileName, backedUpAs) => {
-                setMsg({ text: `Restored ${fileName} — previous version saved as ${backedUpAs}` });
+                setMsg({ text: `Restored ${fileName}. Previous version saved as ${backedUpAs}` });
                 setReloadKey((k) => k + 1);
               }}
               onError={(text) => setMsg({ text, error: true })}

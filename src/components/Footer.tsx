@@ -127,7 +127,7 @@ export function Footer() {
     } catch (e) {
       setSyncState("idle");
       setMsg({
-        text: e instanceof Error ? e.message : "Sync failed — nothing was changed.",
+        text: e instanceof Error ? e.message : "Sync failed. Nothing was changed.",
         error: true,
       });
     }
@@ -141,12 +141,12 @@ export function Footer() {
       setConflict(null);
       syncDone(
         keep === "mine"
-          ? `Synced · kept this version — file copy saved as ${res.conflictFileName}`
-          : `Synced · loaded file version — your copy saved as ${res.conflictFileName}`
+          ? `Synced · kept this version, file copy saved as ${res.conflictFileName}`
+          : `Synced · loaded file version, your copy saved as ${res.conflictFileName}`
       );
     } catch {
       setConflict(null);
-      setMsg({ text: "Couldn't resolve the conflict — nothing was changed.", error: true });
+      setMsg({ text: "Couldn't resolve the conflict. Nothing was changed.", error: true });
     }
   };
 
@@ -203,7 +203,7 @@ export function Footer() {
       ? ""
       : mirror === "current"
         ? " · synced to file"
-        : " · file changed elsewhere — press Sync";
+        : " · file changed elsewhere, press Sync";
   const saveText = failed
     ? "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
@@ -244,7 +244,7 @@ export function Footer() {
             disabled={syncState === "busy"}
             title={
               dirName
-                ? `Sync this project with its file in "${dirName}" (shared with other devices) — also saves a backup copy`
+                ? `Sync this project with its file in "${dirName}" (shared with other devices). Also saves a backup copy`
                 : "Sync this project with its file in your Estoria folder (you'll pick the folder first)"
             }
             className="rounded-md border px-[8px] py-[3px] text-[11px] font-semibold transition-colors disabled:opacity-60"
@@ -310,7 +310,7 @@ export function Footer() {
           onRestored={(fileName, backedUpAs) => {
             // The mirror pushes the restored state to the live file on the
             // next auto-save (or a conflict surfaces if the file moved too).
-            setMsg({ text: `Restored ${fileName} — previous version saved as ${backedUpAs}` });
+            setMsg({ text: `Restored ${fileName}. Previous version saved as ${backedUpAs}` });
           }}
           onError={(message) => setMsg({ text: message, error: true })}
         />

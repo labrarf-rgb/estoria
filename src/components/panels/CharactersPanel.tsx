@@ -91,7 +91,7 @@ export function CharactersPanel() {
                     </div>
                     <div className="text-[11.5px] font-medium text-soft">
                       {isDraft
-                        ? "Nothing saved yet — type anything to add them"
+                        ? "Nothing saved yet, type anything to add them"
                         : `${p.role || "No role"} · in ${chapterCount(p.id)} chapters`}
                     </div>
                   </button>

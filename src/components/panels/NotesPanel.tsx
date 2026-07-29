@@ -177,7 +177,7 @@ export function NotesPanel() {
                   </div>
                   {pins.length === 0 ? (
                     <div className="text-[11.5px] text-faint">
-                      Not pinned yet — link it from a chapter or a world entry.
+                      Not pinned yet. Link it from a chapter or a world entry.
                     </div>
                   ) : (
                     groupPins(pins).map((g) => (

@@ -691,7 +691,7 @@ const RAW_TEMPLATES: Omit<StoryTemplate, "groups">[] = [
     name: "The Nest Builders",
     tag: "Domestic life",
     blurb:
-      "Focused on the domestic journey of building a shared life — a long-term partnership, marriage, buying a home, or raising children — tracking the shift from 'me' to 'we'.",
+      "Focused on the domestic journey of building a shared life (a long-term partnership, marriage, buying a home, or raising children), tracking the shift from 'me' to 'we'.",
     beats: [
       ["Solo Architecture", 1, "Establish your independent lifestyle, personal finances, and domestic habits before merging your life with others."],
       ["The Convergence", 1, "Detail the early phase of dating, meeting a partner, or deciding to commit to a specific lifestyle or location."],

@@ -419,7 +419,7 @@ export function RefList({
           const open = openId === r.id;
           const isDraft = r.id === draft?.id;
           const snippet = isDraft
-            ? "Nothing saved yet — type anything to add it"
+            ? "Nothing saved yet, type anything to add it"
             : r.kind === "IMAGE"
               ? "Image"
               : r.kind === "TODO"
@@ -751,7 +751,7 @@ function PositionInput({
         if (e.key === "Escape") setTyped(null);
       }}
       onBlur={commit}
-      title={`Position ${index + 1} of ${total} — type a number to move it`}
+      title={`Position ${index + 1} of ${total}, type a number to move it`}
       className={`shrink-0 rounded-md border border-rule bg-panel text-center font-mono font-medium text-soft outline-none focus:border-faint focus:text-ink ${
         compact ? "h-[18px] w-[24px] text-[10px]" : "h-[22px] w-[30px] text-[11px]"
       }`}

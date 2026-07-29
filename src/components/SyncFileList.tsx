@@ -85,7 +85,7 @@ export function SyncFileList({
             replaceDoc(res.doc);
             onRestored(f.name, res.backedUpAs);
           } catch (e) {
-            onError(e instanceof Error ? e.message : "Restore failed — nothing was changed.");
+            onError(e instanceof Error ? e.message : "Restore failed. Nothing was changed.");
           }
         })();
       },
@@ -105,7 +105,7 @@ export function SyncFileList({
   if (files.length === 0) {
     return (
       <div className="px-[8px] py-[10px] text-[11px] text-faint">
-        No files for this project yet — press Sync to create the live file.
+        No files for this project yet. Press Sync to create the live file.
       </div>
     );
   }

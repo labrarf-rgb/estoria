@@ -167,7 +167,7 @@ function locked<T>(fn: () => Promise<T>): Promise<T> {
       if ((e as DOMException)?.name === "NotFoundError") {
         await forgetBackupDir();
         throw new Error(
-          "The Estoria folder seems to have moved — click the folder icon to pick it again."
+          "The Estoria folder seems to have moved. Click the folder icon to pick it again."
         );
       }
       throw e;

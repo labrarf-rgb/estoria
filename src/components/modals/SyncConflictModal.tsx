@@ -88,7 +88,7 @@ export function SyncConflictModal({
           </div>
           <div className="mt-[6px] text-[12.5px] leading-[1.5] text-soft">
             Both this app and the file in your Estoria folder were edited since they last
-            agreed, so Estoria can't fast-forward — you choose which version to keep.
+            agreed, so Estoria can't fast-forward. You choose which version to keep.
           </div>
 
           {/* Which side is newer */}
@@ -109,14 +109,14 @@ export function SyncConflictModal({
             </div>
             {newer === null && (
               <div className="text-[11px] text-faint">
-                Couldn't tell which is newer — compare the details below.
+                Couldn't tell which is newer. Compare the details below.
               </div>
             )}
           </div>
 
           {/* How much differs */}
           <div className="mt-[12px] text-[12.5px] font-semibold text-ink">
-            {MAGNITUDE_TEXT[diff.magnitude]} —{" "}
+            {MAGNITUDE_TEXT[diff.magnitude]} ·{" "}
             {diff.differing === 1
               ? "1 item differs"
               : `${diff.differing} of ${diff.total} items differ`}
@@ -155,7 +155,7 @@ export function SyncConflictModal({
                           {STATE_TEXT[it.state]}
                         </span>
                         {it.fields && it.fields.length > 0 && (
-                          <span className="text-faint"> — {it.fields.join(", ")}</span>
+                          <span className="text-faint"> ({it.fields.join(", ")})</span>
                         )}
                       </li>
                     ))}
@@ -166,8 +166,8 @@ export function SyncConflictModal({
           )}
 
           <div className="mt-[12px] text-[12px] leading-[1.5] text-faint">
-            The version you don't keep is saved next to the sync file as a conflict copy —
-            nothing is lost either way.
+            The version you don't keep is saved next to the sync file as a conflict copy.
+            Nothing is lost either way.
           </div>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-[10px] px-[24px] py-[18px]">

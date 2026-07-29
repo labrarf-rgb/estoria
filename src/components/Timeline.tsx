@@ -446,7 +446,7 @@ export function Timeline() {
                       onClick={() => openChapter(c.id)}
                       className="absolute inset-0 flex items-center justify-center text-[12.5px] font-medium text-faint hover:text-soft"
                     >
-                      No scenes yet — open the chapter to add one
+                      No scenes yet, open the chapter to add one
                     </button>
                   ) : (
                     <>

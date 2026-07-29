@@ -90,7 +90,7 @@ export function WorldPanel() {
                       {w.name || (isDraft ? "New entry" : "Untitled entry")}
                     </div>
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-                      {isDraft ? "Nothing saved yet — type anything to add it" : w.cat}
+                      {isDraft ? "Nothing saved yet, type anything to add it" : w.cat}
                     </div>
                   </button>
                   <button
