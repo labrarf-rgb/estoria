@@ -10,7 +10,7 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
@@ -60,7 +60,10 @@ export interface Asset {
   archived?: boolean;
 }
 
-/** A named draft / version of the story. The "main" draft is the base text. */
+/**
+ * A named draft / version of the story. Which one is "main" is a movable
+ * pointer (`mainDraftId`), not this id — see the note on `MAIN_DRAFT_ID`.
+ */
 export interface DraftVersion {
   id: string;
   name: string;
@@ -147,6 +150,8 @@ export interface BookData {
   storyNotes: string;
   drafts: DraftVersion[];
   activeDraftId: string;
+  /** Which version this book treats as canonical. Movable; see `MAIN_DRAFT_ID`. */
+  mainDraftId: string;
   /** Stashed boards for this book's inactive versions, keyed by draft id. */
   draftData: Record<string, VersionData>;
 }
@@ -221,6 +226,8 @@ export interface StoryDoc {
   // `chapters` below). Each version is a standalone fork of the board.
   drafts: DraftVersion[];
   activeDraftId: string;
+  /** Which version the active book treats as canonical (movable). */
+  mainDraftId: string;
 
   // Series bible, shared across all books.
   characters: Character[];
@@ -245,4 +252,11 @@ export interface StoryDoc {
   bookData: Record<string, BookData>;
 }
 
+/**
+ * The id every book's first version is seeded with, and the default value of
+ * `mainDraftId` for documents written before the pointer existed. It is only a
+ * seed: which version is *main* is whatever `mainDraftId` points at, so never
+ * compare against this constant to answer "is this the main version?" — read
+ * the pointer (or `resolveMainDraftId` when the data may be untrusted).
+ */
 export const MAIN_DRAFT_ID = "main";

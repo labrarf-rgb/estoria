@@ -16,6 +16,7 @@ export const sampleStory: StoryDoc = {
     { id: "alt", name: "Alt ending" },
   ],
   activeDraftId: MAIN_DRAFT_ID,
+  mainDraftId: MAIN_DRAFT_ID,
 
   characters: [
     {
@@ -300,6 +301,7 @@ export const sampleStory: StoryDoc = {
       storyNotes: "",
       drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
       activeDraftId: MAIN_DRAFT_ID,
+      mainDraftId: MAIN_DRAFT_ID,
       draftData: {},
     },
     b3: {
@@ -308,6 +310,7 @@ export const sampleStory: StoryDoc = {
       storyNotes: "",
       drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
       activeDraftId: MAIN_DRAFT_ID,
+      mainDraftId: MAIN_DRAFT_ID,
       draftData: {},
     },
   },

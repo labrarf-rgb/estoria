@@ -13,7 +13,7 @@ import {
   type Vec2,
   type WorldEntry,
 } from "@/types";
-import { activeVersionData, cloneVersionData } from "@/lib/drafts";
+import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
@@ -260,6 +260,8 @@ interface StoreState extends UiState {
   setActiveDraft: (id: string) => void;
   renameDraft: (id: string, name: string) => void;
   deleteDraft: (id: string) => void;
+  /** Move the "main"/canonical marker to another version of the active book. */
+  setMainDraft: (id: string) => void;
 
   // ---- ui ----
   toggleTheme: () => void;
@@ -379,6 +381,7 @@ const stashActiveBook = (doc: StoryDoc): BookData => ({
   storyNotes: doc.storyNotes,
   drafts: doc.drafts,
   activeDraftId: doc.activeDraftId,
+  mainDraftId: doc.mainDraftId,
   draftData: doc.draftData,
 });
 
@@ -388,6 +391,7 @@ const emptyBookData = (): BookData => ({
   storyNotes: "",
   drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
   activeDraftId: MAIN_DRAFT_ID,
+  mainDraftId: MAIN_DRAFT_ID,
   draftData: {},
 });
 
@@ -550,7 +554,7 @@ export const useStore = create<StoreState>()(
           let id = incoming.id || uid("story");
           if (id === s.doc.id || stash[id]) id = uid("story");
           delete stash[id];
-          const doc: StoryDoc = { ...incoming, id, schemaVersion: SCHEMA_VERSION };
+          const doc: StoryDoc = withMainDraft({ ...incoming, id, schemaVersion: SCHEMA_VERSION });
           return {
             doc,
             projectStash: stash,
@@ -613,6 +617,7 @@ export const useStore = create<StoreState>()(
               storyNotes: data.storyNotes,
               drafts: data.drafts ?? [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: data.activeDraftId ?? MAIN_DRAFT_ID,
+              mainDraftId: resolveMainDraftId(data.drafts, data.mainDraftId),
               draftData: data.draftData ?? {},
             };
             return {
@@ -1146,7 +1151,7 @@ export const useStore = create<StoreState>()(
 
       replaceDoc: (doc) =>
         set({
-          doc: { ...doc, schemaVersion: SCHEMA_VERSION },
+          doc: withMainDraft({ ...doc, schemaVersion: SCHEMA_VERSION }),
           view: "board",
           arrangeN: 0,
           openCh: null,
@@ -1185,6 +1190,7 @@ export const useStore = create<StoreState>()(
               storyNotes: load.storyNotes,
               drafts: load.drafts ?? [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: load.activeDraftId ?? MAIN_DRAFT_ID,
+              mainDraftId: resolveMainDraftId(load.drafts, load.mainDraftId),
               draftData: load.draftData ?? {},
               bookData: rest,
             },
@@ -1229,6 +1235,7 @@ export const useStore = create<StoreState>()(
               storyNotes: "",
               drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
               activeDraftId: MAIN_DRAFT_ID,
+              mainDraftId: MAIN_DRAFT_ID,
               draftData: {},
               bookData: stash,
             },
@@ -1559,8 +1566,10 @@ export const useStore = create<StoreState>()(
 
       // ---- drafts / versions ----
       // Each version is a standalone fork of the board: creating one deep-copies
-      // the current board, and switching stashes/restores whole boards (same
-      // pattern as switchBook). Edits never leak between versions.
+      // the board you're reading — branching off an experiment you're in the
+      // middle of is the common case, so the fork follows your eyes rather than
+      // the star. Switching stashes/restores whole boards (same pattern as
+      // switchBook). Edits never leak between versions.
       addDraft: (name) =>
         set((s) => {
           const id = uid("d");
@@ -1611,21 +1620,24 @@ export const useStore = create<StoreState>()(
 
       deleteDraft: (id) =>
         set((s) => {
-          if (id === MAIN_DRAFT_ID) return s;
+          // The main version is the one that can't be deleted — whichever the
+          // user has pointed `mainDraftId` at, not the seed id.
+          const mainId = s.doc.mainDraftId;
+          if (id === mainId) return s;
           const drafts = s.doc.drafts.filter((d) => d.id !== id);
           const draftData = { ...s.doc.draftData };
           delete draftData[id];
           if (s.doc.activeDraftId !== id) {
             return { doc: { ...s.doc, drafts, draftData } };
           }
-          // Deleting the active version: fall back to the main draft's board.
-          const load = draftData[MAIN_DRAFT_ID] ?? activeVersionData(s.doc);
-          delete draftData[MAIN_DRAFT_ID];
+          // Deleting the active version: fall back to the main version's board.
+          const load = draftData[mainId] ?? activeVersionData(s.doc);
+          delete draftData[mainId];
           return {
             doc: {
               ...s.doc,
               drafts,
-              activeDraftId: MAIN_DRAFT_ID,
+              activeDraftId: mainId,
               chapters: load.chapters,
               links: load.links,
               storyNotes: load.storyNotes,
@@ -1634,6 +1646,14 @@ export const useStore = create<StoreState>()(
             openCh: s.openCh && load.chapters.some((c) => c.id === s.openCh) ? s.openCh : null,
           };
         }),
+
+      // Moving the marker only re-labels which version is canonical — no board
+      // is copied or swapped, and the version you're viewing doesn't change.
+      // The version losing the marker becomes an ordinary, deletable fork.
+      setMainDraft: (id) =>
+        set((s) =>
+          s.doc.drafts.some((d) => d.id === id) ? { doc: { ...s.doc, mainDraftId: id } } : s
+        ),
 
       // ---- ui ----
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),

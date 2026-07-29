@@ -540,6 +540,7 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
     seriesMode: false,
     drafts: [{ id: MAIN_DRAFT_ID, name: "Main draft" }],
     activeDraftId: MAIN_DRAFT_ID,
+    mainDraftId: MAIN_DRAFT_ID,
     characters,
     world,
     assets: [],

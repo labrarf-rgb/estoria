@@ -33,6 +33,7 @@ export function Toolbar() {
   const addDraft = useStore((s) => s.addDraft);
   const renameDraft = useStore((s) => s.renameDraft);
   const deleteDraft = useStore((s) => s.deleteDraft);
+  const setMainDraft = useStore((s) => s.setMainDraft);
   const askConfirm = useStore((s) => s.askConfirm);
 
   const [versionMenu, setVersionMenu] = useState(false);
@@ -77,6 +78,13 @@ export function Toolbar() {
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
   const activeDraft = doc.drafts.find((d) => d.id === doc.activeDraftId);
+  const mainDraftId = doc.mainDraftId;
+  // The starred version heads the menu — it's the trunk, so it reads first.
+  // Display order only: `doc.drafts` keeps the order versions were created in,
+  // so promoting one doesn't shuffle the rest.
+  const draftsByRank = [...doc.drafts].sort(
+    (a, b) => Number(b.id === mainDraftId) - Number(a.id === mainDraftId)
+  );
   const onSeriesMap = doc.seriesMode && level === "series";
   // The book timeline is a scrolling surface with no camera, so a zoom readout
   // there would report a number that controls nothing.
@@ -151,7 +159,7 @@ export function Toolbar() {
             <div className="px-[8px] pb-[4px] pt-[2px] text-[10px] font-semibold uppercase tracking-wide text-faint">
               Versions
             </div>
-            {doc.drafts.map((d) => (
+            {draftsByRank.map((d) => (
               <div
                 key={d.id}
                 className={`flex items-center gap-[4px] rounded-lg pl-[6px] pr-[4px] ${
@@ -170,7 +178,24 @@ export function Toolbar() {
                   onChange={(e) => renameDraft(d.id, e.target.value)}
                   className="min-w-0 flex-1 bg-transparent py-[8px] text-[12.5px] font-medium text-ink outline-none"
                 />
-                {d.id !== "main" && (
+                {/* The star marks the canonical version: it can't be deleted,
+                    it's where deleting the version you're on drops you, and it
+                    reads as the real book rather than an experiment. Separate
+                    from the radio, which is only what you're looking at now. */}
+                <button
+                  onClick={() => setMainDraft(d.id)}
+                  title={
+                    d.id === mainDraftId
+                      ? "This is the main version"
+                      : `Make "${d.name}" the main version`
+                  }
+                  className={`px-[5px] text-[12px] leading-none ${
+                    d.id === mainDraftId ? "text-ink" : "text-faint hover:text-soft"
+                  }`}
+                >
+                  {d.id === mainDraftId ? "★" : "☆"}
+                </button>
+                {d.id !== mainDraftId && (
                   <button
                     onClick={() =>
                       askConfirm({
@@ -188,6 +213,9 @@ export function Toolbar() {
                 )}
               </div>
             ))}
+            <div className="px-[8px] pb-[2px] pt-[4px] text-[10px] leading-[1.4] text-faint">
+              ★ marks the main version — the one kept safe from deletion.
+            </div>
             <div className="mx-[6px] my-1 h-px bg-rule" />
             <button
               onClick={() => {

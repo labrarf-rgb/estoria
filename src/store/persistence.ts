@@ -12,6 +12,7 @@ import {
   type TodoItem,
   type VersionData,
 } from "@/types";
+import { resolveMainDraftId } from "@/lib/drafts";
 
 /**
  * StorageAdapter — the single seam between Estoria and where stories live.
@@ -524,7 +525,12 @@ export function normalizeDoc(raw: unknown): StoryDoc {
       b.draftData && typeof b.draftData === "object"
         ? { chapters: stripLegacy(bChapters), links: bLinks, storyNotes: bNotes, draftData: b.draftData }
         : materializeLegacyVersions(bChapters, bLinks, bNotes, bDrafts, bActive);
-    bookData[id] = { ...bBoard, drafts: bDrafts, activeDraftId: bActive };
+    bookData[id] = {
+      ...bBoard,
+      drafts: bDrafts,
+      activeDraftId: bActive,
+      mainDraftId: resolveMainDraftId(bDrafts, b.mainDraftId),
+    };
   }
 
   const normalized: StoryDoc = {
@@ -537,6 +543,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     seriesMode: !!d.seriesMode,
     drafts,
     activeDraftId,
+    // Absent in files written before the marker was movable; there the seed
+    // version was always main, which is what the resolver falls back to.
+    mainDraftId: resolveMainDraftId(drafts, typeof d.mainDraftId === "string" ? d.mainDraftId : undefined),
     characters: Array.isArray(d.characters) ? d.characters : [],
     world: Array.isArray(d.world) ? d.world : [],
     assets: normalizeAssets(d.assets),

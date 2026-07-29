@@ -607,9 +607,13 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
   total++; // draft versions (standalone forks), compared as one pseudo-item across all books
   const versionsOf = (d: StoryDoc) => ({
     drafts: d.drafts,
+    mainDraftId: d.mainDraftId,
     draftData: d.draftData,
     stashed: Object.fromEntries(
-      Object.entries(d.bookData).map(([id, b]) => [id, { drafts: b.drafts, draftData: b.draftData }])
+      Object.entries(d.bookData).map(([id, b]) => [
+        id,
+        { drafts: b.drafts, mainDraftId: b.mainDraftId, draftData: b.draftData },
+      ])
     ),
   });
   if (!sameJson(versionsOf(mine), versionsOf(theirs))) {

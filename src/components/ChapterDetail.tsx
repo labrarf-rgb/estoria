@@ -7,7 +7,7 @@ import { resolveRefs } from "@/lib/refs";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
-import { MAIN_DRAFT_ID, type ChapterStatus, type ConnType, type Vec2 } from "@/types";
+import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
@@ -231,6 +231,8 @@ export function ChapterDetail() {
   const prevCh = chIdx > 0 ? doc.chapters[chIdx - 1] : null;
   const nextCh = chIdx >= 0 && chIdx < doc.chapters.length - 1 ? doc.chapters[chIdx + 1] : null;
 
+  // The banner below marks a board that isn't the canonical one; "main" is
+  // wherever the user put the marker, so a fork they promoted stays quiet.
   const draftId = doc.activeDraftId;
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
   // The layout belonging to the size on screen. Falling back to the other one
@@ -397,7 +399,7 @@ export function ChapterDetail() {
               rows={1}
               className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
             />
-            {draftId !== MAIN_DRAFT_ID && (
+            {draftId !== doc.mainDraftId && (
               <div className="mt-[4px] text-[10.5px] font-semibold uppercase tracking-wide text-but">
                 Editing {draftName} · changes stay in this version
               </div>
