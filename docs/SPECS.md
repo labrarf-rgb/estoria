@@ -163,6 +163,17 @@ estoria/
   `var(--shadow)`). Don't hardcode hex values.
 - Runtime-computed styles (card x/y, zoom transform, character `oklch` colors,
   SVG paths) stay as inline `style={}` — Tailwind is for static chrome only.
+- **No em dashes in anything the user reads** (labels, tooltips, empty states,
+  error and status messages, template blurbs). Use a period, a comma,
+  parentheses, or the app's existing `·` separator. Session 54 swept 21 strings
+  that had drifted; the rule is house style, so re-adding one is a regression.
+  Code comments and these docs are exempt.
+  **One deliberate exception, and it is not copy:** the em dashes emitted by
+  `lib/markdown.ts` are **field separators in the export format**
+  (`- **Name** — role | archetype`). The importer parses them
+  (`markdown.ts:272`, `:331`), the AI import prompt documents them literally,
+  and the Android app reads the same files, so "cleaning" them would desync
+  every vault already on disk. Leave them.
 
 ---
 

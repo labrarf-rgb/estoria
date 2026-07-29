@@ -2625,3 +2625,30 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   cross-app note now reads v7 and carries a **new open cross-app event** beside
   the still-open v6 one. Re-checked the two older draft passages (§9 items 5 and
   14) — both still true, versions are still standalone forks.
+
+### 2026-07-28 (Session 54b) — Em dash sweep through the UI copy
+
+- Caught right after the 54 ship: the version-menu legend shipped with an em
+  dash, which house style forbids in anything the user reads. Trimmed the line
+  to just `★ marks the main version` (the star's meaning is already in both
+  tooltips, so the sentence was carrying nothing the hover didn't).
+- Swept the rest while there: **21 strings across 12 files**, all pre-existing.
+  Footer, Backups, Sync conflict, Sync file list, Timeline, the Notes / World /
+  Characters panels, `RefList`, one template blurb, and the folder-moved error in
+  `lib/sync.ts`. Replacements were chosen per sentence rather than mechanically:
+  a period where the clause stood alone ("Sync failed. Nothing was changed."), a
+  comma where it qualified ("Nothing saved yet, type anything to add it"),
+  parentheses for the conflict field list, and the app's own `·` for the
+  conflict-magnitude line, which is a separator rather than prose.
+- **`lib/markdown.ts` was left alone on purpose.** Its em dashes are *field
+  separators in the export format*, not copy: `- **Name** — role | archetype`.
+  The importer parses them (`markdown.ts:272`, `:331`), the AI import prompt
+  documents the shape literally, and the Android app reads the same files.
+  Rewriting the emitter would leave every vault already on disk in a different
+  shape from new exports. Recorded in §3 Conventions so the next sweep doesn't
+  undo it.
+- Verified the version legend in the dev preview; the rest are string swaps
+  covered by typecheck and `npm run build`, both clean.
+- **SPECS reviewed against the code:** §3 Conventions gains the no-em-dash rule
+  *and* the markdown-format exception, which is the part worth having in writing
+  — the exception looks exactly like an oversight to anyone tidying later.
