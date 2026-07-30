@@ -2710,3 +2710,21 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
   for v8** — written to stress that the v6 brief's "an archived asset is unpinned
   by construction" is the thing that stopped being true, since that is the sort
   of inference the phone may have coded against rather than checked.
+
+**Shipped** `da39046` to www.labrarf.com/estoria, verified live by the deploy
+script's version poll.
+
+**Spec review caught one real inconsistency, fixed in a follow-up.** Reviewing
+§4's "Remove vs. delete" row against the code, the Archive/Delete pair had
+shipped in the *opposite* order in the Characters and World panels (Delete
+first) from the one the shared library's destroy row has always used (Archive
+first). Nothing functional, but it puts the destructive word where the muscle
+memory expects the reversible one. Both panels now lead with Archive, and the
+row was rewritten as "Remove vs. archive vs. delete" — the taxonomy had two
+members and now has three, and a labelled button that *doesn't* destroy is
+exactly the kind of thing that erodes a one-meaning-per-control rule if it isn't
+written down. Two other passages were tightened rather than corrected: the v6
+cross-app block's "an archived asset is unpinned by construction" parenthetical
+now carries an inline warning that it is false as of v8 (it reads as present-
+tense fact to anyone who lands there first), and the "Appears in" row now spells
+out that three different counting scopes legitimately coexist on one card.

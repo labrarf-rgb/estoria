@@ -220,22 +220,9 @@ export function WorldPanel() {
                         />
                       )}
                     </div>
+                    {/* Archive before Delete, matching the shared library's
+                        destroy row: the reversible action reads first. */}
                     <div className="flex items-center gap-[8px]">
-                      <button
-                        onClick={() =>
-                          // Nothing to confirm on a draft — there's nothing saved to lose.
-                          isDraft
-                            ? discardDraft()
-                            : askConfirm({
-                                message: `Delete "${w.name || "this entry"}"?`,
-                                danger: true,
-                                onConfirm: () => deleteWorldEntry(w.id),
-                              })
-                        }
-                        className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
-                      >
-                        {isDraft ? "Discard" : "Delete entry"}
-                      </button>
                       {/* A draft isn't saved yet, so there's nothing to retire. */}
                       {!isDraft && (
                         <button
@@ -258,6 +245,21 @@ export function WorldPanel() {
                           Archive
                         </button>
                       )}
+                      <button
+                        onClick={() =>
+                          // Nothing to confirm on a draft — there's nothing saved to lose.
+                          isDraft
+                            ? discardDraft()
+                            : askConfirm({
+                                message: `Delete "${w.name || "this entry"}"?`,
+                                danger: true,
+                                onConfirm: () => deleteWorldEntry(w.id),
+                              })
+                        }
+                        className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
+                      >
+                        {isDraft ? "Discard" : "Delete entry"}
+                      </button>
                     </div>
                   </div>
                 )}
