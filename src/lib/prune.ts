@@ -11,9 +11,10 @@ import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
  * exported and synced forever. `pruneEmptyEntries` is run when the surface that
  * was editing them closes (panels + chapter detail, see `useStore`).
  *
- * The one rule: only *content* counts. A character's `color` and a world entry's
- * `cat` are defaults the app picked, not something the user wrote, so they don't
- * make a record non-empty. Being pinned or cast in a chapter doesn't either — an
+ * The one rule: only *content* counts. A character's `color`, a world entry's
+ * `cat` and the `archived` flag are all things the app set, not something the
+ * user wrote, so they don't make a record non-empty — a blank record that was
+ * archived is still blank, and still goes. Being pinned or cast in a chapter doesn't either — an
  * empty record says nothing about the chapter it's attached to, and a user who
  * wants a placeholder types one ("Unnamed soldier"). So a blank record is removed
  * wherever it appears: assets via `removeAssetLinks`, characters and world

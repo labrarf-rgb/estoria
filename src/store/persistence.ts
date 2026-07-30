@@ -5,12 +5,14 @@ import {
   type BookData,
   type Chapter,
   type ChapterLink,
+  type Character,
   type DraftVersion,
   type PinnedRef,
   type RefKind,
   type StoryDoc,
   type TodoItem,
   type VersionData,
+  type WorldEntry,
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
 
@@ -373,6 +375,24 @@ function migrateRefsToAssets(doc: StoryDoc): StoryDoc {
 }
 
 /**
+ * Schema v7 → v8: characters and world entries gained the same `archived` flag
+ * assets have. Nothing to convert — an absent flag means "not archived", which
+ * is what every pre-v8 record is — but the value itself is coerced to a real
+ * boolean or dropped, so a hand-edited or foreign file can't put a stray truthy
+ * value where the UI expects a boolean. Everything else is left untouched:
+ * unlike assets, these records have no field the UI would crash on.
+ */
+function normalizeArchived<T extends { archived?: boolean }>(raw: unknown): T[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((x): T[] => {
+    if (!x || typeof x !== "object") return [];
+    const p = x as T;
+    const { archived: _drop, ...rest } = p;
+    return [(p.archived ? { ...rest, archived: true } : rest) as T];
+  });
+}
+
+/**
  * Schema v5 → v6: assets gained a third `kind` (`TODO`, with `items`) and an
  * `archived` flag. Nothing to convert — v5 assets are valid v6 assets — but a
  * file can still arrive malformed or from a *newer* app's unknown kind, so every
@@ -546,8 +566,8 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     // Absent in files written before the marker was movable; there the seed
     // version was always main, which is what the resolver falls back to.
     mainDraftId: resolveMainDraftId(drafts, typeof d.mainDraftId === "string" ? d.mainDraftId : undefined),
-    characters: Array.isArray(d.characters) ? d.characters : [],
-    world: Array.isArray(d.world) ? d.world : [],
+    characters: normalizeArchived<Character>(d.characters),
+    world: normalizeArchived<WorldEntry>(d.world),
     assets: normalizeAssets(d.assets),
     books,
     bookLinks: Array.isArray(d.bookLinks) ? d.bookLinks : [],

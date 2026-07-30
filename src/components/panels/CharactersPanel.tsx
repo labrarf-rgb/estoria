@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
+import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
+import { countCharacterCastings } from "@/lib/entities";
 import type { Character } from "@/types";
 
 export function CharactersPanel() {
@@ -11,6 +13,8 @@ export function CharactersPanel() {
   const selectChar = useStore((s) => s.selectChar);
   const updateCharacter = useStore((s) => s.updateCharacter);
   const deleteCharacter = useStore((s) => s.deleteCharacter);
+  const archiveCharacter = useStore((s) => s.archiveCharacter);
+  const unarchiveCharacter = useStore((s) => s.unarchiveCharacter);
   const askConfirm = useStore((s) => s.askConfirm);
   // The blank card from "+ Add character" — not a character yet (see the store).
   const draft = useStore((s) => s.charDraft);
@@ -39,6 +43,12 @@ export function CharactersPanel() {
   if (!show) return null;
   const close = () => setPanel("showChars", false);
 
+  // Archived characters keep every casting, so they stay on the board (dimmed)
+  // but leave the roster and the chapter picker. The shelf below is the only
+  // place they're listed until restored.
+  const roster = doc.characters.filter((c) => !c.archived);
+  const archived = doc.characters.filter((c) => c.archived);
+
   const chapterCount = (id: string) => doc.chapters.filter((c) => c.chars.includes(id)).length;
   /** Chapters of the loaded board this character is cast in — same scope as the
    *  "in N chapters" line above it. */
@@ -65,7 +75,7 @@ export function CharactersPanel() {
       <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
           {/* The draft renders last, exactly where it will land once committed —
               same id, same position, so typing doesn't remount the card. */}
-          {(draft ? doc.characters.concat(draft) : doc.characters).map((p) => {
+          {(draft ? roster.concat(draft) : roster).map((p) => {
             const open = sel === p.id;
             const isDraft = p.id === draft?.id;
             const set = (patch: Partial<Character>) =>
@@ -175,22 +185,51 @@ export function CharactersPanel() {
                         </div>
                       </Field>
                     )}
-                    <button
-                      onClick={() =>
-                        // Nothing to confirm on a draft — there's nothing saved to lose.
-                        isDraft
-                          ? discardDraft()
-                          : askConfirm({
-                              message: `Delete ${p.name || "this character"}?`,
-                              detail: "They will be removed from every chapter they appear in.",
-                              danger: true,
-                              onConfirm: () => deleteCharacter(p.id),
-                            })
-                      }
-                      className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
-                    >
-                      {isDraft ? "Discard" : "Delete character"}
-                    </button>
+                    <div className="flex items-center gap-[8px]">
+                      <button
+                        onClick={() =>
+                          // Nothing to confirm on a draft — there's nothing saved to lose.
+                          isDraft
+                            ? discardDraft()
+                            : askConfirm({
+                                message: `Delete ${p.name || "this character"}?`,
+                                detail: "They will be removed from every chapter they appear in.",
+                                danger: true,
+                                onConfirm: () => deleteCharacter(p.id),
+                              })
+                        }
+                        className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
+                      >
+                        {isDraft ? "Discard" : "Delete character"}
+                      </button>
+                      {/* A draft isn't saved yet, so there's nothing to retire. */}
+                      {!isDraft && (
+                        <button
+                          onClick={() => {
+                            const n = countCharacterCastings(doc, p.id);
+                            askConfirm({
+                              message: `Archive ${p.name || "this character"}?`,
+                              // Archiving keeps everything, so this reassures
+                              // rather than warns. It says what stays, because
+                              // "archive" is the word people expect to mean loss.
+                              // The count spans versions and books, so it says
+                              // so: the card above counts the loaded board only,
+                              // and the two numbers differ often enough that an
+                              // unexplained jump reads like a bug.
+                              detail:
+                                n > 0
+                                  ? `They leave the roster but stay in the ${n} chapter${n === 1 ? "" : "s"} they appear in across your versions and books, shown dimmed. Restoring brings them back unchanged.`
+                                  : "They leave the roster and move to the archive, where you can restore them any time.",
+                              confirmLabel: "Archive",
+                              onConfirm: () => archiveCharacter(p.id),
+                            });
+                          }}
+                          className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-ink"
+                        >
+                          Archive
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -203,6 +242,39 @@ export function CharactersPanel() {
           >
             + Add character
           </button>
+
+          <ArchiveShelf
+            blurb="Archived characters stay in the chapters they appear in, shown dimmed, but can't be cast into new ones. Restoring puts them back on the roster unchanged."
+            items={archived.map((c) => {
+              const n = countCharacterCastings(doc, c.id);
+              return {
+                id: c.id,
+                icon: (
+                  <span
+                    className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9px] font-semibold text-white"
+                    style={{ background: c.color }}
+                  >
+                    {c.initials || "?"}
+                  </span>
+                ),
+                title: c.name || "Unnamed character",
+                caption: `${c.role || "No role"} · in ${n} chapter${n === 1 ? "" : "s"}`,
+              };
+            })}
+            onRestore={(id) => unarchiveCharacter(id)}
+            onDelete={(it) => {
+              const n = countCharacterCastings(doc, it.id);
+              askConfirm({
+                message: `Delete ${it.title} for good?`,
+                detail:
+                  n > 0
+                    ? `They will be removed from the ${n} chapter${n === 1 ? "" : "s"} they still appear in, across your versions and books.`
+                    : "They aren't in any chapters.",
+                danger: true,
+                onConfirm: () => deleteCharacter(it.id),
+              });
+            }}
+          />
       </div>
     </Drawer>
   );

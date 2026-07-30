@@ -14,7 +14,13 @@ export function chipSplit(chars: Character[], slots = CHIP_SLOTS) {
   return { shown: chars.slice(0, slots - 1), rest: chars.slice(slots - 1) };
 }
 
-/** Tooltip for the "+n" chip: who it's hiding. */
+/**
+ * Tooltip for the "+n" chip: who it's hiding. Archived characters are marked,
+ * since the dimming that distinguishes them on a visible chip has nowhere to
+ * show once they're folded into the counter.
+ */
 export function chipRestLabel(rest: Character[]): string {
-  return rest.map((k) => k.name || k.initials || "?").join(", ");
+  return rest
+    .map((k) => `${k.name || k.initials || "?"}${k.archived ? " (archived)" : ""}`)
+    .join(", ");
 }

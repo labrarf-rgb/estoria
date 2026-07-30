@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { CARD_W, CARD_H, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
+import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import type { Chapter, ConnType } from "@/types";
 
 const CONN_COLOR: Record<ConnType, string> = {
@@ -348,9 +349,13 @@ export function Board() {
                           {shown.map((k) => (
                             <span
                               key={k.id}
-                              className="-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white"
+                              className={`-mr-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-card text-[9.5px] font-semibold text-white ${k.archived ? ARCHIVED_DIM : ""}`}
                               style={{ background: k.color }}
-                              title={k.name || undefined}
+                              title={
+                                k.archived
+                                  ? archivedTitle(k.name || "Unnamed character")
+                                  : k.name || undefined
+                              }
                             >
                               {k.initials || "?"}
                             </span>

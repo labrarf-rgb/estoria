@@ -4,6 +4,7 @@ import { sceneGrid, type SceneFill, type SceneGrid } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
+import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import type { Chapter, ConnType, Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -346,9 +347,13 @@ export function Timeline() {
                             {shown.map((k) => (
                               <span
                                 key={k.id}
-                                className="-mr-[6px] flex h-[21px] w-[21px] items-center justify-center rounded-full border-[1.5px] border-card text-[9px] font-semibold text-white"
+                                className={`-mr-[6px] flex h-[21px] w-[21px] items-center justify-center rounded-full border-[1.5px] border-card text-[9px] font-semibold text-white ${k.archived ? ARCHIVED_DIM : ""}`}
                                 style={{ background: k.color }}
-                                title={k.name || undefined}
+                                title={
+                                  k.archived
+                                    ? archivedTitle(k.name || "Unnamed character")
+                                    : k.name || undefined
+                                }
                               >
                                 {k.initials || "?"}
                               </span>

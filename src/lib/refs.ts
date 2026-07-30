@@ -27,6 +27,12 @@ export interface ResolvedRef {
   src?: string;
   /** Checklist lines of a `TODO` asset. */
   items?: TodoItem[];
+  /**
+   * The underlying asset is archived. Archiving keeps existing pins (v8), so a
+   * pin can outlive its asset's place in the library — the row renders dimmed
+   * rather than disappearing.
+   */
+  archived?: boolean;
 }
 
 /** Resolve a chapter/world entry's refs to their assets, dropping danglers. */
@@ -36,7 +42,15 @@ export function resolveRefs(refs: PinnedRef[], assets: Asset[]): ResolvedRef[] {
   for (const r of refs) {
     const a = byId.get(r.assetId);
     if (!a) continue; // normalizeDoc prunes danglers; render must not crash on a stray
-    out.push({ id: r.id, kind: a.kind, label: a.label, body: a.body, src: a.src, items: a.items });
+    out.push({
+      id: r.id,
+      kind: a.kind,
+      label: a.label,
+      body: a.body,
+      src: a.src,
+      items: a.items,
+      ...(a.archived ? { archived: true } : {}),
+    });
   }
   return out;
 }

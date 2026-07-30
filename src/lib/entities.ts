@@ -37,6 +37,33 @@ function mapEveryChapter(doc: StoryDoc, fn: (c: Chapter) => Chapter): StoryDoc {
   };
 }
 
+/** Every chapter in the doc, across all four board locations. */
+function everyChapter(doc: StoryDoc): Chapter[] {
+  const fromVersions = (dd: Record<string, VersionData>): Chapter[] =>
+    Object.values(dd).flatMap((v) => v.chapters);
+  return [
+    ...doc.chapters,
+    ...fromVersions(doc.draftData),
+    ...Object.values(doc.bookData).flatMap((b) => [...b.chapters, ...fromVersions(b.draftData)]),
+  ];
+}
+
+/**
+ * How many chapters cast this character, counting every version and book.
+ *
+ * Wider than the panel's own "in N chapters", which counts the loaded board
+ * only. Archiving is doc-wide, so the confirm that describes it has to be too,
+ * or it would understate what the user is retiring.
+ */
+export function countCharacterCastings(doc: StoryDoc, id: string): number {
+  return everyChapter(doc).filter((c) => c.chars.includes(id)).length;
+}
+
+/** How many chapters reference this world entry, counting every version and book. */
+export function countWorldReferences(doc: StoryDoc, id: string): number {
+  return everyChapter(doc).filter((c) => (c.worldRefs ?? []).includes(id)).length;
+}
+
 /** Drop a character and clear its id from every chapter's `chars`, everywhere. */
 export function deleteCharacterDoc(doc: StoryDoc, id: string): StoryDoc {
   const dropped = mapEveryChapter(doc, (c) =>

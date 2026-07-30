@@ -231,6 +231,9 @@ interface StoreState extends UiState {
   discardCharDraft: () => void;
   updateCharacter: (id: string, patch: Partial<Character>) => void;
   deleteCharacter: (id: string) => void;
+  /** Retire from the roster, keeping every casting. See the archive rule in `types.ts`. */
+  archiveCharacter: (id: string) => void;
+  unarchiveCharacter: (id: string) => void;
 
   // ---- world ----
   startWorldDraft: () => void;
@@ -238,6 +241,9 @@ interface StoreState extends UiState {
   discardWorldDraft: () => void;
   updateWorldEntry: (id: string, patch: Partial<WorldEntry>) => void;
   deleteWorldEntry: (id: string) => void;
+  /** Retire from the world list, keeping every chapter reference. */
+  archiveWorldEntry: (id: string) => void;
+  unarchiveWorldEntry: (id: string) => void;
   /** `refId` lets the caller pre-assign the link id it already rendered a draft under. */
   addWorldRef: (wId: string, kind: RefKind, refId?: string) => void;
   deleteWorldRef: (wId: string, refId: string) => void;
@@ -251,7 +257,7 @@ interface StoreState extends UiState {
   deleteAsset: (id: string) => void;
   /** Move an asset within the library order; `toIdx` counts non-archived assets. */
   reorderAsset: (id: string, toIdx: number) => void;
-  /** Unpin everywhere, then retire from the library. Reversible via `unarchiveAsset`. */
+  /** Retire from the library, keeping every pin. Reversible via `unarchiveAsset`. */
   archiveAsset: (id: string) => void;
   unarchiveAsset: (id: string) => void;
 
@@ -349,6 +355,25 @@ const dedupeById = <T extends { id: string }>(arr: T[]): T[] => {
   const seen = new Set<string>();
   return arr.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
 };
+
+/**
+ * Flip the archive flag on one record of a roster (characters, world, assets).
+ * Restoring *removes* the key rather than writing `archived: false`, so a
+ * restored record is byte-identical to one that was never archived — otherwise
+ * archive-then-restore would leave a diff behind and dirty the sync fingerprint
+ * for a round trip that changed nothing.
+ */
+const setArchived = <T extends { id: string; archived?: boolean }>(
+  arr: T[],
+  id: string,
+  archived: boolean
+): T[] =>
+  arr.map((x) => {
+    if (x.id !== id) return x;
+    if (archived) return { ...x, archived: true };
+    const { archived: _drop, ...rest } = x;
+    return rest as T;
+  });
 
 /**
  * The three right-hand panels: they hold the "+ Add …" buttons that open a blank
@@ -1384,6 +1409,21 @@ export const useStore = create<StoreState>()(
           selChar: s.selChar === id ? null : s.selChar,
         })),
 
+      // Retire from the roster without touching a single `chapter.chars` — the
+      // castings are the record of who was in the scene, and keeping them is
+      // what makes Restore lossless (the archive rule in `types.ts`). Collapse
+      // the card on the way out so it doesn't land on the shelf still expanded.
+      archiveCharacter: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, characters: setArchived(s.doc.characters, id, true) },
+          selChar: s.selChar === id ? null : s.selChar,
+        })),
+
+      unarchiveCharacter: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, characters: setArchived(s.doc.characters, id, false) },
+        })),
+
       // ---- world ----
       // Same deferred-creation shape as the character draft above.
       startWorldDraft: () =>
@@ -1425,6 +1465,19 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           doc: deleteWorldEntryDoc(s.doc, id),
           selWorld: s.selWorld === id ? null : s.selWorld,
+        })),
+
+      // Same rule as `archiveCharacter`: the chapters that reference this entry
+      // keep referencing it, dimmed, and its own pinned refs stay pinned to it.
+      archiveWorldEntry: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, world: setArchived(s.doc.world, id, true) },
+          selWorld: s.selWorld === id ? null : s.selWorld,
+        })),
+
+      unarchiveWorldEntry: (id) =>
+        set((s) => ({
+          doc: { ...s.doc, world: setArchived(s.doc.world, id, false) },
         })),
 
       // World-entry refs mirror chapter refs: create the shared asset, pin a link.
@@ -1524,35 +1577,15 @@ export const useStore = create<StoreState>()(
         }),
 
       /**
-       * Archiving retires a note/image/to-do from the library: it is unpinned
-       * EVERYWHERE first (the same five-location sweep a delete does), then
-       * flagged. So an archived asset is attached to nothing — it survives only
-       * so it can be restored, and it's hidden from the library and link picker
-       * until it is. Restoring brings it back unpinned; the pins are not
-       * remembered, which the archive confirm says out loud.
+       * Archiving retires a note/image/to-do from the library and the link
+       * picker, but leaves its pins alone — see the archive rule in `types.ts`.
+       * Restoring is therefore lossless, so neither direction needs a sweep.
        */
       archiveAsset: (id) =>
-        set((s) => {
-          const swept = removeAssetLinks(s.doc, id);
-          return {
-            doc: {
-              ...swept,
-              assets: swept.assets.map((a) => (a.id === id ? { ...a, archived: true } : a)),
-            },
-          };
-        }),
+        set((s) => ({ doc: { ...s.doc, assets: setArchived(s.doc.assets, id, true) } })),
 
       unarchiveAsset: (id) =>
-        set((s) => ({
-          doc: {
-            ...s.doc,
-            assets: s.doc.assets.map((a) => {
-              if (a.id !== id) return a;
-              const { archived: _drop, ...rest } = a;
-              return rest;
-            }),
-          },
-        })),
+        set((s) => ({ doc: { ...s.doc, assets: setArchived(s.doc.assets, id, false) } })),
 
       // Deleting a library asset unpins it EVERYWHERE — active board, stashed
       // versions, stashed books and their versions, and world entries — then

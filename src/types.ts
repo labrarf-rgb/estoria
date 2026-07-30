@@ -10,7 +10,7 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** Story-causality link type - the "but / therefore / and" method. */
 export type ConnType = "therefore" | "but" | "and";
@@ -52,10 +52,14 @@ export interface Asset {
   /** Checklist lines — `TODO` assets only. */
   items?: TodoItem[];
   /**
-   * Archived (v6): retired from the shared library. Archiving **unpins the asset
-   * everywhere** first, so an archived asset is by definition attached to
-   * nothing — it stays in the pool only so it can be restored, and it is hidden
-   * from the library list and the link picker until it is.
+   * Archived: retired from the shared library. See the shared archive rule on
+   * `Character.archived` — the pins this asset already has are **kept**, and
+   * render dimmed wherever they sit.
+   *
+   * ⚠️ The rule changed in v8. Under v6/v7 archiving unpinned the asset
+   * everywhere first, so an archived asset was attached to nothing by
+   * construction and readers were told they could assume that. They no longer
+   * can: a v8 doc can hold an archived asset with live pins.
    */
   archived?: boolean;
 }
@@ -84,6 +88,19 @@ export interface VersionData {
 
 export type ChapterStatus = "done" | "draft" | "idea";
 
+/**
+ * The shared archive rule (v8), for characters, world entries and assets alike.
+ *
+ * Archiving retires a record from its roster/library and from every picker, so
+ * nothing new can be attached to it — but it leaves everything it is *already*
+ * attached to exactly as it was. A chapter still remembers the character it
+ * cast, the world entry it referenced, the note it pinned; those attachments
+ * just render dimmed and marked "archived". Restoring is therefore always
+ * lossless, which is what makes archiving a low-stakes move rather than a soft
+ * delete.
+ *
+ * This is deliberately *not* how it worked before v8 — see `Asset.archived`.
+ */
 export interface Character {
   id: string;
   name: string;
@@ -99,6 +116,8 @@ export interface Character {
   want: string;
   need: string;
   notes: string;
+  /** Retired from the roster; existing castings are kept. See the rule above. */
+  archived?: boolean;
 }
 
 export type WorldCategory = "Place" | "Faction" | "Lore" | "Event";
@@ -109,6 +128,8 @@ export interface WorldEntry {
   desc: string;
   notes: string;
   refs: PinnedRef[];
+  /** Retired from the world list; existing chapter references are kept. */
+  archived?: boolean;
 }
 
 export type BookStatus = "drafting" | "planned" | "idea";

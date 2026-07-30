@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
+import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { resolveRefs } from "@/lib/refs";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -486,8 +487,10 @@ export function ChapterDetail() {
 
         {/* Characters */}
         {(() => {
+          // An archived character stays cast (dimmed below) but is never
+          // offered for casting into anything new. See the archive rule.
           const members = doc.characters.filter((c) => ch.chars.includes(c.id));
-          const available = doc.characters.filter((c) => !ch.chars.includes(c.id));
+          const available = doc.characters.filter((c) => !ch.chars.includes(c.id) && !c.archived);
           return (
             <div className="border-b border-rule px-[26px] py-[14px]">
               <SectionHeader
@@ -502,7 +505,8 @@ export function ChapterDetail() {
                 {members.map((c) => (
                   <span
                     key={c.id}
-                    className="flex items-center gap-[7px] rounded-full border border-transparent py-[5px] pl-[8px] pr-[6px] text-[12px] font-medium text-white"
+                    title={c.archived ? archivedTitle(c.name || "Unnamed character") : undefined}
+                    className={`flex items-center gap-[7px] rounded-full border border-transparent py-[5px] pl-[8px] pr-[6px] text-[12px] font-medium text-white ${c.archived ? ARCHIVED_DIM : ""}`}
                     style={{ background: c.color }}
                   >
                     <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/25 text-[8.5px] font-semibold">
@@ -566,7 +570,7 @@ export function ChapterDetail() {
         {(() => {
           const refs = ch.worldRefs ?? [];
           const members = doc.world.filter((w) => refs.includes(w.id));
-          const available = doc.world.filter((w) => !refs.includes(w.id));
+          const available = doc.world.filter((w) => !refs.includes(w.id) && !w.archived);
           return (
             <div className="border-b border-rule px-[26px] py-[14px]">
               <SectionHeader
@@ -581,7 +585,8 @@ export function ChapterDetail() {
                 {members.map((w) => (
                   <span
                     key={w.id}
-                    className="flex items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg"
+                    title={w.archived ? archivedTitle(w.name || "Untitled entry", "entry") : undefined}
+                    className={`flex items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg ${w.archived ? ARCHIVED_DIM : ""}`}
                   >
                     {w.name || "Untitled entry"}
                     <span className="text-[9px] uppercase opacity-70">{w.cat}</span>

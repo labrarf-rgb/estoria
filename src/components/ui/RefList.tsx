@@ -3,6 +3,7 @@ import { useStore, type ConfirmRequest } from "@/store/useStore";
 import { readFileAsDataURL } from "@/lib/files";
 import { isAssetEmpty } from "@/lib/prune";
 import { uid } from "@/lib/ids";
+import { ARCHIVED_DIM } from "@/components/ui/ArchiveShelf";
 import type { RefKind, TodoItem } from "@/types";
 import type { ResolvedRef } from "@/lib/refs";
 import type { RefView } from "@/components/ui/ViewToggle";
@@ -240,7 +241,17 @@ export function RefList({
   };
 
   /** No caption on the draft — it isn't pinned anywhere until it exists. */
-  const capOf = (r: ResolvedRef) => (r.id === draft?.id ? undefined : caption?.(r));
+  /**
+   * The small caption under a row/card. An archived asset says so here, which
+   * is the marker card view leans on: cards are inline editors, so dimming one
+   * would fight the typing it exists for. List view dims its header instead.
+   */
+  const capOf = (r: ResolvedRef) => {
+    if (r.id === draft?.id) return undefined;
+    const cap = caption?.(r);
+    if (!r.archived) return cap;
+    return cap ? `Archived · ${cap}` : "Archived";
+  };
 
   const upload = async (id: string, file: File | undefined) => {
     if (!file) return;
@@ -439,7 +450,11 @@ export function RefList({
                 overId === r.id ? "border-faint" : "border-rule"
               } ${dragId === r.id ? "opacity-50" : ""}`}
             >
-              <div className="group flex items-center gap-[10px] px-[12px] py-[9px]">
+              {/* Dim the identity line only: an archived note is still fully
+                  editable, so the expanded body below stays at full contrast. */}
+              <div
+                className={`group flex items-center gap-[10px] px-[12px] py-[9px] ${r.archived ? ARCHIVED_DIM : ""}`}
+              >
                 {onReorder && !isDraft && (
                   <span
                     // The grip is the only drag handle: text selection inside an

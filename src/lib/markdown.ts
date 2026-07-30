@@ -40,6 +40,23 @@ export function roman(a: number): string {
 }
 
 /**
+ * How an archived character or world entry is marked in exported markdown.
+ *
+ * Archived records are still exported: retiring one from the roster shouldn't
+ * quietly delete it from the vault. The marker is a trailing italic tag rather
+ * than a new field, so it reads as a note in Obsidian and can be stripped off
+ * the end of a line before the existing parsers see it (`takeArchived`) — which
+ * is what makes an export → import round trip preserve the flag.
+ */
+const ARCHIVED_MARK = " _(archived)_";
+
+/** Split a trailing archived marker off a list line, if it carries one. */
+function takeArchived(line: string): { line: string; archived: boolean } {
+  const m = line.match(/^(.*?)\s*_\(archived\)_\s*$/i);
+  return m ? { line: m[1], archived: true } : { line, archived: false };
+}
+
+/**
  * Build Obsidian-vault-ready markdown: characters become [[wikilinks]],
  * chapters are grouped under Act headings, scenes carry their but/therefore tags.
  * Renders the active version's board (`doc.chapters` — versions are standalone
@@ -70,7 +87,7 @@ export function buildMarkdown(doc: StoryDoc): string {
   // parseImportMarkdown. Assets, story notes and series data are not re-read.
   md += "\n## Characters\n\n";
   doc.characters.forEach((c) => {
-    md += `- **[[${c.name}]]** — ${c.role}${c.type ? ` | ${c.type}` : ""}\n`;
+    md += `- **[[${c.name}]]** — ${c.role}${c.type ? ` | ${c.type}` : ""}${c.archived ? ARCHIVED_MARK : ""}\n`;
     if (c.desc) md += `  - Desc: ${c.desc}\n`;
     if (c.bio) md += `  - Bio: ${c.bio}\n`;
     if (c.traits.length) md += `  - Traits: ${c.traits.join(", ")}\n`;
@@ -82,7 +99,7 @@ export function buildMarkdown(doc: StoryDoc): string {
   if (doc.world.length) {
     md += "\n## World\n\n";
     doc.world.forEach((w) => {
-      md += `- **${w.name}** [${w.cat}] — ${w.desc}${w.notes ? ` // Notes: ${w.notes}` : ""}\n`;
+      md += `- **${w.name}** [${w.cat}] — ${w.desc}${w.notes ? ` // Notes: ${w.notes}` : ""}${w.archived ? ARCHIVED_MARK : ""}\n`;
     });
   }
 
@@ -106,7 +123,10 @@ export function buildMarkdown(doc: StoryDoc): string {
           .map((r) => doc.assets.find((a) => a.id === r.assetId))
           .filter((a): a is (typeof doc.assets)[number] => a != null);
         if (pinnedAssets.length) {
-          md += `\n**Pinned:** ${pinnedAssets.map((a) => `[[${a.label}]]`).join(", ")}\n`;
+          // An archived asset keeps its pins (v8), so it still exports here.
+          md += `\n**Pinned:** ${pinnedAssets
+            .map((a) => `[[${a.label}]]${a.archived ? ARCHIVED_MARK : ""}`)
+            .join(", ")}\n`;
         }
         // A pinned to-do's lines go out as real markdown checkboxes — the one
         // pinned resource whose *content* is worth carrying into the vault,
@@ -269,7 +289,9 @@ function parseCharacters(body: string[]): Character[] {
   for (const raw of body) {
     // Separator after the name may be a dash *or* a colon — AIs drift between
     // `- **Name** — role` and `- **Name**: role`.
-    const top = raw.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:[—–:-]\s*(.*))?$/);
+    // Strip the archived tag first, so `type` doesn't swallow it.
+    const { line: topLine, archived } = takeArchived(raw);
+    const top = topLine.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:[—–:-]\s*(.*))?$/);
     if (top && !/^\s/.test(raw)) {
       const name = clean(top[1]);
       let role = "Supporting";
@@ -294,6 +316,7 @@ function parseCharacters(body: string[]): Character[] {
         want: "",
         need: "",
         notes: "",
+        ...(archived ? { archived: true } : {}),
       };
       out.push(cur);
       continue;
@@ -328,7 +351,9 @@ function parseWorld(body: string[]): WorldEntry[] {
     event: "Event",
   };
   for (const raw of body) {
-    const m = raw.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:\[(.+?)\])?\s*(?:[—–-]\s*(.*))?$/);
+    // Strip the archived tag first, so it doesn't land inside the notes.
+    const { line, archived } = takeArchived(raw);
+    const m = line.match(/^[-*]\s+\*\*(.+?)\*\*\s*(?:\[(.+?)\])?\s*(?:[—–-]\s*(.*))?$/);
     if (!m) continue;
     const name = clean(m[1]);
     const cat = cats[norm(m[2] || "")] ?? "Lore";
@@ -339,7 +364,15 @@ function parseWorld(body: string[]): WorldEntry[] {
       desc = noteSplit[0].trim();
       notes = noteSplit[1].trim();
     }
-    out.push({ id: importId("w"), cat, name, desc: clean(desc), notes: clean(notes), refs: [] });
+    out.push({
+      id: importId("w"),
+      cat,
+      name,
+      desc: clean(desc),
+      notes: clean(notes),
+      refs: [],
+      ...(archived ? { archived: true } : {}),
+    });
   }
   return out;
 }

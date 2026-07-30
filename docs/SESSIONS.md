@@ -2652,3 +2652,61 @@ that `sceneGrid` exists, but it changes an existing surface and wasn't asked for
 - **SPECS reviewed against the code:** §3 Conventions gains the no-em-dash rule
   *and* the markdown-format exception, which is the part worth having in writing
   — the exception looks exactly like an oversight to anyone tidying later.
+
+### 2026-07-29 (Session 55) — Archive for characters and world entries, and one archive rule for everything
+
+- **Asked for:** "similar to notes, I'd like to be able to archive characters and
+  world detail." The design question underneath it was what archiving should do
+  to the chapters a record is already attached to. Notes answered that by
+  unpinning everywhere first, which is unrecoverable — a restore brings the note
+  back bare. Doing the same to a character would wipe the cast list of every
+  chapter they appear in.
+- **Decision (user, after being shown the trade):** archiving keeps everything,
+  for all three record types, and **notes change to match**. One rule now: an
+  archived record leaves its roster/library and every picker, so nothing new can
+  be attached to it, while every casting, reference and pin it already has stays
+  exactly where it was, rendered dimmed. Restore is a pure flag flip, so it is
+  always lossless. This is a deliberate reversal of the v6 asset behaviour, not
+  a new special case beside it.
+- **Schema v8.** `archived?: boolean` added to `Character` and `WorldEntry`;
+  `archiveAsset` lost its `removeAssetLinks` sweep. Both directions go through
+  one `setArchived` helper that *deletes* the key on restore rather than writing
+  `archived: false`, so an archive-then-restore round trip leaves the document
+  byte-identical and doesn't churn the sync fingerprint.
+- **Known, accepted data consequence:** assets archived under the old rule are
+  already unpinned in the saved document, so they still restore bare. No
+  migration can recover those pins — they were dropped at archive time. Recorded
+  in §4 so a note that restores empty isn't chased as a v8 bug.
+- **UI.** `ui/ArchiveShelf.tsx` is the shared "Archived · N" shelf all three
+  panels now use (Notes' hand-rolled one was replaced by it), plus `ARCHIVED_DIM`
+  and `archivedTitle` so every surface dims the same way. Dimming is applied
+  where it costs nothing and a *word* is used where it would cost legibility:
+  board and timeline chips, chapter-detail cast and world chips, and `RefList`'s
+  list-view header all dim; `RefList` card view instead says "Archived" in its
+  caption, because a card is an inline editor and dimming one fights the typing
+  it exists for.
+- **Copy.** Three strings in `NotesPanel` asserted that archived items are
+  unpinned; all three were false as of this session and were rewritten. The
+  archive confirms now count castings/pins **across every version and book**
+  (`countCharacterCastings` / `countWorldReferences`, new in `lib/entities.ts`)
+  and say "across your versions and books" out loud — the panel card above them
+  counts the loaded board only, and in the sample those numbers are 4 and 8, so
+  an unexplained jump reads like a bug.
+- **Export.** Archived characters and world entries are still exported (the user
+  chose this over dropping them), marked with a trailing `_(archived)_`.
+  `takeArchived` strips it *before* the existing parsers run, which is what keeps
+  it out of `type` and out of `notes` — verified by running the real
+  `parseImportMarkdown` over an export and re-emitting it: markers survive, no
+  leakage, re-export byte-identical.
+- **Verified in the dev preview**, not just by typecheck: archived Pip stays on
+  chapters 1/4/6/8 at 50% opacity titled "Pip (archived)" while live characters
+  stay at 1, the chapter picker drops her, Restore puts her back at full opacity
+  with the shelf gone, an archived note keeps its pin on "The Lower City" and
+  shows "Archived" under it, and the persisted doc reads `schemaVersion: 8`.
+  Console clean; `npm run build` clean.
+- **SPECS:** the glossary's `Archived` is now its own entry covering all three
+  record types, the Notes archive row became an app-wide row with the old
+  behaviour kept beside it as history, and there is a **new open cross-app event
+  for v8** — written to stress that the v6 brief's "an archived asset is unpinned
+  by construction" is the thing that stopped being true, since that is the sort
+  of inference the phone may have coded against rather than checked.

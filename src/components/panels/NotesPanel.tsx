@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
+import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { RefList, todoProgress } from "@/components/ui/RefList";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -29,16 +29,13 @@ export function NotesPanel() {
   const toggleTextarea = useStore((s) => s.toggleTextarea);
   const panelExpanded = useStore((s) => s.panelExpanded);
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
-  // The archived shelf stays folded away until asked for — it's a place things
-  // go to stop being in the way.
-  const [showArchived, setShowArchived] = useState(false);
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
   // One walk of the doc for every asset's link count (used by the caption and
   // the delete confirm), instead of re-walking once per asset per render.
   const linkCounts = countAllAssetLinks(doc);
-  // Archiving unpins everywhere, so an archived asset is never in the library
-  // list or the link picker — only on the shelf below, waiting to be restored.
+  // Archived assets keep their pins (dimmed where they sit) but leave the
+  // library list and the link picker, so nothing new can be pinned to them.
   const assets = doc.assets.filter((a) => !a.archived);
   const archived = doc.assets.filter((a) => a.archived);
 
@@ -140,11 +137,11 @@ export function NotesPanel() {
               const n = linkCounts.get(r.id) ?? 0;
               return {
                 message: "Archive this from the library?",
-                // Archiving unpins first, and that part isn't undone by a
-                // restore — so say it before, not after.
+                // Archiving keeps the pins, so this says what stays. It used to
+                // warn that pins were dropped, which is what changed in v8.
                 detail:
                   n > 0
-                    ? `It will be unpinned from ${n} place${n === 1 ? "" : "s"} and moved to the archive. Restoring it later brings back the ${r.kind === "IMAGE" ? "image" : r.kind === "TODO" ? "list" : "note"}, not the pins.`
+                    ? `It stays pinned in ${n} place${n === 1 ? "" : "s"}, shown dimmed, and leaves the library. Restoring brings it back unchanged.`
                     : "It moves to the archive, where you can restore it any time.",
                 confirmLabel: "Archive",
               };
@@ -212,66 +209,33 @@ export function NotesPanel() {
           />
         </div>
 
-        {archived.length > 0 && (
-          <div>
-            <button
-              onClick={() => setShowArchived((v) => !v)}
-              className="flex items-center gap-[7px] text-[10px] font-semibold uppercase tracking-wide text-faint hover:text-ink"
-            >
-              <span className="text-[9px]">{showArchived ? "▾" : "▸"}</span>
-              Archived · {archived.length}
-            </button>
-            {showArchived && (
-              <div className="mt-[8px] flex flex-col gap-[7px]">
-                <div className="text-[11px] font-medium text-faint">
-                  Archived items are unpinned and hidden from the library. Restoring one puts it
-                  back, unpinned.
-                </div>
-                {archived.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-[10px] rounded-[10px] border border-rule bg-card px-[12px] py-[9px]"
-                  >
-                    <span className="text-[13px]">
-                      {a.kind === "IMAGE" ? "🖼" : a.kind === "TODO" ? "☑" : "📝"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-semibold text-soft">
-                        {untitledLabel(a)}
-                      </div>
-                      <div className="truncate text-[11px] text-faint">
-                        {a.kind === "TODO"
-                          ? todoProgress(a.items)
-                          : a.kind === "IMAGE"
-                            ? "Image"
-                            : (a.body ?? "").trim() || "Empty note"}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => unarchiveAsset(a.id)}
-                      className="shrink-0 rounded-lg border border-rule bg-panel px-[10px] py-[5px] text-[11.5px] font-medium text-ink hover:border-faint"
-                    >
-                      Restore
-                    </button>
-                    <button
-                      onClick={() =>
-                        askConfirm({
-                          message: `Delete "${untitledLabel(a)}" for good?`,
-                          detail: "Archived items are already unpinned, so nothing else changes.",
-                          danger: true,
-                          onConfirm: () => deleteAsset(a.id),
-                        })
-                      }
-                      className="shrink-0 text-[11.5px] font-medium text-faint hover:text-but"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <ArchiveShelf
+          blurb="Archived items stay pinned where they are, shown dimmed, but leave the library so nothing new can be pinned to them. Restoring puts one back unchanged."
+          items={archived.map((a) => ({
+            id: a.id,
+            icon: a.kind === "IMAGE" ? "🖼" : a.kind === "TODO" ? "☑" : "📝",
+            title: untitledLabel(a),
+            caption:
+              a.kind === "TODO"
+                ? todoProgress(a.items)
+                : a.kind === "IMAGE"
+                  ? "Image"
+                  : (a.body ?? "").trim() || "Empty note",
+          }))}
+          onRestore={(id) => unarchiveAsset(id)}
+          onDelete={(it) => {
+            const n = linkCounts.get(it.id) ?? 0;
+            askConfirm({
+              message: `Delete "${it.title}" for good?`,
+              detail:
+                n > 0
+                  ? `It is still pinned in ${n} place${n === 1 ? "" : "s"} across your versions and books.`
+                  : "It isn't pinned anywhere.",
+              danger: true,
+              onConfirm: () => deleteAsset(it.id),
+            });
+          }}
+        />
 
         <div className="text-[11px] font-medium text-faint">
           Notes are per book · the library is shared across the series · included in markdown export

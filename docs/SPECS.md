@@ -36,8 +36,15 @@ running app.
 - **Character / World entry** — rich reference records.
 - **Asset** — a shared, book-level **note, image or to-do list** in one pool,
   linkable ("pinned") into any number of chapters and world entries. Each surface
-  keeps its **own pin order**, independent of the library's order. An asset can be
-  **archived**: unpinned everywhere and retired from the library, restorable.
+  keeps its **own pin order**, independent of the library's order.
+- **Archived** (characters, world entries and assets alike, schema v8) — retired
+  from its roster/library and from every picker, so nothing new can be attached
+  to it, while **everything already attached to it is kept**. The chapter still
+  casts the character, still references the world entry, still pins the note;
+  those attachments render dimmed and marked "Archived". Restoring is therefore
+  always lossless, which is what makes archiving a low-stakes move rather than a
+  soft delete. ⚠️ Under v6/v7 archiving an asset *unpinned it everywhere first* —
+  the opposite rule; see §9 and the v8 cross-app note.
 - **Series** — optional multi-book planning layer above the current book, with its
   own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
 - **Draft / version** — **per book**: each book has its own named versions, and
@@ -200,7 +207,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Detail | Pinned refs | ✅ | Add/link/rename/delete note, image + to-do refs; asset-backed since v5. Content edits write through the store (`updateChapterRefAsset` / `updateWorldRefAsset`) rather than a caller-resolved `updateAsset` — resolving `refId → asset` from a render closure dropped keystrokes typed in the moments right after a draft committed. |
 | App | Reorder pinned resources | ✅ | Grip-drag rows (pointer-based, like every other drag in the app) **or type a position number** — in the shared library, on a chapter, and on a world entry. Both controls sit **at the head of the row**, grip then number then the kind icon (Session 49; list view used to park the number on the right, beside the expand caret, while card view already led with it). The draft row has neither, so it carries a 56px spacer to keep its icon on the same line as every saved row. Each surface owns its order: `reorderAsset` (counts non-archived, leaves archived slots alone) / `reorderChapterRef` / `reorderWorldRef`. |
 | Notes | Where a note is pinned + jump | ✅ | Expanding a library item lists every pin as a button, in the same compact form as a character's "Appears in" — just `Ch N ↗`, with the chapter name in the tooltip. Pins outside the loaded board are **grouped** under one small heading rather than repeating the location on each chip. That heading is **the user's own names, not a fixed label** — `pinWhere` builds it as the version's name, prefixed with `bookTitle · ` only when the project has more than one book. So a note pinned into a version called "Template addition" gets a heading reading exactly that, sitting between "Pinned in" and the Archive/Delete row. Worth knowing when reading a bug report: unexplained text in that block is usually a version name, not chrome (Session 49 — it was mistaken for a stray label once). Clicking switches book and version through the normal stashing actions, closes the panel and opens the chapter (`jumpToChapter`); world pins sit under a "World" heading and open the World panel on that entry (`jumpToWorldEntry`). Data from `findAssetPins`. |
-| Notes | Archive / restore | ✅ | Archiving **unpins everywhere first** (same five-location sweep as delete), then flags `archived` — so an archived asset is attached to nothing. Hidden from the library and the link picker, listed under "Archived · N" with Restore (comes back unpinned; the confirm says so before you commit) and a plain Delete. |
+| App | Archive / restore | ✅ | **One rule for characters, world entries and assets** (schema v8): archiving flags `archived` and touches *nothing else*. The record leaves its roster/library and every picker, so it can't be attached to anything new, but every casting, reference and pin it already has is kept and renders dimmed (`ARCHIVED_DIM`, 50%) with an "archived" tooltip or an "Archived" caption. Restore just clears the flag, so it is always lossless. Each panel lists its archived records under a collapsed "Archived · N" shelf (`ui/ArchiveShelf.tsx`, shared by all three) with Restore and a Delete the panel confirms. Archive confirms count castings/references **across every version and book** (`countCharacterCastings` / `countWorldReferences` / `countAllAssetLinks`) and say so out loud, because the card above them counts the loaded board only and the two numbers differ often. |
+| Notes | Archive / restore (history) | — | Until v8 archiving an asset ran the same five-location unpin sweep as delete, so an archived asset was attached to nothing by construction and restore brought it back bare. Assets archived under the old rule stay unpinned: the pins were dropped from the saved document at archive time and no migration can recover them. So a note archived before v8 restores empty while one archived after restores whole — expected, not a bug. |
 | Notes | To-do lists as a pinnable resource | ✅ | Schema v6 `TODO` asset with `items[{id,text,done}]`: checkboxes, add/remove tasks, "N/M done" in the row and library caption, pinnable into chapters and world entries like a note. Exported as real markdown checkboxes (`- [x]`), blank lines omitted. The add row reads **+ Note · + To-do · + Image** everywhere `RefList` appears. **Enter inserts the next task directly below the one you're in and moves the caret into it** (Session 53); "+ Add task" appends to the end and focuses that. **Backspace in an *empty* task deletes it and merges back into the one above, caret at the end** — the undo of that Enter. It only fires on the *first* row's terms: with text in the field Backspace stays an ordinary character delete, and on the top row it does nothing (nowhere to merge into), which is also what stops a held Backspace from chewing through the list. The ✕ remains the way to remove a top or non-empty task. Both views share one `checklist` helper, so the keyboard behaves the same in cards and rows. |
 | App | Remove vs. delete | ✅ | Session 47b: one meaning per control — an **✕ detaches** (chip off a chapter, note unpinned from a chapter/world entry; confirm button says "Remove"), a **labelled button destroys** — "Delete character", "Delete entry", and plain "Delete" in the shared library, where the confirm is what names the blast radius: "Delete this note everywhere?". `RefList`'s `removeMode` prop picks which affordance a list gets; only the library passes `destroy`. |
 | App | Nothing saved until typed | ✅ | Session 47: "+ Add character / world entry / Note / To-do / Image" open a **draft** card that isn't in `doc` (a to-do counts as typed on its title *or* a task's text) — the record is created by the first keystroke (`charDraft`/`worldDraft` in the store; `RefList`'s own draft row). So a blank record is never saved, listed or castable. `lib/prune.ts` sweeps records *emptied later* (and pre-existing blanks) on the same panel/modal close, clearing their ids from every chapter. |
@@ -272,9 +280,10 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
 > - The Android app reads/writes the **same `.estoria.json` (currently schema
->   v7 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
+>   v8 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
 >   v5 = asset-backed pinned refs, v6 = `TODO` assets + `archived` + per-mode
->   scene layout, v7 = movable `mainDraftId`)**. Any
+>   scene layout, v7 = movable `mainDraftId`, v8 = `archived` on characters and
+>   world entries **plus a reversal of what `archived` means**)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
 > - **⚠️ OPEN CROSS-APP EVENT — v6 (2026-07-26).** The web app now writes schema
@@ -306,6 +315,27 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   A writer that drops the field silently demotes the user's chosen version
 >   back to the seed one, so the phone should carry it through its passthrough
 >   even before it grows UI for it.
+> - **⚠️ OPEN CROSS-APP EVENT — v8 (2026-07-29).** The web app now writes schema
+>   8, stacking on the still-open v6 and v7 events above. Two additive fields:
+>   `Character.archived?: boolean` and `WorldEntry.archived?: boolean`, the same
+>   flag `Asset` has had since v6. A reader that ignores them shows archived
+>   records as ordinary ones — a degradation, not a corruption.
+>   **The part that is NOT additive, and is the reason this event matters more
+>   than its field count suggests: v8 reverses what `archived` MEANS.** The v6
+>   brief told the phone that "an archived asset is unpinned everywhere by
+>   construction, so a reader can treat it as library-hidden and nothing else".
+>   **That is now false.** Under v8 archiving keeps every pin, casting and
+>   reference and only hides the record from its roster/library and pickers, so a
+>   v8 document can and does contain an archived asset with live pins, and an
+>   archived character cast in chapters. Any code on either side that *inferred*
+>   "archived ⇒ no references" rather than checking is wrong against v8 data:
+>   the phone must not, for example, skip archived records when resolving a
+>   chapter's `chars`/`worldRefs`/`refs`, or it will silently drop content the
+>   user can still see here. Archiving and restoring are now pure flag flips on
+>   both sides; restore must not attempt to "re-attach" anything.
+>   Markdown export marks archived characters and world entries with a trailing
+>   `_(archived)_` on their list line, and reads it back (`takeArchived` in
+>   `lib/markdown.ts`), so the flag survives an export → import round trip.
 > - **The Timeline reading view is web-app only (Session 51) — by decision, not
 >   by omission.** The user scoped it to the web app, and it is built so that
 >   choice costs the phone nothing: it is pure presentation over data that
