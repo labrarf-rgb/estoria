@@ -8,6 +8,7 @@ import { resolveRefs } from "@/lib/refs";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
+import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -108,6 +109,57 @@ export function ChapterDetail() {
   // cleanup would cancel the fade before it ever fired.
   const flashTimer = useRef<number | null>(null);
   useEffect(() => () => void (flashTimer.current && clearTimeout(flashTimer.current)), []);
+
+  /**
+   * The scene whose last keystroke was refused for length, so its card can go
+   * red while it nudges.
+   *
+   * The nudge itself runs through `element.animate` rather than a CSS class.
+   * A class has to be taken off and put back on to replay, which needs a frame
+   * callback to sit between the two — and frame callbacks are paused whenever
+   * the tab is not visible, so a held key would land its refusals with no
+   * animation at all. `animate()` restarts from the top every call.
+   */
+  const [capHit, setCapHit] = useState<number | null>(null);
+  const capTimer = useRef<number | null>(null);
+  useEffect(() => () => void (capTimer.current && clearTimeout(capTimer.current)), []);
+  const flagCapHit = (idx: number) => {
+    setCapHit(idx);
+    if (capTimer.current) clearTimeout(capTimer.current);
+    capTimer.current = window.setTimeout(() => setCapHit(null), 420);
+
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const card = sceneBoxRef.current?.querySelector<HTMLElement>(
+      `[data-scene-idx="${idx}"] [data-scene-card]`
+    );
+    // Small on purpose (3px, one cycle): an ordinary limit being met, not an
+    // error. The red edge is what carries the meaning.
+    card?.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(-3px)" },
+        { transform: "translateX(3px)" },
+        { transform: "translateX(-2px)" },
+        { transform: "translateX(0)" },
+      ],
+      { duration: 260, easing: "ease-in-out" }
+    );
+  };
+
+  /**
+   * Scene text is capped, but a scene written *before* the cap keeps every
+   * character it has: its own length becomes its ceiling, so it can be shortened
+   * or left alone but never grown. Refused input nudges the card rather than
+   * silently vanishing.
+   */
+  const writeScene = (chapterId: string, idx: number, prev: string, next: string) => {
+    const ceiling = Math.max(SCENE_TEXT_MAX, prev.length);
+    if (next.length > ceiling) {
+      flagCapHit(idx);
+      if (next.length > prev.length) return; // nothing of the refused text lands
+    }
+    updateScene(chapterId, idx, next);
+  };
 
   const chId = ch?.id;
   const sceneCount = ch?.scenes.length ?? 0;
@@ -835,18 +887,26 @@ export function ChapterDetail() {
                     </>
                   )}
                   <div
+                    data-scene-card
                     className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
                     style={
-                      // Inline only when selected or freshly jumped to — a
-                      // permanent inline borderColor would override the
-                      // hover:border-faint highlight.
-                      isSelected || flashIdx === i
+                      // Inline only when refused, selected or freshly jumped to
+                      // — a permanent inline borderColor would override the
+                      // hover:border-faint highlight. The cap wins over the
+                      // others: it is answering something just typed.
+                      capHit === i
                         ? {
-                            borderColor: "var(--therefore)",
+                            borderColor: "var(--but)",
                             boxShadow:
-                              "0 0 0 2px color-mix(in srgb, var(--therefore) 45%, transparent), var(--shadow)",
+                              "0 0 0 2px color-mix(in srgb, var(--but) 45%, transparent), var(--shadow)",
                           }
-                        : undefined
+                        : isSelected || flashIdx === i
+                          ? {
+                              borderColor: "var(--therefore)",
+                              boxShadow:
+                                "0 0 0 2px color-mix(in srgb, var(--therefore) 45%, transparent), var(--shadow)",
+                            }
+                          : undefined
                     }
                   >
                     <div className="flex items-center gap-[6px]">
@@ -865,6 +925,21 @@ export function ChapterDetail() {
                         SCENE {slot.num}
                       </span>
                       <div className="flex-1" />
+                      {/* Silent until it matters: at the cap it explains why
+                          typing stopped, past it (written before the cap) it
+                          says how much has to go. */}
+                      {s.trim().length >= SCENE_TEXT_MAX && (
+                        <span
+                          className="font-mono text-[10px] font-semibold text-but"
+                          title={
+                            s.trim().length > SCENE_TEXT_MAX
+                              ? `Written before the ${SCENE_TEXT_MAX} character limit. Nothing has been cut, but the timeline card can only show part of it.`
+                              : `A scene holds up to ${SCENE_TEXT_MAX} characters, so it fits a timeline card whole.`
+                          }
+                        >
+                          {s.trim().length} / {SCENE_TEXT_MAX}
+                        </span>
+                      )}
                       {!moveMode && ch.scenes.length > 1 && (
                         <button
                           onClick={() =>
@@ -883,7 +958,11 @@ export function ChapterDetail() {
                     </div>
                     <textarea
                       value={s}
-                      onChange={(e) => updateScene(ch.id, i, e.target.value)}
+                      // Not `maxLength`: the browser would drop the keystroke
+                      // silently, and a refusal the writer cannot see is the
+                      // thing this cap must not do. `writeScene` refuses it and
+                      // says so.
+                      onChange={(e) => writeScene(ch.id, i, s, e.target.value)}
                       onMouseDown={(e) => !moveMode && e.stopPropagation()}
                       readOnly={moveMode}
                       rows={3}

@@ -284,8 +284,27 @@ export const TL_NODE_MAX_H = 208;
  */
 export const TL_GAP_X_STACKED = 64;
 
+/** A placed scene node. `w` varies: a long scene takes more than one column. */
+export interface SceneBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The track geometry a pane yields, before any scene is placed in it. */
+export interface SceneMetrics {
+  /** Column slots across (row fill) or rows down (column fill). */
+  tracks: number;
+  nodeW: number;
+  nodeH: number;
+  gapX: number;
+  gapY: number;
+  fill: SceneFill;
+}
+
 export interface SceneGrid {
-  positions: Vec2[];
+  nodes: SceneBox[];
   nodeW: number;
   nodeH: number;
   gapX: number;
@@ -312,13 +331,18 @@ function fitSize(tracks: number, avail: number, gap: number, min: number, max: n
 }
 
 /**
- * Lay a chapter's scenes onto a grid sized to the space actually available,
- * for the timeline's scene pane. The nodes are elastic (see `TL_NODE_MIN_W`),
- * so the canvas fills the pane instead of leaving a fixed-size grid adrift in
- * it. Distinct from `sceneAutoArrange`, which produces the *persisted* layout
- * for the chapter modal and must stay on its fixed grid.
+ * The track geometry the pane yields for `count` scenes. Nodes are elastic
+ * (see `TL_NODE_MIN_W`), so the canvas fills the pane instead of leaving a
+ * fixed-size grid adrift in it. Split out from `sceneGrid` because the caller
+ * needs the column width before it can work out how many columns each scene's
+ * text needs.
  */
-export function sceneGrid(count: number, availW: number, availH: number, fill: SceneFill): SceneGrid {
+export function sceneMetrics(
+  count: number,
+  availW: number,
+  availH: number,
+  fill: SceneFill
+): SceneMetrics {
   const n = Math.max(0, count);
   const row = fill === "row";
   const gapX = row ? SCENE_GAP_X : TL_GAP_X_STACKED;
@@ -326,25 +350,87 @@ export function sceneGrid(count: number, availW: number, availH: number, fill: S
   const tracks = row
     ? fitTracks(n, availW, TL_NODE_MIN_W, gapX)
     : fitTracks(n, availH, TL_NODE_MIN_H, gapY);
-  const nodeW = row ? fitSize(tracks, availW, gapX, TL_NODE_MIN_W, TL_NODE_MAX_W) : SCENE_W;
-  const nodeH = row ? SCENE_H : fitSize(tracks, availH, gapY, TL_NODE_MIN_H, TL_NODE_MAX_H);
-
-  const positions: Vec2[] = Array.from({ length: n }, (_, i) => {
-    const col = row ? i % tracks : Math.floor(i / tracks);
-    const r = row ? Math.floor(i / tracks) : i % tracks;
-    return { x: SCENE_MARGIN + col * (nodeW + gapX), y: SCENE_MARGIN + r * (nodeH + gapY) };
-  });
-
-  const cols = row ? Math.min(tracks, n) : Math.ceil(n / tracks);
-  const rows = row ? Math.ceil(n / tracks) : Math.min(tracks, n);
   return {
-    positions,
+    tracks,
+    nodeW: row ? fitSize(tracks, availW, gapX, TL_NODE_MIN_W, TL_NODE_MAX_W) : SCENE_W,
+    nodeH: row ? SCENE_H : fitSize(tracks, availH, gapY, TL_NODE_MIN_H, TL_NODE_MAX_H),
+    gapX,
+    gapY,
+    fill,
+  };
+}
+
+/**
+ * Place a chapter's scenes on the tracks `sceneMetrics` produced.
+ *
+ * `spans` says how many column slots each scene needs to show its text whole
+ * (`sceneSpan` in `sceneFit.ts`). Cards keep a **fixed height** and widen
+ * instead, so rows stay level and no vertical space is wasted. A widened card
+ * that will not fit the slots left in its row starts the next one, leaving the
+ * tail of that row empty — the ordinary cost of a flowing layout, and rare,
+ * since widening is.
+ *
+ * Column fill (the horizontal timeline) ignores spans: there the pane is
+ * height-bound, beats run down a column before wrapping right, and a card wide
+ * enough to matter would break that column. It relies on `SCENE_TEXT_MAX`
+ * instead.
+ *
+ * Distinct from `sceneAutoArrange`, which produces the *persisted* layout for
+ * the chapter modal and must stay on its fixed grid.
+ */
+export function sceneGrid(m: SceneMetrics, spans: number[]): SceneGrid {
+  const { tracks, nodeW, nodeH, gapX, gapY, fill } = m;
+  const n = spans.length;
+  const nodes: SceneBox[] = [];
+  let rows = 0;
+  let cols = 0;
+
+  if (fill === "row") {
+    let col = 0;
+    let r = 0;
+    for (let i = 0; i < n; i++) {
+      const s = Math.max(1, Math.min(tracks, spans[i] ?? 1));
+      if (col + s > tracks) {
+        r++;
+        col = 0;
+      }
+      nodes.push({
+        x: SCENE_MARGIN + col * (nodeW + gapX),
+        y: SCENE_MARGIN + r * (nodeH + gapY),
+        w: s * nodeW + (s - 1) * gapX,
+        h: nodeH,
+      });
+      col += s;
+      cols = Math.max(cols, col);
+    }
+    rows = n ? r + 1 : 0;
+  } else {
+    for (let i = 0; i < n; i++) {
+      nodes.push({
+        x: SCENE_MARGIN + Math.floor(i / tracks) * (nodeW + gapX),
+        y: SCENE_MARGIN + (i % tracks) * (nodeH + gapY),
+        w: nodeW,
+        h: nodeH,
+      });
+    }
+    cols = Math.ceil(n / tracks);
+    rows = Math.min(tracks, n);
+  }
+
+  // Once the grid wraps, hold the canvas to the full track span so it keeps a
+  // stable rectangle even where a widened card left the tail of a row empty.
+  const span = (k: number, size: number, gap: number) =>
+    SCENE_MARGIN * 2 + Math.max(1, k) * size + Math.max(0, k - 1) * gap;
+  const acrossTracks = fill === "row" && rows > 1;
+
+  return {
+    nodes,
     nodeW,
     nodeH,
     gapX,
     gapY,
-    width: SCENE_MARGIN * 2 + Math.max(1, cols) * nodeW + Math.max(0, cols - 1) * gapX,
-    height: SCENE_MARGIN * 2 + Math.max(1, rows) * nodeH + Math.max(0, rows - 1) * gapY,
+    width: span(acrossTracks ? tracks : cols, nodeW, gapX),
+    height: span(rows, nodeH, gapY),
   };
 }
 

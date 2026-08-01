@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
-import { sceneGrid, type SceneFill, type SceneGrid } from "@/lib/layout";
+import { sceneGrid, sceneMetrics, type SceneBox, type SceneFill } from "@/lib/layout";
+import { SCENE_TEXT_MAX, isOverCap, sceneSpan } from "@/lib/sceneFit";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
@@ -33,26 +34,26 @@ const PANE_PAD_Y = 62;
  * turns the corner and runs back through the empty gutter between the rows, so
  * the whole curve stays inside the canvas.
  */
-function sceneConnector(a: Vec2, b: Vec2, g: SceneGrid, fill: SceneFill) {
+function sceneConnector(a: SceneBox, b: SceneBox, fill: SceneFill) {
   const cubic = (p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2) => ({
     d: `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`,
     c: [p0, p1, p2, p3],
   });
   /** Down the gutter: out of a's bottom edge, into b's top edge. */
   const vertical = (min: number) => {
-    const x1 = a.x + g.nodeW / 2;
-    const y1 = a.y + g.nodeH;
-    const x2 = b.x + g.nodeW / 2;
+    const x1 = a.x + a.w / 2;
+    const y1 = a.y + a.h;
+    const x2 = b.x + b.w / 2;
     const y2 = b.y;
     const d = Math.max(min, (y2 - y1) * 0.55);
     return cubic({ x: x1, y: y1 }, { x: x1, y: y1 + d }, { x: x2, y: y2 - d }, { x: x2, y: y2 });
   };
   /** Across the gutter: out of a's right edge, into b's left edge. */
   const horizontal = (min: number) => {
-    const x1 = a.x + g.nodeW;
-    const y1 = a.y + g.nodeH / 2;
+    const x1 = a.x + a.w;
+    const y1 = a.y + a.h / 2;
     const x2 = b.x;
-    const y2 = b.y + g.nodeH / 2;
+    const y2 = b.y + b.h / 2;
     const d = Math.max(min, (x2 - x1) * 0.5);
     return cubic({ x: x1, y: y1 }, { x: x1 + d, y: y1 }, { x: x2 - d, y: y2 }, { x: x2, y: y2 });
   };
@@ -258,6 +259,22 @@ export function Timeline() {
   const availW = Math.max(0, pane.w - PANE_PAD_X);
   const availH = Math.max(0, pane.h - PANE_PAD_Y);
 
+  // Cards keep a fixed height and widen instead, so a long scene is never cut
+  // off. Measuring is memoized per pane size (see `sceneFit.ts`), so this costs
+  // a handful of probes per resize rather than one per scene.
+  const grids = useMemo(() => {
+    const out = new Map<string, ReturnType<typeof sceneGrid>>();
+    for (const c of doc.chapters) {
+      const m = sceneMetrics(c.scenes.length, availW, availH, fill);
+      const spans =
+        m.fill === "row"
+          ? c.scenes.map((t) => sceneSpan(t, m.nodeW, m.gapX, m.tracks, m.nodeH))
+          : c.scenes.map(() => 1);
+      out.set(c.id, sceneGrid(m, spans));
+    }
+    return out;
+  }, [doc.chapters, availW, availH, fill]);
+
   return (
     <div className={`flex min-h-0 flex-1 ${vertical ? "flex-row" : "flex-col"}`}>
       {/* ---- chapter rail ---- */}
@@ -404,7 +421,7 @@ export function Timeline() {
       >
         <div className={vertical ? "px-[22px] pb-[80px]" : "flex h-full items-stretch pr-[22px]"}>
           {doc.chapters.map((c) => {
-            const g = sceneGrid(c.scenes.length, availW, availH, fill);
+            const g = grids.get(c.id)!;
             return (
               <div
                 key={c.id}
@@ -463,7 +480,7 @@ export function Timeline() {
                         {c.scenes.slice(0, -1).map((_, i) => (
                           <path
                             key={i}
-                            d={sceneConnector(g.positions[i], g.positions[i + 1], g, fill).d}
+                            d={sceneConnector(g.nodes[i], g.nodes[i + 1], fill).d}
                             fill="none"
                             stroke="var(--line)"
                             strokeWidth={1.75}
@@ -479,14 +496,28 @@ export function Timeline() {
                           title={`Open chapter ${c.num} at scene ${i + 1}`}
                           className="group absolute z-[5] flex cursor-pointer flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-[var(--therefore)]"
                           style={{
-                            left: g.positions[i].x,
-                            top: g.positions[i].y,
-                            width: g.nodeW,
-                            height: g.nodeH,
+                            left: g.nodes[i].x,
+                            top: g.nodes[i].y,
+                            width: g.nodes[i].w,
+                            height: g.nodes[i].h,
                           }}
                         >
-                          <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
+                          {/* The count rides the label line, so it takes no room
+                              of its own, and shows only when a scene predates
+                              the cap and therefore may still not fit. */}
+                          <span className="flex items-center gap-[6px] font-mono text-[10px] font-semibold tracking-wide text-faint">
                             SCENE {i + 1}
+                            {isOverCap(text) && (
+                              <>
+                                <span className="flex-1" />
+                                <span
+                                  className="text-but"
+                                  title={`This scene is ${text.trim().length} characters, past the ${SCENE_TEXT_MAX} a card can show. Shorten it in the chapter to see all of it.`}
+                                >
+                                  {text.trim().length} / {SCENE_TEXT_MAX}
+                                </span>
+                              </>
+                            )}
                           </span>
                           <span className="overflow-hidden text-[13px] leading-[1.5] text-ink">
                             {text || <span className="text-faint">New scene</span>}
@@ -496,7 +527,7 @@ export function Timeline() {
 
                       {c.scenes.slice(0, -1).map((_, i) => {
                         const type = c.sceneLinks[i] ?? "therefore";
-                        const m = curveMid(sceneConnector(g.positions[i], g.positions[i + 1], g, fill).c);
+                        const m = curveMid(sceneConnector(g.nodes[i], g.nodes[i + 1], fill).c);
                         return (
                           <span
                             key={i}

@@ -2728,3 +2728,107 @@ cross-app block's "an archived asset is unpinned by construction" parenthetical
 now carries an inline warning that it is false as of v8 (it reads as present-
 tense fact to anyone who lands there first), and the "Appears in" row now spells
 out that three different counting scopes legitimately coexist on one card.
+
+### 2026-08-01 (Session 56) — A scene card never cuts its text off
+
+**The report:** in timeline mode, not all the text in a scene card is visible,
+and since clicking a scene opens the chapter modal there was no way to read the
+rest without leaving the reading view.
+
+**Measured before touching anything**, on the user's real book (*Dreams and
+Afterthought*, 421 scenes, one chapter of 110): **50 scenes clipped, 12%**, the
+worst losing three lines. The mechanism was a plain `overflow-hidden` span in a
+fixed-height node — no ellipsis, no fade, no tooltip, so a cut read as a
+finished sentence. The chapter card in the rail two inches away uses
+`line-clamp-2` and *does* show "…", which is what made the scene node the only
+silently-clipped text in the app.
+
+**The counter-intuitive part, and the reason the first fix ideas were wrong:**
+this is a **wide-screen** bug. More columns means *narrower* cards, so clipping
+rises with window width — 46 clipped at 1600px, 50 at 1280px, but only **4** at
+half screen, where a single column grows to 336px and almost nothing clips.
+Anything reasoned from "narrow screens are the hard case" points the wrong way.
+
+**Three designs were mocked before one was built.** A reading-layout toggle
+(one scene per row, no height cap) was built as a mockup and scrapped: the
+timeline exists for a continuous read, and a mode you have to switch into does
+not fix the view you are already in. A pure character cap was scrapped as a
+solo fix for two structural reasons — the card width is elastic, so one limit
+cannot be right (a 124px card holds 134 characters at 228px wide but 206 at
+336px, forcing the limit down to the narrowest case and wasting a third of the
+card at half screen), and it cannot apply retroactively without either
+truncating the user's book or grandfathering scenes that then keep clipping.
+
+**What shipped: cards grow sideways, never taller.** Fixed height, and a scene
+that will not fit one column takes two. Rows stay level, no vertical space is
+wasted, and the layout keeps reading order. Result on the reference book:
+**0 clipped** on a wide screen, 43 cards (10%) taking the double width, rows
+92% occupied.
+
+- `lib/sceneFit.ts` (new) — `SCENE_TEXT_MAX` and capacity measured off a hidden
+  DOM probe mirroring the real card, memoized per pane size. A characters-per-
+  line guess was rejected: capacity depends on font, padding and the label line.
+  The cheap check is deliberately pessimistic (mid-length-word filler), and only
+  the few scenes that fail it get an exact `fitsAt` measurement — which is what
+  brought over-eager widening down from 55 cards to 43.
+- `lib/layout.ts` — `sceneGrid` split into `sceneMetrics` (track geometry) and
+  `sceneGrid` (placement, given spans), because the caller needs the column
+  width before it can decide how many columns a scene needs. Positions became
+  `SceneBox[]` carrying per-node width; connectors now read those boxes.
+- **The cap is 200 characters**, set by the half-screen ceiling (~205). The
+  user's longest scene is 199, so **nothing in the book is over it** and nothing
+  was grandfathered.
+
+**The cap refuses input out loud.** Not `maxLength` — the browser drops the
+keystroke silently, and an invisible refusal is precisely what this must not do.
+`writeScene` refuses it and the card says so: border to `--but`, one 3px nudge.
+The nudge runs through `element.animate`, not a CSS class: replaying a class
+means removing and re-adding it with a frame callback in between, and frame
+callbacks are **paused whenever the tab is not visible**, so a held key would
+land its refusals with no animation at all. Caught by instrumenting rather than
+assuming — a control `ResizeObserver` firing 0 times during a real size change
+had already shown this environment lies about frame-timing.
+
+**Migration: there is none, deliberately.** No schema change, no data touched,
+nothing truncated, so this is **not a cross-app event**. Each scene's ceiling is
+`max(200, its current length)`, so a pre-cap scene can be shortened or left
+alone but never grown. This also fixed a bug the `maxLength` version had:
+`maxLength={200}` blocks *all* insertion once the value already exceeds it,
+which froze a 303-character scene completely.
+
+**Verified in the running app** against the user's own file, not by typecheck
+alone: 421 scenes, 0 clipped at 1400px; a forced 303-character legacy scene
+widened, displayed whole and showed `303 / 200`; at exactly 200 the counter
+reads `200 / 200` in red; typing past it turned the border red, ran one
+animation and the character did not land; shortening from the cap, regrowing to
+exactly 200, and ordinary editing of a short scene all behaved. Build clean.
+
+**One honest gap:** at half screen a single column cannot widen, so 4 scenes
+overflow by **2px** — a clipped descender on the last line, not lost words.
+Fixable by adding 4px to the timeline card height, which is a "taller" change
+and so was left as the user's call rather than taken unilaterally.
+
+**Corrected mid-session, twice.** A mockup claimed "13 of 421 need double
+width"; the real figure is 43, because the mockup's probe gave the label line a
+shorter line-height than the real card has. And an apparent "the pane never
+re-fits on resize" bug was withdrawn once a control `ResizeObserver` was shown
+to fire 0 times for a genuine size change — the embedded browser's viewport
+override does not trigger `ResizeObserver`, so live-resize is simply untestable
+there; the fit logic is fine.
+
+### 2026-08-01 (Session 56b) — The green ring on a jumped-to scene never faded
+
+Found while verifying Session 56's red cap outline, which it was masking, and
+fixed on its own rather than folded into that work.
+
+`flashIdx` in `ChapterDetail` was stuck. The landing effect calls
+`clearFocusScene()`, which sets `focusScene` to null and so changes the effect's
+own deps; the re-run's cleanup cancelled the pending 1600ms fade, and the
+early-return guard meant no replacement timer was ever scheduled. A scene opened
+from the timeline therefore kept its green "freshly jumped to" ring for as long
+as the chapter modal stayed open.
+
+The timer now lives in a ref with an unmount-only cleanup, so consuming
+`focusScene` cannot cancel it. **Verified by measuring the border over time**
+rather than reading the diff: green at 400ms, back to `--rule` by 1400ms, and
+still normal at 2600ms and 4600ms.
