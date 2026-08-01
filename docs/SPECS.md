@@ -44,7 +44,7 @@ running app.
   those attachments render dimmed and marked "Archived". Restoring is therefore
   always lossless, which is what makes archiving a low-stakes move rather than a
   soft delete. ⚠️ Under v6/v7 archiving an asset *unpinned it everywhere first* —
-  the opposite rule; see §9 and the v8 cross-app note.
+  the opposite rule; see §9 and the "Archive / restore (history)" row in §4.
 - **Series** — optional multi-book planning layer above the current book, with its
   own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
 - **Draft / version** — **per book**: each book has its own named versions, and
@@ -291,58 +291,22 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   world entries **plus a reversal of what `archived` means**)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
-> - **⚠️ OPEN CROSS-APP EVENT — v6 (2026-07-26).** The web app now writes schema
->   6. An app that reads up to v5 must refuse a v6 file rather than drop what it
->   doesn't understand (that's what `SchemaTooNewError` is for here), so **until
->   the Android side is updated it will decline files this app has written** and
->   cross-app Sync is effectively one-directional. What v6 adds, all additive:
->   `Asset.kind` gains `"TODO"` with `items: [{ id, text, done }]`;
->   `Asset.archived?: boolean` (an archived asset is unpinned everywhere by
->   construction, so a reader can treat it as library-hidden and nothing else)
->   — **⚠️ that parenthesis was true of v6/v7 and is FALSE as of v8; do not act
->   on it, read the v8 event below before implementing `archived` at all**;
->   `Chapter.scenePosCompact?: Vec2[]`, the collapsed-canvas twin of `scenePos`
->   (safe to ignore, or to mirror if the phone ever grows two canvas sizes).
->   **The brief for that work is written up in the Android repo itself** —
->   `Estoria-aa/docs/SPECS.md` §3.1 plus a dated `docs/SESSIONS.md` entry
->   (2026-07-26), including the finding that the phone needs little more than
->   `SCHEMA_VERSION = 6`: its `ExtrasSerializer` passthrough and raw-JSON asset
->   handling already preserve the new fields, and `RefKind` is a value class over
->   `String`, so `"TODO"` decodes without crashing. An
->   unknown `kind` should degrade to a note, which is what `normalizeAssets` in
->   `store/persistence.ts` does here.
-> - **⚠️ OPEN CROSS-APP EVENT — v7 (2026-07-28).** The web app now writes schema
->   7, which stacks on the still-open v6 event above. The addition is one field,
->   additive and small: `mainDraftId: string` on the document (the active book)
->   and on every `bookData[*]` entry, naming which version that book treats as
->   canonical. A reader that ignores it loses only the star; nothing about board
->   content moves, because promotion never copies or swaps a board. The safe
->   default for a doc without the field is the seed id `"main"`, falling back to
->   the first entry in `drafts` — see `resolveMainDraftId` in `lib/drafts.ts`.
->   A writer that drops the field silently demotes the user's chosen version
->   back to the seed one, so the phone should carry it through its passthrough
->   even before it grows UI for it.
-> - **⚠️ OPEN CROSS-APP EVENT — v8 (2026-07-29).** The web app now writes schema
->   8, stacking on the still-open v6 and v7 events above. Two additive fields:
->   `Character.archived?: boolean` and `WorldEntry.archived?: boolean`, the same
->   flag `Asset` has had since v6. A reader that ignores them shows archived
->   records as ordinary ones — a degradation, not a corruption.
->   **The part that is NOT additive, and is the reason this event matters more
->   than its field count suggests: v8 reverses what `archived` MEANS.** The v6
->   brief told the phone that "an archived asset is unpinned everywhere by
->   construction, so a reader can treat it as library-hidden and nothing else".
->   **That is now false.** Under v8 archiving keeps every pin, casting and
->   reference and only hides the record from its roster/library and pickers, so a
->   v8 document can and does contain an archived asset with live pins, and an
->   archived character cast in chapters. Any code on either side that *inferred*
->   "archived ⇒ no references" rather than checking is wrong against v8 data:
->   the phone must not, for example, skip archived records when resolving a
->   chapter's `chars`/`worldRefs`/`refs`, or it will silently drop content the
->   user can still see here. Archiving and restoring are now pure flag flips on
->   both sides; restore must not attempt to "re-attach" anything.
->   Markdown export marks archived characters and world entries with a trailing
->   `_(archived)_` on their list line, and reads it back (`takeArchived` in
->   `lib/markdown.ts`), so the flag survives an export → import round trip.
+> - **v6, v7 and v8 are CLOSED — both apps are on schema 8 (verified 2026-08-01).**
+>   Each of these was an open cross-app event for several days, and the warnings
+>   that stood here are gone because the phone caught up, not because they
+>   stopped mattering. Confirmed in the Android source rather than from its
+>   session log: `SCHEMA_VERSION = 8` in `StoryDoc.kt`; v6's `RefKind.Todo`,
+>   `items` and `scenePosCompact` all present with `Normalize` defending them;
+>   v7's `mainDraftId` on both the doc and each book, carrying the "never compare
+>   against `MAIN_DRAFT_ID`" warning; v8's `archived` on `Character`,
+>   `WorldEntry` **and** `Asset`. The v8 one was worth checking properly, because
+>   its risk was semantic rather than structural — and the phone documents the
+>   reversal on the field itself ("a v8 doc can hold an archived asset with live
+>   pins"), so it took on the rule change and not merely the new field. Cross-app
+>   Sync is bidirectional again. **What each version added is still recorded in
+>   the bullet above and in [`SESSIONS.md`](SESSIONS.md); what is retired here is
+>   only the "the phone cannot read our files yet" warning.** The next change to
+>   `StoryDoc` starts a new event — reinstate a bullet like the ones removed.
 > - **The Timeline reading view is web-app only (Session 51) — by decision, not
 >   by omission.** The user scoped it to the web app, and it is built so that
 >   choice costs the phone nothing: it is pure presentation over data that

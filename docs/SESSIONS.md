@@ -2832,3 +2832,38 @@ The timer now lives in a ref with an unmount-only cleanup, so consuming
 `focusScene` cannot cancel it. **Verified by measuring the border over time**
 rather than reading the diff: green at 400ms, back to `--rule` by 1400ms, and
 still normal at 2600ms and 4600ms.
+
+### 2026-08-01 (Session 56c) — The v6/v7/v8 cross-app warnings were stale, and are cleared
+
+Asked whether the Android app needed a parity update for Session 56. It does
+not — no schema change, `SCHEMA_VERSION` still 8, and the diff touched no model,
+persistence, export or sync file. But checking that turned up a real
+inaccuracy: §6 still carried **three open cross-app events** (v6, v7, v8)
+warning that the phone could not read files this app writes. All three had been
+closed for days.
+
+**Verified in the Android source, not from its session log**, because a log
+entry says work happened while the source says what it actually does:
+`SCHEMA_VERSION = 8` in `StoryDoc.kt`; v6's `RefKind.Todo`, `items` and
+`scenePosCompact` present with `Normalize` defending them; v7's `mainDraftId` on
+both the doc and each book; v8's `archived` on `Character`, `WorldEntry` **and**
+`Asset`. v8 was the one worth checking properly — its risk was semantic, not
+structural, and the phone documents the reversal on the field itself ("a v8 doc
+can hold an archived asset with live pins"), so it took on the rule change
+rather than just the field.
+
+Replaced with a single closed note. **What each version added is deliberately
+kept** (it is still in the bullet above and in this log); what was retired is
+only the "the phone cannot read our files yet" warning, which had become the
+opposite of true and would have cost someone a wasted investigation. The next
+change to `StoryDoc` starts a fresh event.
+
+**Android docs updated too** (`Estoria-aa/docs/`): a §4(a) compatibility bullet
+and a session entry, both saying the same thing from that side — the 200
+character scene cap is a **web input rule, not a document rule**. It serves the
+web timeline, a view that app does not have; the web never truncates stored
+text; a `.estoria.json` may legitimately carry longer scenes in either
+direction; and validating or trimming against that number on import would
+destroy the user's prose to satisfy someone else's layout. That is the one way
+this session could have caused a real cross-app bug, so it is written down on
+both sides rather than only here.
