@@ -352,6 +352,17 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   `partialize`. So there is **no schema implication and nothing for Android to
 >   match** — a phone that never builds this view reads and writes the same files
 >   as before.
+> - **`SCENE_TEXT_MAX` (200 characters, Session 56) is a web-side *input* rule,
+>   not a document rule — do not enforce it on read, on either side.** It exists
+>   so a timeline scene card can show its text whole, and the timeline is a view
+>   the phone does not have. The web app never truncates: a longer scene (written
+>   before the cap, or written on the phone, which has no such limit) keeps every
+>   character, widens to show what it can, and carries an `N / 200` count. A
+>   `.estoria.json` may therefore legitimately hold scenes over 200 characters,
+>   and **validating or trimming against this number on import would destroy the
+>   user's text to satisfy a layout constraint only one app has.** Not a schema
+>   change and not a cross-app event; recorded only so the number is not mistaken
+>   for a model constraint later.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
 >   both apps (same Google identity, one Drive file). Decisions made for the web
 >   OAuth/Drive setup should not preclude a second (Android) OAuth client under
@@ -756,3 +767,11 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     (Session 36b): versions are standalone forks, so `ch.title` **is** the
     active version's title. No override layer left to resolve.)*
 
+15. **A timeline scene card can still clip by ~2px at half screen** (Session 56).
+    Widening is what stops a card cutting its text off, but at half screen the
+    pane fits a single column and there is nowhere to widen to, so a scene near
+    the cap overflows by about 2px — a clipped descender on the last line, not
+    lost words. Measured at a 760px window: 4 of 421 scenes, worst 2px. The fix
+    is ~4px more height on the timeline card, which is a *taller* change and so
+    cuts against the rule the feature was built on ("wider, never taller"); left
+    as the user's call rather than taken unilaterally.
