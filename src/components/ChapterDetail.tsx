@@ -103,6 +103,12 @@ export function ChapterDetail() {
   // marker is consumed as soon as it is applied, so re-renders (and reopening
   // the same chapter by other routes) don't yank the canvas around again.
   const [flashIdx, setFlashIdx] = useState<number | null>(null);
+  // Held in a ref, not in the landing effect's cleanup: that effect consumes
+  // `focusScene` as it runs, which changes its own deps and re-runs it, and the
+  // cleanup would cancel the fade before it ever fired.
+  const flashTimer = useRef<number | null>(null);
+  useEffect(() => () => void (flashTimer.current && clearTimeout(flashTimer.current)), []);
+
   const chId = ch?.id;
   const sceneCount = ch?.scenes.length ?? 0;
   useEffect(() => {
@@ -116,8 +122,8 @@ export function ChapterDetail() {
     node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
     node.querySelector("textarea")?.focus();
     setFlashIdx(idx);
-    const t = setTimeout(() => setFlashIdx(null), 1600);
-    return () => clearTimeout(t);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashIdx(null), 1600);
   }, [focusScene, chId, sceneCount, clearFocusScene]);
 
   const canvasPoint = (clientX: number, clientY: number) => {
