@@ -788,6 +788,28 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     (Session 36b): versions are standalone forks, so `ch.title` **is** the
     active version's title. No override layer left to resolve.)*
 
+16. **The manuscript should probably be its own modal.** Raised 2026-08-02, after
+    four separate complaints that turned out to be one problem: beat cards too
+    tall, the section's controls scrolling away, an empty sheet making the modal
+    scroll with no visible scrollbar, and navigation between the scene canvas and
+    the manuscript feeling messy. Each was patched; the cause was not. **A
+    writing surface and a planning surface are competing for one scrolling
+    column**, and the chapter modal now stacks three sticky layers (its own
+    header, the manuscript header, the beat guide) over two scroll contexts (the
+    modal and the textarea).
+
+    A separate modal, opened from the chapter, would give the writing pane the
+    whole window and the beats a fixed rail beside it — no stickiness, one scroll
+    context. **It does not break the original premise** ("the map, with a place to
+    write inside it") or the locked decision against a fourth top-level view: it
+    is still entered from the chapter and still shows the beats while you draft.
+    What it costs is a second surface to keep in step with the chapter modal, and
+    a decision about where the Manuscript section header, `Edit`/`View` and the
+    size control live once there is no section to hang them on.
+
+    Worth doing before the branch merges, because the shape of this is what the
+    feature is judged on.
+
 15. **A timeline scene card can still clip by ~2px at half screen** (Session 56).
     Widening is what stops a card cutting its text off, but at half screen the
     pane fits a single column and there is nowhere to widen to, so a scene near
