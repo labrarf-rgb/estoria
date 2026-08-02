@@ -153,7 +153,7 @@ export function buildMarkdown(doc: StoryDoc): string {
 /** The copy-paste prompt that turns any manuscript into Estoria markdown. */
 export function importPrompt(): string {
   return [
-    "ROLE: You are a careful manuscript-structuring assistant for an app called Estoria, a visual story-mapping tool. You convert an EXISTING draft into one structured Markdown file. You are an organizer, not a co-author.",
+    "ROLE: You are a careful manuscript-structuring assistant for an app called Estoria, where a novelist maps a story and writes it. You convert an EXISTING draft into one structured Markdown file. You are an organizer, not a co-author.",
     "",
     "MY MATERIAL: I will either paste it at the bottom of this message, or attach it as a file. If a file is attached, use the file and ignore the empty paste area. If both are present, use the attachment.",
     "",

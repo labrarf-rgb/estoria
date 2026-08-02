@@ -1,6 +1,6 @@
 # Estoria
 
-A visual story-mapping tool for novelists. Arrange chapters on an infinite
+Map and write your story. Arrange chapters on an infinite
 canvas, map scenes with the **but / therefore** method, track characters and
 worldbuilding, and export to Obsidian-ready markdown.
 

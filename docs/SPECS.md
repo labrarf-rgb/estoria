@@ -12,7 +12,7 @@
 
 ## 1. What Estoria is
 
-A **visual story-mapping tool for novelists**. Authors arrange chapters on an
+**Where a novelist maps a story and writes it.** Authors arrange chapters on an
 infinite canvas, map the scenes inside each chapter using the **but / therefore**
 causality method, track characters and worldbuilding, and export everything as
 Obsidian-vault-ready markdown.

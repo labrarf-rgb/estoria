@@ -157,13 +157,17 @@ commit count, so it carries on by itself).
 
 - `package.json` is already at **`3.0.0`**, with the description changed to
   *"Estoria — map your story and write it."*
-- **Still to sweep:** nine places still describe Estoria as a story-mapping tool
-  and nothing else — `README.md`, `index.html`, `docs/SPECS.md` §1,
-  `src/lib/markdown.ts` (the export header and the AI import prompt) and
-  `src/lib/templates.ts`. The export and import strings are the careful ones:
-  the Android app reads the same files and the import prompt is a documented
-  format, so change the prose around them, not the field separators or the
-  schema they describe (see SPECS §3 "Conventions").
+- **Swept.** `index.html`'s `<title>` (which is what the browser tab shows, and
+  which now has a `meta description` beside it), `README.md`'s opening line,
+  `SPECS.md` §1, and the AI import prompt in `src/lib/markdown.ts`. That last one
+  was the careful edit: the Android app reads the same files and the prompt
+  documents a format, so **only the sentence describing the app changed** and the
+  schema, field separators and headings it specifies did not.
+- **Deliberately left:** the remaining hits name the `Story Mapping WebApp
+  Prototype/` folder, which is a real directory on disk and the design reference
+  (SPECS §1), and the source guides the templates came from
+  (`src/lib/templates.ts`). Renaming the folder is a separate job; misquoting the
+  guides would be wrong.
 - The `About` modal shows `v… · build N · sha · time` from
   `window.__ESTORIA_BUILD__`, so it picks the new version up from
   `package.json` with no further work.
