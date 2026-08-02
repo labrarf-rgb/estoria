@@ -5,12 +5,16 @@ import {
   applyReorder,
   appendBreaks,
   breakCount,
+  breaksBefore,
+  changedAt,
   isWritten,
   removeBreak,
+  SCENE_BREAK,
   sectionAt,
   sections,
   seedManuscript,
 } from "@/lib/manuscript";
+import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType } from "@/types";
 
 /**
@@ -41,6 +45,8 @@ export function ManuscriptSheet({
   scroller,
   stickyTop,
   full,
+  view,
+  onView,
 }: {
   ch: Chapter;
   /** The chapter modal's scroll container — see `stickyTop`. */
@@ -49,6 +55,9 @@ export function ManuscriptSheet({
   stickyTop: number;
   /** Full screen: the sheet fills what is left rather than taking a fixed slice. */
   full: boolean;
+  /** Edit (the textarea) or View (the same rendering the timeline reads). */
+  view: "edit" | "read";
+  onView: (v: "edit" | "read") => void;
 }) {
   const setManuscript = useStore((s) => s.setManuscript);
   const insertScene = useStore((s) => s.insertScene);
@@ -88,9 +97,10 @@ export function ManuscriptSheet({
     setManuscript(ch.id, next);
     setCaret(pos);
     if (before === ch.sceneLinks.length && after === before + 1) {
-      // The caret is still on the `***` line, which belongs to the section
-      // above it — so the section the break just opened is the next one along.
-      insertScene(ch.id, sectionAt(next, pos) + 1);
+      // Where the *text* changed, not where the caret ended up: typing the three
+      // asterisks leaves the caret on the break line, while inserting one from
+      // the keyboard leaves it two lines below, and only this gets both right.
+      insertScene(ch.id, breaksBefore(next, changedAt(text, next)) + 1);
     }
   };
 
@@ -100,13 +110,73 @@ export function ManuscriptSheet({
    */
   const jumpToSection = (i: number) => {
     const ta = taRef.current;
-    const sec = secs[Math.min(i, secs.length - 1)];
+    const sec = secs[Math.max(0, Math.min(i, secs.length - 1))];
     if (!ta || !sec) return;
     ta.focus();
     // Setting a collapsed selection on a focused textarea scrolls the caret
     // into view; the focus has to land first or there is nothing to scroll.
     ta.setSelectionRange(sec.start, sec.start);
     setCaret(sec.start);
+  };
+
+  /**
+   * Jumping to a beat from View mode has to wait for the textarea to exist, so
+   * the click records where to go and an effect makes the move once Edit is back.
+   */
+  const [pendingJump, setPendingJump] = useState<number | null>(null);
+  useEffect(() => {
+    if (pendingJump == null || view !== "edit" || !taRef.current) return;
+    jumpToSection(pendingJump);
+    setPendingJump(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJump, view]);
+
+  /**
+   * `Cmd+S` does not save — saving is automatic — but it must not do *nothing*
+   * either. Writers press it reflexively, and silence reads as failure, so it
+   * forces everything out to disk now and says so.
+   */
+  const [confirmed, setConfirmed] = useState(false);
+  const confirmTimer = useRef<number | null>(null);
+  useEffect(() => () => void (confirmTimer.current && clearTimeout(confirmTimer.current)), []);
+  const forceSave = () => {
+    flushNow();
+    setConfirmed(true);
+    if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    confirmTimer.current = window.setTimeout(() => setConfirmed(false), 1800);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        forceSave();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * The shortcuts worth having are **not** formatting ones. They are the two
+   * moves this editor can make that a text box cannot: go to the next or
+   * previous beat, and start a new one.
+   */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.altKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      jumpToSection(idx + (e.key === "ArrowDown" ? 1 : -1));
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      // `execCommand` rather than splicing the value and setting the selection:
+      // assigning `selectionStart`/`selectionEnd` directly **destroys the
+      // browser's native undo stack**, and losing Cmd+Z in a writing pane is a
+      // far worse trade than depending on a deprecated-but-universal API.
+      document.execCommand("insertText", false, `\n\n${SCENE_BREAK}\n\n`);
+    }
   };
 
   // Keep the carousel honest when the prose is replaced under it (a version
@@ -189,10 +259,37 @@ export function ManuscriptSheet({
         <span className="absolute right-[14px] top-[10px] font-mono text-[11px] font-semibold text-faint">
           {idx + 1} / {ch.scenes.length}
         </span>
+        {confirmed && (
+          <span
+            className="absolute left-[14px] top-[10px] rounded-full px-[8px] py-[1px] text-[10px] font-semibold uppercase tracking-wide"
+            style={{ color: "var(--therefore)", border: "1px solid var(--therefore)" }}
+          >
+            Saved
+          </span>
+        )}
       </div>
 
-      {/* The sheet. Its own scroll container, so the beat above stays put
-          however far into the chapter you write. */}
+      {/* View: the same rendering the timeline reads the book with, so the
+          `***` you typed is the centred rule it will be, decorated with the
+          connector the map already knows. Clicking a beat comes back to Edit
+          with the caret in it. */}
+      {view === "read" ? (
+        <div
+          className={`overflow-y-auto px-[max(24px,calc(50%-330px))] py-[26px] ${
+            full ? "min-h-0 flex-1" : "h-[52vh]"
+          }`}
+        >
+          <ProseChapter
+            ch={ch}
+            onPickScene={(i) => {
+              onView("edit");
+              setPendingJump(i);
+            }}
+          />
+        </div>
+      ) : (
+      /* The sheet. Its own scroll container, so the beat above stays put
+         however far into the chapter you write. */
       <textarea
         ref={taRef}
         value={text}
@@ -200,6 +297,7 @@ export function ManuscriptSheet({
         onSelect={readCaret}
         onClick={readCaret}
         onKeyUp={readCaret}
+        onKeyDown={onKeyDown}
         // Write-through on blur. The prose debounce is short, but "I stopped
         // typing and clicked away" is the moment a writer assumes their words
         // are safe, and it costs nothing to make that true.
@@ -210,6 +308,37 @@ export function ManuscriptSheet({
           full ? "min-h-0 flex-1" : "h-[52vh]"
         }`}
       />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Edit / View — the editor's one and only mode switch (§2). Both halves render
+ * the same markdown; only Edit lets you change it, and only Edit shows `***` as
+ * the literal characters a textarea can actually draw.
+ */
+export function SheetViewToggle({
+  view,
+  onChange,
+}: {
+  view: "edit" | "read";
+  onChange: (v: "edit" | "read") => void;
+}) {
+  return (
+    <div className="flex rounded-lg bg-chip p-[3px]">
+      {(["edit", "read"] as const).map((v) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          title={v === "edit" ? "Write" : "Read it back, scene breaks and all"}
+          className={`rounded-md px-[9px] py-[4px] text-[11px] font-medium ${
+            view === v ? "bg-card text-ink" : "text-soft hover:bg-card"
+          }`}
+        >
+          {v === "edit" ? "Edit" : "View"}
+        </button>
+      ))}
     </div>
   );
 }

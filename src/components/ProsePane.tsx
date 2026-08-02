@@ -19,7 +19,20 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
  * and but the map already knows, shown over the prose without ever being stored
  * in it. See docs/manuscript-mode-build.md §3 and §8 phase 4.
  */
-export function ProseChapter({ ch, width }: { ch: Chapter; width?: number }) {
+export function ProseChapter({
+  ch,
+  width,
+  onPickScene,
+}: {
+  ch: Chapter;
+  width?: number;
+  /**
+   * What clicking a beat does. The timeline leaves this off and gets the
+   * default — open the chapter there. The editor's own View mode passes one,
+   * because it is already in the chapter and only needs to move the caret.
+   */
+  onPickScene?: (scene: number) => void;
+}) {
   const openChapterAtScene = useStore((s) => s.openChapterAtScene);
   const openChapter = useStore((s) => s.openChapter);
   const manuscriptState = useStore((s) => s.manuscriptState);
@@ -30,6 +43,7 @@ export function ProseChapter({ ch, width }: { ch: Chapter; width?: number }) {
 
   /** Read the chapter with the sheet already open, not the planning canvas. */
   const openToWrite = (scene?: number) => {
+    if (onPickScene) return onPickScene(scene ?? 0);
     if (manuscriptState === "min") setManuscriptState("regular");
     if (scene === undefined) openChapter(ch.id);
     else openChapterAtScene(ch.id, scene);

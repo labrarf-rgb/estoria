@@ -94,6 +94,37 @@ export function sectionAt(text: string, caret: number, sceneCount?: number): num
   return sceneCount ? Math.min(idx, sceneCount - 1) : idx;
 }
 
+/**
+ * How many breaks start before `offset` — and so, which scene an edit at that
+ * offset landed in.
+ *
+ * This is what says where a newly typed `***` puts its beat, and it is
+ * deliberately **not** derived from the caret. Typing the three asterisks leaves
+ * the caret on the break line; inserting a break from a keyboard shortcut leaves
+ * it two lines below. Reading the position from where the *text changed* instead
+ * gets both right, where a caret rule can only ever get one right.
+ */
+export function breaksBefore(text: string, offset: number): number {
+  let n = 0;
+  let lineStart = 0;
+  while (lineStart < offset && lineStart <= text.length) {
+    let lineEnd = text.indexOf("\n", lineStart);
+    if (lineEnd === -1) lineEnd = text.length;
+    if (lineStart < offset && isBreak(text.slice(lineStart, lineEnd))) n++;
+    if (lineEnd === text.length) break;
+    lineStart = lineEnd + 1;
+  }
+  return n;
+}
+
+/** Where two strings stop matching — the point a single-point edit happened. */
+export function changedAt(before: string, after: string): number {
+  const n = Math.min(before.length, after.length);
+  let i = 0;
+  while (i < n && before.charCodeAt(i) === after.charCodeAt(i)) i++;
+  return i;
+}
+
 /** Has this scene been written into? Whitespace between two breaks has not. */
 export function isWritten(text: string, section: Section): boolean {
   return text.slice(section.start, section.end).trim().length > 0;

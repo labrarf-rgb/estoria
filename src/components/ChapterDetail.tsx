@@ -9,7 +9,7 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { DriftBar, ManuscriptSheet } from "@/components/ManuscriptSheet";
+import { DriftBar, ManuscriptSheet, SheetViewToggle } from "@/components/ManuscriptSheet";
 import { writtenCount } from "@/lib/manuscript";
 import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
@@ -84,6 +84,10 @@ export function ChapterDetail() {
   const setManuscriptState = useStore((s) => s.setManuscriptState);
   const manuscriptOpen = manuscriptState !== "min";
   const full = manuscriptState === "full";
+  // Edit / View. Local, and always starts on Edit: unlike the three states,
+  // this one has a wrong side to land on — opening the sheet unable to type
+  // because a previous session left it in View is a trap, not a preference.
+  const [sheetView, setSheetView] = useState<"edit" | "read">("edit");
   // The modal is one scroll container under a sticky header, so the carousel
   // has to know how tall that header is to stick *below* it rather than under
   // it. Measured rather than guessed: the summary line wraps, and the banner on
@@ -1071,7 +1075,14 @@ export function ChapterDetail() {
                   label="Manuscript"
                   collapsed={!manuscriptOpen}
                   onToggle={() => go(manuscriptOpen ? "min" : "regular")}
-                  right={<StateControl state={manuscriptState} onChange={go} />}
+                  right={
+                    <div className="flex items-center gap-[8px]">
+                      {manuscriptOpen && (
+                        <SheetViewToggle view={sheetView} onChange={setSheetView} />
+                      )}
+                      <StateControl state={manuscriptState} onChange={go} />
+                    </div>
+                  }
                 />
               </div>
               <DriftBar ch={ch} />
@@ -1083,6 +1094,8 @@ export function ChapterDetail() {
                   // to pin under — the carousel is simply the row above the sheet.
                   stickyTop={full ? 0 : headerH}
                   full={full}
+                  view={sheetView}
+                  onView={setSheetView}
                 />
               ) : (
                 <button

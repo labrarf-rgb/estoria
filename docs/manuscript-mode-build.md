@@ -10,11 +10,13 @@
 > before any code. Everything here is scoped to this repo; the file is not
 > self-contained away from the codebase it describes.
 >
-> **Status: Phases 0, 1 and 4 are built** on `feature/manuscript-mode`
-> (2026-08-01) — see §8 for what each shipped. Phase 4 was taken out of order,
-> deliberately: it is the cheapest large win, and Phase 2's storage work only
-> starts to bite once there is real prose to store, which there is not yet.
-> Phases 2, 3 and 5 are not started.
+> **Status: Phases 0, 1, 2 and 4 are built** on `feature/manuscript-mode`
+> (2026-08-01) — see §8 for what each shipped. Phase 4 was taken before phase 2
+> deliberately: it is the cheapest large win. **Phases 3 and 5 are not started**,
+> and the §9 list below is now the accurate account of what is left.
+>
+> The editor's **Edit/View toggle** (§2) is built, along with the keyboard
+> shortcuts and `Cmd+S` from §9 items 4 and 5.
 >
 > **The riskiest assumption held.** Asked directly on 2026-08-01, the author's
 > verdict on Phase 0 was *"seeing beats while drafting manuscript is something
@@ -603,24 +605,41 @@ must say which is which.
 
 ## 9. Still open
 
-1. What scrolls the carousel, and whether caret-sync makes a trackpad swipe feel
-   wrong (§4).
-2. What the editor does when break count and scene count disagree, beyond
-   raising the drift bar.
+1. ~~What scrolls the carousel~~ — **answered in Phase 0.** The caret drives it,
+   one way. Nothing was ever wired from a horizontal swipe to the cursor, so the
+   trackpad worry does not arise.
+2. ~~What the editor does when the counts disagree~~ — **answered in Phase 1.**
+   Nothing on its own: it reports, and offers a fix it can name.
 3. Whether a hand-typed `***` should name its new beat `"New scene."` or lift the
-   first sentence after the break. Start with the former.
-4. Keyboard shortcuts. The interesting ones are **not** formatting: jump to
-   next/previous beat, and insert a break (which creates the scene). One gotcha
-   if you do build `Cmd+B`: setting `selectionStart/End` directly **destroys the
-   browser's native undo stack**; `document.execCommand("insertText")` preserves
-   it and still works everywhere despite being deprecated.
-5. `Cmd+S` should not save (saving is automatic) but probably should force-flush
-   and confirm, because writers press it reflexively and silence reads as
-   failure.
+   first sentence after the break. **Still open**, and currently neither: the new
+   beat is seeded empty, the same as every other blank record in the app, and the
+   card shows its "New scene" placeholder. Lifting the first sentence remains the
+   interesting version.
+4. ~~Keyboard shortcuts~~ — **built.** `Alt+↑` / `Alt+↓` jump to the previous and
+   next beat; `Cmd/Ctrl+Enter` inserts a scene break, which creates the scene.
+   The undo gotcha was real and is respected: the insert goes through
+   `document.execCommand("insertText")`, and native `Cmd+Z` was verified to still
+   undo it. `Alt+↑/↓` deliberately shadows the OS "move by paragraph" binding
+   inside this one textarea, which is the same gesture one level up.
+5. ~~`Cmd+S`~~ — **built.** It does not save, because saving is automatic; it
+   force-flushes everything to disk and shows a "Saved" confirmation on the
+   carousel. Registered only while the sheet is mounted, so `Cmd+S` anywhere else
+   in the app is still the browser's.
 6. **Unrelated but worth fixing while you're in here:** `SPECS.md` §8 is stale —
-   it lists the save debounce as to-do, but it shipped.
+   it lists the save debounce as to-do, but it shipped. **Still true, and now
+   doubly so:** [`SPECS.md:439`](SPECS.md) still says persist "serializes the
+   whole store on every keystroke", which Session 20 fixed and phase 2 above
+   fixed again.
 
----
+### Added since this list was written
+
+7. **A latent scroll bug in Scenes mode.** Phase 4 fixed it for prose: a
+   jumped-to chapter near the end of the book could not reach the leading edge,
+   so the ring stayed on the chapter before it. The same shape of bug remains for
+   the very last chapter in Scenes mode, untouched because it predates this work.
+8. **The editor's View mode has no print stylesheet yet.** Phase 5 plans to skip
+   a PDF exporter by putting one on the timeline's prose view; the sheet's own
+   View mode is the same renderer and would come along nearly free.
 
 ## 10. References
 
