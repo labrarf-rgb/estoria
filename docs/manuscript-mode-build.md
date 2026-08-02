@@ -11,12 +11,17 @@
 > self-contained away from the codebase it describes.
 >
 > **Status: Phases 0 and 1 are built** on `feature/manuscript-mode`
-> (2026-08-01) — see §8 for what each shipped. Phase 0's question ("does seeing
-> your beats while drafting feel like anything?") was never actually answered:
-> the session was told to carry on building. It is still open, and it is still
-> the question that decides whether Phase 2's storage work is worth paying for.
-> Phases 2-5 are not started. Written 2026-08-01. Delete this file when the
-> feature lands, folding what survives into [`SPECS.md`](SPECS.md) §4.
+> (2026-08-01) — see §8 for what each shipped. Phases 2-5 are not started.
+>
+> **The riskiest assumption held.** Asked directly on 2026-08-01, the author's
+> verdict on Phase 0 was *"seeing beats while drafting manuscript is something
+> I'd like"*. That was the one question the whole build order hung on (§1, §8),
+> and it is now answered yes — so the expensive phases below are worth paying
+> for, and the premise in §1 can be folded into [`SPECS.md`](SPECS.md) §4 as a
+> feature rather than an experiment when this lands.
+>
+> Written 2026-08-01. Delete this file when the feature lands, folding what
+> survives into [`SPECS.md`](SPECS.md) §4.
 
 ---
 
@@ -371,8 +376,13 @@ horizontal swipe over the carousel was never wired to move the cursor, so the
 trackpad worry the mockup raised does not arise. Two-way sync can still be added
 in Phase 1 if reading back wants it, but it should be justified on its own.
 
-**Left for the verdict:** whether writing a few thousand real words in it
-actually feels like something.
+**The verdict: yes** (2026-08-01). Asked directly, the author's answer was
+*"seeing beats while drafting manuscript is something I'd like"*. The premise in
+§1 — that the coupling is the product, not the editor — is confirmed, so nothing
+downstream is speculative any more. Note what was *not* tested: this was a
+judgement on the built thing, not the "few thousand real words" load-adjacent
+soak the phase describes, so §8 phase 2's storage numbers are still theory
+rather than something felt.
 
 ### Phase 1 — the three states — ✅ BUILT
 
