@@ -169,3 +169,62 @@ commit count, so it carries on by itself).
   `package.json` with no further work.
 - **House style still applies to every new string**: no em dashes in anything the
   user reads (SPECS §3).
+
+---
+
+## 8. Scale: does this survive a real book collection?
+
+**The target to test against: 300k words in a version, 5 versions, 5 books.**
+That is 25 manuscripts, ~7.5M words, roughly **45M characters** — and nothing in
+this feature has been run against more than a few thousand.
+
+### Build the fixture first
+
+A generator, not hand-typing: a script that fills a `.estoria.json` with N books
+× M versions × K chapters of lorem prose at a target word count, imported through
+the normal path so the split, the counts and the sync fingerprint all see it.
+Keep it out of the repo's real data and run it on the isolated port (§0).
+
+### Where it will break, in the order it probably breaks
+
+1. **The crash pad, and this one is a real bug today.** `writePad` puts every
+   *dirty* manuscript into **localStorage**, synchronously, before the IndexedDB
+   write. It was designed for "usually one chapter". A single 300k-word chapter
+   is ~1.8M characters ≈ **3.6MB in UTF-16 — most of the ~5MB origin quota on its
+   own**, and it shares that quota with the map. Expect `QuotaExceededError` on
+   the pad write; it is caught and ignored, so the *symptom* is the safety net
+   silently not being there. Fix by capping what the pad accepts (a tail of the
+   chapter, or a size ceiling above which it does not try) and saying so, rather
+   than failing quietly.
+2. **Export, sync and backup reassemble the whole document into one JSON
+   string.** `JSON.stringify` over 45M characters on the main thread, plus the
+   sync fingerprint's SHA-256 over a canonical copy of the same, on every
+   save-settle. This is the design's deliberate trade — `StoryDoc` stays whole in
+   every file — so the question is not whether to split it but whether the
+   fingerprint can be cheaper (hash per chapter and combine?) and whether these
+   belong in a worker.
+3. **`loadAllProse()` reads every manuscript into memory at startup.** 45MB of
+   strings before the first paint, for a writer who is going to open one chapter.
+   Consider loading the active book/version eagerly and the rest on demand — the
+   key is already `(projectId, bookId, draftId, chapterId)`, so this is a
+   filtered cursor rather than a redesign.
+4. **`countWords` and `hasProse` run in render paths.** `ChapterDetail` computes
+   `counted` every render, and `ExportModal` calls `manuscriptWordCount` and
+   `writtenChapters` over every chapter. Each is a full regex sweep of the prose.
+   Memoize, or lean on the stored `words` cache that exists precisely for this.
+5. **Timeline manuscript mode renders every chapter's prose into the DOM.**
+   `parseBlocks` × 30 chapters × 300k words is a lot of nodes. It needs
+   windowing, or to render only the chapters near the viewport.
+6. **`splitProse` / `mergeProse` walk every chapter of every book and version**
+   on each flush — 750-odd chapters at this size. Cheap per item and identity is
+   preserved where nothing changed, but measure it rather than assume.
+
+### What to measure
+
+Time to first paint on load; time from keystroke to the prose reaching
+IndexedDB; the main-thread cost of one save-settle with Sync configured; peak
+memory with all 25 manuscripts loaded; and whether the `.estoria.json` a 45M
+character document produces can be written, re-read and round-tripped at all.
+
+**Report the numbers in `SESSIONS.md`, even the ones that pass** — the point of
+this exercise is a baseline to compare against later, not a pass mark.
