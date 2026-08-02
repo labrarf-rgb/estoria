@@ -9,6 +9,12 @@
       "autoPort": true
     },
     {
+      "name": "estoria-manuscript",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5199", "--strictPort"],
+      "port": 5199
+    },
+    {
       "name": "portfolio-static",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8899", "-d", "/Users/rfcl/Portfolio-Website"],

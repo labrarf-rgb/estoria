@@ -189,6 +189,11 @@ interface StoreState extends UiState {
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
+  // ---- manuscript (chapter prose) ----
+  /** Write a chapter's prose. The only writer of `manuscript`; see the hard
+   *  rule in docs/manuscript-mode-build.md §7 — the map never mutates it. */
+  setManuscript: (chId: string, text: string) => void;
+
   // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
   deleteChapterRef: (chId: string, refId: string) => void;
@@ -1044,6 +1049,19 @@ export const useStore = create<StoreState>()(
             },
           };
         }),
+
+      // ---- manuscript (chapter prose) ----
+      // Deliberately the plainest action in the store: prose is one string on
+      // the chapter, written through the same persist path as everything else.
+      // Versions get it for free — `cloneVersionData` is a `structuredClone`, so
+      // a fork deep-copies the prose exactly as it deep-copies the scenes.
+      setManuscript: (chId, text) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
+          },
+        })),
 
       // ---- chapter refs (pure links into the shared asset pool) ----
       // Adding a note/image creates a shared Asset first, then pins a link to it

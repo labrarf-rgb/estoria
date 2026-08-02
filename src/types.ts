@@ -202,6 +202,19 @@ export interface Chapter {
   chars: string[];
   /** World-entry ids referenced in this chapter. */
   worldRefs?: string[];
+  /**
+   * The chapter's prose, as markdown. Scenes are separated by `***` thematic
+   * breaks — real markdown a novelist types anyway, rather than a marker they
+   * would have to work around; see docs/manuscript-mode-build.md §3. A `***` is
+   * the prose form of a connector, so a written chapter holds exactly
+   * `sceneLinks.length` breaks, and the causal type is never stored in the prose.
+   *
+   * Absent until the chapter is written in. Optional on purpose: that is what
+   * every existing document already has, so this field needs no
+   * `SCHEMA_VERSION` bump and is not a cross-app event — it rides through the
+   * Android app's unknown-key passthrough untouched (SPECS.md §6).
+   */
+  manuscript?: string;
   /** Scene beats, in order. */
   scenes: string[];
   /** Link type between scene i and i+1 (length = scenes.length - 1). */

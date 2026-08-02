@@ -9,6 +9,8 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
+import { ManuscriptSheet } from "@/components/ManuscriptSheet";
+import { writtenCount } from "@/lib/manuscript";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -74,6 +76,26 @@ export function ChapterDetail() {
   const [moveMode, setMoveMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [destPickerOpen, setDestPickerOpen] = useState(false);
+  // Manuscript mode. Local, not store state: Phase 1 replaces this boolean with
+  // the Minimized / Regular / Full screen control, and there is nothing worth
+  // persisting about it until then. It survives prev/next navigation because
+  // the modal stays mounted, which is what you want mid-draft.
+  const [manuscriptOpen, setManuscriptOpen] = useState(false);
+  // The modal is one scroll container under a sticky header, so the carousel
+  // has to know how tall that header is to stick *below* it rather than under
+  // it. Measured rather than guessed: the summary line wraps, and the banner on
+  // a non-main version adds a row.
+  const modalRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerH, setHeaderH] = useState(0);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setHeaderH(el.offsetHeight));
+    ro.observe(el);
+    setHeaderH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [openCh]);
   // Chosen destination + insertion position, shown in the confirm dialog.
   const [moveDest, setMoveDest] = useState<{ id: string; num: number; title: string } | null>(null);
   const [movePos, setMovePos] = useState<"beginning" | "middle" | "end">("end");
@@ -434,13 +456,17 @@ export function ChapterDetail() {
     <>
     <Scrim onClose={closeFromScrim} z={50} center>
       <div
+        ref={modalRef}
         onMouseDown={stop}
         className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
           expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
         }`}
       >
         {/* Header */}
-        <div className="sticky top-0 z-[2] flex items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
+        <div
+          ref={headerRef}
+          className="sticky top-0 z-[2] flex items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]"
+        >
           <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
             {String(ch.num).padStart(2, "0")}
           </span>
@@ -697,7 +723,10 @@ export function ChapterDetail() {
           );
         })()}
 
-        {/* Scene flow toolbar */}
+        {/* Scene flow toolbar. Hidden while the manuscript is open: there the
+            carousel *is* the scene flow, and every control here acts on a
+            canvas that isn't on screen. */}
+        {!manuscriptOpen && (
         <div className="flex items-center gap-[9px] px-[26px] pb-[12px] pt-[16px]">
           <span className="text-[11px] font-semibold uppercase tracking-widest text-soft">
             Scene flow
@@ -760,6 +789,7 @@ export function ChapterDetail() {
             </div>
           )}
         </div>
+        )}
 
         {/* Destination dropdown — the "Select chapter" menu. */}
         {moveMode && destPickerOpen && selected.size > 0 && (
@@ -791,6 +821,8 @@ export function ChapterDetail() {
         {/* Scene canvas. `isolate` keeps the absolutely-positioned scene cards
             (z-5/z-10) contained so they can't paint over the sticky header when
             the modal scrolls. */}
+        {!manuscriptOpen && (
+        <>
         <div
           ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
@@ -996,6 +1028,64 @@ export function ChapterDetail() {
             ? "Click scenes to select them, then choose a destination chapter · the scenes are appended to that chapter in order"
             : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And"}
         </div>
+        </>
+        )}
+
+        {/* Manuscript. Under Scene flow, not a view of its own: the whole point
+            is that the prose sits inside the map rather than beside it. */}
+        {(() => {
+          const written = writtenCount(ch.manuscript ?? "");
+          return (
+            <div className={manuscriptOpen ? "pt-[16px]" : "px-[26px] pt-[18px]"}>
+              <div className={manuscriptOpen ? "px-[26px]" : ""}>
+                <SectionHeader
+                  label="Manuscript"
+                  collapsed={!manuscriptOpen}
+                  onToggle={() => {
+                    if (!manuscriptOpen) exitMoveMode();
+                    setManuscriptOpen(!manuscriptOpen);
+                  }}
+                  right={
+                    <button
+                      onClick={() => {
+                        if (!manuscriptOpen) exitMoveMode();
+                        setManuscriptOpen(!manuscriptOpen);
+                      }}
+                      className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                    >
+                      {manuscriptOpen ? "Close the manuscript" : "Open the manuscript"}
+                    </button>
+                  }
+                />
+              </div>
+              {manuscriptOpen ? (
+                <div className="mt-[12px]">
+                  <ManuscriptSheet ch={ch} scroller={modalRef} stickyTop={headerH} />
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    exitMoveMode();
+                    setManuscriptOpen(true);
+                  }}
+                  className="mt-[10px] flex w-full items-center gap-[10px] rounded-xl border border-dashed border-line px-[14px] py-[12px] text-left hover:border-faint"
+                >
+                  <span className="font-mono text-[11.5px] font-medium text-soft">
+                    {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"} · {written} written
+                  </span>
+                  <div className="flex-1" />
+                  <span className="text-[11.5px] font-medium text-faint">
+                    {ch.manuscript === undefined
+                      ? "Nothing written yet"
+                      : written === ch.scenes.length
+                        ? "Every scene is drafted"
+                        : "Pick up where you left off"}
+                  </span>
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Chapter notes */}
         <div className="px-[26px] pt-[18px]">

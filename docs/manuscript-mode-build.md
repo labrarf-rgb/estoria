@@ -10,8 +10,10 @@
 > before any code. Everything here is scoped to this repo; the file is not
 > self-contained away from the codebase it describes.
 >
-> **Status: nothing is built.** Written 2026-08-01. Delete this file when the
-> feature lands, folding what survives into [`SPECS.md`](SPECS.md) §4.
+> **Status: Phase 0 is built** on `feature/manuscript-mode` (2026-08-01), and is
+> waiting on the one question it exists to answer — see §8. Nothing else is
+> started. Written 2026-08-01. Delete this file when the feature lands, folding
+> what survives into [`SPECS.md`](SPECS.md) §4.
 
 ---
 
@@ -325,7 +327,7 @@ Violating any of these is how this goes wrong quietly.
 
 ## 8. Build order
 
-### Phase 0 — find out if it feels like anything (~1 day)
+### Phase 0 — find out if it feels like anything (~1 day) — ✅ BUILT, awaiting the verdict
 
 Add `manuscript?: string` to `Chapter`. Persist it through the **existing**
 localStorage path, unchanged. Build one thing: the Regular state for a single
@@ -337,6 +339,37 @@ no word count.
 Then write a few thousand real words into **one** chapter and decide. It is a
 **feel test, not a load test**. If the answer is no, delete the field and the
 branch and nothing else was spent.
+
+**What shipped** (`lib/manuscript.ts`, `components/ManuscriptSheet.tsx`, a
+`setManuscript` action, one field on `Chapter`):
+
+- **Two states, not three.** A dashed Minimized row reporting *N scenes · N
+  written* with "Open the manuscript", and the Regular sheet. Full screen is
+  Phase 1. The open/closed flag is local component state on purpose — Phase 1
+  replaces it with the real three-way control.
+- **Seeded on first open** from the breaks the scenes already imply, keyed on
+  `manuscript === undefined` rather than emptiness, because a one-scene chapter
+  seeds legitimately to `""`.
+- **The carousel is `sticky`, and that mattered more than expected.** The
+  chapter modal is one scroll container under a sticky header, so the first
+  build scrolled the beat out of view the moment you started writing — the
+  feature not happening. It now pins below the header, whose height is measured
+  (`ResizeObserver`) rather than guessed, and the sheet scrolls itself into
+  place on open. Note for Phase 1: **no `overflow-hidden` on any ancestor of the
+  carousel** — it makes that box the sticky scrollport and the pinning silently
+  stops.
+- **Read direction only**, per §3: the caret drives the carousel, and clicking a
+  peek card moves the caret. Typing `***` does **not** yet create a beat.
+- Peek cards show label + written/not-written; the focused card shows the beat
+  whole and is never clamped. `***` renders literally, as §4 asks.
+
+**Answers §9 item 1** (what scrolls the carousel): the caret does, one-way. A
+horizontal swipe over the carousel was never wired to move the cursor, so the
+trackpad worry the mockup raised does not arise. Two-way sync can still be added
+in Phase 1 if reading back wants it, but it should be justified on its own.
+
+**Left for the verdict:** whether writing a few thousand real words in it
+actually feels like something.
 
 ### Phase 1 — the three states
 
