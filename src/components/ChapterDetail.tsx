@@ -9,8 +9,8 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { DriftBar, ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
-import { borrowedLabel, countWords, writtenCount } from "@/lib/manuscript";
+import { ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
+import { countWords, hasProse } from "@/lib/manuscript";
 import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
@@ -342,7 +342,7 @@ export function ChapterDetail() {
   // The layout belonging to the size on screen. Falling back to the other one
   // covers the frame between a size toggle and the store catching up.
   // Does this chapter's count come from its prose rather than from the keyboard?
-  const counted = ch.manuscript !== undefined && countWords(ch.manuscript) > 0;
+  const counted = hasProse(ch.manuscript);
   const positions = (expanded ? ch.scenePos : ch.scenePosCompact) ?? ch.scenePos ?? [];
   const boxW = sceneBoxRef.current?.clientWidth ?? 0;
 
@@ -960,7 +960,6 @@ export function ChapterDetail() {
             {cardSlots.map((slot) => {
               const i = slot.idx;
               const s = ch.scenes[i];
-              const borrowed = borrowedLabel(s, ch.manuscript, i, ch.scenes.length);
               const isSelected = moveMode && selected.has(i);
               return (
                 <div
@@ -1075,12 +1074,10 @@ export function ChapterDetail() {
                       onMouseDown={(e) => !moveMode && e.stopPropagation()}
                       readOnly={moveMode}
                       rows={3}
-                      // A borrowed opening line reads naturally as placeholder
-                      // text: visibly not typed, and gone the moment it is.
-                      placeholder={borrowed || "New scene"}
-                      className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none ${
-                        borrowed ? "placeholder:italic placeholder:text-soft" : "placeholder:text-faint"
-                      } ${moveMode ? "pointer-events-none" : ""}`}
+                      placeholder="New scene"
+                      className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint ${
+                        moveMode ? "pointer-events-none" : ""
+                      }`}
                     />
                   </div>
                 </div>
@@ -1113,7 +1110,7 @@ export function ChapterDetail() {
         {/* Manuscript. Under Scene flow, not a view of its own: the whole point
             is that the prose sits inside the map rather than beside it. */}
         {(() => {
-          const written = writtenCount(ch.manuscript ?? "");
+          const proseWords = ch.manuscript ? countWords(ch.manuscript) : 0;
           const go = (next: ManuscriptState) => {
             if (next !== "min") exitMoveMode();
             setManuscriptState(next);
@@ -1139,7 +1136,6 @@ export function ChapterDetail() {
                   }
                 />
               </div>
-              <DriftBar ch={ch} />
               {manuscriptOpen && <PullFromVersion ch={ch} />}
               {manuscriptOpen ? (
                 <ManuscriptSheet
@@ -1150,7 +1146,6 @@ export function ChapterDetail() {
                   stickyTop={full ? 0 : headerH}
                   full={full}
                   view={sheetView}
-                  onView={setSheetView}
                 />
               ) : (
                 <button
@@ -1158,15 +1153,12 @@ export function ChapterDetail() {
                   className="mt-[10px] flex w-full items-center gap-[10px] rounded-xl border border-dashed border-line px-[14px] py-[12px] text-left hover:border-faint"
                 >
                   <span className="font-mono text-[11.5px] font-medium text-soft">
-                    {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"} · {written} written
+                    {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"} ·{" "}
+                    {proseWords.toLocaleString()} words written
                   </span>
                   <div className="flex-1" />
                   <span className="text-[11.5px] font-medium text-faint">
-                    {ch.manuscript === undefined
-                      ? "Nothing written yet"
-                      : written === ch.scenes.length
-                        ? "Every scene is drafted"
-                        : "Pick up where you left off"}
+                    {proseWords === 0 ? "Nothing written yet" : "Pick up where you left off"}
                   </span>
                 </button>
               )}

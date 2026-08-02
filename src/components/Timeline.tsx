@@ -5,7 +5,7 @@ import { SCENE_TEXT_MAX, isOverCap, sceneSpan } from "@/lib/sceneFit";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
-import { borrowedLabel, wordsMeta, writtenCount } from "@/lib/manuscript";
+import { countWords, wordsMeta } from "@/lib/manuscript";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType, Vec2 } from "@/types";
@@ -79,23 +79,6 @@ interface Box {
   y: number;
   w: number;
   h: number;
-}
-
-/**
- * What an unnamed beat shows. If prose has been written under it, its opening
- * sentence stands in — italic and dimmed, because it is borrowed rather than
- * typed, and you should be able to see at a glance which beats you actually
- * named. Nothing is stored; it follows the prose and disappears the moment a
- * real name is given. See `borrowedLabel`.
- */
-export function BorrowedOrBlank({ ch, i }: { ch: Chapter; i: number }) {
-  const lifted = borrowedLabel(ch.scenes[i], ch.manuscript, i, ch.scenes.length);
-  if (!lifted) return <span className="text-faint">New scene</span>;
-  return (
-    <span className="italic text-soft" title="The opening line of this scene's prose. Type a name to replace it.">
-      {lifted}
-    </span>
-  );
 }
 
 /**
@@ -315,20 +298,9 @@ export function Timeline() {
     const out = new Map<string, ReturnType<typeof sceneGrid>>();
     for (const c of doc.chapters) {
       const m = sceneMetrics(c.scenes.length, availW, availH, fill);
-      // Measured against what the card will *show*, borrowed opening line
-      // included — sizing on the stored label would under-size a card whose
-      // name is being lifted from the prose.
       const spans =
         m.fill === "row"
-          ? c.scenes.map((t, i) =>
-              sceneSpan(
-                t || borrowedLabel(t, c.manuscript, i, c.scenes.length),
-                m.nodeW,
-                m.gapX,
-                m.tracks,
-                m.nodeH
-              )
-            )
+          ? c.scenes.map((t) => sceneSpan(t, m.nodeW, m.gapX, m.tracks, m.nodeH))
           : c.scenes.map(() => 1);
       out.set(c.id, sceneGrid(m, spans));
     }
@@ -511,7 +483,7 @@ export function Timeline() {
                   </span>
                   <span className="flex-none font-mono text-[10.5px] font-medium text-faint">
                     {prose
-                      ? `${writtenCount(c.manuscript ?? "")} of ${c.scenes.length} written`
+                      ? `${countWords(c.manuscript ?? "").toLocaleString()} words`
                       : `${c.scenes.length} ${c.scenes.length === 1 ? "scene" : "scenes"}`}
                   </span>
                 </div>
@@ -520,12 +492,21 @@ export function Timeline() {
                   <div
                     className={
                       vertical
-                        ? "pb-[26px] pt-[4px]"
+                        ? "pb-[26px] pr-[clamp(8px,3%,48px)] pt-[4px]"
                         : "mb-[18px] min-h-0 flex-1 overflow-y-auto pr-[10px] pt-[4px]"
                     }
                     style={vertical ? undefined : { width: PROSE_COL }}
                   >
-                    <ProseChapter ch={c} width={vertical ? undefined : PROSE_COL - 10} />
+                    {/* Vertical fills the pane: the rail already takes the left
+                        of the window, so capping the prose at a 660px column on
+                        top of that left most of the screen empty. Horizontal
+                        keeps its fixed column, because there the pane scrolls
+                        sideways and every chapter needs the same width. */}
+                    <ProseChapter
+                      ch={c}
+                      width={vertical ? undefined : PROSE_COL - 10}
+                      maxWidth={vertical ? "none" : 660}
+                    />
                   </div>
                 ) : (
                 <div
@@ -598,7 +579,7 @@ export function Timeline() {
                             )}
                           </span>
                           <span className="overflow-hidden text-[13px] leading-[1.5] text-ink">
-                            {text || <BorrowedOrBlank ch={c} i={i} />}
+                            {text || <span className="text-faint">New scene</span>}
                           </span>
                         </div>
                       ))}

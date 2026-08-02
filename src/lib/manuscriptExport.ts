@@ -1,5 +1,5 @@
 import type { Chapter, StoryDoc } from "@/types";
-import { countWords, sections } from "@/lib/manuscript";
+import { countWords, parseBlocks, type Block } from "@/lib/manuscript";
 import { inlineTokens } from "@/lib/inline";
 import { zipStore } from "@/lib/zip";
 
@@ -44,13 +44,12 @@ export function buildManuscriptText(doc: StoryDoc): string {
   const parts = [doc.projectTitle.toUpperCase(), ""];
   for (const c of writtenChapters(doc)) {
     parts.push("", chapterHeading(c).toUpperCase(), "");
-    writtenSections(c.manuscript ?? "").forEach((sec, i) => {
-      if (i > 0) parts.push("", "#", "");
-      for (const block of sec.split(/\n[ \t]*\n/)) {
-        const line = paragraphText(block);
-        if (line) parts.push(inlineTokens(line).map((t) => t.text).join(""), "");
-      }
-    });
+    for (const b of parseBlocks(c.manuscript ?? "")) {
+      if (b.kind === "hr") parts.push("#", "");
+      else if (b.kind === "ul" || b.kind === "ol") parts.push(...b.items.map(plain), "");
+      else if (b.kind === "h" || b.kind === "p" || b.kind === "quote")
+        parts.push(plain(b.text.replace(/\n/g, " ")), "");
+    }
   }
   return `${parts.join("\n").replace(/\n{4,}/g, "\n\n\n").trim()}\n`;
 }
@@ -99,40 +98,45 @@ const runsFor = (line: string): string =>
  */
 function chapterParagraphs(text: string): string[] {
   const out: string[] = [];
-  writtenSections(text).forEach((sec, i) => {
-    if (i > 0) out.push(para(runsFor("#"), { align: "center" }));
-    let firstOfScene = true;
-    for (const block of sec.split(/\n[ \t]*\n/)) {
-      const line = paragraphText(block);
-      if (!line) continue;
-      out.push(para(runsFor(line), { indent: !firstOfScene }));
-      firstOfScene = false;
-    }
-  });
+  let bodyStarted = false;
+  for (const b of parseBlocks(text)) {
+    out.push(...docxBlock(b, bodyStarted));
+    if (b.kind === "p") bodyStarted = true;
+    // A rule or a heading ends a passage, so the paragraph after it opens one —
+    // no indent, the way the first paragraph of a chapter has none.
+    if (b.kind === "hr" || b.kind === "h") bodyStarted = false;
+  }
   return out;
 }
 
 /**
- * The scenes with prose in them.
+ * One markdown block as Word paragraphs.
  *
- * A break with nothing under it is an **unwritten scene, not a scene break**, so
- * it is dropped rather than exported. A half-drafted chapter would otherwise
- * hand a beta reader a page of `#` with no story between them, which says
- * something true about the draft in the least useful possible way.
+ * Uses the *same* parser the reading view does, so a heading is a heading and a
+ * rule is a rule in both. Anything less and the file an agent opens quietly
+ * disagrees with the screen the author approved it on.
  */
-function writtenSections(text: string): string[] {
-  return sections(text)
-    .map((s) => text.slice(s.start, s.end))
-    .filter((t) => t.trim());
+function docxBlock(b: Block, indent: boolean): string[] {
+  switch (b.kind) {
+    case "hr":
+      // The centred `#` standard manuscript format uses for a passage break.
+      return [para(runsFor("#"), { align: "center" })];
+    case "h":
+      return [para(runsFor(b.text), { align: "center" })];
+    case "quote":
+      return [para(runsFor(b.text), { indent: true })];
+    case "ul":
+      return b.items.map((it) => para(runsFor(BULLET_CHAR + " " + it), { indent: true }));
+    case "ol":
+      return b.items.map((it, i) => para(runsFor(String(i + 1) + ". " + it), { indent: true }));
+    default:
+      return [para(runsFor(b.text.replace(/\n/g, " ")), { indent })];
+  }
 }
 
-/** One paragraph: block markup dropped, soft wraps rejoined as markdown says. */
-const paragraphText = (block: string): string =>
-  block
-    .split("\n")
-    .map((l) => l.replace(/^\s{0,3}(#{1,6}\s+|>\s?)/, "").trim())
-    .filter(Boolean)
-    .join(" ");
+/** Markdown taken out, for the plain-text export. */
+const plain = (s: string): string => inlineTokens(s).map((t) => t.text).join("");
+const BULLET_CHAR = "\u2022";
 
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
