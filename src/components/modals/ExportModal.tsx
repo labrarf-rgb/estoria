@@ -68,8 +68,8 @@ export function ExportModal() {
             <div className="font-serif text-[18px] font-semibold text-ink">Save to file</div>
             <div className="mt-[3px] text-[12px] font-medium text-soft">
               {tab === "map"
-                ? "The story map: chapters become notes and characters become [[wikilinks]], for an Obsidian vault. Or a portable project file."
-                : "The prose you have written, laid out for someone to read. Standard manuscript format is what agents and beta readers expect."}
+                ? "Your story map: chapters become notes, characters become [[wikilinks]], ready for an Obsidian vault. Or save the whole project as a file."
+                : "Your writing, laid out for someone to read. Standard manuscript format is what agents and beta readers expect."}
             </div>
           </div>
           <CloseButton onClick={close} />
@@ -96,7 +96,7 @@ export function ExportModal() {
 
         {tab === "manuscript" && written.length === 0 ? (
           <div className="flex-1 px-[24px] py-[40px] text-center text-[13px] font-medium text-faint">
-            Nothing is written yet. Open a chapter's manuscript and the prose will appear here.
+            Nothing written yet. Open a chapter's manuscript and it shows up here.
           </div>
         ) : (
           <pre className="m-0 flex-1 overflow-auto whitespace-pre-wrap bg-card px-[24px] py-5 font-mono text-[12.5px] leading-[1.7] text-ink">

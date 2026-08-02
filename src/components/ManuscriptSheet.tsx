@@ -269,7 +269,7 @@ export function PullFromVersion({ ch }: { ch: Chapter }) {
           onClick={() =>
             askConfirm({
               message: `Replace this chapter's writing with the copy from "${v.name}"?`,
-              detail: `${v.words.toLocaleString()} words come across. What is here now can be put back with a single undo, but only once.`,
+              detail: `${v.words.toLocaleString()} words are copied in. What's here now can be put back with one undo, but only once.`,
               confirmLabel: "Pull it in",
               onConfirm: () => pull(ch.id, v.id),
             })
