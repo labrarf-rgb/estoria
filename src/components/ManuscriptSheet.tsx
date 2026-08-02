@@ -49,6 +49,17 @@ export function ManuscriptSheet({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const text = ch.manuscript ?? "";
+  /**
+   * An empty manuscript takes only the room it needs.
+   *
+   * Reserving the full writing height for a chapter nobody has written in makes
+   * the modal taller than the window on a chapter with nothing in it — so it
+   * scrolls, and because the sheet's own headers are pinned it reads as the
+   * manuscript area scrolling, with the scrollbar somewhere else entirely. The
+   * room appears when there are words to put in it.
+   */
+  const empty = text.trim() === "";
+  const sheetHeight = empty ? "h-[18vh]" : expanded ? "h-[74vh]" : "h-[46vh]";
 
   /**
    * Bring the sheet up to the top of the modal on open. Without this the writer
@@ -140,7 +151,7 @@ export function ManuscriptSheet({
         <div
           data-print-root
           className={`overflow-y-auto px-[clamp(20px,4%,56px)] py-[26px] ${
-            expanded ? "h-[74vh]" : "h-[46vh]"
+            empty ? "" : sheetHeight
           }`}
         >
           <ProseChapter ch={ch} maxWidth="none" />
@@ -158,9 +169,7 @@ export function ManuscriptSheet({
           onBlur={flushNow}
           spellCheck
           placeholder="Write the chapter here. Markdown works: **bold**, *italic*, # heading."
-          className={`block w-full resize-none rounded-b-xl bg-transparent px-[clamp(20px,4%,56px)] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${
-            expanded ? "h-[74vh]" : "h-[46vh]"
-          }`}
+          className={`block w-full resize-none rounded-b-xl bg-transparent px-[clamp(20px,4%,56px)] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${sheetHeight}`}
         />
       )}
     </div>
