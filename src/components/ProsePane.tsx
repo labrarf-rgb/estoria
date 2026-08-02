@@ -23,10 +23,18 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
 export function ProseChapter({
   ch,
   width,
+  maxWidth = 660,
   onPickScene,
 }: {
   ch: Chapter;
   width?: number;
+  /**
+   * The reading measure. 660px suits the timeline, where the prose is one column
+   * inside a much wider pane. In the editor's own View mode the column *is* the
+   * pane, so it passes `"none"` and fills it — anything else leaves the same dead
+   * margins the writing pane had.
+   */
+  maxWidth?: number | "none";
   /**
    * What clicking a beat does. The timeline leaves this off and gets the
    * default — open the chapter there. The editor's own View mode passes one,
@@ -70,7 +78,7 @@ export function ProseChapter({
   }
 
   return (
-    <div data-print-chapter className="mx-auto" style={{ width, maxWidth: 660 }}>
+    <div data-print-chapter className="mx-auto" style={{ width, maxWidth }}>
       {secs.map((sec, i) => {
         const paras = paragraphs(text.slice(sec.start, sec.end));
         // The type belongs to the connector *before* this scene, so it decorates

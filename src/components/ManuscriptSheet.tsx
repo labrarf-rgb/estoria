@@ -283,12 +283,13 @@ export function ManuscriptSheet({
       {view === "read" ? (
         <div
           data-print-root
-          className={`overflow-y-auto px-[max(24px,calc(50%-330px))] py-[26px] ${
+          className={`overflow-y-auto px-[clamp(20px,4%,56px)] py-[26px] ${
             full ? "min-h-0 flex-1" : "h-[52vh]"
           }`}
         >
           <ProseChapter
             ch={ch}
+            maxWidth="none"
             onPickScene={(i) => {
               onView("edit");
               setPendingJump(i);
@@ -312,7 +313,7 @@ export function ManuscriptSheet({
         onBlur={flushNow}
         spellCheck
         placeholder="Write the chapter here. A *** on its own line is a scene break."
-        className={`block w-full resize-none rounded-b-xl bg-transparent px-[max(24px,calc(50%-330px))] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${
+        className={`block w-full resize-none rounded-b-xl bg-transparent px-[clamp(20px,4%,56px)] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${
           full ? "min-h-0 flex-1" : "h-[52vh]"
         }`}
       />
