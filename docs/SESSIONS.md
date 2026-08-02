@@ -2867,3 +2867,90 @@ direction; and validating or trimming against that number on import would
 destroy the user's prose to satisfy someone else's layout. That is the one way
 this session could have caused a real cross-app bug, so it is written down on
 both sides rather than only here.
+
+---
+
+## 2026-08-02 — Manuscript mode, all six phases, on `feature/manuscript-mode`
+
+Built the whole feature from `docs/manuscript-mode-build.md`, then folded that
+brief into [`SPECS.md`](SPECS.md) §4 and deleted it, which is what the brief
+told its last reader to do. The brainstorm survives in `archives/` because the
+rejected alternatives are the part worth keeping. **Nothing is pushed or
+deployed, and the branch is not merged.**
+
+### What shipped
+
+- **Phase 0 — the writing pane.** `Chapter.manuscript`, an optional string, no
+  `SCHEMA_VERSION` bump. **The premise was tested and held**: asked directly, the
+  verdict was *"seeing beats while drafting manuscript is something I'd like"*.
+  Everything expensive below sits downstream of that answer.
+- **Phase 1 — three states, then not.** Minimized / Regular / Full screen, plus a
+  drift bar. Both were later removed; see "the reversal".
+- **Phase 4, taken early — the timeline reads prose.** A `Scenes / Manuscript`
+  pane toggle, not a fourth view. Taken before phase 2 deliberately: it is the
+  cheapest large win, and storage only bites once prose exists.
+- **Phase 2 — storage.** Manuscripts moved to **IndexedDB**, keyed by
+  `(projectId, bookId, draftId, chapterId)`, split at the at-rest layer only so
+  `StoryDoc` stays whole in memory and in every file. `createJSONStorage` is gone
+  so the **serialize** is deferred, not just the write: measured, 40 keystrokes
+  now stringify ~26KB instead of 40 × 188KB on the main thread. The async-write
+  hazard is covered by a synchronous localStorage crash pad, proven by forcing
+  IndexedDB to fail and recovering the words through a reload.
+- **Phase 5 — word count and exports.** `words` became a cache of the manuscript
+  with two rules that protect what was typed (never auto-zero; promote the old
+  estimate into the new `target` rather than overwrite it). A prose export sits
+  apart from the map export: standard-manuscript-format `.docx` (built on a
+  110-line ZIP writer rather than a dependency), `.md`, `.txt`, and `Cmd+P` as
+  the PDF route.
+- **Phase 3 — fork ergonomics.** Forking asks whether to take the writing, but
+  only when there is any; the version menu shows word counts; a chapter can pull
+  its text from another version behind a confirm, with one undo. Not a merge
+  engine, on purpose.
+
+### The reversal, and it is the important part
+
+The `***` scene-break contract — prose divided into sections, a caret-following
+carousel, per-scene written state, borrowed opening lines, a drift bar — was
+**built, shipped, and then removed**. The reason is worth keeping: the app
+*seeded* those breaks, so opening a fresh nine-scene chapter greeted you with
+eight rows of `***` and nothing between them. The whole argument for that marker
+over a hidden one was that it is what a novelist types anyway; pre-filling it is
+the app typing it for you.
+
+The beats are now a guide beside the prose. **The premise survived intact** —
+seeing your beats while you draft never required the beats to own the
+paragraphs — and about three hundred lines of sections, drift and reconciliation
+went with it. `View` became a real markdown renderer instead.
+
+### Fixed in passing
+
+- Two raw **NUL bytes in `persistence.ts`**, one a live separator, which made
+  `grep` and `ripgrep` treat the whole file as binary and return nothing. That
+  cost real time before it was spotted.
+- A **latent timeline scroll bug**: the last chapter could never reach the
+  leading edge, so clicking chapter 15 ringed 14. The prose-mode "fix" made
+  earlier in the session was a heuristic; it is now measured and correct in both
+  modes and orientations.
+- `SPECS.md` §8's claim that persist serializes on every keystroke — stale since
+  Session 20 and doubly wrong after phase 2.
+- **Markdown that did not work**: `__bold__` rendered as an italic wearing two
+  stray underscores (alternation order), `~~strikethrough~~` was unhandled, task
+  lists showed their brackets, and `####` was drawn identically to `###`.
+
+### Owed
+
+- **Word has never opened the `.docx`.** Its structure and CRCs are verified;
+  the application is not available here.
+- An **Android regression test** for unknown-field passthrough (different repo;
+  the requirement is written into §6).
+- A **drag-select check** in the timeline's manuscript pane that never came back
+  clean, because a stale modal was open during the test.
+
+### Next session
+
+**§9 item 16: move the manuscript into its own modal.** Four separate complaints
+this session — beat cards too tall, controls scrolling out of reach, an empty
+sheet making the modal scroll with no visible scrollbar, navigation feeling
+messy — turned out to be one cause: a writing surface and a planning surface
+competing for a single scrolling column. Each was patched; the cause was not.
+Read that item before touching the chapter modal.
