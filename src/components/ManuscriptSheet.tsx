@@ -31,7 +31,7 @@ export function ManuscriptSheet({
   ch,
   scroller,
   stickyTop,
-  full,
+  expanded,
   view,
 }: {
   ch: Chapter;
@@ -39,8 +39,8 @@ export function ManuscriptSheet({
   scroller: React.RefObject<HTMLDivElement | null>;
   /** Height of the modal's sticky header, so the guide pins below it. */
   stickyTop: number;
-  /** Full screen: the sheet fills what is left rather than taking a fixed slice. */
-  full: boolean;
+  /** Expanded: the sheet gets more room, as the scene canvas does. */
+  expanded: boolean;
   /** Edit (the textarea) or View (the same markdown, rendered). */
   view: "edit" | "read";
 }) {
@@ -93,9 +93,7 @@ export function ManuscriptSheet({
   return (
     <div
       ref={rootRef}
-      className={`mx-[22px] mb-[6px] mt-[12px] rounded-xl border border-rule bg-bg ${
-        full ? "flex min-h-0 flex-1 flex-col" : ""
-      }`}
+      className="mx-[22px] mb-[6px] mt-[12px] rounded-xl border border-rule bg-bg"
     >
       {/* The beats, as a guide. Sticky rather than merely above the sheet: the
           whole feature is *seeing your beats while you draft*, and a beat that
@@ -142,7 +140,7 @@ export function ManuscriptSheet({
         <div
           data-print-root
           className={`overflow-y-auto px-[clamp(20px,4%,56px)] py-[26px] ${
-            full ? "min-h-0 flex-1" : "h-[52vh]"
+            expanded ? "h-[74vh]" : "h-[46vh]"
           }`}
         >
           <ProseChapter ch={ch} maxWidth="none" />
@@ -161,7 +159,7 @@ export function ManuscriptSheet({
           spellCheck
           placeholder="Write the chapter here. Markdown works: **bold**, *italic*, # heading."
           className={`block w-full resize-none rounded-b-xl bg-transparent px-[clamp(20px,4%,56px)] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${
-            full ? "min-h-0 flex-1" : "h-[52vh]"
+            expanded ? "h-[74vh]" : "h-[46vh]"
           }`}
         />
       )}
@@ -170,19 +168,28 @@ export function ManuscriptSheet({
 }
 
 /**
- * One beat. Reference material while you draft, so it is readable and inert —
- * there is no longer a section of prose for it to point at.
+ * One beat. Reference material while you draft, so it is readable and inert.
  *
- * Never clamped. A scene card that cuts its text off reads as a finished
- * sentence, which is the bug Session 56 exists to have fixed.
+ * **Fixed height, growing sideways** — the same rule the timeline card follows.
+ * Letting a card grow *downwards* makes the guide as tall as its wordiest beat
+ * and pushes the writing pane off the screen, which is the wrong thing to spend
+ * vertical space on when the point is to write.
  */
 function BeatCard({ num, text }: { num: number; text: string }) {
+  // Three width steps rather than a measured fit: enough that a scene at the
+  // 200-character cap still shows whole, without the probe machinery the
+  // timeline needs for a grid it has to pack.
+  const n = text.trim().length;
+  const width = n > 130 ? 460 : n > 62 ? 340 : 230;
   return (
-    <div className="w-[228px] shrink-0 rounded-[11px] border border-rule bg-card p-[10px_12px] shadow-[var(--shadow)]">
-      <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
+    <div
+      className="h-[74px] shrink-0 overflow-hidden rounded-[11px] border border-rule bg-card p-[8px_12px] shadow-[var(--shadow)]"
+      style={{ width }}
+    >
+      <span className="font-mono text-[9.5px] font-semibold tracking-wide text-faint">
         SCENE {num}
       </span>
-      <div className="mt-[6px] text-[12.5px] leading-[1.5] text-ink">
+      <div className="mt-[3px] text-[12px] leading-[1.4] text-ink">
         {text || <span className="text-faint">New scene</span>}
       </div>
     </div>

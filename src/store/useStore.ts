@@ -44,7 +44,7 @@ export type Theme = "light" | "dark";
 export type Level = "series" | "book";
 
 /** Collapsible sections of the chapter modal (Scene flow has its own sizing toggle). */
-export type ChapterSection = "chars" | "world" | "notes" | "refs";
+export type ChapterSection = "scenes" | "manuscript" | "chars" | "world" | "notes" | "refs";
 
 /** Expandable textarea surfaces whose tall/short state is remembered (global). */
 export type TextareaKey = "storyNotes" | "chapterNotes" | "worldDesc" | "worldNotes";
@@ -115,12 +115,10 @@ interface UiState {
   /** Chapter-modal scene-flow canvas size (persisted). */
   sceneFlowExpanded: boolean;
   /**
-   * Which of the three manuscript states the chapter modal is in (persisted).
-   * A mode rather than a per-chapter setting: a planning session stays in
-   * `min` and never looks at prose, a drafting session stays in `regular` or
-   * `full` and gets there without a click per chapter.
+   * Sheet size, the same two-state shape the scene canvas has: the writing area
+   * grows, it does not become a separate mode. Persisted.
    */
-  manuscriptState: ManuscriptState;
+  manuscriptExpanded: boolean;
   /**
    * The prose as it was before the last reconciliation, for a single undo.
    * `previous` is `undefined` when the chapter had never been written in — that
@@ -136,9 +134,6 @@ interface UiState {
    */
   panelExpanded: boolean;
 }
-
-/** Minimized / Regular / Full screen — see docs/SPECS.md §4. */
-export type ManuscriptState = "min" | "regular" | "full";
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
 export interface ConfirmRequest {
@@ -222,7 +217,7 @@ interface StoreState extends UiState {
   /** Refresh `words` from the prose. Debounced by its caller, not by itself. */
   recomputeWords: (chId: string) => void;
   undoManuscript: () => void;
-  setManuscriptState: (state: ManuscriptState) => void;
+  setManuscriptExpanded: (expanded: boolean) => void;
 
   // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
@@ -332,6 +327,8 @@ interface StoreState extends UiState {
   closeNewMenu: () => void;
   setPanel: (panel: PanelKey, open: boolean) => void;
   toggleChapterSection: (section: ChapterSection) => void;
+  /** Ensure a chapter section is open — used when navigating straight into one. */
+  openChapterSection: (section: ChapterSection) => void;
   setRefView: (view: RefView) => void;
   toggleTextarea: (key: TextareaKey) => void;
   setSceneFlowExpanded: (expanded: boolean) => void;
@@ -538,11 +535,18 @@ const initialUi: UiState = {
   worldDraft: null,
   lightbox: null,
   onboarded: false,
-  chapterSectionsCollapsed: { chars: false, world: false, notes: false, refs: false },
+  chapterSectionsCollapsed: {
+    scenes: false,
+    manuscript: true,
+    chars: false,
+    world: false,
+    notes: false,
+    refs: false,
+  },
   refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
-  manuscriptState: "min",
+  manuscriptExpanded: false,
   manuscriptUndo: null,
   panelExpanded: false,
 };
@@ -1195,7 +1199,7 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      setManuscriptState: (state) => set({ manuscriptState: state }),
+      setManuscriptExpanded: (expanded) => set({ manuscriptExpanded: expanded }),
 
       // ---- chapter refs (pure links into the shared asset pool) ----
       // Adding a note/image creates a shared Asset first, then pins a link to it
@@ -1952,6 +1956,11 @@ export const useStore = create<StoreState>()(
             ...(left ? { charDraft: null, worldDraft: null, ...prunedState(s) } : null),
           } as Partial<StoreState>;
         }),
+      openChapterSection: (section) =>
+        set((s) => ({
+          chapterSectionsCollapsed: { ...s.chapterSectionsCollapsed, [section]: false },
+        })),
+
       toggleChapterSection: (section) =>
         set((s) => ({
           chapterSectionsCollapsed: {
@@ -2002,7 +2011,7 @@ export const useStore = create<StoreState>()(
         refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
-        manuscriptState: s.manuscriptState,
+        manuscriptExpanded: s.manuscriptExpanded,
         panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed

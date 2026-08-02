@@ -364,9 +364,11 @@ export function Toolbar() {
             →
           </button>
         </div>
-        {/* Scenes / Prose — a pane toggle, not a fourth view: the rail either
-            side of it is the same rail. Shown only on the timeline, because
-            that is the only surface with a pane to change. */}
+        {/* Scenes / Manuscript — a pane toggle, not a fourth view: the rail
+            either side of it is the same rail. Shown only on the timeline,
+            because that is the only surface with a pane to change.
+            "Manuscript" rather than "Prose", so one word means one thing here
+            and in the chapter modal. It is also what the export is called. */}
         {view === "timeline" && (
           <div className="flex rounded-[9px] bg-chip p-[3px]">
             <button
@@ -377,11 +379,11 @@ export function Toolbar() {
               Scenes
             </button>
             <button
-              title="Read the chapters' prose"
+              title="Read the chapters' manuscript"
               onClick={() => setTimelinePane("prose")}
               className={pane === "prose" ? segOn : segOff}
             >
-              Prose
+              Manuscript
             </button>
           </div>
         )}
