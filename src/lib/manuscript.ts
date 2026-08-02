@@ -163,6 +163,78 @@ export function paragraphs(text: string): string[] {
     .filter((p) => p.trim().length > 0);
 }
 
+// ---- Borrowed labels --------------------------------------------------------
+
+/** Abbreviations whose full stop does not end a sentence. */
+const ABBR = new Set(["mr", "mrs", "ms", "dr", "st", "prof", "sr", "jr", "vs", "etc"]);
+
+/** Enough markdown removed that a label reads as words rather than syntax. */
+const flatten = (s: string): string =>
+  s
+    // A heading is a complete thought, so it ends one. Without this it runs
+    // into the paragraph below it once the line breaks are collapsed.
+    .replace(/^\s{0,3}#{1,6}\s+(.*)$/gm, (_, t: string) => (/[.!?]$/.test(t) ? t : `${t}.`))
+    .replace(/^\s{0,3}(>\s?|[-*+]\s+|\d+\.\s+)/gm, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_~`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * The first sentence of some prose, for use as a label.
+ *
+ * Abbreviations and initials are stepped over, because "Mr." ending a scene name
+ * looks like a bug even though the rule that produced it is defensible. Prose
+ * with no full stop in reach is cut at a word boundary with an ellipsis — never
+ * mid-word, which is the truncation this app has spent a whole session removing.
+ */
+export function firstSentence(prose: string, cap = 120): string {
+  const flat = flatten(prose);
+  if (!flat) return "";
+
+  const re = /[.!?](?=\s|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(flat)) !== null) {
+    const word = (flat.slice(0, m.index).match(/(\S+)$/)?.[1] ?? "").toLowerCase();
+    if (flat[m.index] === "." && (ABBR.has(word) || /^[a-z]$/.test(word))) continue;
+    if (m.index + 1 <= cap) return flat.slice(0, m.index + 1);
+    break;
+  }
+
+  if (flat.length <= cap) return flat;
+  const cut = flat.slice(0, cap);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > cap * 0.5 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/**
+ * What an **unnamed** beat shows instead of its placeholder: the opening
+ * sentence of the prose written under it.
+ *
+ * Derived on read and **never stored**. Storing it would make the map quietly
+ * acquire text from the manuscript, and then nothing could tell a lifted
+ * sentence from one the writer typed — so the label could not follow the prose
+ * as it changed, and could not get out of the way the moment a real name was
+ * given. Deriving costs a string scan and keeps both properties for free.
+ *
+ * Returns `""` when the beat already has a name, when there is no prose under
+ * it, or when the prose has **drifted out of step with the map** — in that last
+ * case section `i` is not this scene's section, and showing another scene's
+ * opening line as this one's name would be worse than showing nothing.
+ */
+export function borrowedLabel(
+  scene: string | undefined,
+  manuscript: string | undefined,
+  sceneIndex: number,
+  sceneCount: number
+): string {
+  if (scene?.trim() || !manuscript) return "";
+  const secs = sections(manuscript);
+  if (secs.length !== sceneCount) return "";
+  const sec = secs[sceneIndex];
+  return sec ? firstSentence(manuscript.slice(sec.start, sec.end)) : "";
+}
+
 // ---- Edits ------------------------------------------------------------------
 //
 // All of these are surgical: they splice at an offset rather than rebuild the

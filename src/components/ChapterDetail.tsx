@@ -10,7 +10,7 @@ import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { DriftBar, ManuscriptSheet, SheetViewToggle } from "@/components/ManuscriptSheet";
-import { writtenCount } from "@/lib/manuscript";
+import { borrowedLabel, writtenCount } from "@/lib/manuscript";
 import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
@@ -909,6 +909,7 @@ export function ChapterDetail() {
             {cardSlots.map((slot) => {
               const i = slot.idx;
               const s = ch.scenes[i];
+              const borrowed = borrowedLabel(s, ch.manuscript, i, ch.scenes.length);
               const isSelected = moveMode && selected.has(i);
               return (
                 <div
@@ -1023,10 +1024,12 @@ export function ChapterDetail() {
                       onMouseDown={(e) => !moveMode && e.stopPropagation()}
                       readOnly={moveMode}
                       rows={3}
-                      placeholder="New scene"
-                      className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint ${
-                        moveMode ? "pointer-events-none" : ""
-                      }`}
+                      // A borrowed opening line reads naturally as placeholder
+                      // text: visibly not typed, and gone the moment it is.
+                      placeholder={borrowed || "New scene"}
+                      className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none ${
+                        borrowed ? "placeholder:italic placeholder:text-soft" : "placeholder:text-faint"
+                      } ${moveMode ? "pointer-events-none" : ""}`}
                     />
                   </div>
                 </div>

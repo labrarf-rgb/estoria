@@ -5,6 +5,7 @@ import { SCENE_TEXT_MAX, isOverCap, sceneSpan } from "@/lib/sceneFit";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
+import { borrowedLabel } from "@/lib/manuscript";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
 import { writtenCount } from "@/lib/manuscript";
@@ -79,6 +80,23 @@ interface Box {
   y: number;
   w: number;
   h: number;
+}
+
+/**
+ * What an unnamed beat shows. If prose has been written under it, its opening
+ * sentence stands in — italic and dimmed, because it is borrowed rather than
+ * typed, and you should be able to see at a glance which beats you actually
+ * named. Nothing is stored; it follows the prose and disappears the moment a
+ * real name is given. See `borrowedLabel`.
+ */
+export function BorrowedOrBlank({ ch, i }: { ch: Chapter; i: number }) {
+  const lifted = borrowedLabel(ch.scenes[i], ch.manuscript, i, ch.scenes.length);
+  if (!lifted) return <span className="text-faint">New scene</span>;
+  return (
+    <span className="italic text-soft" title="The opening line of this scene's prose. Type a name to replace it.">
+      {lifted}
+    </span>
+  );
 }
 
 /**
@@ -277,9 +295,20 @@ export function Timeline() {
     const out = new Map<string, ReturnType<typeof sceneGrid>>();
     for (const c of doc.chapters) {
       const m = sceneMetrics(c.scenes.length, availW, availH, fill);
+      // Measured against what the card will *show*, borrowed opening line
+      // included — sizing on the stored label would under-size a card whose
+      // name is being lifted from the prose.
       const spans =
         m.fill === "row"
-          ? c.scenes.map((t) => sceneSpan(t, m.nodeW, m.gapX, m.tracks, m.nodeH))
+          ? c.scenes.map((t, i) =>
+              sceneSpan(
+                t || borrowedLabel(t, c.manuscript, i, c.scenes.length),
+                m.nodeW,
+                m.gapX,
+                m.tracks,
+                m.nodeH
+              )
+            )
           : c.scenes.map(() => 1);
       out.set(c.id, sceneGrid(m, spans));
     }
@@ -545,7 +574,7 @@ export function Timeline() {
                             )}
                           </span>
                           <span className="overflow-hidden text-[13px] leading-[1.5] text-ink">
-                            {text || <span className="text-faint">New scene</span>}
+                            {text || <BorrowedOrBlank ch={c} i={i} />}
                           </span>
                         </div>
                       ))}

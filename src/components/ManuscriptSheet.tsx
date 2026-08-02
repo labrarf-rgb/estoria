@@ -4,6 +4,7 @@ import { flushNow } from "@/store/persistence";
 import {
   applyReorder,
   appendBreaks,
+  borrowedLabel,
   breakCount,
   breaksBefore,
   changedAt,
@@ -221,6 +222,10 @@ export function ManuscriptSheet({
   const beat = (i: number) => ({
     i,
     text: ch.scenes[i] ?? "",
+    // An unnamed beat borrows its opening line from the prose beneath it, so
+    // the carousel says something about the scene you are writing rather than
+    // "New scene" nine times over.
+    borrowed: borrowedLabel(ch.scenes[i], ch.manuscript, i, ch.scenes.length),
     written: secs[i] ? isWritten(text, secs[i]) : false,
   });
   const prev = idx > 0 ? beat(idx - 1) : null;
@@ -535,6 +540,8 @@ function Slot({
 interface Beat {
   i: number;
   text: string;
+  /** Lifted from the prose when the beat has no name of its own; else "". */
+  borrowed: string;
   written: boolean;
 }
 
@@ -558,7 +565,17 @@ function FocusCard({ beat, count }: { beat: Beat; count: number }) {
       {/* Never clamped. A scene card that cuts its text off reads as a finished
           sentence, which is the bug Session 56 exists to have fixed. */}
       <div className="mt-[7px] text-[13px] leading-[1.5] text-ink">
-        {beat.text || <span className="text-faint">New scene</span>}
+        {beat.text ||
+          (beat.borrowed ? (
+            <span
+              className="italic text-soft"
+              title="The opening line of this scene's prose. Type a name to replace it."
+            >
+              {beat.borrowed}
+            </span>
+          ) : (
+            <span className="text-faint">New scene</span>
+          ))}
       </div>
       <div className="sr-only">
         Scene {beat.i + 1} of {count}
@@ -575,7 +592,7 @@ function PeekCard({ beat, onClick }: { beat: Beat; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      title={beat.text || "New scene"}
+      title={beat.text || beat.borrowed || "New scene"}
       style={{ maxWidth: PEEK_W }}
       className="flex h-full w-full flex-col items-start gap-[6px] overflow-hidden rounded-[11px] border border-rule bg-card p-[10px] text-left opacity-70 shadow-[var(--shadow)] transition-opacity hover:border-faint hover:opacity-100"
     >

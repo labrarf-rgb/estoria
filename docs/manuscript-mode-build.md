@@ -610,11 +610,29 @@ must say which is which.
    trackpad worry does not arise.
 2. ~~What the editor does when the counts disagree~~ — **answered in Phase 1.**
    Nothing on its own: it reports, and offers a fix it can name.
-3. Whether a hand-typed `***` should name its new beat `"New scene."` or lift the
-   first sentence after the break. **Still open**, and currently neither: the new
-   beat is seeded empty, the same as every other blank record in the app, and the
-   card shows its "New scene" placeholder. Lifting the first sentence remains the
-   interesting version.
+3. ~~Whether a hand-typed `***` should name its new beat `"New scene."` or lift
+   the first sentence after the break~~ — **answered: it borrows, and stores
+   nothing.**
+
+   The question as written has no answer, because at the moment you type `***`
+   there is no sentence after the break yet to lift. The new beat is still seeded
+   empty, like every other blank record in the app. What changed is what an
+   **unnamed** beat *displays*: the opening sentence of the prose written under
+   it, in italic, wherever it would otherwise have said "New scene" — the
+   carousel, the scene canvas (as its placeholder), and the timeline card.
+
+   **Derived on read, never written to `scenes[i]`.** Storing the lifted sentence
+   would be the manuscript quietly editing the map, and then nothing could tell a
+   borrowed name from a typed one: the label could not follow the prose as it
+   changed, and could not get out of the way the moment a real name was given.
+   Deriving costs a string scan and keeps both properties.
+
+   Three things it deliberately does: steps over abbreviations and initials, so a
+   scene is not named "Mr."; cuts at a word boundary with an ellipsis rather than
+   mid-word, which is the truncation Session 56 exists to have removed; and
+   **refuses to borrow at all while the prose has drifted out of step with the
+   map**, because section `i` is then not that scene's section, and showing
+   another scene's opening line as this one's name is worse than showing nothing.
 4. ~~Keyboard shortcuts~~ — **built.** `Alt+↑` / `Alt+↓` jump to the previous and
    next beat; `Cmd/Ctrl+Enter` inserts a scene break, which creates the scene.
    The undo gotcha was real and is respected: the insert goes through
