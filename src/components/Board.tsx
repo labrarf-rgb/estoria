@@ -43,6 +43,8 @@ export function Board() {
   const setBoardSize = useStore((s) => s.setBoardSize);
   const moveChapter = useStore((s) => s.moveChapter);
   const reorderChapter = useStore((s) => s.reorderChapter);
+  const reorderChapters = useStore((s) => s.reorderChapters);
+  const deleteChapters = useStore((s) => s.deleteChapters);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const setDragId = useStore((s) => s.setDragId);
   const openChapter = useStore((s) => s.openChapter);
@@ -71,6 +73,22 @@ export function Board() {
   // card. A few pixels of hand-shake still counts as a click, hence the slop.
   const movedRef = useRef(false);
   const CLICK_SLOP = 4;
+
+  /**
+   * Multi-selected chapters, for reordering or deleting several at once.
+   *
+   * Entered by **modifier-clicking** a card rather than by a mode button: the
+   * board has no toolbar of its own, and a press on a card already means three
+   * things (click to open, drag to move, drop to reorder). A modifier is the
+   * one addition that does not have to be arbitrated against those.
+   *
+   * Mirrored into a ref because the drag and drop handlers are window-level and
+   * would otherwise close over the selection as it was when they were bound.
+   */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectedRef = useRef<Set<string>>(selected);
+  selectedRef.current = selected;
+  const clearSelection = () => setSelected(new Set());
 
   // Pointer drag (chapters) and background pan — via window listeners.
   useEffect(() => {
@@ -121,17 +139,41 @@ export function Board() {
           dragRaf.current = null;
         }
         const click = !movedRef.current;
+        // Where the card actually came to rest, kept for the hit-test below —
+        // `pendingDragPos` is cleared as part of committing the move.
+        let finalPos = { x: drag.current.ox, y: drag.current.oy };
         if (pendingDragPos.current) {
           // A click that jiggled a pixel or two puts the card back where it was
           // — clicking into a chapter must never nudge the board.
           const { x, y } = click
             ? { x: drag.current.ox, y: drag.current.oy }
             : pendingDragPos.current;
+          finalPos = { x, y };
           moveChapter(drag.current.id, x, y);
           pendingDragPos.current = null;
         }
         const draggedId = drag.current.id;
-        const targetId = click ? null : dropTargetRef.current;
+        // Hit-test against the card's *final* position rather than trusting
+        // `dropTargetRef`. That ref is only written inside the coalescing rAF,
+        // and the cancel above means a drag that ends in the same frame as its
+        // last move never ran one — so the ref can be a frame stale, or never
+        // set at all on a quick flick.
+        let targetId: string | null = null;
+        if (!click) {
+          const cx = finalPos.x + CARD_W / 2;
+          const cy = finalPos.y + CARD_H / 2;
+          targetId =
+            useStore
+              .getState()
+              .doc.chapters.find(
+                (c) =>
+                  c.id !== draggedId &&
+                  cx >= c.x &&
+                  cx <= c.x + CARD_W &&
+                  cy >= c.y &&
+                  cy <= c.y + CARD_H
+              )?.id ?? null;
+        }
         drag.current = null;
         setDragId(null);
         if (click) openChapter(draggedId);
@@ -139,14 +181,29 @@ export function Board() {
           const chapters = useStore.getState().doc.chapters;
           const dragged = chapters.find((c) => c.id === draggedId);
           const target = chapters.find((c) => c.id === targetId);
+          // Dragging a card that is part of a selection moves the whole
+          // selection; dragging an unselected card moves just that card, so the
+          // ordinary single reorder is untouched by a selection sitting idle
+          // elsewhere on the board. A drop *onto* a selected card is refused by
+          // the store, so it is not offered here either.
+          const sel = selectedRef.current;
+          const block = sel.has(draggedId) && !sel.has(targetId) ? [...sel] : null;
           if (dragged && target) {
             const after = dragged.x > target.x;
+            const where = after ? "after" : "before";
             askConfirm({
-              message: "Reorder chapters?",
-              detail: `"${dragged.title}" will move ${after ? "after" : "before"} "${target.title}", and the board will re-arrange to match.`,
+              message: block ? `Reorder ${block.length} chapters?` : "Reorder chapters?",
+              detail: block
+                ? `The ${block.length} selected chapters will move ${where} "${target.title}", keeping the order they're in now. The board will re-arrange to match.`
+                : `"${dragged.title}" will move ${where} "${target.title}", and the board will re-arrange to match.`,
               confirmLabel: "Reorder",
               onConfirm: () => {
-                reorderChapter(draggedId, target.id, after);
+                if (block) {
+                  reorderChapters(block, target.id, after);
+                  setSelected(new Set());
+                } else {
+                  reorderChapter(draggedId, target.id, after);
+                }
                 autoArrangeBoard();
               },
             });
@@ -164,7 +221,16 @@ export function Board() {
       window.removeEventListener("mouseup", onUp);
       if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
     };
-  }, [moveChapter, reorderChapter, autoArrangeBoard, setCamera, setDragId, askConfirm, openChapter]);
+  }, [
+    moveChapter,
+    reorderChapter,
+    reorderChapters,
+    autoArrangeBoard,
+    setCamera,
+    setDragId,
+    askConfirm,
+    openChapter,
+  ]);
 
   // Wheel zooms the map.
   useEffect(() => {
@@ -241,11 +307,26 @@ export function Board() {
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
     e.stopPropagation();
     e.preventDefault();
+    // Modifier-click toggles selection and starts no drag: picking chapters is
+    // not a gesture that should also nudge the board.
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(ch.id)) next.delete(ch.id);
+        else next.add(ch.id);
+        return next;
+      });
+      return;
+    }
     movedRef.current = false;
     drag.current = { id: ch.id, mx: e.clientX, my: e.clientY, ox: ch.x, oy: ch.y };
     setDragId(ch.id);
   };
   const onCanvasDown = (e: React.MouseEvent) => {
+    // A press on bare board clears the selection, the same way clicking away
+    // dismisses a selection anywhere else. Panning still works: this fires on
+    // the press, and the selection was not doing anything for the pan.
+    if (selected.size > 0) clearSelection();
     pan.current = { mx: e.clientX, my: e.clientY, px: panX, py: panY };
     void e;
   };
@@ -324,13 +405,20 @@ export function Board() {
               <div
                 className="flex h-full flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] hover:border-faint"
                 style={{
-                  borderColor: dropTargetId === c.id ? "color-mix(in srgb, var(--but) 60%, var(--rule))" : "var(--rule)",
+                  borderColor:
+                    dropTargetId === c.id
+                      ? "color-mix(in srgb, var(--but) 60%, var(--rule))"
+                      : selected.has(c.id)
+                        ? "var(--therefore)"
+                        : "var(--rule)",
                   boxShadow:
                     dropTargetId === c.id
                       ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent), var(--shadow)"
-                      : dragId === c.id
-                        ? "0 14px 32px rgba(0,0,0,0.26), var(--shadow)"
-                        : "var(--shadow)",
+                      : selected.has(c.id)
+                        ? "0 0 0 3px color-mix(in srgb, var(--therefore) 30%, transparent), var(--shadow)"
+                        : dragId === c.id
+                          ? "0 14px 32px rgba(0,0,0,0.26), var(--shadow)"
+                          : "var(--shadow)",
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -397,6 +485,59 @@ export function Board() {
           );
         })}
       </div>
+
+      {/* Selection bar. Floats over the board rather than living in the toolbar,
+          because it only exists while a selection does and the toolbar is
+          shared with the series map and the timeline. */}
+      {selected.size > 0 && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-[22px] left-1/2 flex -translate-x-1/2 items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
+        >
+          <span className="text-[12.5px] font-medium text-ink">
+            {selected.size} {selected.size === 1 ? "chapter" : "chapters"} selected
+          </span>
+          <span className="text-[11.5px] text-faint">
+            drag one onto another chapter to move them all there
+          </span>
+          <span className="mx-[2px] h-[20px] w-px bg-rule" />
+          <button
+            onClick={() => {
+              const all = useStore.getState().doc.chapters;
+              const names = all.filter((c) => selected.has(c.id)).map((c) => c.title || "Untitled chapter");
+              // The store refuses to empty a book; say so here rather than
+              // letting the confirm run and silently do nothing.
+              if (selected.size >= all.length) {
+                askConfirm({
+                  message: "A book keeps at least one chapter",
+                  detail: "Leave one chapter unselected, then delete the rest.",
+                  confirmLabel: "Got it",
+                  onConfirm: () => {},
+                });
+                return;
+              }
+              askConfirm({
+                message: `Delete ${selected.size} ${selected.size === 1 ? "chapter" : "chapters"}?`,
+                detail: `${names.slice(0, 4).join(", ")}${names.length > 4 ? `, and ${names.length - 4} more` : ""}. Their scenes, notes and writing go with them. This can't be undone.`,
+                confirmLabel: "Delete",
+                onConfirm: () => {
+                  deleteChapters([...selected]);
+                  clearSelection();
+                },
+              });
+            }}
+            className="rounded-lg border border-rule bg-card px-[12px] py-[6px] text-[12px] font-medium text-but hover:border-but"
+          >
+            Delete
+          </button>
+          <button
+            onClick={clearSelection}
+            className="rounded-lg border border-rule bg-card px-[12px] py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,9 +9,9 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
-import { countWords, hasProse } from "@/lib/manuscript";
-import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
+import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
+import { type ChapterTab } from "@/store/useStore";
+import { type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
@@ -19,10 +19,12 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
   and: { label: "And", color: "var(--and)" },
 };
 
-const STATUSES: { value: ChapterStatus; label: string }[] = [
-  { value: "idea", label: "Idea" },
-  { value: "draft", label: "Draft" },
-  { value: "done", label: "Done" },
+/** The reference tabs, in order. See `ChapterTab` in the store. */
+const TABS: { key: ChapterTab; label: string; hint: string }[] = [
+  { key: "chars", label: "Characters", hint: "Who is in this chapter" },
+  { key: "world", label: "World details", hint: "World entries this chapter touches" },
+  { key: "notes", label: "Chapter notes", hint: "Reminders and revision ideas" },
+  { key: "refs", label: "Pinned references", hint: "Notes, to-dos and images pinned here" },
 ];
 
 export function ChapterDetail() {
@@ -43,6 +45,7 @@ export function ChapterDetail() {
   const deleteScene = useStore((s) => s.deleteScene);
   const reorderScene = useStore((s) => s.reorderScene);
   const moveScenesToChapter = useStore((s) => s.moveScenesToChapter);
+  const moveScenesWithin = useStore((s) => s.moveScenesWithin);
   const cycleSceneLink = useStore((s) => s.cycleSceneLink);
   const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
@@ -53,8 +56,10 @@ export function ChapterDetail() {
   const startCharDraft = useStore((s) => s.startCharDraft);
   const startWorldDraft = useStore((s) => s.startWorldDraft);
   const askConfirm = useStore((s) => s.askConfirm);
-  const collapsed = useStore((s) => s.chapterSectionsCollapsed);
-  const toggleSection = useStore((s) => s.toggleChapterSection);
+  const scenesCollapsed = useStore((s) => s.scenesCollapsed);
+  const toggleScenesCollapsed = useStore((s) => s.toggleScenesCollapsed);
+  const tab = useStore((s) => s.chapterTab);
+  const setTab = useStore((s) => s.setChapterTab);
   const refView = useStore((s) => s.refView);
   const setRefView = useStore((s) => s.setRefView);
   const expanded = useStore((s) => s.sceneFlowExpanded);
@@ -76,72 +81,17 @@ export function ChapterDetail() {
   const [moveMode, setMoveMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [destPickerOpen, setDestPickerOpen] = useState(false);
-  // Minimized / Regular / Full screen (§4). A mode, so it lives in the store and
-  // persists: a planning session stays minimized and never sees prose, a
-  // drafting session stays open and doesn't re-open the sheet per chapter.
-  // The manuscript is an ordinary collapsible section like every other one in
-  // this modal. Its Expand/Collapse is the *same* control the scene canvas has,
-  // not a second one: both grow their area and both widen the modal, so one
-  // flag drives both and the two buttons always agree.
-  // `?? ` rather than a plain read: a store persisted before these two sections
-  // existed has no key for them, and `undefined` would silently mean "open" —
-  // which is the wrong default for the manuscript, whose whole point is that a
-  // planning session never has to look at prose.
-  const scenesCollapsed = collapsed.scenes ?? false;
-  const manuscriptCollapsed = collapsed.manuscript ?? true;
-  const manuscriptOpen = !manuscriptCollapsed;
-  // Edit / View. Local, and always starts on Edit: unlike the three states,
-  // this one has a wrong side to land on — opening the sheet unable to type
-  // because a previous session left it in View is a trap, not a preference.
-  const [sheetView, setSheetView] = useState<"edit" | "read">("edit");
-  // `words` follows the prose, on the same rhythm as the save rather than per
-  // keystroke: each edit resets the timer, so counting a long chapter happens
-  // once when the typing stops. Lives here, not in the sheet, so a drift-bar
-  // reconciliation with the manuscript minimized still updates the count.
-  const recomputeWords = useStore((s) => s.recomputeWords);
-  const manuscriptText = ch?.manuscript;
-  useEffect(() => {
-    if (!chIdRef.current || manuscriptText === undefined) return;
-    const id = chIdRef.current;
-    const t = setTimeout(() => recomputeWords(id), 700);
-    return () => clearTimeout(t);
-  }, [manuscriptText, openCh, recomputeWords]);
-  // The modal is one scroll container under a sticky header, so the carousel
-  // has to know how tall that header is to stick *below* it rather than under
-  // it. Measured rather than guessed: the summary line wraps, and the banner on
-  // a non-main version adds a row.
   const modalRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [headerH, setHeaderH] = useState(0);
-  // The manuscript's own header sticks under the modal's, and the beat guide
-  // under that — so each needs to know the height of what it sits below.
-  const manHeaderRef = useRef<HTMLDivElement>(null);
-  const [manHeaderH, setManHeaderH] = useState(0);
-  useEffect(() => {
-    const el = manHeaderRef.current;
-    if (!el) return setManHeaderH(0);
-    const ro = new ResizeObserver(() => setManHeaderH(el.offsetHeight));
-    ro.observe(el);
-    setManHeaderH(el.offsetHeight);
-    return () => ro.disconnect();
-  }, [openCh, manuscriptOpen]);
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setHeaderH(el.offsetHeight));
-    ro.observe(el);
-    setHeaderH(el.offsetHeight);
-    return () => ro.disconnect();
-  }, [openCh]);
   // Chosen destination + insertion position, shown in the confirm dialog.
   const [moveDest, setMoveDest] = useState<{ id: string; num: number; title: string } | null>(null);
   const [movePos, setMovePos] = useState<"beginning" | "middle" | "end">("end");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
 
-  // Scene drag-to-reorder: either an existing card ("move") or the ghost from
-  // a long-pressed Add-scene button ("new"). Coordinates are canvas-local
-  // (relative to sceneBoxRef's content, including its scroll offset) so they
-  // line up directly with scenePos / sceneAutoArrange output.
+  // Scene drag-to-reorder: an existing card ("move"), the ghost from a
+  // long-pressed Add-scene button ("new"), or the whole checked selection in
+  // move mode ("block"). Coordinates are canvas-local (relative to
+  // sceneBoxRef's content, including its scroll offset) so they line up
+  // directly with scenePos / sceneAutoArrange output.
   type SceneDrag =
     | {
         kind: "move";
@@ -153,11 +103,33 @@ export function ChapterDetail() {
         offX: number;
         offY: number;
       }
-    | { kind: "new"; overIdx: number; cx: number; cy: number; clientY: number };
+    | { kind: "new"; overIdx: number; cx: number; cy: number; clientY: number }
+    | {
+        kind: "block";
+        /** The selected indices, frozen at drag start. */
+        idxs: number[];
+        overIdx: number;
+        cx: number;
+        cy: number;
+        clientY: number;
+      };
   const [drag, setDrag] = useState<SceneDrag | null>(null);
   const dragRef = useRef<SceneDrag | null>(null);
   dragRef.current = drag;
   const addScenePressRef = useRef(false);
+  /**
+   * A press on a selected card in move mode, not yet a drag.
+   *
+   * In move mode a click on a card toggles its selection, so a block drag
+   * cannot start on mousedown or every attempt to pick the block up would also
+   * deselect the card it started from. The press is held here and promoted to a
+   * real drag only once the pointer has actually moved; if it never does, the
+   * click falls through and toggles as it always did. The same press-versus-drag
+   * rule the board uses for chapter cards.
+   */
+  const pendingBlock = useRef<{ x: number; y: number; idxs: number[] } | null>(null);
+  /** Set when a press became a block drag, so the click that follows is eaten. */
+  const blockDragged = useRef(false);
 
   // Landing on a specific scene, from the timeline's scene pane. One-shot: the
   // marker is consumed as soon as it is applied, so re-renders (and reopening
@@ -224,10 +196,8 @@ export function ChapterDetail() {
   const sceneCount = ch?.scenes.length ?? 0;
   useEffect(() => {
     if (!chId || !focusScene || focusScene.chapterId !== chId || sceneCount === 0) return;
-    // With the manuscript open there is no canvas to land on, and the marker is
-    // the sheet's to consume — it moves the caret to that scene's prose instead.
-    // Checked before `clearFocusScene`, or this effect would eat it first.
-    if (manuscriptOpen) return;
+    // No mode check: `openChapterAtScene` forces the story map on, so this modal
+    // is the one mounted whenever there is a marker to consume.
     clearFocusScene();
     const box = sceneBoxRef.current;
     if (!box) return;
@@ -239,7 +209,7 @@ export function ChapterDetail() {
     setFlashIdx(idx);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlashIdx(null), 1600);
-  }, [focusScene, chId, sceneCount, clearFocusScene, manuscriptOpen]);
+  }, [focusScene, chId, sceneCount, clearFocusScene]);
 
   const canvasPoint = (clientX: number, clientY: number) => {
     const box = sceneBoxRef.current;
@@ -250,35 +220,91 @@ export function ChapterDetail() {
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const d = dragRef.current;
       const chId = chIdRef.current;
       const box = sceneBoxRef.current;
-      if (!d || !chId || !box) return;
+      if (!chId || !box) return;
+
+      // Promote a held press into a block drag, once the pointer has moved far
+      // enough that this is plainly not a click. 4px is the same slack the
+      // board allows a chapter card.
+      const p = pendingBlock.current;
+      if (p && !dragRef.current) {
+        if (Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) < 4) return;
+        const pt0 = canvasPoint(e.clientX, e.clientY);
+        pendingBlock.current = null;
+        blockDragged.current = true;
+        // The block's ghost is one card standing in for several, so it hangs
+        // from the cursor rather than from a corner of any one of them.
+        const started: SceneDrag = {
+          kind: "block",
+          idxs: p.idxs,
+          overIdx: 0,
+          cx: pt0.x,
+          cy: pt0.y,
+          clientY: e.clientY,
+        };
+        // Written straight to the ref as well as to state. `dragRef` is
+        // otherwise assigned during render, so every mousemove arriving before
+        // React re-renders would see `null` here and be dropped — which loses
+        // the first few pixels of a fast drag, and the whole drag if the
+        // pointer moves and releases inside one frame.
+        dragRef.current = started;
+        setDrag(started);
+        return;
+      }
+
+      const d = dragRef.current;
+      if (!d) return;
       const c = useStore.getState().doc.chapters.find((x) => x.id === chId);
       if (!c) return;
       const pt = canvasPoint(e.clientX, e.clientY);
       // Total slots rendered in the preview grid (including the gap) — must
       // match the `others.length + 1` used by the render logic below, or the
       // column count (and therefore the detected slot) desyncs from what's
-      // actually on screen.
-      const total = d.kind === "move" ? c.scenes.length : c.scenes.length + 1;
+      // actually on screen. A block leaves as many holes as it has scenes.
+      const total =
+        d.kind === "move"
+          ? c.scenes.length
+          : d.kind === "block"
+            ? c.scenes.length - d.idxs.length + 1
+            : c.scenes.length + 1;
       const cols = sceneColumnsForWidth(total, box.clientWidth);
       const overIdx = Math.max(0, Math.min(sceneSlotFromPoint(pt.x, pt.y, cols), total - 1));
       setDrag({ ...d, cx: pt.x, cy: pt.y, clientY: e.clientY, overIdx });
     };
     const onUp = () => {
+      pendingBlock.current = null;
       const d = dragRef.current;
       const chId = chIdRef.current;
       const box = sceneBoxRef.current;
       if (d && chId) {
         const c = useStore.getState().doc.chapters.find((x) => x.id === chId);
         if (c) {
-          const total = d.kind === "move" ? c.scenes.length : c.scenes.length + 1;
+          const total =
+            d.kind === "move"
+              ? c.scenes.length
+              : d.kind === "block"
+                ? c.scenes.length - d.idxs.length + 1
+                : c.scenes.length + 1;
           const cols = sceneColumnsForWidth(total, box?.clientWidth ?? 0);
           if (d.kind === "move") reorderScene(chId, d.fromIdx, d.overIdx, cols);
-          else insertScene(chId, d.overIdx, cols);
+          else if (d.kind === "block") {
+            moveScenesWithin(chId, d.idxs, d.overIdx, cols);
+            // Follow the block to where it landed. Selection is by index, so
+            // leaving it alone after a reorder would leave the highlight on
+            // whatever scenes now happen to sit at the old positions — the
+            // wrong ones, and the next drag would move those instead.
+            const at = Math.max(0, Math.min(d.overIdx, c.scenes.length - d.idxs.length));
+            setSelected(new Set(d.idxs.map((_, i) => at + i)));
+          } else insertScene(chId, d.overIdx, cols);
         }
       }
+      // Cleared on the next task, not by the click that may follow. A drag that
+      // ends with the pointer *off* the card it started on produces no click at
+      // all, and a flag left standing would then eat the next real selection
+      // click. `click` is dispatched before a queued macrotask, so a drag that
+      // does end on its card still gets its click swallowed first.
+      if (blockDragged.current) setTimeout(() => (blockDragged.current = false), 0);
       setDrag(null);
     };
     window.addEventListener("mousemove", onMove);
@@ -287,7 +313,7 @@ export function ChapterDetail() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [reorderScene, insertScene]);
+  }, [reorderScene, insertScene, moveScenesWithin]);
 
   // Auto-scroll the scene canvas while dragging near its top/bottom edge, so
   // reordering works on boards with more scenes than fit on screen.
@@ -357,10 +383,19 @@ export function ChapterDetail() {
   // wherever the user put the marker, so a fork they promoted stays quiet.
   const draftId = doc.activeDraftId;
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
+  // Tab badges. `undefined` shows no number at all, which is what an empty tab
+  // wants — a grey "0" reads as a broken count rather than as nothing there.
+  // Chapter notes has nothing to count, so it gets a dot when it has been
+  // written in.
+  const tabCount: Record<ChapterTab, string | undefined> = {
+    chars: ch.chars.length ? String(ch.chars.length) : undefined,
+    world: (ch.worldRefs ?? []).length ? String((ch.worldRefs ?? []).length) : undefined,
+    notes: ch.notes?.trim() ? "•" : undefined,
+    refs: ch.refs.length ? String(ch.refs.length) : undefined,
+  };
+
   // The layout belonging to the size on screen. Falling back to the other one
   // covers the frame between a size toggle and the store catching up.
-  // Does this chapter's count come from its prose rather than from the keyboard?
-  const counted = hasProse(ch.manuscript);
   const positions = (expanded ? ch.scenePos : ch.scenePosCompact) ?? ch.scenePos ?? [];
   const boxW = sceneBoxRef.current?.clientWidth ?? 0;
 
@@ -377,22 +412,36 @@ export function ChapterDetail() {
   let ghostText: string | null = null;
   let ghostNum = 1;
 
+  // A block drag lifts every selected card out at once, so the cards that stay
+  // on the canvas are the unselected ones and the ghost stands in for the rest.
+  const blockSet = drag?.kind === "block" ? new Set(drag.idxs) : null;
+
   if (drag) {
     const others =
       drag.kind === "move"
         ? ch.scenes.map((_, i) => i).filter((i) => i !== drag.fromIdx)
-        : ch.scenes.map((_, i) => i);
+        : blockSet
+          ? ch.scenes.map((_, i) => i).filter((i) => !blockSet.has(i))
+          : ch.scenes.map((_, i) => i);
     const at = Math.max(0, Math.min(drag.overIdx, others.length));
     const previewCols = sceneColumnsForWidth(others.length + 1, boxW);
     const previewPos = sceneAutoArrange(new Array(others.length + 1).fill(""), 0, previewCols);
+    // A block takes as many numbers as it has scenes, so everything after the
+    // drop point shifts by that much rather than by one.
+    const span = blockSet ? blockSet.size : 1;
     cardSlots = others.map((origIdx, i) => ({
       idx: origIdx,
       pos: previewPos[i < at ? i : i + 1],
-      num: i < at ? i + 1 : i + 2,
+      num: i < at ? i + 1 : i + span + 1,
     }));
     gapPos = previewPos[at];
     ghostNum = at + 1;
-    ghostText = drag.kind === "move" ? ch.scenes[drag.fromIdx] : "New scene.";
+    ghostText =
+      drag.kind === "move"
+        ? ch.scenes[drag.fromIdx]
+        : blockSet
+          ? ch.scenes[[...blockSet].sort((a, b) => a - b)[0]]
+          : "New scene.";
     ghostPos =
       drag.kind === "move"
         ? { x: drag.cx - drag.offX, y: drag.cy - drag.offY }
@@ -410,7 +459,18 @@ export function ChapterDetail() {
   };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
-    if (moveMode) return; // In move mode a card click toggles selection, not drag.
+    if (moveMode) {
+      // Pressing a checked card in move mode arms a block drag; pressing an
+      // unchecked one does nothing, so the click can still check it. Nothing is
+      // committed here — see `pendingBlock` for why the drag cannot start until
+      // the pointer moves.
+      if (!selected.has(idx) || selected.size >= ch.scenes.length) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("button")) return;
+      e.preventDefault();
+      pendingBlock.current = { x: e.clientX, y: e.clientY, idxs: [...selected] };
+      return;
+    }
     const target = e.target as HTMLElement;
     if (target.closest("textarea") || target.closest("button")) return;
     e.preventDefault();
@@ -485,13 +545,32 @@ export function ChapterDetail() {
     setMovePos("end");
     setMoveDest(dest);
   };
+  // Moving into this same chapter is a reorder, not a transfer, and the two
+  // count their destination against different lists: a transfer positions the
+  // block among the destination's scenes, a reorder positions it among the
+  // scenes that are *left here* once the selection is lifted out. Using the
+  // chapter's full length for a reorder would let "end" land before scenes that
+  // are themselves being moved.
+  const movingWithin = moveDest?.id === ch.id;
   const confirmMove = () => {
     if (!moveDest) return;
-    const destScenes = doc.chapters.find((c) => c.id === moveDest.id)?.scenes.length ?? 0;
-    const atIdx =
-      movePos === "beginning" ? 0 : movePos === "middle" ? Math.floor(destScenes / 2) : destScenes;
     const remaining = ch.scenes.length - selected.size;
-    moveScenesToChapter(ch.id, moveDest.id, [...selected], atIdx, sceneColumnsForWidth(remaining, boxW));
+    const target = movingWithin
+      ? remaining
+      : (doc.chapters.find((c) => c.id === moveDest.id)?.scenes.length ?? 0);
+    const atIdx =
+      movePos === "beginning" ? 0 : movePos === "middle" ? Math.floor(target / 2) : target;
+    if (movingWithin) {
+      moveScenesWithin(ch.id, [...selected], atIdx, sceneColumnsForWidth(ch.scenes.length, boxW));
+    } else {
+      moveScenesToChapter(
+        ch.id,
+        moveDest.id,
+        [...selected],
+        atIdx,
+        sceneColumnsForWidth(remaining, boxW)
+      );
+    }
     exitMoveMode();
   };
 
@@ -506,10 +585,7 @@ export function ChapterDetail() {
         }`}
       >
         {/* Header */}
-        <div
-          ref={headerRef}
-          className="sticky top-0 z-[2] flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]"
-        >
+        <div className="sticky top-0 z-[2] flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
           <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
             {String(ch.num).padStart(2, "0")}
           </span>
@@ -520,118 +596,53 @@ export function ChapterDetail() {
               placeholder="Chapter title"
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
             />
-            {/* Drafting sheds the planning chrome (§4). The words chip and the
-                status stay, because those are the two you watch while writing;
-                the summary and the act stepper are things you set once. */}
-            {!manuscriptOpen && (
-              <textarea
-                value={ch.summary ?? ""}
-                onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
-                placeholder="One-line chapter summary..."
-                rows={1}
-                className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
-              />
-            )}
+            <textarea
+              value={ch.summary ?? ""}
+              onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
+              placeholder="One-line chapter summary..."
+              rows={1}
+              className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
+            />
             {draftId !== doc.mainDraftId && (
               <div className="mt-[4px] text-[10.5px] font-semibold uppercase tracking-wide text-but">
                 Editing {draftName} · changes stay in this version
               </div>
             )}
 
-            <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
-              {/* Counted, not typed, once the chapter has prose — so the field
-                  stops being editable rather than silently ignoring edits. A
-                  chapter with nothing written keeps the hand-typed estimate it
-                  has always had. */}
-              {counted ? (
-                <span
-                  className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]"
-                  title="Counted from the manuscript, and updated as you write."
-                >
-                  <span className="font-mono text-[12px] font-medium text-ink">
-                    {ch.words.toLocaleString()}
+            {/* Shared with the manuscript modal, so the two cannot drift and
+                the switch between them sits in the same place in each. The act
+                stepper is a planning control and goes only here. */}
+            <ChapterMetaRow
+              ch={ch}
+              act={
+                <div className="flex items-center gap-[8px]">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
+                    Act
                   </span>
-                  <span className="font-mono text-[11px] font-medium text-soft">words</span>
-                </span>
-              ) : (
-                <label className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]">
-                  <input
-                    type="number"
-                    min={0}
-                    value={ch.words}
-                    onChange={(e) => patchChapter(ch.id, { words: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                    className="w-[56px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield]"
-                    title="Words in this chapter. Once you write in it, this is counted for you."
-                  />
-                  <span className="font-mono text-[11px] font-medium text-soft">words</span>
-                </label>
-              )}
-              <label
-                className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]"
-                title="How long you mean this chapter to be. The gap is the progress."
-              >
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-faint">
-                  Target
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={ch.target ?? ""}
-                  placeholder="none"
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    patchChapter(ch.id, {
-                      target: e.target.value.trim() === "" || isNaN(v) ? undefined : Math.max(0, v),
-                    });
-                  }}
-                  className="w-[52px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield] placeholder:text-faint"
-                />
-              </label>
-              <span className="font-mono text-[11.5px] font-medium text-faint">
-                · {ch.scenes.length} scenes
-              </span>
-
-              <div className="flex rounded-lg bg-chip p-[3px]">
-                {STATUSES.map((st) => (
-                  <button
-                    key={st.value}
-                    onClick={() => patchChapter(ch.id, { status: st.value })}
-                    className={`rounded-md px-[9px] py-[3px] text-[11px] font-medium ${
-                      ch.status === st.value ? "bg-card text-ink" : "text-soft hover:bg-card"
-                    }`}
-                  >
-                    {st.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className={`items-center gap-[8px] ${manuscriptOpen ? "hidden" : "flex"}`}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
-                  Act
-                </span>
-                <div className="flex items-center rounded-lg bg-chip p-[3px]">
-                  <button
-                    onClick={() => bumpAct(ch.id, -1)}
-                    className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    value={ch.act}
-                    onChange={(e) => setAct(ch.id, parseInt(e.target.value, 10))}
-                    className="h-[24px] w-[38px] bg-transparent text-center font-mono text-[13px] font-semibold text-ink [appearance:textfield]"
-                  />
-                  <button
-                    onClick={() => bumpAct(ch.id, 1)}
-                    className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-                  >
-                    +
-                  </button>
+                  <div className="flex items-center rounded-lg bg-chip p-[3px]">
+                    <button
+                      onClick={() => bumpAct(ch.id, -1)}
+                      className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={ch.act}
+                      onChange={(e) => setAct(ch.id, parseInt(e.target.value, 10))}
+                      className="h-[24px] w-[38px] bg-transparent text-center font-mono text-[13px] font-semibold text-ink [appearance:textfield]"
+                    />
+                    <button
+                      onClick={() => bumpAct(ch.id, 1)}
+                      className="h-[24px] w-[24px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
+              }
+            />
           </div>
           <div className="flex items-center gap-[6px]">
             <button
@@ -654,22 +665,50 @@ export function ChapterDetail() {
           </div>
         </div>
 
-        {/* Characters */}
-        {!manuscriptOpen && (() => {
+        {/* Reference material, tabbed.
+            One strip and one panel, above the canvas — see `ChapterTab` for why
+            these stopped being four stacked collapsible sections. Only the story
+            map has this: the manuscript modal shows the beats and nothing else,
+            because reference material beside a writing surface is the crowding
+            this branch spent its time removing. */}
+        <div className="border-b border-rule">
+          <div className="flex flex-wrap items-center gap-[6px] px-[26px] pb-[12px] pt-[14px]">
+            {TABS.map((t) => {
+              const n = tabCount[t.key];
+              const on = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  title={on ? `Hide ${t.label.toLowerCase()}` : t.hint}
+                  className={`flex items-center gap-[7px] rounded-lg px-[11px] py-[6px] text-[12px] font-medium ${
+                    on ? "bg-ink text-bg" : "bg-chip text-soft hover:text-ink"
+                  }`}
+                >
+                  {t.label}
+                  {n !== undefined && (
+                    <span
+                      className={`font-mono text-[10.5px] font-semibold ${on ? "opacity-70" : "text-faint"}`}
+                    >
+                      {n}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            <div className="flex-1" />
+            {/* The refs list's card/list control. It belongs to one tab, so it
+                only appears with that tab open. */}
+            {tab === "refs" && <ViewToggle view={refView} onChange={setRefView} />}
+          </div>
+
+          {tab === "chars" && (() => {
           // An archived character stays cast (dimmed below) but is never
           // offered for casting into anything new. See the archive rule.
           const members = doc.characters.filter((c) => ch.chars.includes(c.id));
           const available = doc.characters.filter((c) => !ch.chars.includes(c.id) && !c.archived);
           return (
-            <div className="border-b border-rule px-[26px] py-[14px]">
-              <SectionHeader
-                label="Characters"
-                count={members.length ? `${members.length}` : undefined}
-                collapsed={collapsed.chars}
-                onToggle={() => toggleSection("chars")}
-              />
-              {collapsed.chars ? null : (
-              <>
+            <div className="px-[26px] pb-[16px]">
               <div className="flex flex-wrap items-center gap-[7px]">
                 {members.map((c) => (
                   <span
@@ -729,27 +768,16 @@ export function ChapterDetail() {
                   </button>
                 </div>
               )}
-              </>
-              )}
             </div>
           );
         })()}
 
-        {/* World details */}
-        {!manuscriptOpen && (() => {
+          {tab === "world" && (() => {
           const refs = ch.worldRefs ?? [];
           const members = doc.world.filter((w) => refs.includes(w.id));
           const available = doc.world.filter((w) => !refs.includes(w.id) && !w.archived);
           return (
-            <div className="border-b border-rule px-[26px] py-[14px]">
-              <SectionHeader
-                label="World details"
-                count={members.length ? `${members.length}` : undefined}
-                collapsed={collapsed.world}
-                onToggle={() => toggleSection("world")}
-              />
-              {collapsed.world ? null : (
-              <>
+            <div className="px-[26px] pb-[16px]">
               <div className="flex flex-wrap items-center gap-[7px]">
                 {members.map((w) => (
                   <span
@@ -802,32 +830,84 @@ export function ChapterDetail() {
                   </button>
                 </div>
               )}
-              </>
-              )}
             </div>
           );
         })()}
 
-        {/* Scene flow — collapsible like every other section here. */}
+          {tab === "notes" && (
+            <div className="px-[26px] pb-[16px]">
+              <ExpandableTextarea
+                value={ch.notes ?? ""}
+                onChange={(v) => patchChapter(ch.id, { notes: v })}
+                placeholder="Reminders, revision ideas, continuity flags for this chapter..."
+                collapsedRows={3}
+                expandedHeight="52vh"
+                expanded={notesExpanded}
+                onToggleExpanded={() => toggleTextarea("chapterNotes")}
+                className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
+              />
+            </div>
+          )}
+
+          {tab === "refs" && (
+            <div className="px-[26px] pb-[16px]">
+              <RefList
+                refs={resolveRefs(ch.refs, doc.assets)}
+                onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
+                // Content edits write through to the shared asset this ref links.
+                // The store resolves ref → asset, so a burst of typing right after
+                // a draft commits can't be dropped against a stale render.
+                onUpdate={(refId, patch) => updateChapterRefAsset(ch.id, refId, patch)}
+                onDelete={(refId) => deleteChapterRef(ch.id, refId)}
+                // This chapter's pin order — the shared library has its own, so
+                // the same note can sit first here and anywhere there.
+                onReorder={(refId, toIdx) => reorderChapterRef(ch.id, refId, toIdx)}
+                deletePrompt={() => ({
+                  message: "Remove from this chapter?",
+                  detail: "It stays in the shared library.",
+                  // Not a delete — the button must not say one.
+                  confirmLabel: "Remove",
+                })}
+                onLink={() => setLinkOpen((v) => !v)}
+                linkLabel="Link book asset"
+                view={refView}
+              />
+              {linkOpen && (
+                <AssetLinkPicker
+                  // Archived assets are retired — not offered for pinning.
+                  assets={doc.assets.filter((a) => !a.archived)}
+                  linkedAssetIds={new Set(ch.refs.map((r) => r.assetId))}
+                  onPick={(assetId) => {
+                    linkAssetToChapter(ch.id, assetId);
+                    setLinkOpen(false);
+                  }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Scene flow. Its header carries the mode tabs, so the control that
+            swaps the working area sits on the working area. The chevron keeps
+            its own job — collapsing the section to shrink the modal — and is
+            split off from the label because the label is now a tab. */}
         <div className="flex items-center gap-[9px] px-[26px] pb-[12px] pt-[16px]">
           <button
-            onClick={() => toggleSection("scenes")}
-            className="flex items-center gap-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft hover:text-ink"
-            title={scenesCollapsed ? "Expand section" : "Collapse section"}
+            onClick={toggleScenesCollapsed}
+            className="text-[9px] font-medium text-faint hover:text-ink"
+            title={scenesCollapsed ? "Show the scene canvas" : "Hide the scene canvas"}
           >
-            <span className="text-[9px] font-medium text-faint">
-              {scenesCollapsed ? "▸" : "▾"}
-            </span>
-            Scene flow
-            <span className="font-medium normal-case tracking-normal text-faint">
-              · {ch.scenes.length}
-            </span>
+            {scenesCollapsed ? "▸" : "▾"}
           </button>
+          <ChapterModeTabs />
+          <span className="font-mono text-[11px] font-medium text-faint">
+            {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"}
+          </span>
           {scenesCollapsed ? null : moveMode ? (
             <div className="ml-auto flex items-center gap-[9px]">
               <span className="text-[12px] font-medium text-soft">
                 {selected.size === 0
-                  ? "Check the scenes to move"
+                  ? "Click the scenes to move"
                   : `${selected.size} ${selected.size === 1 ? "scene" : "scenes"} selected`}
               </span>
               {selected.size > 0 && (
@@ -861,11 +941,14 @@ export function ChapterDetail() {
               >
                 Auto-arrange
               </button>
-              {otherChapters.length > 0 && ch.scenes.length > 0 && (
+              {/* Two scenes here is enough on its own now: the destination
+                  picker offers this chapter, so a book with one chapter can
+                  still reorder a block within it. */}
+              {(otherChapters.length > 0 || ch.scenes.length > 1) && ch.scenes.length > 0 && (
                 <button
                   onClick={() => setMoveMode(true)}
                   className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                  title="Select scenes to move to another chapter"
+                  title="Select several scenes to reorder together, or send to another chapter"
                 >
                   Move scenes
                 </button>
@@ -888,6 +971,21 @@ export function ChapterDetail() {
             <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-faint">
               Move to which chapter?
             </span>
+            {/* This chapter first, and only when there is somewhere to move to
+                within it — with every scene selected there is nothing left to
+                position them against, so the option would do nothing. */}
+            {selected.size < ch.scenes.length && (
+              <button
+                onClick={() => pickDest({ id: ch.id, num: ch.num, title: ch.title })}
+                className="flex items-center gap-[7px] rounded-full border border-ink bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+              >
+                <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[10px] font-semibold text-bg">
+                  {String(ch.num).padStart(2, "0")}
+                </span>
+                This chapter
+                <span className="font-mono text-[10px] text-faint">reorder</span>
+              </button>
+            )}
             {otherChapters.map((c) => {
               const title = c.title;
               return (
@@ -981,7 +1079,19 @@ export function ChapterDetail() {
                   key={i}
                   data-scene-idx={i}
                   onMouseDown={(e) => onSceneDown(e, i)}
-                  onClick={moveMode ? () => toggleSelected(i) : undefined}
+                  onClick={
+                    moveMode
+                      ? () => {
+                          // The click that ends a block drag must not also
+                          // deselect the card it was picked up by.
+                          if (blockDragged.current) {
+                            blockDragged.current = false;
+                            return;
+                          }
+                          toggleSelected(i);
+                        }
+                      : undefined
+                  }
                   className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
                     moveMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
                   }`}
@@ -1116,143 +1226,14 @@ export function ChapterDetail() {
         </div>
         <div className="px-[26px] pt-[8px] text-[11px] font-medium text-faint">
           {moveMode
-            ? "Click scenes to select them, then choose a destination chapter · the scenes are appended to that chapter in order"
+            ? "Click scenes to select them · drag any selected scene to reorder them all together · or pick a chapter to send them to"
             : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And"}
         </div>
         </>
         )}
 
-        {/* Manuscript. Under Scene flow, and an ordinary section of this modal:
-            a header you can collapse like any other, plus Expand/Collapse for
-            how much room the sheet gets. */}
-        {(() => {
-          const proseWords = ch.manuscript ? countWords(ch.manuscript) : 0;
-          return (
-            <div
-              ref={manHeaderRef}
-              // Sticky, so the controls in line with the label stay reachable
-              // however far into a chapter you scroll — the beat guide below
-              // then pins under this rather than under the modal header.
-              className={`bg-panel px-[26px] pt-[18px] ${
-                manuscriptOpen ? "sticky z-[3] pb-[10px]" : ""
-              }`}
-              style={manuscriptOpen ? { top: headerH } : undefined}
-            >
-              <SectionHeader
-                label="Manuscript"
-                count={proseWords ? `${proseWords.toLocaleString()} words` : undefined}
-                collapsed={manuscriptCollapsed}
-                onToggle={() => {
-                  if (manuscriptCollapsed) exitMoveMode();
-                  toggleSection("manuscript");
-                }}
-                right={
-                  manuscriptOpen ? (
-                    <div className="flex items-center gap-[8px]">
-                      <SheetViewToggle view={sheetView} onChange={setSheetView} />
-                      <button
-                        onClick={() => setSceneFlowExpanded(!expanded)}
-                        className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                        title={
-                          expanded
-                            ? "Shrink the writing area and the scene canvas"
-                            : "Expand the writing area and the scene canvas"
-                        }
-                      >
-                        {expanded ? "Collapse" : "Expand"}
-                      </button>
-                    </div>
-                  ) : undefined
-                }
-              />
-            </div>
-          );
-        })()}
-        {manuscriptOpen && (
-          <>
-            <div className="pt-[10px]">
-              <PullFromVersion ch={ch} />
-            </div>
-            <ManuscriptSheet
-              ch={ch}
-              scroller={modalRef}
-              stickyTop={headerH + manHeaderH}
-              expanded={expanded}
-              view={sheetView}
-            />
-          </>
-        )}
-
-        {/* Chapter notes */}
-        <div className="px-[26px] pt-[18px]">
-          <SectionHeader
-            label="Chapter notes"
-            count={ch.notes?.trim() ? "written" : undefined}
-            collapsed={collapsed.notes}
-            onToggle={() => toggleSection("notes")}
-          />
-          {!collapsed.notes && (
-            <ExpandableTextarea
-              value={ch.notes ?? ""}
-              onChange={(v) => patchChapter(ch.id, { notes: v })}
-              placeholder="Reminders, revision ideas, continuity flags for this chapter..."
-              collapsedRows={3}
-              expandedHeight="52vh"
-              expanded={notesExpanded}
-              onToggleExpanded={() => toggleTextarea("chapterNotes")}
-              className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
-            />
-          )}
-        </div>
-
-        {/* Pinned refs */}
-        <div className="px-[26px] py-[18px]">
-          <div className={collapsed.refs ? "" : "mb-[13px]"}>
-            <SectionHeader
-              label="Pinned references"
-              count={ch.refs.length ? `${ch.refs.length}` : undefined}
-              collapsed={collapsed.refs}
-              onToggle={() => toggleSection("refs")}
-              right={collapsed.refs ? undefined : <ViewToggle view={refView} onChange={setRefView} />}
-            />
-          </div>
-          {!collapsed.refs && (
-          <>
-          <RefList
-            refs={resolveRefs(ch.refs, doc.assets)}
-            onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
-            // Content edits write through to the shared asset this ref links.
-            // The store resolves ref → asset, so a burst of typing right after a
-            // draft commits can't be dropped against a stale render.
-            onUpdate={(refId, patch) => updateChapterRefAsset(ch.id, refId, patch)}
-            onDelete={(refId) => deleteChapterRef(ch.id, refId)}
-            // This chapter's pin order — the shared library has its own, so the
-            // same note can sit first here and anywhere there.
-            onReorder={(refId, toIdx) => reorderChapterRef(ch.id, refId, toIdx)}
-            deletePrompt={() => ({
-              message: "Remove from this chapter?",
-              detail: "It stays in the shared library.",
-              // Not a delete — the button must not say one.
-              confirmLabel: "Remove",
-            })}
-            onLink={() => setLinkOpen((v) => !v)}
-            linkLabel="Link book asset"
-            view={refView}
-          />
-          {linkOpen && (
-            <AssetLinkPicker
-              // Archived assets are retired — not offered for pinning.
-              assets={doc.assets.filter((a) => !a.archived)}
-              linkedAssetIds={new Set(ch.refs.map((r) => r.assetId))}
-              onPick={(assetId) => {
-                linkAssetToChapter(ch.id, assetId);
-                setLinkOpen(false);
-              }}
-            />
-          )}
-          </>
-          )}
-        </div>
+        {/* The manuscript is not here. It has its own modal, reached by the
+            button on the meta line above — see `ManuscriptModal`. */}
 
         {/* Danger zone */}
         <div className="flex items-center justify-end border-t border-rule px-[26px] py-[14px]">
@@ -1285,7 +1266,7 @@ export function ChapterDetail() {
             Move {selected.size} {selected.size === 1 ? "scene" : "scenes"}
           </div>
           <div className="mt-[4px] flex items-center gap-[7px] text-[13px] text-soft">
-            to
+            {movingWithin ? "within" : "to"}
             <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[11px] font-semibold text-bg">
               {String(moveDest.num).padStart(2, "0")}
             </span>
@@ -1293,7 +1274,7 @@ export function ChapterDetail() {
           </div>
 
           <div className="mt-[18px] text-[11px] font-semibold uppercase tracking-widest text-soft">
-            Add them to the
+            {movingWithin ? "Move them to the" : "Add them to the"}
           </div>
           <div className="mt-[8px] flex rounded-lg bg-chip p-[3px]">
             {(["beginning", "middle", "end"] as const).map((pos) => (
@@ -1309,11 +1290,17 @@ export function ChapterDetail() {
             ))}
           </div>
           <div className="mt-[8px] text-[11.5px] leading-[1.5] text-faint">
-            {movePos === "beginning"
-              ? "The scenes will lead off the destination chapter, before its current first scene."
-              : movePos === "middle"
-                ? "The scenes will drop in around the middle of the destination chapter's scene flow."
-                : "The scenes will be appended after the destination chapter's current last scene."}
+            {movingWithin
+              ? movePos === "beginning"
+                ? "The scenes will lead off this chapter, before every scene you haven't selected."
+                : movePos === "middle"
+                  ? "The scenes will sit around the middle of what's left once they're lifted out."
+                  : "The scenes will follow every scene you haven't selected."
+              : movePos === "beginning"
+                ? "The scenes will lead off the destination chapter, before its current first scene."
+                : movePos === "middle"
+                  ? "The scenes will drop in around the middle of the destination chapter's scene flow."
+                  : "The scenes will be appended after the destination chapter's current last scene."}
           </div>
 
           <div className="mt-[20px] flex justify-end gap-[9px]">
@@ -1337,37 +1324,3 @@ export function ChapterDetail() {
   );
 }
 
-/** Collapsible section label for the chapter modal. Clicking the label (or its
- *  chevron) hides the section body while keeping this row visible. `right` holds
- *  optional controls (e.g. the refs view toggle) shown only when expanded. */
-function SectionHeader({
-  label,
-  count,
-  collapsed,
-  onToggle,
-  right,
-}: {
-  label: string;
-  count?: string;
-  collapsed: boolean;
-  onToggle: () => void;
-  right?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-[12px]">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-[8px] text-[11px] font-semibold uppercase tracking-widest text-soft hover:text-ink"
-        title={collapsed ? "Expand section" : "Collapse section"}
-      >
-        <span className="text-[9px] font-medium text-faint">{collapsed ? "▸" : "▾"}</span>
-        {label}
-        {count && (
-          <span className="font-medium normal-case tracking-normal text-faint">· {count}</span>
-        )}
-      </button>
-      <div className="flex-1" />
-      {right}
-    </div>
-  );
-}

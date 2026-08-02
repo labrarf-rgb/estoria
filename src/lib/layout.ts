@@ -285,6 +285,24 @@ export const TL_NODE_MAX_W = 340;
 export const TL_NODE_MIN_H = 112;
 export const TL_NODE_MAX_H = 208;
 /**
+ * The vertical timeline's card height (SPECS §9 item 15).
+ *
+ * Four pixels taller than the chapter modal's `SCENE_H`, and deliberately its
+ * own constant rather than a bump to the shared one — the modal's canvas has no
+ * clipping problem to solve and no reason to grow.
+ *
+ * **Why a taller card at all, when the rule is "wider, never taller".** Widening
+ * is what normally stops a card cutting its text off, but at half screen the
+ * pane fits a single column and there is nowhere to widen to, so a scene near
+ * the 200-character cap overflowed its box by about 2px — a shaved descender on
+ * the last line. Measured at a 760px window: 4 of 421 scenes, worst 2px. The
+ * rule is not abandoned, only bounded: cards are still a fixed height that grow
+ * sideways, this is just a slightly larger fixed height. The fit probe measures
+ * against whatever height it is handed, so raising it raises capacity and the
+ * overflow resolves without touching `sceneSpan`.
+ */
+export const TL_NODE_H = SCENE_H + 4;
+/**
  * Column gap when scenes stack (`column` fill). Consecutive beats are then
  * vertically adjacent, so their connector pill sits in the *row* gap and the
  * columns no longer need the full `SCENE_GAP_X` pill clearance.
@@ -360,7 +378,7 @@ export function sceneMetrics(
   return {
     tracks,
     nodeW: row ? fitSize(tracks, availW, gapX, TL_NODE_MIN_W, TL_NODE_MAX_W) : SCENE_W,
-    nodeH: row ? SCENE_H : fitSize(tracks, availH, gapY, TL_NODE_MIN_H, TL_NODE_MAX_H),
+    nodeH: row ? TL_NODE_H : fitSize(tracks, availH, gapY, TL_NODE_MIN_H, TL_NODE_MAX_H),
     gapX,
     gapY,
     fill,

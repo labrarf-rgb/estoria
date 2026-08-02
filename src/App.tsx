@@ -5,7 +5,7 @@ import { Board } from "@/components/Board";
 import { Timeline } from "@/components/Timeline";
 import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
-import { ChapterDetail } from "@/components/ChapterDetail";
+import { ChapterModal } from "@/components/ChapterModal";
 import { Lightbox } from "@/components/Lightbox";
 import { Welcome } from "@/components/Welcome";
 import { CharactersPanel } from "@/components/panels/CharactersPanel";
@@ -46,7 +46,7 @@ export function App() {
       {onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
       <Footer />
 
-      {openCh && !onSeriesMap && <ChapterDetail />}
+      {openCh && !onSeriesMap && <ChapterModal />}
       {/* Side panels are modal overlays: the app behind them is dimmed and
           inert, one panel at a time (see `Drawer`). */}
       <CharactersPanel />

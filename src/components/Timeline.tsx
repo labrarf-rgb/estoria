@@ -122,7 +122,7 @@ export function Timeline() {
   const orient = useStore((s) => s.timelineOrient);
   const paneMode = useStore((s) => s.timelinePane);
   const openChapter = useStore((s) => s.openChapter);
-  const openChapterSection = useStore((s) => s.openChapterSection);
+  const setChapterMode = useStore((s) => s.setChapterMode);
   const openChapterAtScene = useStore((s) => s.openChapterAtScene);
 
   const vertical = orient === "vertical";
@@ -510,7 +510,7 @@ export function Timeline() {
                       // Clicking a scene node opens the chapter on that scene;
                       // clicking the prose should get you to where you write it.
                       onOpen={() => {
-                        openChapterSection("manuscript");
+                        setChapterMode("manuscript");
                         openChapter(c.id);
                       }}
                     />

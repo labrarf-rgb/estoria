@@ -1,12 +1,12 @@
-# Manuscript mode as its own modal — build brief
+# Manuscript mode — what is still owed
 
-> **What this is.** A handoff for the next session. Manuscript mode is **built
-> and working** (SPECS §4); what is left is a restructure of *where it lives*.
+> **What this is.** The remainder of a handoff whose main job is done. The
+> manuscript is now **its own modal** (SPECS §4, and the 2026-08-02 (b) entry in
+> [`SESSIONS.md`](SESSIONS.md)) — §4 and §5 of this file were the instructions
+> for that work and were cut out when it landed.
 >
-> **Read [`SPECS.md`](SPECS.md) first** — §4's Manuscript rows are the current
-> state, §9 item 16 is why this work exists. The dated account of how it got here
-> is the 2026-08-02 entry in [`SESSIONS.md`](SESSIONS.md). Everything below is
-> scoped to this repo.
+> **What is left is §6 and §8, and they are independent.** Scope a session to one
+> of them out loud. §8 is the one that matters.
 >
 > ## ⚠️ Work on the branch, not `main`
 >
@@ -14,191 +14,63 @@
 > git checkout feature/manuscript-mode
 > ```
 >
-> Everything described here is on **`feature/manuscript-mode`** (28 commits),
-> **not merged, not pushed, not deployed**. `main` has none of it. Run the dev
-> server on a **separate port** so the branch's browser storage stays apart from
-> whatever you normally develop against (localStorage and IndexedDB are keyed by
-> origin, and origin includes the port):
+> Everything here is on **`feature/manuscript-mode`**, **not merged, not pushed,
+> not deployed**. `main` has none of it. Run the dev server on a **separate
+> port** so the branch's browser storage stays apart from whatever you normally
+> develop against (localStorage and IndexedDB are keyed by origin, and origin
+> includes the port). The `.claude/launch.json` entry `estoria-manuscript` does
+> exactly this:
 >
 > ```bash
 > npx vite --port 5199 --strictPort
 > ```
 >
-> There is a `.claude/launch.json` entry named `estoria-manuscript` that does
-> exactly this. Written 2026-08-02. Delete this file when the restructure lands,
-> folding what survives into [`SPECS.md`](SPECS.md) §4.
+> Delete this file when both sections below are done.
 
 ---
 
-## 0. Start here
-
-### How to open the session
-
-```
-Read docs/manuscript-modal-build.md and follow it. Do §4 only, and settle §5 first.
-```
-
-**Scope it out loud, and scope it to one of these.** This file covers three
-separable jobs, and a session handed all of them will do the interesting one and
-leave the others half-done. Pick:
-
-- **`§4 only, settle §5 first`** — the modal restructure. The main event.
-- **`§8 only`** — the scale test. Worth doing *first* if you want the design
-  informed by real numbers, because it may change what §4 should build.
-- Anything in §6, which are small and independent.
-
-### What to read, and nothing else
+## 0. What to read, and nothing else
 
 Context is the budget. Read this file, then:
 
-- [`SPECS.md`](SPECS.md) **§4** for what manuscript mode already does, and **§9
+- [`SPECS.md`](SPECS.md) **§4** for what manuscript mode does today, and **§9
   items 15-16** for the open backlog.
-- [`SESSIONS.md`](SESSIONS.md), the **2026-08-02 entry only**, if you need to
+- [`SESSIONS.md`](SESSIONS.md), the **2026-08-02** entries only, if you need to
   know why something is shaped the way it is.
 
-Do **not** read the whole of SPECS or the session log front to back. §3 below
-lists what is already built so you do not go looking for it, and
+Do **not** read the whole of SPECS or the session log front to back.
 `archives/manuscript-mode-brainstorm.md` holds rejected alternatives, which is
-only worth opening if a decision here looks arbitrary.
+only worth opening if a decision looks arbitrary.
 
-### Before any code
-
-Everything is on `feature/manuscript-mode`, unmerged. Run on the isolated port
-(see the banner above) so the branch's browser storage stays apart from your
-everyday project.
+**Every user-facing string you add follows house style (SPECS §3)** — no em
+dashes in labels, tooltips, empty states, confirm dialogs or exported text, and
+write the way a person talks rather than the way a manual does.
 
 ---
 
-## 1. Why
+## 6. Small and independent, do not let them fall off
 
-Four separate complaints in one session turned out to be one cause:
+Each of these is separable from the others and from §8. None was touched by the
+modal restructure.
 
-- beat cards too tall,
-- the manuscript's controls scrolling out of reach,
-- an empty sheet making the modal scroll with no visible scrollbar,
-- navigating between the scene canvas and the manuscript feeling messy.
-
-Each was patched. The cause was not: **a writing surface and a planning surface
-are competing for a single scrolling column.** The chapter modal ended up
-stacking three sticky layers (its own header, the manuscript header, the beat
-guide) over two scroll contexts (the modal and the textarea). Every fix added
-another rule to that pile.
-
-**This does not break the original premise** — "the map, with a place to write
-inside it" — nor the locked decision against a fourth top-level view. It is
-still entered from a chapter and still shows the beats while you draft. It is a
-second face of the same chapter, not a new place in the app.
-
----
-
-## 2. The design (from the author, 2026-08-02)
-
-One chapter, two modals, and a switch between them.
-
-| | |
-|---|---|
-| **Manuscript modal** | Its own modal. Carries the **chapter** (number + title), the **word count**, a **view of the scenes**, and the writing pane. |
-| **Story map modal** | The chapter modal as it is today, minus the Manuscript section. |
-| **The switch** | A button to toggle between the two, **on the chapter's meta line** — the row carrying the word count, the scene count and Idea / Draft / Done. In Story map mode it reads *Manuscript*; in Manuscript mode it reads *Story map*. One button, always in the same place, naming where it takes you. |
-| **Memory** | Remember which of the two was last opened, and open that one next time a chapter is opened. |
-| **Controls** | Each modal keeps its own collapse/expand and its own buttons. |
-
----
-
-## 3. What is already built (do not rebuild)
-
-All of this works and is verified; see SPECS §4.
-
-- `Chapter.manuscript`, `Chapter.target`, `StoryDoc.author` — optional, **no
-  `SCHEMA_VERSION` bump**, and Android round-trips them untouched (SPECS §6).
-- **Prose at rest in IndexedDB** with the synchronous crash pad
-  (`store/prose.ts`). Do not disturb this; the split is at the at-rest layer only
-  and `StoryDoc` stays whole in memory and in every file.
-- **Markdown rendering** (`lib/manuscript.ts` `parseBlocks`, `lib/inline.ts`),
-  shared by the reading view and the `.docx` exporter so they cannot drift.
-- **Exports**: standard-format `.docx`, `.md`, `.txt`, and `Cmd+P` as the PDF
-  route via the `@media print` block in `index.css`.
-- **Word count** as a cache of the prose, with its two protective rules.
-- **Fork ergonomics**: the copy-or-structure question, word counts in the version
-  menu, and pull-a-chapter's-text-from-another-version with one undo.
-- `Cmd+S` force-flush, and write-through on blur and on leaving a chapter.
-
-**The beats are a guide, not a structure.** The `***` contract was built and
-deliberately removed — see SPECS §4 "The beats are a guide, not a structure"
-before proposing anything that re-couples prose to scenes.
-
----
-
-## 4. What to build
-
-1. **A `ManuscriptModal`**, opened per chapter. Header carries the chapter number
-   and title, the word count, the mode switch, and its own size control.
-2. **A view of the scenes inside it.** The current horizontal beat strip exists
-   (`BeatCard` in `ManuscriptSheet.tsx`) and can move across, but a **rail down
-   one side** is the shape §9 item 16 suggested: it gives the prose the window,
-   needs no stickiness, and leaves one scroll context instead of two. Decide
-   this deliberately — it is the main thing the restructure is for.
-3. **The mode switch**, on the meta line in both modals (see §2), swapping the
-   open chapter between them without closing and reopening. The meta line already
-   exists in `ChapterDetail`'s header — the words chip, the target, the scene
-   count and the status picker — so the manuscript modal needs the same row, which
-   is also where its word count and status belong.
-4. **Remember the last mode** — one persisted flag beside `manuscriptExpanded`'s
-   replacement, not per chapter.
-5. **Strip the Manuscript section out of `ChapterDetail`**: the section header,
-   its sticky wrapper, `manHeaderH`, `sheetView`, and the `PullFromVersion` row
-   all move to the new modal.
-6. **Repoint the ways in.** `openChapterSection("manuscript")` is used by the
-   timeline's prose click and by `ProsePane`'s empty state; both should open the
-   manuscript modal instead.
-
----
-
-## 5. Decisions to settle before building
-
-1. **Scene rail or beat strip**, per item 2 above.
-2. **Does the scene canvas stay editable in the manuscript modal?** The current
-   guide is inert. A rail that only shows beats is simpler and matches "a view of
-   the scenes"; making it editable rebuilds the competition this work removes.
-3. **What the size control does** now that there is no section to grow. Probably
-   modal width, as `sceneFlowExpanded` does today for both.
-4. **Where `Cmd+S`, blur-flush and the drafting write-through live** once the
-   sheet moves — they are currently registered inside `ManuscriptSheet` and should
-   move with it, not be duplicated.
-5. **Whether `sceneFlowExpanded` should finally be renamed.** It drives both
-   areas' size today and is named for only one of them; the persisted key is what
-   makes it awkward.
-
----
-
-## 6. Still owed from the last session
-
-Unrelated to this restructure, but do not let them fall off:
-
-- **Word has never opened the `.docx`.** Structure and CRCs are verified, the
-  application is not available here. One manual check before anyone sends a file.
 - **An Android regression test** for a chapter carrying an unknown field, so the
   passthrough survives a refactor (different repo; requirement in SPECS §6).
-- **A drag-select check** in the timeline's manuscript pane: dragging across
-  prose should select it, not open the chapter. The test never came back clean
-  because a stale modal was open.
 - SPECS §9 item 15, the 2px timeline card clip at half screen — pre-existing and
   still the author's call.
 
+**Closed 2026-08-02 (c), by the author at the keyboard — do not re-raise:**
+
+- ✅ **The drag-select check.** Dragging across prose in the timeline's
+  manuscript pane selects the words and leaves the chapter closed; a click opens
+  it; a click that wobbles a pixel still opens it. The press-versus-drag rule at
+  [`ProsePane.tsx`](../src/components/ProsePane.tsx) works as designed.
+- ✅ **Multi-chapter drag-reorder**, confirmed with a real pointer (it had only
+  been exercised with synthetic events).
+- ⏸️ **Word opening the `.docx`** — deferred by the author, who has no Word on
+  this machine. Structure and CRCs are verified and it is assumed good. Pick this
+  up only if a real file misbehaves in someone else's hands.
+
 ---
-
-## 7. Naming and version
-
-**Done, 2026-08-02.** The app is `v3.0.0` and is named for what it does now:
-*Estoria | Map and Write Your Story*, in the browser tab, the README, SPECS §1
-and the AI import prompt. The record, including the one edit that had to be made
-carefully and the two mentions deliberately left alone, is in
-[`archives/manuscript-mode-v3-repositioning.md`](archives/manuscript-mode-v3-repositioning.md).
-
-**What this means for new work here:** every user-facing string you add follows
-house style (SPECS §3) — no em dashes in labels, tooltips, empty states, confirm
-dialogs or exported text, and write the way a person talks rather than the way a
-manual does.
 
 ## 8. Scale: does this survive a real book collection?
 

@@ -2954,3 +2954,196 @@ sheet making the modal scroll with no visible scrollbar, navigation feeling
 messy — turned out to be one cause: a writing surface and a planning surface
 competing for a single scrolling column. Each was patched; the cause was not.
 Read that item before touching the chapter modal.
+
+---
+
+## 2026-08-02 (b) — The manuscript becomes its own modal, on `feature/manuscript-mode`
+
+Picked up from `docs/manuscript-modal-build.md` §4, with §5 settled first. §6 and
+§8 were deliberately left alone: the brief warns that a session handed all three
+jobs does the interesting one and leaves the rest half-done.
+
+### §5, settled before any code
+
+1. **Scene rail, down the left.** Not the horizontal beat strip moved across. The
+   strip needed stickiness and needed cards that grew *sideways*; a column beside
+   the prose needs neither, and it has the vertical room to show a beat at the
+   200-character cap whole. Left rather than right, matching the timeline's
+   vertical rail, so the beats do not change sides depending on where you are.
+2. **The rail is inert, with one exception.** Clicking a beat opens that scene on
+   the story map. Editing in place would rebuild the two-surfaces-one-chapter
+   competition this work exists to remove; a link out costs nothing, because
+   `openChapterAtScene` already lands on a scene, focuses it and flashes it. It
+   now also forces `chapterMode` back to `"map"`, which is what lets the rail
+   card be a plain button that only has to name a scene.
+3. **The size control is the modal's width**, on its own flag.
+4. **`Cmd+S`, blur-flush and the leaving-a-chapter flush moved with the sheet**
+   into `ManuscriptModal`, registered once. **The word-count recompute did not** —
+   it went *up*, into a new `ChapterModal` dispatcher. It is debounced 700ms off
+   the prose, and left in the manuscript modal a mode switch would unmount the
+   component and clear the pending timer, so the count would stop updating on
+   exactly the click that goes to look at it. The prose flush needed no such help:
+   it is registered as an effect *cleanup*, so unmounting is what fires it.
+5. **`sceneFlowExpanded` keeps its name.** It is not only a width — `scenePosKey`
+   uses it to pick between `scenePos` and `scenePosCompact`, which are persisted
+   *document* data, so a rename would either drag a doc migration behind it or
+   leave the flag and the layout key disagreeing. Adding `manuscriptExpanded`
+   beside it fixes the actual problem: the old name was wrong only because one
+   flag drove two areas, and now it drives one.
+
+### What changed
+
+- **New `ChapterModal`** (dispatcher), **`ManuscriptModal`** (renamed from
+  `ManuscriptSheet` via `git mv`, so `PullFromVersion`'s history follows), and
+  **`ChapterMetaRow`** — the meta line, shared by both modals so they cannot
+  drift.
+- **New store state**: `chapterMode` (`"map" | "manuscript"`, persisted, global
+  not per chapter) and `manuscriptExpanded`. `"manuscript"` left the
+  `ChapterSection` union. **No `SCHEMA_VERSION` bump** — this is UI state, not
+  the document, and a stale `chapterSectionsCollapsed.manuscript` key in an
+  already-persisted store is inert.
+- **`ChapterDetail` lost 190 lines net** (51 added, 241 removed). The Manuscript
+  section, `manHeaderH`
+  and its `ResizeObserver`, `sheetView`, the sticky wrapper, the `PullFromVersion`
+  row — and **seven `manuscriptOpen` conditionals**, which had been hiding the
+  summary, the act stepper, Characters and World whenever the section was open.
+  The story map modal is unconditionally itself again.
+- **Both ways in repointed** off `openChapterSection("manuscript")`: the
+  timeline's prose click and `ProsePane`'s empty state.
+
+### Verified in the browser, on the isolated port 5199
+
+- Story map modal: summary, act stepper, Characters and World all back with no
+  conditionals; no Manuscript section.
+- The switch swaps the open chapter both ways without closing it, and lands at
+  the same x in each modal (this is why it sits after the status picker rather
+  than at the end of the row — see §9 item 16).
+- Rail: beats wrap and show whole, connector pills between them. Clicking beat 3
+  landed on the story map with `data-scene-idx="2"` focused and its textarea
+  holding "Bram drags her out before the tide takes…".
+- Typing promoted the hand-typed 2800 into `target` and flipped the chip to a
+  counted 40 — the existing promote-don't-overwrite rule working through the new
+  shared row. Live footer count reads "40 words of 2,800".
+- Markdown round-trip in the new pane: heading, bold, italic and `***` as a rule;
+  the count strips all of it (25 words).
+- **Persistence**: `chapterMode: "manuscript"` survived a full page reload, and a
+  chapter opened from the board afterwards came up in the manuscript with the
+  caret already in the text.
+- **The two size flags are independent**: `manuscriptExpanded: false` while
+  `sceneFlowExpanded: true`, story map still 1220px wide with its own control
+  reading "Shrink the scene area".
+- `npm run typecheck` and `npm run build` clean; no console errors.
+
+### Owed, unchanged from the last session
+
+- **Word has never opened the `.docx`.** Structure and CRCs verified; the
+  application is not available here.
+- An **Android regression test** for unknown-field passthrough (different repo).
+- A **drag-select check** in the timeline's manuscript pane.
+- §9 item 15, the 2px timeline card clip at half screen, still the author's call.
+
+### Next session
+
+`docs/manuscript-modal-build.md` is now **§6 and §8 only** — §4 and §5 were cut
+out of it when this landed. **§8 is the one that matters**: the scale test, and
+the brief names a real bug to confirm first, which is that `writePad` puts every
+dirty manuscript into localStorage synchronously and a single 300k-word chapter
+is ~3.6MB of a ~5MB origin quota. The failure is silent, because the
+`QuotaExceededError` is caught and ignored, so the symptom is the safety net
+quietly not being there.
+
+---
+
+## 2026-08-02 (c) — Tabs, bulk scene and chapter moves, toolbar scoping
+
+Four requests, on `feature/manuscript-mode`, after the modal restructure landed.
+
+### The mode switch became a tab (mid-session change of direction)
+
+It shipped earlier the same session as a button on the meta line naming its
+destination (*Manuscript* / *Story map*). Changed to a two-segment tab
+`[Scene flow | Manuscript]` on the **section header of the working area** — the
+Scene flow row in the story map, the head of the beat rail in the manuscript.
+The control that swaps the working area now sits on the working area, and the
+meta line went back to being only about the chapter. One shared
+`ChapterModeTabs` in both, so the pair cannot drift.
+
+### What was built
+
+1. **Reference material is tabbed** (story map only). Four stacked collapsible
+   sections became one strip above the canvas and one panel under it. Clicking
+   the open tab closes it, so click-to-show-and-hide survives. `SectionHeader`
+   and `chapterSectionsCollapsed` were deleted; `scenesCollapsed` and
+   `chapterTab` replaced them.
+2. **Move several scenes within a chapter**, both ways asked for: *This chapter ·
+   reorder* in the destination picker, and dragging any selected card to move the
+   whole block.
+3. **Multi-select chapters** on the board by modifier-click, with a floating bar:
+   reorder the block by dropping it on another chapter, or delete them together.
+4. **New chapter / Auto-arrange hidden in Timeline view.**
+
+### Three bugs found while verifying, all fixed
+
+- **`reorderChapters` returned the un-renumbered array.** It computed
+  `renumber()` for the links and then returned the pre-renumber `chapters`, so
+  the order changed while every `num` badge stayed stale. Caught because the
+  board still read 01–06 in the old order after a confirmed reorder.
+- **The board's drop target could be stale or unset.** The hit test runs inside a
+  coalescing rAF that `onUp` cancels, so a drag ending in the same frame as its
+  last move never ran one. Release now re-tests against the final position.
+  Pre-existing; found because multi-chapter reorder rides the same path.
+- **`blockDragged` was never cleared when a scene drag ended off-card.** No click
+  is synthesized in that case, so the flag stood and ate the next real selection
+  click. Cleared on the next task instead.
+
+Also hardened: `dragRef.current` is written directly when a block drag is
+promoted, not left to the next render, so a fast drag does not lose its first
+moves.
+
+### Verified in the browser, on port 5199
+
+Tabs open, close on re-click, and are absent from the manuscript modal. Scene
+reorder via the picker (3 → front gives Bram·Wren·trapdoor, links collapse to
+`therefore` per the positional rule) and via block drag (selecting two of three
+and dropping past the third gives the expected order, block order preserved).
+Chapter multi-select shows the bar, bulk delete took 8 chapters to 6 with
+contiguous renumbering, bulk reorder moved the block and renumbered correctly.
+Toolbar buttons gone in Timeline. `npm run typecheck` and `npm run build` clean.
+
+**Then confirmed at the keyboard by the author**, same session: the multi-chapter
+drag (which had only been exercised with synthetic events) reorders and renumbers
+correctly with a real pointer, and the long-owed **drag-select check** finally
+came back clean — dragging across prose in the timeline's manuscript pane selects
+the words and leaves the chapter closed, a click opens it, and a click that
+wobbles a pixel still opens it. Both are struck off §6 of the build brief.
+
+**Word opening the `.docx` is deferred**, not owed: there is no Word on this
+machine, structure and CRCs are verified, and the author's call is to assume it
+works until a real file misbehaves somewhere else.
+
+### SPECS §9 item 15 closed the same session
+
+The 2px timeline card clip had been left as the author's call because the fix is
+a *taller* card and the feature was built on "wider, never taller". The call came
+back: make it taller. `TL_NODE_H` (`SCENE_H + 4`) is now the vertical timeline's
+own height constant — deliberately **not** a bump to the shared `SCENE_H`, since
+the chapter modal's canvas has no clipping problem and no reason to grow.
+
+The rule survives bounded rather than broken: cards are still a fixed height that
+grows sideways, just a slightly larger fixed height. The case that forced it is
+the one where widening cannot help at all — at half screen the pane fits a single
+column, so there is nowhere to widen to.
+
+Nothing else needed changing: the fit probe measures against whatever height it
+is handed, so raising the height raised capacity on its own. Verified at a 760px
+window with a 197-character scene — renders whole, 0 overflow across all 24 cards
+on screen.
+
+### A note on testing this branch
+
+Two red herrings cost time and are worth knowing about. Vite HMR keeps the *old*
+window listeners bound when an effect's dependency array changes size, so drag
+behaviour silently runs the pre-edit code until a full reload. And dispatching
+`mousemove` + `mouseup` in one JS task means the coalescing rAF never runs
+between them, which looks exactly like a broken hit test. Reload, and spread
+synthetic pointer events across calls.

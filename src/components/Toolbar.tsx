@@ -302,8 +302,13 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
-      {/* New chapter / Auto-arrange (book level only) */}
-      {!onSeriesMap && (
+      {/* New chapter / Auto-arrange — board only.
+          Neither does anything the timeline can show. Auto-arrange lays out the
+          board's free-floating cards, and the timeline's rail is an ordered list
+          with no positions to arrange; a new chapter would be appended somewhere
+          off screen. Both dropped drag-to-reorder when the timeline became a
+          reading surface (§4), and this is the same rule applied to the toolbar. */}
+      {!onSeriesMap && view === "board" && (
         <>
           <button onClick={addChapter} className={action}>
             <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter

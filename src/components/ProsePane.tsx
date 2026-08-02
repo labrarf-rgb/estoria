@@ -38,7 +38,7 @@ export function ProseChapter({
   maxWidth?: number | "none";
 }) {
   const openChapter = useStore((s) => s.openChapter);
-  const openSection = useStore((s) => s.openChapterSection);
+  const setChapterMode = useStore((s) => s.setChapterMode);
 
   const text = ch.manuscript ?? "";
   const blocks = useMemo(() => parseBlocks(text), [text]);
@@ -54,7 +54,7 @@ export function ProseChapter({
       >
         <button
           onClick={() => {
-            openSection("manuscript");
+            setChapterMode("manuscript");
             openChapter(ch.id);
           }}
           className="text-[12.5px] font-medium text-faint hover:text-soft"

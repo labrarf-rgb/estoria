@@ -43,8 +43,36 @@ export type Theme = "light" | "dark";
 /** Which level of the hierarchy is on screen: the series map or a book's board. */
 export type Level = "series" | "book";
 
-/** Collapsible sections of the chapter modal (Scene flow has its own sizing toggle). */
-export type ChapterSection = "scenes" | "manuscript" | "chars" | "world" | "notes" | "refs";
+/**
+ * The story map modal's reference material, tabbed.
+ *
+ * These four were stacked collapsible sections, two above the scene canvas and
+ * two below it, and any number of them could be open at once — so the canvas
+ * could end up anywhere on a long scroll, and the chapter you opened to look at
+ * its scenes opened on its cast instead. One strip, one panel, and the canvas
+ * always in the same place under it.
+ *
+ * `null` is a real state and the default: every tab closed, nothing but the
+ * strip between the header and the canvas. Clicking the open tab returns to it,
+ * which is what keeps the old click-to-show-and-hide behaviour intact.
+ */
+export type ChapterTab = "chars" | "world" | "notes" | "refs";
+
+/**
+ * Which face of a chapter is on screen. One chapter, two modals: the story map
+ * (scenes, cast, notes, refs) and the manuscript (the writing pane, with the
+ * beats beside it). A button on each one's meta line swaps between them.
+ *
+ * The manuscript used to be a collapsible section of the chapter modal, which
+ * put a writing surface and a planning surface in one scrolling column — three
+ * sticky layers over two nested scroll contexts, and every fix for it added a
+ * fourth rule to the pile. See SPECS §4.
+ *
+ * Global and persisted, not per chapter: a drafting session opens every chapter
+ * to write in, a planning session opens every chapter to plan in, and neither
+ * wants to say so once per chapter.
+ */
+export type ChapterMode = "map" | "manuscript";
 
 /** Expandable textarea surfaces whose tall/short state is remembered (global). */
 export type TextareaKey = "storyNotes" | "chapterNotes" | "worldDesc" | "worldNotes";
@@ -106,23 +134,37 @@ interface UiState {
   lightbox: string | null;
   /** False until the user has chosen sample-vs-fresh on first launch. */
   onboarded: boolean;
-  /** Per-section collapse state for the chapter modal (persisted, global). */
-  chapterSectionsCollapsed: Record<ChapterSection, boolean>;
+  /** Scene flow's own collapse state in the story map modal (persisted, global). */
+  scenesCollapsed: boolean;
+  /** Which reference tab is open, or `null` for none. See `ChapterTab`. */
+  chapterTab: ChapterTab | null;
+  /** Which of the chapter's two modals opens (persisted, global). See `ChapterMode`. */
+  chapterMode: ChapterMode;
   /** Card-vs-list view for reference lists (persisted, global across surfaces). */
   refView: RefView;
   /** Tall/short state per expandable-textarea surface (persisted, global). */
   textareaExpanded: Record<TextareaKey, boolean>;
   /**
-   * How much room the chapter modal gives its two working areas — the scene
-   * canvas and the manuscript sheet — and, with it, how wide the modal is.
+   * How much room the scene canvas gets, and with it how wide the story map
+   * modal is.
    *
-   * **One flag for both**, because both `Expand` buttons widen the same modal:
-   * two independent size toggles with one shared consequence meant expanding
-   * the manuscript silently gave the canvas more room while its own control
-   * still read "Expand". Named for the canvas because that is where it started
-   * and the name is what the persisted preference is keyed on.
+   * It drove the manuscript sheet too while that was a section of the same
+   * modal, which is why it was once one flag for two areas. The manuscript has
+   * its own modal and its own `manuscriptExpanded` now, so this is back to
+   * meaning exactly what it is named for.
+   *
+   * **Not renamed, deliberately.** It is not only a width: `scenePosKey` uses it
+   * to choose between `scenePos` and `scenePosCompact`, which are persisted
+   * *document* data. Renaming the flag would either drag a doc migration behind
+   * it or leave the flag and the layout key disagreeing.
    */
   sceneFlowExpanded: boolean;
+  /**
+   * The manuscript modal's own width toggle. Separate from `sceneFlowExpanded`
+   * because each modal keeps its own size control, and a writer who wants the
+   * page wide has no opinion about the scene canvas at that moment.
+   */
+  manuscriptExpanded: boolean;
   /**
    * The prose as it was before the last reconciliation, for a single undo.
    * `previous` is `undefined` when the chapter had never been written in — that
@@ -186,6 +228,10 @@ interface StoreState extends UiState {
   // ---- chapters ----
   moveChapter: (id: string, x: number, y: number) => void;
   reorderChapter: (id: string, targetId: string, after: boolean) => void;
+  /** Reorder several chapters as one block, before or after `targetId`. */
+  reorderChapters: (ids: string[], targetId: string, after: boolean) => void;
+  /** Delete several chapters at once. Refused if it would empty the book. */
+  deleteChapters: (ids: string[]) => void;
   addChapter: () => void;
   deleteChapter: (id: string) => void;
   autoArrangeBoard: () => void;
@@ -212,6 +258,9 @@ interface StoreState extends UiState {
     atIdx?: number,
     cols?: number
   ) => void;
+  /** Reorder the given scene indices as a block within one chapter. `atIdx`
+   *  counts against the scenes *remaining* once the selection is lifted out. */
+  moveScenesWithin: (chId: string, indices: number[], atIdx?: number, cols?: number) => void;
   cycleSceneLink: (chId: string, idx: number) => void;
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
@@ -329,12 +378,15 @@ interface StoreState extends UiState {
   toggleNewMenu: () => void;
   closeNewMenu: () => void;
   setPanel: (panel: PanelKey, open: boolean) => void;
-  toggleChapterSection: (section: ChapterSection) => void;
-  /** Ensure a chapter section is open — used when navigating straight into one. */
-  openChapterSection: (section: ChapterSection) => void;
+  toggleScenesCollapsed: () => void;
+  /** Open a reference tab, or pass the open one to close it. */
+  setChapterTab: (tab: ChapterTab | null) => void;
+  /** Swap the open chapter between its story map and its manuscript. */
+  setChapterMode: (mode: ChapterMode) => void;
   setRefView: (view: RefView) => void;
   toggleTextarea: (key: TextareaKey) => void;
   setSceneFlowExpanded: (expanded: boolean) => void;
+  setManuscriptExpanded: (expanded: boolean) => void;
   setPanelExpanded: (expanded: boolean) => void;
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
@@ -499,6 +551,55 @@ const scenePosBoth = (
 const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
   expanded ? "scenePos" : "scenePosCompact";
 
+/**
+ * Take an ordered subset of a chapter's scenes, keeping each link that joined
+ * two scenes still adjacent after the subset.
+ *
+ * Links are **positional** — a link is the gap between two scenes, not a
+ * property of either — so pulling scene 3 out of 1·2·3·4 leaves 1·2·4 and the
+ * gap that used to sit between 2 and 3 is gone. A gap that closes over removed
+ * scenes cannot inherit a meaning from either side, so it defaults to
+ * "therefore" rather than guessing.
+ *
+ * Shared by both scene moves, within a chapter and across two, so the two
+ * cannot disagree about what happens to the links.
+ */
+const sceneSubset = (scenes: string[], links: ConnType[], keep: number[]) => {
+  const sorted = [...keep].sort((a, b) => a - b);
+  const outLinks: ConnType[] = [];
+  for (let j = 0; j < sorted.length - 1; j++) {
+    const a = sorted[j];
+    outLinks.push(sorted[j + 1] === a + 1 ? links[a] ?? "therefore" : "therefore");
+  }
+  return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
+};
+
+/**
+ * Splice a block of scenes into a list at `p`, re-joining whatever the
+ * insertion splits apart with a neutral "therefore" on each new seam.
+ */
+const spliceSceneBlock = (
+  scenes: string[],
+  links: ConnType[],
+  block: { scenes: string[]; sceneLinks: ConnType[] },
+  p: number
+) => {
+  const at = Math.max(0, Math.min(p, scenes.length));
+  const left = scenes.slice(0, at);
+  const right = scenes.slice(at);
+  const outScenes = left.concat(block.scenes, right);
+  const leftLinks = links.slice(0, Math.max(0, at - 1));
+  const rightLinks = links.slice(at);
+  const outLinks = ([] as ConnType[]).concat(
+    leftLinks,
+    left.length > 0 && block.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+    block.sceneLinks,
+    right.length > 0 && block.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+    rightLinks
+  );
+  return { scenes: outScenes, sceneLinks: outLinks };
+};
+
 const renumber = (chapters: Chapter[]): Chapter[] =>
   chapters.map((c, i) => ({ ...c, num: i + 1 }));
 
@@ -538,17 +639,13 @@ const initialUi: UiState = {
   worldDraft: null,
   lightbox: null,
   onboarded: false,
-  chapterSectionsCollapsed: {
-    scenes: false,
-    manuscript: true,
-    chars: false,
-    world: false,
-    notes: false,
-    refs: false,
-  },
+  scenesCollapsed: false,
+  chapterTab: null,
+  chapterMode: "map",
   refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
+  manuscriptExpanded: true,
   manuscriptUndo: null,
   panelExpanded: false,
 };
@@ -771,6 +868,69 @@ export const useStore = create<StoreState>()(
             type: prevType.get(`${c.id}>${ordered[i + 1].id}`) ?? ("therefore" as const),
           }));
           return { doc: { ...s.doc, chapters: ordered, links } };
+        }),
+
+      /**
+       * Reorder a block of chapters to sit before or after `targetId`.
+       *
+       * The single-card version cannot be looped: each hop renumbers and
+       * re-chains everything, so "move 2 and 5 after 7" would depend on the
+       * order the hops ran in and could land the second one relative to a
+       * sequence the first already changed. The block is lifted out whole and
+       * dropped in one place, keeping the order the chapters were already in.
+       *
+       * A target inside the selection is meaningless — the block cannot land
+       * relative to itself — so it is refused rather than guessed at.
+       */
+      reorderChapters: (ids, targetId, after) =>
+        set((s) => {
+          const moving = new Set(ids);
+          if (moving.size === 0 || moving.has(targetId)) return s;
+          const rest = s.doc.chapters.filter((c) => !moving.has(c.id));
+          const block = s.doc.chapters.filter((c) => moving.has(c.id));
+          if (block.length === 0) return s;
+          let toIdx = rest.findIndex((c) => c.id === targetId);
+          if (toIdx === -1) toIdx = rest.length;
+          else if (after) toIdx += 1;
+          const spliced = rest.slice();
+          spliced.splice(toIdx, 0, ...block);
+          const ordered = renumber(spliced);
+          const prevType = new Map(s.doc.links.map((l) => [`${l.fromId}>${l.toId}`, l.type]));
+          const links = ordered.slice(0, -1).map((c, i) => ({
+            fromId: c.id,
+            toId: ordered[i + 1].id,
+            type: prevType.get(`${c.id}>${ordered[i + 1].id}`) ?? ("therefore" as const),
+          }));
+          return { doc: { ...s.doc, chapters: ordered, links } };
+        }),
+
+      /**
+       * Delete several chapters at once.
+       *
+       * Not a loop over `deleteChapter` either: that one bridges the gap it
+       * leaves by wiring its two neighbours together, and running it per chapter
+       * would build and rebuild bridges across chapters that are themselves
+       * about to go. Here the survivors are re-chained once, at the end.
+       *
+       * **A book always keeps a chapter.** Deleting every one of them is refused
+       * rather than silently leaving an empty board with no way back.
+       */
+      deleteChapters: (ids) =>
+        set((s) => {
+          const gone = new Set(ids);
+          const chapters = s.doc.chapters.filter((c) => !gone.has(c.id));
+          if (chapters.length === 0 || chapters.length === s.doc.chapters.length) return s;
+          const ordered = renumber(chapters);
+          const prevType = new Map(s.doc.links.map((l) => [`${l.fromId}>${l.toId}`, l.type]));
+          const links = ordered.slice(0, -1).map((c, i) => ({
+            fromId: c.id,
+            toId: ordered[i + 1].id,
+            type: prevType.get(`${c.id}>${ordered[i + 1].id}`) ?? ("therefore" as const),
+          }));
+          return {
+            doc: { ...s.doc, chapters: ordered, links },
+            openCh: s.openCh && gone.has(s.openCh) ? null : s.openCh,
+          };
         }),
 
       addChapter: () =>
@@ -1009,26 +1169,13 @@ export const useStore = create<StoreState>()(
           const to = s.doc.chapters.find((c) => c.id === toChId);
           if (!from || !to) return {};
 
-          // Take an ordered subset of a chapter's scenes, preserving each link
-          // that joined two scenes still adjacent after the subset (collapsed
-          // gaps default to "therefore").
-          const subset = (scenes: string[], links: ConnType[], keep: number[]) => {
-            const sorted = [...keep].sort((a, b) => a - b);
-            const outLinks: ConnType[] = [];
-            for (let j = 0; j < sorted.length - 1; j++) {
-              const a = sorted[j];
-              outLinks.push(sorted[j + 1] === a + 1 ? links[a] ?? "therefore" : "therefore");
-            }
-            return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
-          };
-
           const moveSet = new Set(indices.filter((i) => i >= 0 && i < from.scenes.length));
           if (moveSet.size === 0) return {};
           const keepIdx = from.scenes.map((_, i) => i).filter((i) => !moveSet.has(i));
           const moveIdx = from.scenes.map((_, i) => i).filter((i) => moveSet.has(i));
 
-          const remaining = subset(from.scenes, from.sceneLinks, keepIdx);
-          const moved = subset(from.scenes, from.sceneLinks, moveIdx);
+          const remaining = sceneSubset(from.scenes, from.sceneLinks, keepIdx);
+          const moved = sceneSubset(from.scenes, from.sceneLinks, moveIdx);
 
           // An emptied source keeps one blank placeholder scene — the same
           // state a freshly created chapter starts in. Chapters never drop
@@ -1037,21 +1184,14 @@ export const useStore = create<StoreState>()(
           const srcScenes = remaining.scenes.length > 0 ? remaining.scenes : [""];
           const srcLinks = remaining.scenes.length > 0 ? remaining.sceneLinks : [];
 
-          // Insert the moved block into the destination at `p`; anything the
-          // insertion splits apart is re-joined with a neutral "therefore".
-          const p = Math.max(0, Math.min(atIdx ?? to.scenes.length, to.scenes.length));
-          const left = to.scenes.slice(0, p);
-          const right = to.scenes.slice(p);
-          const toScenes = left.concat(moved.scenes, right);
-          const leftLinks = to.sceneLinks.slice(0, Math.max(0, p - 1));
-          const rightLinks = to.sceneLinks.slice(p);
-          const toLinks = ([] as ConnType[]).concat(
-            leftLinks,
-            left.length > 0 && moved.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
-            moved.sceneLinks,
-            right.length > 0 && moved.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
-            rightLinks
+          const dest = spliceSceneBlock(
+            to.scenes,
+            to.sceneLinks,
+            moved,
+            atIdx ?? to.scenes.length
           );
+          const toScenes = dest.scenes;
+          const toLinks = dest.sceneLinks;
 
           return {
             doc: {
@@ -1079,6 +1219,66 @@ export const useStore = create<StoreState>()(
                   };
                 return c;
               }),
+            },
+          };
+        }),
+
+      /**
+       * Reorder a block of scenes *within* one chapter.
+       *
+       * `reorderScene` already moves a single scene, but repeating it per scene
+       * is not the same operation: each hop renumbers everything after it, so
+       * "move 2 and 5 to the front" needs the caller to track shifting indices
+       * and the result depends on the order the hops are applied in.
+       *
+       * **`atIdx` counts against the scenes that are left after the selection is
+       * lifted out**, not against the original list. That is the only reading
+       * that is unambiguous — an index into the original list can point at a
+       * scene that is itself being moved — and it is what "beginning / middle /
+       * end" mean to someone looking at the chapter.
+       */
+      moveScenesWithin: (chId, indices, atIdx, cols) =>
+        set((s) => {
+          const ch = s.doc.chapters.find((c) => c.id === chId);
+          if (!ch || indices.length === 0) return {};
+
+          const moveSet = new Set(indices.filter((i) => i >= 0 && i < ch.scenes.length));
+          // Moving every scene is a no-op by definition: there is nothing left
+          // to position them against.
+          if (moveSet.size === 0 || moveSet.size === ch.scenes.length) return {};
+
+          const all = ch.scenes.map((_, i) => i);
+          const remaining = sceneSubset(
+            ch.scenes,
+            ch.sceneLinks,
+            all.filter((i) => !moveSet.has(i))
+          );
+          const moved = sceneSubset(
+            ch.scenes,
+            ch.sceneLinks,
+            all.filter((i) => moveSet.has(i))
+          );
+
+          const next = spliceSceneBlock(
+            remaining.scenes,
+            remaining.sceneLinks,
+            moved,
+            atIdx ?? remaining.scenes.length
+          );
+
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id === chId
+                  ? {
+                      ...c,
+                      scenes: next.scenes,
+                      sceneLinks: next.sceneLinks,
+                      ...scenePosBoth(next.scenes, s.sceneFlowExpanded, cols),
+                    }
+                  : c
+              ),
             },
           };
         }),
@@ -1889,12 +2089,18 @@ export const useStore = create<StoreState>()(
             },
           };
         }),
-      // Opening straight onto a scene (from the timeline's scene pane) goes
-      // through `openChapter` so the modal's per-mode scene layouts are still
-      // seeded, then leaves a one-shot marker for the modal to consume.
+      // Opening straight onto a scene (from the timeline's scene pane, or from a
+      // beat in the manuscript's rail) goes through `openChapter` so the modal's
+      // per-mode scene layouts are still seeded, then leaves a one-shot marker
+      // for the modal to consume.
+      //
+      // It forces the story map on, because landing on a scene means landing on
+      // the scene canvas: the manuscript's rail is a view of the beats and has
+      // nothing to focus. This is also what makes a rail beat clickable — the
+      // button only has to name the scene, not know about the mode.
       openChapterAtScene: (id, index) => {
         useStore.getState().openChapter(id);
-        set({ focusScene: { chapterId: id, index } });
+        set({ chapterMode: "map", focusScene: { chapterId: id, index } });
       },
       clearFocusScene: () => set({ focusScene: null }),
       // Jumping to a pin can cross a book and a version boundary, so it reuses
@@ -1957,24 +2163,19 @@ export const useStore = create<StoreState>()(
             ...(left ? { charDraft: null, worldDraft: null, ...prunedState(s) } : null),
           } as Partial<StoreState>;
         }),
-      openChapterSection: (section) =>
-        set((s) => ({
-          chapterSectionsCollapsed: { ...s.chapterSectionsCollapsed, [section]: false },
-        })),
+      toggleScenesCollapsed: () => set((s) => ({ scenesCollapsed: !s.scenesCollapsed })),
 
-      toggleChapterSection: (section) =>
-        set((s) => ({
-          chapterSectionsCollapsed: {
-            ...s.chapterSectionsCollapsed,
-            [section]: !s.chapterSectionsCollapsed[section],
-          },
-        })),
+      // Passing the tab that is already open closes it, so one control both
+      // shows and hides — the behaviour the collapsible sections had.
+      setChapterTab: (tab) => set((s) => ({ chapterTab: s.chapterTab === tab ? null : tab })),
+      setChapterMode: (mode) => set({ chapterMode: mode }),
       setRefView: (view) => set({ refView: view }),
       toggleTextarea: (key) =>
         set((s) => ({
           textareaExpanded: { ...s.textareaExpanded, [key]: !s.textareaExpanded[key] },
         })),
       setSceneFlowExpanded: (expanded) => set({ sceneFlowExpanded: expanded }),
+      setManuscriptExpanded: (expanded) => set({ manuscriptExpanded: expanded }),
       setPanelExpanded: (expanded) => set({ panelExpanded: expanded }),
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
@@ -2008,10 +2209,13 @@ export const useStore = create<StoreState>()(
         timelineOrient: s.timelineOrient,
         timelinePane: s.timelinePane,
         onboarded: s.onboarded,
-        chapterSectionsCollapsed: s.chapterSectionsCollapsed,
+        scenesCollapsed: s.scenesCollapsed,
+        chapterTab: s.chapterTab,
+        chapterMode: s.chapterMode,
         refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
+        manuscriptExpanded: s.manuscriptExpanded,
         panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed
