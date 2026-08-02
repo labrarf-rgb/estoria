@@ -45,6 +45,10 @@ running app.
   always lossless, which is what makes archiving a low-stakes move rather than a
   soft delete. ⚠️ Under v6/v7 archiving an asset *unpinned it everywhere first* —
   the opposite rule; see §9 and the "Archive / restore (history)" row in §4.
+- **Manuscript** — a chapter's **prose**, written inside the chapter modal.
+  Markdown, one string per chapter, with scenes separated by a `***` thematic
+  break. This is not an editor with a map beside it; it is the map with a place
+  to write inside it, and the point is seeing your beats while you draft.
 - **Series** — optional multi-book planning layer above the current book, with its
   own story-map (books as cards) and timeline. Navigated via a header breadcrumb.
 - **Draft / version** — **per book**: each book has its own named versions, and
@@ -111,7 +115,10 @@ estoria/
 ├─ docs/SPECS.md              # ← you are here: current state, §§1-9
 ├─ docs/SESSIONS.md           # dated session log (history; §N refs point here)
 ├─ docs/archives/            # closed records — read for background, don't work from
-│  └─ REVIEW-FINDINGS.md     #   3 code reviews + 1 task brief, all items closed
+│  ├─ REVIEW-FINDINGS.md     #   3 code reviews + 1 task brief, all items closed
+│  └─ manuscript-mode-brainstorm.md  # why manuscript mode is shaped as it is:
+│                            #   the rejected alternatives, kept after the build
+│                            #   brief itself was folded into §4 and deleted
 ├─ Story Mapping WebApp Prototype/   # design reference (not built on)
 └─ src/
    ├─ main.tsx                # React root
@@ -124,13 +131,21 @@ estoria/
    │  └─ emptyStory.ts        # blank document for a new project
    ├─ store/
    │  ├─ useStore.ts          # Zustand store: doc + UI state + all actions
-   │  └─ persistence.ts       # StorageAdapter, debounced storage shim, normalizeDoc,
-   │                          #   save-status pub/sub, file save/load
+   │  ├─ persistence.ts       # StorageAdapter, the two-stream save (map -> localStorage,
+   │  │                       #   prose -> IndexedDB), normalizeDoc, save-status, file I/O
+   │  └─ prose.ts             # manuscripts at rest: the IndexedDB store, the doc
+   │                          #   split/merge, and the synchronous crash pad
    ├─ lib/
    │  ├─ layout.ts            # board layout, auto-arrange, fit-to-content, scene grids
    │  ├─ sceneFit.ts          # SCENE_TEXT_MAX + measured card capacity: how wide a
    │  │                       #   timeline scene card must be to show its text whole
-   │  ├─ markdown.ts          # export builder, import prompt + parser
+   │  ├─ markdown.ts          # *map* export builder (Obsidian), import prompt + parser
+   │  ├─ manuscript.ts        # the `***` scene-break contract: sections, drift, word
+   │  │                       #   count, borrowed labels, prose edits
+   │  ├─ manuscriptExport.ts  # *prose* export: .md / .txt / standard-format .docx
+   │  ├─ inline.ts            # inline-markdown tokenizer, shared by the reading
+   │  │                       #   view and the .docx runs so they cannot drift
+   │  ├─ zip.ts               # minimal store-only ZIP writer (a .docx is a ZIP)
    │  ├─ templates.ts         # story-structure skeletons (34 cards, 3 facets)
    │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, file history
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
@@ -149,7 +164,9 @@ estoria/
       ├─ Board.tsx            # story map: pan/zoom/drag, cards, connectors
       ├─ Timeline.tsx         # chapter rail + scene-flow pane (scrolling, no camera)
       ├─ SeriesMap.tsx        # series-level board: book cards + links
-      ├─ ChapterDetail.tsx    # chapter modal: scene flow + act controls
+      ├─ ChapterDetail.tsx    # chapter modal: scene flow + act controls + manuscript
+      ├─ ManuscriptSheet.tsx  # the writing pane, scene carousel, drift bar, pull-from-version
+      ├─ ProsePane.tsx        # prose rendering, shared by the timeline and the editor's View
       ├─ Footer.tsx           # autosave status, Sync button, folder icon
       ├─ SyncHistoryPopover.tsx / SyncFileList.tsx   # file history + restore
       ├─ Welcome.tsx · Lightbox.tsx · ConfirmDialog.tsx
@@ -204,6 +221,15 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Detail | Scene length cap | ✅ | **Session 56.** `SCENE_TEXT_MAX` = **200 characters**, set by the *narrowest* place a card still has to fit whole: a half-screen window, where the pane holds one ~336px column and a card cannot widen at all (that card shows ~205). A wide-screen two-column card holds ~344, with room to spare. **Enforced on input, never on stored data** — deliberately *not* `maxLength`, which makes the browser drop the keystroke silently, and a refusal the writer cannot see is the one thing this cap must not do. `writeScene` refuses it and says so: the card border goes red (`--but`) and nudges 3px once via `element.animate` (not a CSS class — replaying a class needs a frame callback between removing and re-adding it, and frame callbacks are paused in a hidden tab, so a held key would land its refusals silently). Reduced motion keeps the red edge, drops the nudge. The counter is hidden until it matters, then red, at `>= max`. |
 | Detail | Scenes written before the cap | ✅ | **No migration, by design — nothing is truncated and no schema changed.** Each scene's ceiling is `max(SCENE_TEXT_MAX, its current length)`, so a pre-cap scene can be shortened or left alone but never grown, and ordinary editing of it still works. (A plain `maxLength={200}` gets this *wrong* in a way worth remembering: it blocks **all** insertion once the value already exceeds it, freezing the scene entirely.) On the timeline such a scene still widens to show what it can and carries the `N / 200` count in its top-right corner, on the label line, so it costs no layout space. Because `StoryDoc` is untouched this is invisible to the Android app and is **not** a cross-app event. |
 | Timeline | Open a scene for editing | ✅ | Clicking a scene node opens the chapter modal **on that scene** — scrolled into view, textarea focused, border flashed for 1600ms (`focusScene` in the store; transient, never persisted). Rail cards jump rather than open, so a scene-less chapter's empty canvas is itself the way in. The fade timer lives in a **ref, not the effect's cleanup** (fixed Session 56): the effect consumes `focusScene` as it runs, which changes its own deps and immediately re-runs it, and a cleanup-held timer was cancelled by that re-run while the early-return guard stopped a replacement being scheduled — so the green ring never faded and sat on the card for as long as the modal stayed open. |
+| Detail | Manuscript: write inside the chapter | ✅ | **The prose lives in the map.** A `Manuscript` section under Scene flow, in three states (`manuscriptState`, persisted): **Minimized** — a dashed row reporting `N scenes · N written`, so a planning session never sees prose; **Regular** — the writing sheet opens and the scene flow *becomes a one-card carousel* (focused beat at 352px with the green ring, neighbours peeking at 118px, connector pills between, `2 / 3` readout), while the chapter header sheds its summary, act stepper and character/world chips; **Full screen** — the same, filling the viewport with everything below the sheet dropped. The carousel is sticky under the modal's header (measured, not guessed) so the beat stays put however far you write. One `Edit` / `View` toggle, no formatting toolbar — the editor is deliberately plain because the *coupling* is the product. **View starts on Edit every time and is not persisted**: unlike the three states it has a wrong side to land on. |
+| Detail | The `***` contract | ✅ | A scene break is a **markdown thematic break**, chosen over a marker (`<!-- s1 -->`) because the question that killed the marker was "is that something I have to type?" — `***` is what a novelist types anyway, renders as the rule a scene break has always looked like, and exports without stripping. Use `***`, never `---` (a `---` under text is a setext heading and would promote the sentence above it to an H2). A break is the prose form of a **connector**, so the counting rule falls out of the schema: `breakCount === sceneLinks.length`. The causal type is **never written into the prose** — reading mode decorates the rule from `sceneLinks[i]`. Typing `***` creates a beat (positioned from *where the text changed*, not where the caret ended up — a shortcut-inserted break leaves the caret two lines lower); `+ Add scene` opens an empty section. Both only when the two are already in step. |
+| Detail | Drift bar | ✅ | **The map never mutates the manuscript** (the one hard rule): deleting a scene never deletes prose, and reordering scenes never rearranges paragraphs. Instead the counts disagree and a bar says so. When the map edit *just happened* the store recorded exactly what it was (`manuscriptDrift`, transient), so the bar names the scene and offers the matching change — merge that prose into the scene above, or reorder the prose to match. When it did not (a reload, a hand-deleted break), no amount of counting says *which* pair drifted, so the only offers are ones that append at the end and guess at nothing. Everything is confirmed and keeps one undo. |
+| Detail | An unnamed beat borrows its opening line | ✅ | A scene with no name of its own displays the first sentence of the prose under it, italic, wherever it would have said "New scene" — carousel, canvas placeholder, timeline card. **Derived on read, never written to `scenes[i]`**: storing it would be the manuscript editing the map, and then nothing could tell a borrowed name from a typed one. Steps over abbreviations and initials (no scene called "Mr."), cuts at a word boundary with an ellipsis, and **refuses to borrow while the prose has drifted**, because section `i` is then not that scene's section. |
+| Timeline | Read the book as prose | ✅ | A `Scenes / Prose` **pane toggle** beside the ↓ / → control, not a fourth view: same rail, same cards, same active ring, same two-way scroll sync — only the pane's contents change. Renders through `ProsePane`, the same component the editor's View mode uses. |
+| App | Word count is derived | ✅ | `words` is a **cache of the manuscript**, recomputed on the save rhythm and written back — still a stored field, because eight places read it and deriving at those call sites would put a manuscript scan inside every render. Counting strips markdown (`**tension**` is one word) and ignores `***`. Two rules protect what was typed: **never auto-zero** (every pre-manuscript book has a hand-typed count and no prose; merely *opening* the manuscript must not zero it), and **promote, don't overwrite** — the first real prose moves the old number into the new `target` field, because `words` used to mean *planned* (the AI import prompt says "estimate from scene length"). Board and rail cards then read `1.2k / 3k words`. Deleting every word freezes the last count rather than showing 0 — the safe side of that trade. |
+| Export | Manuscript (prose) | ✅ | **A second export with a different purpose**, tabbed apart from the map export and never merged: that one is Obsidian-shaped structure, this one is prose for a person. `.docx` in **standard manuscript format** (12pt Times, double spaced, 1" margins, half-inch indents except the first paragraph of a scene, title page, `#` scene breaks, running `Surname / Title / page` header) — the one export agents and beta readers expect and Obsidian cannot produce. Plus `.md` / `.txt`. `StoryDoc` gained an optional `author` for the title block; **no name is invented when none is given**. A ZIP writer (`lib/zip.ts`, stored not deflated) rather than a dependency. An **unwritten scene is not a scene break** — empty sections are dropped, or a half-drafted chapter prints a page of `#` with no story between them. |
+| Export | PDF, via print | ✅ | **Deliberately not an exporter.** `Cmd+P` from the timeline's Prose mode or the editor's View mode prints a typeset reading copy, through an `@media print` block in `index.css`. A PDF writer would be a second implementation of the reading view that could drift from it; this *is* the reading view, on paper. Screen-only furniture (chrome, hover affordances, the scroll spacer, unwritten scenes) is marked `data-print-skip`. |
+| App | Versions carry their prose | ✅ | Prose forks with the version, exactly as scenes do — "version" keeps meaning a version of the book. So: forking **asks whether to take the writing**, but only when there is prose to copy (with none, both answers are identical and the prompt is just a click); the version menu shows **word counts**, so a fork's cost is visible before you pay it; and a chapter can **pull its text from another version** (`Also written in …`), behind a confirm naming the version and the count, with one undo. Deliberately **not a merge engine** — merging prose is a hard problem and a bad one to half-solve. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
 | Detail | Scene layout remembered per canvas size | ✅ | The expanded and collapsed canvases fit different column counts, so each keeps **its own layout** (`scenePos` / `scenePosCompact`, v6). Toggling size swaps layouts instead of re-arranging — which is what used to throw the arrangement away. Auto-arrange tidies only the size you're looking at; structural edits keep both in step. |
 | Board | Card meta redesign | ✅ | Bottom row reads "N scenes · N.Nk words"; character avatars moved to the top-right; pinned-notes count dropped (board + timeline rail). The avatar stack is **capped at 7 slots** (`lib/chips.ts`) — a bigger cast fills six and turns the seventh into a muted **`+n`** counter, tooltipped with the hidden names, instead of running the row off the card. Seven is the narrowest card's budget (the horizontal rail's 234px), so board and rail cap alike. |
@@ -307,6 +333,26 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   the bullet above and in [`SESSIONS.md`](SESSIONS.md); what is retired here is
 >   only the "the phone cannot read our files yet" warning.** The next change to
 >   `StoryDoc` starts a new event — reinstate a bullet like the ones removed.
+> - **Manuscript mode added three optional fields and did NOT bump the schema.**
+>   `Chapter.manuscript` (the prose), `Chapter.target` (the hand-set word goal)
+>   and `StoryDoc.author` (the `.docx` title block) are all optional, which is
+>   already the shape every existing document has — so this is **not** a cross-app
+>   event and there is nothing for Android to match. Verified in `Estoria-aa`
+>   that unknown chapter fields round-trip losslessly through two independent
+>   layers: `normalizeDocJson` (`Normalize.kt`) builds each chapter with
+>   `val out = p.toMutableMap()` and only *overwrites* known keys, and
+>   `ExtrasSerializer` (`StoryDoc.kt`) captures unknown keys into `extra` on
+>   decode and merges them back on encode. **Worth adding on the Android side:**
+>   a regression test for a chapter carrying an unknown field, so that
+>   passthrough is not lost to a future refactor.
+> - **Two consequences to remember rather than fix.** A **prose-only edit on web
+>   registers as a real change on Android**, because its conflict detection
+>   hashes the canonical encoding — that is correct, not a bug. And the web app
+>   now **derives `words` from the manuscript** while Android still offers a
+>   hand-typed field, so a round trip can recompute a typed number away. That is
+>   the first place the two apps would visibly disagree; if Android ever grows a
+>   manuscript field, it should adopt the same two rules (never auto-zero, and
+>   promote the old number into `target` rather than overwriting it).
 > - **The Timeline reading view is web-app only (Session 51) — by decision, not
 >   by omission.** The user scoped it to the web app, and it is built so that
 >   choice costs the phone nothing: it is pure presentation over data that
@@ -436,9 +482,21 @@ shape of roadmap item 7 (cloud backend).
 - **Fix the seam first**: `zustandStorage` currently reads localStorage
   directly (never calls `activeAdapter.load()`) and double-writes every save.
   A Drive adapter dropped in today would never be read from. §9 item 1.
-- **Debounce saves before Drive**: persist currently serializes the whole store
-  on every keystroke — fine-ish locally, unacceptable against a network API
-  (quota + latency). Debounce ~500ms trailing + flush on `beforeunload`. §9 item 3.
+- ~~**Debounce saves before Drive**~~ — **done, twice.** Session 20 debounced the
+  *write* (500ms trailing + flush on `beforeunload`), and the manuscript work
+  went further and debounced the **serialize**: `createJSONStorage` is gone, the
+  storage is object-form and owns its own serialization, so `setItem` is one
+  assignment and `JSON.stringify` runs on the timer rather than per keystroke.
+  Measured on a 15-chapter project: 40 keystrokes stringify ~26KB in about no
+  time, then one ~188KB serialization when the timer fires.
+- **Prose is already split out**: chapter manuscripts live in **IndexedDB**,
+  keyed by `(projectId, bookId, draftId, chapterId)` — see `store/prose.ts`. The
+  split is **at the at-rest layer only**: `StoryDoc` stays whole in memory and in
+  every file, so export, Sync, backup, import and Android see one document with
+  `manuscript` on its chapters. A Drive adapter inherits this unchanged, and
+  should note the crash pad: IndexedDB is async and `beforeunload` is not, so
+  every prose flush writes a synchronous localStorage pad first and clears it
+  only once the IndexedDB write resolves.
 - **Granularity**: the persisted blob today is doc + `projectStash` + prefs in
   one string. For Drive, prefer **one file per project**
   (`<title>.estoria.json` in an app folder) plus keeping UI prefs local-only —

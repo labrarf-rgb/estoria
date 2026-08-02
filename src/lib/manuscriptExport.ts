@@ -12,7 +12,7 @@ import { zipStore } from "@/lib/zip";
  * for a person who is going to read the book. They are not variations of each
  * other and must not be merged; the Export modal says which is which.
  *
- * See docs/manuscript-mode-build.md §8 phase 5.
+ * See docs/SPECS.md §4, row "Export | Manuscript (prose)".
  */
 
 /** Chapters that have something written in them, in order. */

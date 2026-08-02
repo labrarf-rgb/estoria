@@ -144,7 +144,7 @@ interface UiState {
   panelExpanded: boolean;
 }
 
-/** Minimized / Regular / Full screen — see docs/manuscript-mode-build.md §4. */
+/** Minimized / Regular / Full screen — see docs/SPECS.md §4. */
 export type ManuscriptState = "min" | "regular" | "full";
 
 /**
@@ -528,7 +528,7 @@ const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
 /**
  * Is this chapter's prose in step with its map? A `***` is the prose form of a
  * connector, so three scenes mean two connectors and two breaks — the whole
- * check is `breakCount === sceneLinks.length` (docs/manuscript-mode-build.md §3).
+ * check is `breakCount === sceneLinks.length` (docs/SPECS.md §4).
  *
  * A chapter that has never been written in is *not* in step; it has no prose to
  * keep in step, and the seed on first open is what puts it there.
@@ -949,7 +949,8 @@ export const useStore = create<StoreState>()(
       // by themselves, because opening an empty section moves no existing text
       // (`addScene`, `insertScene`); the two that cannot — `deleteScene` and
       // `reorderScene` — leave the prose alone and raise the drift bar instead.
-      // See the hard rule in docs/manuscript-mode-build.md §7.
+      // See the "Drift bar" row in docs/SPECS.md §4 — the map never mutates
+      // the manuscript.
       addScene: (chId, cols) =>
         set((s) => ({
           doc: {

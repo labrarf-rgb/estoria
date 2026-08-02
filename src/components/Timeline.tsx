@@ -204,6 +204,27 @@ export function Timeline() {
     return () => ro.disconnect();
   }, [doc.chapters, orient]);
 
+  // Trailing room past the last chapter — see the spacer in the pane below.
+  const [tailSpace, setTailSpace] = useState(0);
+  useLayoutEffect(() => {
+    const el = paneRef.current;
+    const lastId = doc.chapters[doc.chapters.length - 1]?.id;
+    const g = lastId ? groupRefs.current.get(lastId) : null;
+    if (!el || !g) return setTailSpace(0);
+    const measure = () => {
+      const filled = vertical ? g.offsetHeight : g.offsetWidth;
+      const paneSize = vertical ? el.clientHeight : el.clientWidth;
+      // The allowance is the "End of book" line's own space, so it does not
+      // push the last chapter back off the top again.
+      setTailSpace(Math.max(0, paneSize - filled - (vertical ? 96 : 150)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(g);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [doc.chapters, vertical, prose, pane.w, pane.h]);
+
   /**
    * Distance from the pane's scroll origin to a group. Measured off the
    * scroller's own box rather than `offsetTop`/`offsetLeft`: neither the pane
@@ -454,6 +475,10 @@ export function Timeline() {
       {/* ---- scene pane ---- */}
       <div
         ref={paneRef}
+        // Printing the prose view is the PDF export: a print stylesheet costs
+        // nothing to maintain and Cmd+P already exists, where a PDF writer would
+        // be a second renderer to keep in step with this one.
+        {...(prose ? { "data-print-root": true } : {})}
         className={`min-h-0 min-w-0 flex-1 ${
           vertical ? "overflow-y-auto overflow-x-hidden" : "overflow-x-auto overflow-y-hidden"
         }`}
@@ -605,24 +630,27 @@ export function Timeline() {
           >
             End of book
           </div>
-          {/* Room past the last chapter, so the last chapters can still reach
-              the leading edge when jumped to.
-              A prose column is a fixed 560px against a scene grid that fills the
-              pane, so the tail of the book has far less content behind it to
-              scroll against: without this the pane bottoms out before the
-              chapter you clicked gets there, and the ring stays on the one
-              before it. Only in prose mode, where the narrow column caused it. */}
-          {prose && (
-            <div
-              aria-hidden
-              className="flex-none"
-              style={
-                vertical
-                  ? { height: Math.max(0, pane.h - 260) }
-                  : { width: Math.max(0, pane.w - PROSE_COL - 44) }
-              }
-            />
-          )}
+          {/* Room past the last chapter, so *every* chapter can reach the
+              leading edge when jumped to.
+
+              Without it the pane bottoms out before the chapter you clicked
+              gets to the top, the scroll handler reads the position it actually
+              reached, and the ring stays on the chapter before it — clicking
+              the last card visibly selected the second to last. Measured rather
+              than guessed, because how much room is needed is exactly "the pane,
+              less whatever the last chapter already fills", and that varies with
+              the pane size, the mode, and how many scenes the chapter has. A
+              chapter already taller than the pane needs none. */}
+          <div
+            aria-hidden
+            // Screen-only. On paper it has nothing to scroll against, and
+            // leaving it in feeds its own measurement: print makes the pane
+            // `height: auto`, so a spacer sized from the pane's height grows the
+            // pane, which grows the spacer.
+            data-print-skip
+            className="flex-none"
+            style={vertical ? { height: tailSpace } : { width: tailSpace }}
+          />
         </div>
       </div>
     </div>

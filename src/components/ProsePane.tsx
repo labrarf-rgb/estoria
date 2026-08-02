@@ -18,7 +18,7 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
  * horizontal rule a scene break has always looked like, and reading mode
  * decorates that rule with the causal type from `sceneLinks[i]` — the therefore
  * and but the map already knows, shown over the prose without ever being stored
- * in it. See docs/manuscript-mode-build.md §3 and §8 phase 4.
+ * in it. See docs/SPECS.md §4, rows "The `***` contract" and "Read the book as prose".
  */
 export function ProseChapter({
   ch,
@@ -53,6 +53,9 @@ export function ProseChapter({
   if (ch.manuscript === undefined || text.trim().length === 0) {
     return (
       <div
+        // Nothing to print for a chapter nobody has written yet: a dashed
+        // "start here" box is a screen affordance, not part of the book.
+        data-print-skip
         className="flex items-center justify-center rounded-xl border border-dashed border-line px-[20px] py-[34px]"
         style={{ width }}
       >
@@ -67,15 +70,18 @@ export function ProseChapter({
   }
 
   return (
-    <div className="mx-auto" style={{ width, maxWidth: 660 }}>
+    <div data-print-chapter className="mx-auto" style={{ width, maxWidth: 660 }}>
       {secs.map((sec, i) => {
         const paras = paragraphs(text.slice(sec.start, sec.end));
         // The type belongs to the connector *before* this scene, so it decorates
         // the rule drawn above it. Scene 1 has no rule above it.
         const type = ch.sceneLinks[i - 1] ?? "therefore";
         return (
+          // A scene nobody has written is not part of the book, so it does not
+          // print — the rule above it included, or the page would collect
+          // stacked scene breaks with nothing between them.
           <Fragment key={i}>
-            {i > 0 && <SceneRule type={type} />}
+            {i > 0 && <SceneRule type={type} skip={!isWritten(text, sec)} />}
             <div className="group">
               {/* A marker, not a wrapper: the prose itself stays selectable, so
                   the reading view can still be read from and copied out of. */}
@@ -90,7 +96,10 @@ export function ProseChapter({
                 {!isWritten(text, sec) && " · not written"}
               </button>
               {paras.length === 0 ? (
-                <p className="mb-[14px] font-serif text-[15.5px] italic leading-[1.85] text-faint">
+                <p
+                  data-print-skip
+                  className="mb-[14px] font-serif text-[15.5px] italic leading-[1.85] text-faint"
+                >
                   (not written)
                 </p>
               ) : (
@@ -113,9 +122,9 @@ export function ProseChapter({
  * same colour the connector pill uses everywhere else. This is what a `***`
  * looks like once it stops being markdown.
  */
-function SceneRule({ type }: { type: ConnType }) {
+function SceneRule({ type, skip }: { type: ConnType; skip?: boolean }) {
   return (
-    <div className="my-[22px] flex items-center gap-[12px]">
+    <div {...(skip ? { "data-print-skip": true } : {})} className="my-[22px] flex items-center gap-[12px]">
       <span className="h-px flex-1" style={{ background: "var(--rule)" }} />
       <span
         className="rounded-full border bg-bg px-[9px] py-[1px] text-[9.5px] font-semibold uppercase tracking-wide"

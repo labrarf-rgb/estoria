@@ -222,7 +222,7 @@ export interface Chapter {
   /**
    * The chapter's prose, as markdown. Scenes are separated by `***` thematic
    * breaks — real markdown a novelist types anyway, rather than a marker they
-   * would have to work around; see docs/manuscript-mode-build.md §3. A `***` is
+   * would have to work around; see docs/SPECS.md §4 ("The `***` contract"). A `***` is
    * the prose form of a connector, so a written chapter holds exactly
    * `sceneLinks.length` breaks, and the causal type is never stored in the prose.
    *

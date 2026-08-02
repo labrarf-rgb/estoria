@@ -29,7 +29,7 @@ import type { Chapter, ConnType } from "@/types";
  * plain — one textarea, markdown, no formatting toolbar — and the carousel is
  * the part that is worth building.
  *
- * See docs/manuscript-mode-build.md §3 and §4.
+ * See docs/SPECS.md §4, the "Manuscript" rows.
  */
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -282,6 +282,7 @@ export function ManuscriptSheet({
           with the caret in it. */}
       {view === "read" ? (
         <div
+          data-print-root
           className={`overflow-y-auto px-[max(24px,calc(50%-330px))] py-[26px] ${
             full ? "min-h-0 flex-1" : "h-[52vh]"
           }`}

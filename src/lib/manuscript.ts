@@ -13,7 +13,8 @@
  * (`therefore` / `but` / `and`) is never written into the prose — reading mode
  * decorates the rule from `sceneLinks[i]`.
  *
- * See docs/manuscript-mode-build.md §3.
+ * See docs/SPECS.md §4, row "The `***` contract"; the alternatives it beat
+ * are in docs/archives/manuscript-mode-brainstorm.md.
  */
 
 /** What we write when we insert a break. Detection is looser — see `isBreak`. */

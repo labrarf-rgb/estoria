@@ -89,3 +89,81 @@ body {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
+/*
+ * Printing the prose view IS the PDF export.
+ *
+ * The build brief called for skipping a PDF writer on the grounds that a print
+ * stylesheet gets there with no export code at all — and it is the better trade
+ * for a second reason: a PDF renderer would be a separate implementation of the
+ * reading view that could drift from it, while this is the reading view, on
+ * paper. `Cmd+P` from the timeline's Prose mode, or from the editor's View mode,
+ * produces a typeset reading copy.
+ *
+ * (Standard manuscript format is a different job with a different audience, and
+ * that one is a real exporter — see lib/manuscriptExport.ts.)
+ */
+@media print {
+  @page {
+    margin: 20mm 18mm;
+  }
+
+  /* Hide by visibility rather than display: the print root sits inside a chain
+     of flex/scroll containers, and collapsing them changes what it measures
+     itself against. This keeps the boxes and blanks their ink. */
+  body * {
+    visibility: hidden !important;
+    box-shadow: none !important;
+  }
+  [data-print-root],
+  [data-print-root] * {
+    visibility: visible !important;
+  }
+
+  /* Every scrolling ancestor has to open up, or the page prints only what
+     happened to be scrolled into view. */
+  [data-print-root] {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  [data-print-root] * {
+    overflow: visible !important;
+    max-height: none !important;
+    color: #000 !important;
+    border-color: #999 !important;
+  }
+
+  [data-print-chapter] {
+    width: auto !important;
+    max-width: none !important;
+    break-inside: auto;
+  }
+  /* A chapter starts a page, the way it does in a book — but the first one
+     should not push a blank sheet out ahead of it. */
+  [data-print-chapter] + [data-print-chapter],
+  [data-print-root] > * + * > [data-print-chapter] {
+    break-before: page;
+  }
+
+  [data-print-root] p {
+    font-family: var(--font-serif), Georgia, serif;
+    font-size: 11.5pt;
+    line-height: 1.62;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Controls that only make sense on screen: the scene markers are hover
+     affordances, and a chapter's sticky header repeats itself on paper. */
+  [data-print-root] button,
+  [data-print-root] [data-print-skip] {
+    display: none !important;
+  }
+}

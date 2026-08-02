@@ -10,7 +10,7 @@ import type { Chapter, StoryDoc } from "@/types";
  * the map to localStorage and the prose to IndexedDB, and the load puts them
  * back together before the store ever sees them.
  *
- * Why it has to move (docs/manuscript-mode-build.md §8 phase 2):
+ * Why it has to move (docs/SPECS.md §8, "Prose is already split out"):
  *
  *  - 100k words of markdown is ~600,000 characters. localStorage stores UTF-16,
  *    so the ~5MB budget is ~2.5M characters — **one manuscript is a quarter of

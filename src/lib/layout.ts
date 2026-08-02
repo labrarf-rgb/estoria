@@ -101,7 +101,7 @@ export type TimelineOrient = "vertical" | "horizontal";
 /**
  * What the timeline's pane renders: the scene flow, or the chapter's prose.
  * A toggle on the one pane rather than a separate view — the rail either side
- * of it is the same rail (docs/manuscript-mode-build.md §8 phase 4).
+ * of it is the same rail (docs/SPECS.md §4, "Read the book as prose").
  */
 export type TimelinePane = "scenes" | "prose";
 
