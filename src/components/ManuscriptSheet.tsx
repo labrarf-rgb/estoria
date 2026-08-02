@@ -6,6 +6,7 @@ import {
   appendBreaks,
   borrowedLabel,
   breakCount,
+  countWords,
   breaksBefore,
   changedAt,
   isWritten,
@@ -14,6 +15,7 @@ import {
   sectionAt,
   sections,
   seedManuscript,
+  shortCount,
 } from "@/lib/manuscript";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType } from "@/types";
@@ -483,6 +485,57 @@ export function DriftBar({ ch }: { ch: Chapter }) {
         Add {missing} at the end
       </BarButton>
     </Bar>
+  );
+}
+
+/**
+ * The way back out of a fork.
+ *
+ * Prose forks with the version, which is right — "version" keeps meaning a
+ * version of the book — but it means writing done in a fork you then abandon is
+ * stranded, with no path out. This is that path: per chapter, replace what is
+ * here with what that version has, behind a confirm and with one undo.
+ *
+ * Deliberately not a merge engine. Merging prose is a genuinely hard problem and
+ * a bad one to half-solve; "take that version's copy of this chapter" is
+ * unambiguous, and it is what someone abandoning a fork actually wants.
+ */
+export function PullFromVersion({ ch }: { ch: Chapter }) {
+  const doc = useStore((s) => s.doc);
+  const pull = useStore((s) => s.pullManuscriptFrom);
+  const askConfirm = useStore((s) => s.askConfirm);
+
+  const elsewhere = doc.drafts
+    .filter((d) => d.id !== doc.activeDraftId)
+    .map((d) => {
+      const text = doc.draftData[d.id]?.chapters.find((c) => c.id === ch.id)?.manuscript;
+      return { id: d.id, name: d.name, words: text ? countWords(text) : 0 };
+    })
+    .filter((v) => v.words > 0);
+
+  if (elsewhere.length === 0) return null;
+
+  return (
+    <div className="mx-[22px] mb-[8px] flex flex-wrap items-center gap-[8px] text-[11.5px] font-medium text-faint">
+      <span>Also written in</span>
+      {elsewhere.map((v) => (
+        <button
+          key={v.id}
+          onClick={() =>
+            askConfirm({
+              message: `Replace this chapter's writing with the copy from "${v.name}"?`,
+              detail: `${v.words.toLocaleString()} words come across. What is here now can be put back with a single undo, but only once.`,
+              confirmLabel: "Pull it in",
+              onConfirm: () => pull(ch.id, v.id),
+            })
+          }
+          title={`Pull this chapter's text from "${v.name}"`}
+          className="rounded-full border border-rule bg-card px-[9px] py-[3px] text-[11px] font-medium text-ink hover:border-faint"
+        >
+          {v.name} <span className="font-mono text-faint">{shortCount(v.words)}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

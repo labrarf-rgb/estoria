@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
 
@@ -39,6 +40,8 @@ export function Toolbar() {
   const askConfirm = useStore((s) => s.askConfirm);
 
   const [versionMenu, setVersionMenu] = useState(false);
+  // "+ Add version" expands into the prose question rather than acting at once.
+  const [forkChoice, setForkChoice] = useState(false);
   const [moreMenu, setMoreMenu] = useState(false);
   const [compact, setCompact] = useState(false);
   const versionBtnRef = useRef<HTMLButtonElement>(null);
@@ -86,6 +89,21 @@ export function Toolbar() {
   // so promoting one doesn't shuffle the rest.
   const draftsByRank = [...doc.drafts].sort(
     (a, b) => Number(b.id === mainDraftId) - Number(a.id === mainDraftId)
+  );
+  /**
+   * Words in a version. Read off the stored `words` cache rather than counted
+   * from the prose: it is the same number every other surface shows, and the
+   * menu should not scan four manuscripts to open.
+   */
+  const versionWords = (id: string): number =>
+    (id === doc.activeDraftId ? doc.chapters : (doc.draftData[id]?.chapters ?? [])).reduce(
+      (a, c) => a + c.words,
+      0
+    );
+  /** Whether forking would actually copy anything, i.e. whether to ask. */
+  const activeProseWords = doc.chapters.reduce(
+    (a, c) => a + (c.manuscript ? countWords(c.manuscript) : 0),
+    0
   );
   const onSeriesMap = doc.seriesMode && level === "series";
   // The book timeline is a scrolling surface with no camera, so a zoom readout
@@ -157,7 +175,15 @@ export function Toolbar() {
             <span className="h-[7px] w-[7px] rounded-full bg-but" />
             {activeDraft?.name ?? "Main draft"} <span className="text-faint">▾</span>
           </button>
-          <Popover anchorRef={versionBtnRef} open={versionMenu} onClose={() => setVersionMenu(false)} width={250}>
+          <Popover
+            anchorRef={versionBtnRef}
+            open={versionMenu}
+            onClose={() => {
+              setVersionMenu(false);
+              setForkChoice(false);
+            }}
+            width={250}
+          >
             <div className="px-[8px] pb-[4px] pt-[2px] text-[10px] font-semibold uppercase tracking-wide text-faint">
               Versions
             </div>
@@ -184,6 +210,11 @@ export function Toolbar() {
                     it's where deleting the version you're on drops you, and it
                     reads as the real book rather than an experiment. Separate
                     from the radio, which is only what you're looking at now. */}
+                {/* What this version costs, so a fork's price is visible from
+                    the menu that offers one. */}
+                <span className="shrink-0 font-mono text-[10px] font-medium text-faint">
+                  {shortCount(versionWords(d.id))}
+                </span>
                 <button
                   onClick={() => setMainDraft(d.id)}
                   title={
@@ -219,15 +250,51 @@ export function Toolbar() {
               ★ marks the main version
             </div>
             <div className="mx-[6px] my-1 h-px bg-rule" />
-            <button
-              onClick={() => {
-                addDraft();
-                setVersionMenu(false);
-              }}
-              className="rounded-lg px-[11px] py-[8px] text-left text-[12.5px] font-semibold text-ink hover:bg-chip"
-            >
-              + Add version
-            </button>
+            {/* Prose forks with the version, so a fork has a cost — and the
+                question is only worth asking when there is prose to copy.
+                With none written, the two answers are the same and it just adds
+                a click. */}
+            {forkChoice ? (
+              <div className="px-[8px] pb-[6px] pt-[2px]">
+                <div className="pb-[6px] text-[11px] leading-[1.45] text-soft">
+                  Take the writing with it?
+                </div>
+                <button
+                  onClick={() => {
+                    addDraft(undefined, { copyProse: true });
+                    setForkChoice(false);
+                    setVersionMenu(false);
+                  }}
+                  className="w-full rounded-lg bg-ink px-[10px] py-[7px] text-left text-[12px] font-semibold text-bg"
+                >
+                  Copy the manuscript
+                </button>
+                <button
+                  onClick={() => {
+                    addDraft(undefined, { copyProse: false });
+                    setForkChoice(false);
+                    setVersionMenu(false);
+                  }}
+                  className="mt-[5px] w-full rounded-lg border border-rule bg-card px-[10px] py-[7px] text-left text-[12px] font-medium text-ink hover:border-faint"
+                >
+                  Structure only
+                  <span className="block text-[10.5px] font-normal text-faint">
+                    The map, with none of the prose
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (activeProseWords > 0) return setForkChoice(true);
+                  addDraft();
+                  setVersionMenu(false);
+                }}
+                className="w-full rounded-lg px-[11px] py-[8px] text-left text-[12.5px] font-semibold text-ink hover:bg-chip"
+              >
+                + Add version
+              </button>
+            )}
           </Popover>
         </div>
         )}

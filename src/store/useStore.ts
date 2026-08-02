@@ -128,8 +128,13 @@ interface UiState {
    * and guessing it later is exactly what must not happen to finished paragraphs.
    */
   manuscriptDrift: ManuscriptDrift | null;
-  /** The prose as it was before the last reconciliation, for a single undo. */
-  manuscriptUndo: { chapterId: string; previous: string; label: string } | null;
+  /**
+   * The prose as it was before the last reconciliation, for a single undo.
+   * `previous` is `undefined` when the chapter had never been written in — that
+   * is a real state to go back to, and pulling text in from another version is
+   * exactly when someone wants it back.
+   */
+  manuscriptUndo: { chapterId: string; previous: string | undefined; label: string } | null;
   /**
    * Right-hand panel size (Characters / World / Notes), persisted and shared by
    * all three. `false` = the 460px drawer, which leaves the board beside it live
@@ -318,7 +323,13 @@ interface StoreState extends UiState {
   unarchiveAsset: (id: string) => void;
 
   // ---- drafts / versions ----
-  addDraft: (name?: string) => void;
+  addDraft: (name?: string, opts?: { copyProse?: boolean }) => void;
+  /**
+   * Copy one chapter's prose in from another version — the way back out of a
+   * fork you are abandoning. Not a merge: it replaces, behind a confirm, with
+   * one undo.
+   */
+  pullManuscriptFrom: (chId: string, fromDraftId: string) => void;
   setActiveDraft: (id: string) => void;
   renameDraft: (id: string, name: string) => void;
   deleteDraft: (id: string) => void;
@@ -1179,7 +1190,7 @@ export const useStore = create<StoreState>()(
           const prev = s.doc.chapters.find((c) => c.id === chId)?.manuscript;
           return {
             manuscriptDrift: null,
-            manuscriptUndo: prev === undefined ? null : { chapterId: chId, previous: prev, label },
+            manuscriptUndo: { chapterId: chId, previous: prev, label },
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
@@ -1216,6 +1227,28 @@ export const useStore = create<StoreState>()(
               ...s.doc,
               chapters: s.doc.chapters.map((x) =>
                 x.id === chId ? { ...x, ...(promote ? { target: x.words } : {}), words: n } : x
+              ),
+            },
+          };
+        }),
+
+      pullManuscriptFrom: (chId, fromDraftId) =>
+        set((s) => {
+          // Chapter ids survive a fork, so the same chapter is findable in every
+          // version without any matching heuristic.
+          const src = s.doc.draftData[fromDraftId]?.chapters.find((c) => c.id === chId);
+          if (!src || src.manuscript === undefined) return {};
+          const name = s.doc.drafts.find((d) => d.id === fromDraftId)?.name ?? "another version";
+          return {
+            manuscriptUndo: {
+              chapterId: chId,
+              previous: s.doc.chapters.find((c) => c.id === chId)?.manuscript,
+              label: `This chapter's writing was pulled from ${name}.`,
+            },
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id === chId ? { ...c, manuscript: src.manuscript } : c
               ),
             },
           };
@@ -1797,11 +1830,18 @@ export const useStore = create<StoreState>()(
       // middle of is the common case, so the fork follows your eyes rather than
       // the star. Switching stashes/restores whole boards (same pattern as
       // switchBook). Edits never leak between versions.
-      addDraft: (name) =>
+      addDraft: (name, opts) =>
         set((s) => {
           const id = uid("d");
           const n = s.doc.drafts.length;
           const fork = cloneVersionData(activeVersionData(s.doc));
+          // Structure only: the fork gets the map and none of the writing, which
+          // is what makes a re-arrangement experiment free rather than something
+          // that doubles the manuscript on disk to try.
+          const chapters =
+            opts?.copyProse === false
+              ? fork.chapters.map(({ manuscript: _drop, ...rest }) => rest as Chapter)
+              : fork.chapters;
           return {
             doc: {
               ...s.doc,
@@ -1809,7 +1849,7 @@ export const useStore = create<StoreState>()(
               activeDraftId: id,
               // The fork becomes the active board; the old active version keeps
               // the original objects in the stash.
-              chapters: fork.chapters,
+              chapters,
               links: fork.links,
               storyNotes: fork.storyNotes,
               draftData: { ...s.doc.draftData, [s.doc.activeDraftId]: activeVersionData(s.doc) },

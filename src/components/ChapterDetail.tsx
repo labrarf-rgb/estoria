@@ -9,7 +9,7 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { DriftBar, ManuscriptSheet, SheetViewToggle } from "@/components/ManuscriptSheet";
+import { DriftBar, ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
 import { borrowedLabel, countWords, writtenCount } from "@/lib/manuscript";
 import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
@@ -1140,6 +1140,7 @@ export function ChapterDetail() {
                 />
               </div>
               <DriftBar ch={ch} />
+              {manuscriptOpen && <PullFromVersion ch={ch} />}
               {manuscriptOpen ? (
                 <ManuscriptSheet
                   ch={ch}

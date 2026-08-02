@@ -10,10 +10,10 @@
 > before any code. Everything here is scoped to this repo; the file is not
 > self-contained away from the codebase it describes.
 >
-> **Status: Phases 0, 1, 2 and 4 are built** on `feature/manuscript-mode`
+> **Status: every phase (0-5) is built** on `feature/manuscript-mode`
 > (2026-08-01) — see §8 for what each shipped. Phase 4 was taken before phase 2
-> deliberately: it is the cheapest large win. **Phases 3 and 5 are not started**,
-> and the §9 list below is now the accurate account of what is left.
+> deliberately: it is the cheapest large win. **The §9 list below is now the
+> accurate account of what is left**, and it is short.
 >
 > The editor's **Edit/View toggle** (§2) is built, along with the keyboard
 > shortcuts and `Cmd+S` from §9 items 4 and 5.
@@ -551,6 +551,36 @@ Needed only because prose forks:
   confirm. Not a merge engine, about a day — but without it, prose written in a
   fork you abandon is stranded with no path out.
 - **Word counts in the version menu**, so a fork's cost is visible beforehand.
+
+
+#### ✅ BUILT
+
+All three, and the shape of each was decided by what the positional model can
+actually answer.
+
+- **The fork question is asked only when it has an answer.** "+ Add version"
+  expands into *Copy the manuscript* / *Structure only* — but **only when the
+  version being forked has prose in it**. With nothing written the two answers
+  are identical and the question is just a click, so it forks straight away.
+- **A way back out of a fork.** The chapter modal shows `Also written in —
+  <version> <count>` for every other version holding prose for *this* chapter,
+  and pulling it in replaces what is here behind a confirm that names the version
+  and the word count. Chapter ids survive a fork, so this needs no matching
+  heuristic. **Deliberately not a merge engine**: merging prose is a hard problem
+  and a bad one to half-solve, while "take that version's copy of this chapter"
+  is unambiguous and is what someone abandoning a fork actually wants.
+- **Word counts in the version menu**, read off the stored `words` cache rather
+  than counted from the prose — the same number every other surface shows, and
+  the menu should not scan four manuscripts in order to open.
+
+The undo record grew to allow `previous: undefined`, because "this chapter had
+never been written in" is a real state to go back to and is exactly the one
+someone wants after pulling text in by mistake.
+
+**Verified end to end:** forking structure-only produced a version with all nine
+scenes and no prose; the modal then offered `Main draft 17`; the confirm named
+both; pulling brought the prose across; and Undo put the chapter back to
+unwritten.
 
 ### Phase 4 — timeline prose mode — ✅ BUILT
 
