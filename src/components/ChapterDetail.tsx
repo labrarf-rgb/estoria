@@ -9,8 +9,9 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { ManuscriptSheet } from "@/components/ManuscriptSheet";
+import { DriftBar, ManuscriptSheet } from "@/components/ManuscriptSheet";
 import { writtenCount } from "@/lib/manuscript";
+import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -76,11 +77,13 @@ export function ChapterDetail() {
   const [moveMode, setMoveMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [destPickerOpen, setDestPickerOpen] = useState(false);
-  // Manuscript mode. Local, not store state: Phase 1 replaces this boolean with
-  // the Minimized / Regular / Full screen control, and there is nothing worth
-  // persisting about it until then. It survives prev/next navigation because
-  // the modal stays mounted, which is what you want mid-draft.
-  const [manuscriptOpen, setManuscriptOpen] = useState(false);
+  // Minimized / Regular / Full screen (§4). A mode, so it lives in the store and
+  // persists: a planning session stays minimized and never sees prose, a
+  // drafting session stays open and doesn't re-open the sheet per chapter.
+  const manuscriptState = useStore((s) => s.manuscriptState);
+  const setManuscriptState = useStore((s) => s.setManuscriptState);
+  const manuscriptOpen = manuscriptState !== "min";
+  const full = manuscriptState === "full";
   // The modal is one scroll container under a sticky header, so the carousel
   // has to know how tall that header is to stick *below* it rather than under
   // it. Measured rather than guessed: the summary line wraps, and the banner on
@@ -187,6 +190,10 @@ export function ChapterDetail() {
   const sceneCount = ch?.scenes.length ?? 0;
   useEffect(() => {
     if (!chId || !focusScene || focusScene.chapterId !== chId || sceneCount === 0) return;
+    // With the manuscript open there is no canvas to land on, and the marker is
+    // the sheet's to consume — it moves the caret to that scene's prose instead.
+    // Checked before `clearFocusScene`, or this effect would eat it first.
+    if (manuscriptOpen) return;
     clearFocusScene();
     const box = sceneBoxRef.current;
     if (!box) return;
@@ -198,7 +205,7 @@ export function ChapterDetail() {
     setFlashIdx(idx);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlashIdx(null), 1600);
-  }, [focusScene, chId, sceneCount, clearFocusScene]);
+  }, [focusScene, chId, sceneCount, clearFocusScene, manuscriptOpen]);
 
   const canvasPoint = (clientX: number, clientY: number) => {
     const box = sceneBoxRef.current;
@@ -454,18 +461,27 @@ export function ChapterDetail() {
 
   return (
     <>
-    <Scrim onClose={closeFromScrim} z={50} center>
+    {/* Full screen keeps the `Scrim` wrapper but covers it completely, the way
+        an expanded `Drawer` does — the backdrop is dropped by being hidden
+        rather than by a second code path. It also stops scrolling as a whole:
+        the header is a flex sibling and the sheet takes the rest, so the prose
+        is the only thing that moves. */}
+    <Scrim onClose={closeFromScrim} z={50} center={!full}>
       <div
         ref={modalRef}
         onMouseDown={stop}
-        className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-          expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
-        }`}
+        className={
+          full
+            ? "absolute inset-0 flex flex-col bg-panel"
+            : `max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+                expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+              }`
+        }
       >
         {/* Header */}
         <div
           ref={headerRef}
-          className="sticky top-0 z-[2] flex items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]"
+          className="sticky top-0 z-[2] flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]"
         >
           <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
             {String(ch.num).padStart(2, "0")}
@@ -477,13 +493,18 @@ export function ChapterDetail() {
               placeholder="Chapter title"
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
             />
-            <textarea
-              value={ch.summary ?? ""}
-              onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
-              placeholder="One-line chapter summary..."
-              rows={1}
-              className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
-            />
+            {/* Drafting sheds the planning chrome (§4). The words chip and the
+                status stay, because those are the two you watch while writing;
+                the summary and the act stepper are things you set once. */}
+            {!manuscriptOpen && (
+              <textarea
+                value={ch.summary ?? ""}
+                onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
+                placeholder="One-line chapter summary..."
+                rows={1}
+                className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
+              />
+            )}
             {draftId !== doc.mainDraftId && (
               <div className="mt-[4px] text-[10.5px] font-semibold uppercase tracking-wide text-but">
                 Editing {draftName} · changes stay in this version
@@ -520,7 +541,7 @@ export function ChapterDetail() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-[8px]">
+              <div className={`items-center gap-[8px] ${manuscriptOpen ? "hidden" : "flex"}`}>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
                   Act
                 </span>
@@ -570,7 +591,7 @@ export function ChapterDetail() {
         </div>
 
         {/* Characters */}
-        {(() => {
+        {!manuscriptOpen && (() => {
           // An archived character stays cast (dimmed below) but is never
           // offered for casting into anything new. See the archive rule.
           const members = doc.characters.filter((c) => ch.chars.includes(c.id));
@@ -651,7 +672,7 @@ export function ChapterDetail() {
         })()}
 
         {/* World details */}
-        {(() => {
+        {!manuscriptOpen && (() => {
           const refs = ch.worldRefs ?? [];
           const members = doc.world.filter((w) => refs.includes(w.id));
           const available = doc.world.filter((w) => !refs.includes(w.id) && !w.archived);
@@ -1035,39 +1056,37 @@ export function ChapterDetail() {
             is that the prose sits inside the map rather than beside it. */}
         {(() => {
           const written = writtenCount(ch.manuscript ?? "");
+          const go = (next: ManuscriptState) => {
+            if (next !== "min") exitMoveMode();
+            setManuscriptState(next);
+          };
           return (
-            <div className={manuscriptOpen ? "pt-[16px]" : "px-[26px] pt-[18px]"}>
-              <div className={manuscriptOpen ? "px-[26px]" : ""}>
+            <div
+              className={`${manuscriptOpen ? "pt-[16px]" : "px-[26px] pt-[18px]"} ${
+                full ? "flex min-h-0 flex-1 flex-col" : ""
+              }`}
+            >
+              <div className={manuscriptOpen ? "shrink-0 px-[26px]" : ""}>
                 <SectionHeader
                   label="Manuscript"
                   collapsed={!manuscriptOpen}
-                  onToggle={() => {
-                    if (!manuscriptOpen) exitMoveMode();
-                    setManuscriptOpen(!manuscriptOpen);
-                  }}
-                  right={
-                    <button
-                      onClick={() => {
-                        if (!manuscriptOpen) exitMoveMode();
-                        setManuscriptOpen(!manuscriptOpen);
-                      }}
-                      className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                    >
-                      {manuscriptOpen ? "Close the manuscript" : "Open the manuscript"}
-                    </button>
-                  }
+                  onToggle={() => go(manuscriptOpen ? "min" : "regular")}
+                  right={<StateControl state={manuscriptState} onChange={go} />}
                 />
               </div>
+              <DriftBar ch={ch} />
               {manuscriptOpen ? (
-                <div className="mt-[12px]">
-                  <ManuscriptSheet ch={ch} scroller={modalRef} stickyTop={headerH} />
-                </div>
+                <ManuscriptSheet
+                  ch={ch}
+                  scroller={modalRef}
+                  // Full screen doesn't scroll as a whole, so there is no header
+                  // to pin under — the carousel is simply the row above the sheet.
+                  stickyTop={full ? 0 : headerH}
+                  full={full}
+                />
               ) : (
                 <button
-                  onClick={() => {
-                    exitMoveMode();
-                    setManuscriptOpen(true);
-                  }}
+                  onClick={() => go("regular")}
                   className="mt-[10px] flex w-full items-center gap-[10px] rounded-xl border border-dashed border-line px-[14px] py-[12px] text-left hover:border-faint"
                 >
                   <span className="font-mono text-[11.5px] font-medium text-soft">
@@ -1087,7 +1106,10 @@ export function ChapterDetail() {
           );
         })()}
 
-        {/* Chapter notes */}
+        {/* Chapter notes. Full screen drops everything below the sheet (§4) —
+            the point of that state is that the manuscript is the only thing on
+            the screen. */}
+        {!full && (
         <div className="px-[26px] pt-[18px]">
           <SectionHeader
             label="Chapter notes"
@@ -1108,8 +1130,10 @@ export function ChapterDetail() {
             />
           )}
         </div>
+        )}
 
         {/* Pinned refs */}
+        {!full && (
         <div className="px-[26px] py-[18px]">
           <div className={collapsed.refs ? "" : "mb-[13px]"}>
             <SectionHeader
@@ -1157,8 +1181,10 @@ export function ChapterDetail() {
           </>
           )}
         </div>
+        )}
 
         {/* Danger zone */}
+        {!full && (
         <div className="flex items-center justify-end border-t border-rule px-[26px] py-[14px]">
           <button
             onClick={() =>
@@ -1174,6 +1200,7 @@ export function ChapterDetail() {
             Delete chapter
           </button>
         </div>
+        )}
       </div>
     </Scrim>
 
@@ -1238,6 +1265,42 @@ export function ChapterDetail() {
       </Scrim>
     )}
     </>
+  );
+}
+
+/**
+ * The three-way manuscript control (§4). One segmented control rather than a
+ * chain of Open / Expand buttons, because the three are states of one thing and
+ * you move between them in any order — including straight from planning to full
+ * screen, which is what someone sitting down to write actually wants.
+ */
+function StateControl({
+  state,
+  onChange,
+}: {
+  state: ManuscriptState;
+  onChange: (next: ManuscriptState) => void;
+}) {
+  const OPTIONS: { value: ManuscriptState; label: string; title: string }[] = [
+    { value: "min", label: "Minimized", title: "Hide the prose and plan the scene flow" },
+    { value: "regular", label: "Regular", title: "Write with the scene carousel above" },
+    { value: "full", label: "Full screen", title: "Fill the window with the manuscript" },
+  ];
+  return (
+    <div className="flex rounded-lg bg-chip p-[3px]">
+      {OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          title={o.title}
+          className={`rounded-md px-[9px] py-[4px] text-[11px] font-medium ${
+            state === o.value ? "bg-card text-ink" : "text-soft hover:bg-card"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

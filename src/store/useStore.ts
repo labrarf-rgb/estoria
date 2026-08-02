@@ -18,6 +18,7 @@ import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
+import { breakCount, insertBreak } from "@/lib/manuscript";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -107,12 +108,43 @@ interface UiState {
   /** Chapter-modal scene-flow canvas size (persisted). */
   sceneFlowExpanded: boolean;
   /**
+   * Which of the three manuscript states the chapter modal is in (persisted).
+   * A mode rather than a per-chapter setting: a planning session stays in
+   * `min` and never looks at prose, a drafting session stays in `regular` or
+   * `full` and gets there without a click per chapter.
+   */
+  manuscriptState: ManuscriptState;
+  /**
+   * A map edit that the prose has not followed, waiting on the writer's answer.
+   * Transient: the *counts* disagreeing is durable state anyone can see in the
+   * document, but "which scene you just deleted" is only knowable in the moment,
+   * and guessing it later is exactly what must not happen to finished paragraphs.
+   */
+  manuscriptDrift: ManuscriptDrift | null;
+  /** The prose as it was before the last reconciliation, for a single undo. */
+  manuscriptUndo: { chapterId: string; previous: string; label: string } | null;
+  /**
    * Right-hand panel size (Characters / World / Notes), persisted and shared by
    * all three. `false` = the 460px drawer, which leaves the board beside it live
    * (no scrim, so you can pan, drag and open chapters while it's open); `true` =
    * full screen, covering the canvas.
    */
   panelExpanded: boolean;
+}
+
+/** Minimized / Regular / Full screen — see docs/manuscript-mode-build.md §4. */
+export type ManuscriptState = "min" | "regular" | "full";
+
+/**
+ * A map edit the prose hasn't followed. Recorded only when the two were in step
+ * beforehand, so the fix it offers is a fact about what just happened rather
+ * than an inference from counts that could mean several things.
+ */
+export interface ManuscriptDrift {
+  chapterId: string;
+  op:
+    | { kind: "merge"; index: number }
+    | { kind: "reorder"; from: number; to: number };
 }
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
@@ -190,9 +222,17 @@ interface StoreState extends UiState {
   arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
   // ---- manuscript (chapter prose) ----
-  /** Write a chapter's prose. The only writer of `manuscript`; see the hard
-   *  rule in docs/manuscript-mode-build.md §7 — the map never mutates it. */
+  /** Write a chapter's prose. The writer's own keystrokes go through here. */
   setManuscript: (chId: string, text: string) => void;
+  /**
+   * Write prose on the map's behalf, keeping the previous text for one undo.
+   * Every path that reaches this is a confirmed answer to the drift bar — the
+   * map is never allowed to reshape finished paragraphs on its own initiative.
+   */
+  reconcileManuscript: (chId: string, text: string, label: string) => void;
+  undoManuscript: () => void;
+  setManuscriptState: (state: ManuscriptState) => void;
+  clearManuscriptDrift: () => void;
 
   // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
@@ -462,6 +502,28 @@ const scenePosBoth = (
 const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
   expanded ? "scenePos" : "scenePosCompact";
 
+/**
+ * Is this chapter's prose in step with its map? A `***` is the prose form of a
+ * connector, so three scenes mean two connectors and two breaks — the whole
+ * check is `breakCount === sceneLinks.length` (docs/manuscript-mode-build.md §3).
+ *
+ * A chapter that has never been written in is *not* in step; it has no prose to
+ * keep in step, and the seed on first open is what puts it there.
+ */
+const inStep = (c?: Chapter): boolean =>
+  !!c && c.manuscript !== undefined && breakCount(c.manuscript) === c.sceneLinks.length;
+
+/**
+ * The prose half of adding a scene: open an empty section at the same index.
+ *
+ * Purely additive — no existing character moves — which is why this one map edit
+ * is allowed to write prose without asking. Returns nothing at all when the two
+ * are already out of step, because a second guess stacked on an unanswered
+ * first one is how a manuscript ends up shuffled with no way back.
+ */
+const withBreakAt = (c: Chapter, sectionIdx: number): Partial<Chapter> =>
+  inStep(c) ? { manuscript: insertBreak(c.manuscript as string, sectionIdx) } : {};
+
 const renumber = (chapters: Chapter[]): Chapter[] =>
   chapters.map((c, i) => ({ ...c, num: i + 1 }));
 
@@ -504,6 +566,9 @@ const initialUi: UiState = {
   refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
+  manuscriptState: "min",
+  manuscriptDrift: null,
+  manuscriptUndo: null,
   panelExpanded: false,
 };
 
@@ -851,6 +916,13 @@ export const useStore = create<StoreState>()(
         })),
 
       // ---- scenes ----
+      //
+      // The four actions that change how many scenes a chapter has, or their
+      // order, all have to answer to the prose. Two of them can keep it in step
+      // by themselves, because opening an empty section moves no existing text
+      // (`addScene`, `insertScene`); the two that cannot — `deleteScene` and
+      // `reorderScene` — leave the prose alone and raise the drift bar instead.
+      // See the hard rule in docs/manuscript-mode-build.md §7.
       addScene: (chId, cols) =>
         set((s) => ({
           doc: {
@@ -859,7 +931,13 @@ export const useStore = create<StoreState>()(
               if (c.id !== chId) return c;
               const scenes = c.scenes.concat("");
               const sceneLinks = c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks;
-              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
+              return {
+                ...c,
+                scenes,
+                sceneLinks,
+                ...withBreakAt(c, c.scenes.length),
+                ...scenePosBoth(scenes, s.sceneFlowExpanded, cols),
+              };
             }),
           },
         })),
@@ -875,7 +953,13 @@ export const useStore = create<StoreState>()(
               scenes.splice(idx, 0, "");
               const sceneLinks = c.sceneLinks.slice();
               if (scenes.length > 1) sceneLinks.splice(Math.min(idx, sceneLinks.length), 0, "therefore");
-              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
+              return {
+                ...c,
+                scenes,
+                sceneLinks,
+                ...withBreakAt(c, idx),
+                ...scenePosBoth(scenes, s.sceneFlowExpanded, cols),
+              };
             }),
           },
         })),
@@ -895,6 +979,11 @@ export const useStore = create<StoreState>()(
 
       deleteScene: (chId, idx) =>
         set((s) => ({
+          // The prose is untouched — deleting a beat must never delete writing.
+          // The break stays, the counts disagree, and the bar offers the merge.
+          manuscriptDrift: inStep(s.doc.chapters.find((c) => c.id === chId))
+            ? { chapterId: chId, op: { kind: "merge", index: idx } }
+            : s.manuscriptDrift,
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => {
@@ -913,6 +1002,12 @@ export const useStore = create<StoreState>()(
 
       reorderScene: (chId, fromIdx, toIdx, cols) =>
         set((s) => ({
+          // Map only. Rearranging finished paragraphs behind the writer's back
+          // is the one thing there is no undo model for, so the bar offers it.
+          manuscriptDrift:
+            inStep(s.doc.chapters.find((c) => c.id === chId)) && fromIdx !== toIdx
+              ? { chapterId: chId, op: { kind: "reorder", from: fromIdx, to: toIdx } }
+              : s.manuscriptDrift,
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => {
@@ -1062,6 +1157,37 @@ export const useStore = create<StoreState>()(
             chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
           },
         })),
+
+      reconcileManuscript: (chId, text, label) =>
+        set((s) => {
+          const prev = s.doc.chapters.find((c) => c.id === chId)?.manuscript;
+          return {
+            manuscriptDrift: null,
+            manuscriptUndo: prev === undefined ? null : { chapterId: chId, previous: prev, label },
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
+            },
+          };
+        }),
+
+      undoManuscript: () =>
+        set((s) => {
+          const u = s.manuscriptUndo;
+          if (!u) return {};
+          return {
+            manuscriptUndo: null,
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id === u.chapterId ? { ...c, manuscript: u.previous } : c
+              ),
+            },
+          };
+        }),
+
+      setManuscriptState: (state) => set({ manuscriptState: state }),
+      clearManuscriptDrift: () => set({ manuscriptDrift: null }),
 
       // ---- chapter refs (pure links into the shared asset pool) ----
       // Adding a note/image creates a shared Asset first, then pins a link to it
@@ -1859,6 +1985,7 @@ export const useStore = create<StoreState>()(
         refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
+        manuscriptState: s.manuscriptState,
         panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed

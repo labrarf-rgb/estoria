@@ -10,10 +10,13 @@
 > before any code. Everything here is scoped to this repo; the file is not
 > self-contained away from the codebase it describes.
 >
-> **Status: Phase 0 is built** on `feature/manuscript-mode` (2026-08-01), and is
-> waiting on the one question it exists to answer — see §8. Nothing else is
-> started. Written 2026-08-01. Delete this file when the feature lands, folding
-> what survives into [`SPECS.md`](SPECS.md) §4.
+> **Status: Phases 0 and 1 are built** on `feature/manuscript-mode`
+> (2026-08-01) — see §8 for what each shipped. Phase 0's question ("does seeing
+> your beats while drafting feel like anything?") was never actually answered:
+> the session was told to carry on building. It is still open, and it is still
+> the question that decides whether Phase 2's storage work is worth paying for.
+> Phases 2-5 are not started. Written 2026-08-01. Delete this file when the
+> feature lands, folding what survives into [`SPECS.md`](SPECS.md) §4.
 
 ---
 
@@ -371,10 +374,54 @@ in Phase 1 if reading back wants it, but it should be justified on its own.
 **Left for the verdict:** whether writing a few thousand real words in it
 actually feels like something.
 
-### Phase 1 — the three states
+### Phase 1 — the three states — ✅ BUILT
 
 Minimized / Regular / Full screen, the carousel, the `***` contract in §3
 including the drift bar.
+
+**What shipped:**
+
+- **The three states**, as one segmented control in the Manuscript header rather
+  than a chain of Open / Expand buttons — they are states of one thing and you
+  move between them in any order, including straight from planning to full
+  screen. The state is a **persisted mode** (`manuscriptState` in the store, in
+  `partialize`), so a drafting session doesn't re-open the sheet per chapter.
+  Regular sheds the summary, act stepper, Characters and World; Full screen also
+  drops Chapter notes, Pinned references and the delete row, and stops the modal
+  scrolling as a whole so the prose is the only thing that moves.
+- **Both write directions of §3's table.** `+ Add scene` and the hover `+`
+  insert a `***` at the same index; typing `***` inserts a beat at the position
+  the break opened. Both are gated on the two being **in step beforehand**
+  (`inStep` in `useStore.ts`) — a second guess stacked on an unanswered first
+  one is how a manuscript ends up shuffled with no way back.
+- **The drift bar, in two tiers.** When the map edit *just happened*, the store
+  has recorded exactly what it was (`manuscriptDrift`, transient) and the bar
+  names the scene: "Scene 4 is gone from the map, but its prose is still in the
+  manuscript" → *Merge into scene 3*; "Scene 1 moved to position 3" → *Reorder
+  the prose*. When it did not — after a reload, or a hand-deleted break — no
+  amount of counting says *which* pair drifted, so the only offers are the ones
+  that append at the end and guess at nothing. Both tiers confirm, and every
+  reconciliation keeps one undo (`manuscriptUndo`).
+- **A scene clicked on the timeline moves the caret** when the sheet is open.
+  `focusScene` is consumed by the sheet instead of the canvas in that state —
+  the guard sits *before* `clearFocusScene`, or the canvas effect eats the
+  marker and neither one acts on it.
+
+**Answers §9 item 2** (what the editor does when the counts disagree): nothing
+on its own. It reports, and offers a fix it can name.
+
+**Two departures from §4 worth knowing:**
+
+1. **Regular hides World details too**, not just the character chips §4 lists.
+   Dropping Characters while keeping World beside it reads as an oversight
+   rather than a decision.
+2. **`moveScenesToChapter` gets no precise offer** — it moves an arbitrary set
+   across two chapters, so there is no single named operation to propose. It
+   falls through to the count-only tier.
+
+**Not built, and not part of Phase 1:** View mode (the Edit/View toggle in §2 —
+`***` still renders literally, as §4 requires of Edit mode), word count, export,
+timeline prose mode, and the keyboard shortcuts in §9 item 4.
 
 ### Phase 2 — storage (the real cost of the versioning decision)
 

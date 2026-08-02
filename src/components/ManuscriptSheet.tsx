@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
-import { isWritten, sectionAt, sections, seedManuscript } from "@/lib/manuscript";
+import {
+  applyReorder,
+  appendBreaks,
+  breakCount,
+  isWritten,
+  removeBreak,
+  sectionAt,
+  sections,
+  seedManuscript,
+} from "@/lib/manuscript";
 import type { Chapter, ConnType } from "@/types";
 
 /**
- * Manuscript mode, Regular state — the writing pane, with the chapter's beats
- * above it.
+ * Manuscript mode — the writing pane, with the chapter's beats above it.
  *
  * The point of the feature is not the editor. Any text box can hold prose; what
  * no writing app can do is show you the beats you planned while you draft them,
@@ -13,9 +21,7 @@ import type { Chapter, ConnType } from "@/types";
  * plain — one textarea, markdown, no formatting toolbar — and the carousel is
  * the part that is worth building.
  *
- * See docs/manuscript-mode-build.md §4. Phase 0 builds this state only:
- * Minimized and Full screen, the drift bar, and the *write* direction of the
- * `***` contract (typing a break creating a beat) all come in Phase 1.
+ * See docs/manuscript-mode-build.md §3 and §4.
  */
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -33,14 +39,20 @@ export function ManuscriptSheet({
   ch,
   scroller,
   stickyTop,
+  full,
 }: {
   ch: Chapter;
   /** The chapter modal's scroll container — see `stickyTop`. */
   scroller: React.RefObject<HTMLDivElement | null>;
   /** Height of the modal's sticky header, so the carousel pins below it. */
   stickyTop: number;
+  /** Full screen: the sheet fills what is left rather than taking a fixed slice. */
+  full: boolean;
 }) {
   const setManuscript = useStore((s) => s.setManuscript);
+  const insertScene = useStore((s) => s.insertScene);
+  const focusScene = useStore((s) => s.focusScene);
+  const clearFocusScene = useStore((s) => s.clearFocusScene);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState(0);
@@ -62,6 +74,26 @@ export function ManuscriptSheet({
   const readCaret = () => setCaret(taRef.current?.selectionStart ?? 0);
 
   /**
+   * Every keystroke, and the one place prose is allowed to change the map.
+   *
+   * Typing `***` is how a writer says "new scene" in the middle of drafting, so
+   * a beat appears for it — but only when the two were in step beforehand. Once
+   * they have drifted, a second guess stacked on an unanswered first one is how
+   * a manuscript ends up shuffled with no way back; the drift bar asks instead.
+   */
+  const onWrite = (next: string, pos: number) => {
+    const before = breakCount(text);
+    const after = breakCount(next);
+    setManuscript(ch.id, next);
+    setCaret(pos);
+    if (before === ch.sceneLinks.length && after === before + 1) {
+      // The caret is still on the `***` line, which belongs to the section
+      // above it — so the section the break just opened is the next one along.
+      insertScene(ch.id, sectionAt(next, pos) + 1);
+    }
+  };
+
+  /**
    * Clicking a beat moves the caret to that scene's prose. **Nothing is
    * written** — a card is a place to go, not an edit (§3's interaction table).
    */
@@ -80,6 +112,21 @@ export function ManuscriptSheet({
   // switch, a chapter switch), rather than pointing at an offset that is now
   // somewhere else entirely.
   useEffect(() => setCaret(0), [ch.id]);
+
+  /**
+   * A scene clicked on the timeline opens this chapter on that beat. With the
+   * sheet open that means the caret, not a card — same marker, same one-shot
+   * consumption, and still **nothing written** (§3).
+   */
+  useEffect(() => {
+    if (!focusScene || focusScene.chapterId !== ch.id) return;
+    // Wait for the seed: on the very first open the prose is still `undefined`
+    // for one render, and jumping then would land everything on section 0.
+    if (ch.manuscript === undefined) return;
+    clearFocusScene();
+    jumpToSection(Math.max(0, Math.min(focusScene.index, ch.scenes.length - 1)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusScene, ch.id, ch.manuscript === undefined]);
 
   /**
    * Bring the sheet up to the top of the modal on open. Without this the writer
@@ -106,7 +153,12 @@ export function ManuscriptSheet({
   const here = beat(idx);
 
   return (
-    <div ref={rootRef} className="mx-[22px] mb-[6px] rounded-xl border border-rule bg-bg">
+    <div
+      ref={rootRef}
+      className={`mx-[22px] mb-[6px] mt-[12px] rounded-xl border border-rule bg-bg ${
+        full ? "flex min-h-0 flex-1 flex-col" : ""
+      }`}
+    >
       {/* Carousel. One card is legible at a time, so the position readout says
           where in the chapter that card is.
 
@@ -116,7 +168,7 @@ export function ManuscriptSheet({
           the wrapper for the same reason — it would make this box the sticky
           scrollport, and a box that never scrolls never sticks. */}
       <div
-        className="sticky z-[1] flex items-stretch justify-center gap-[8px] rounded-t-xl border-b border-rule bg-bg px-[16px] py-[14px]"
+        className="sticky z-[1] flex shrink-0 items-stretch justify-center gap-[8px] rounded-t-xl border-b border-rule bg-bg px-[16px] py-[14px]"
         style={{ top: stickyTop }}
       >
         <Slot width={PEEK_W} shrink>
@@ -139,18 +191,181 @@ export function ManuscriptSheet({
       <textarea
         ref={taRef}
         value={text}
-        onChange={(e) => {
-          setManuscript(ch.id, e.target.value);
-          setCaret(e.target.selectionStart);
-        }}
+        onChange={(e) => onWrite(e.target.value, e.target.selectionStart)}
         onSelect={readCaret}
         onClick={readCaret}
         onKeyUp={readCaret}
         spellCheck
         placeholder="Write the chapter here. A *** on its own line is a scene break."
-        className="block h-[52vh] w-full resize-none rounded-b-xl bg-transparent px-[max(24px,calc(50%-330px))] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint"
+        className={`block w-full resize-none rounded-b-xl bg-transparent px-[max(24px,calc(50%-330px))] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${
+          full ? "min-h-0 flex-1" : "h-[52vh]"
+        }`}
       />
     </div>
+  );
+}
+
+/**
+ * What to do when the map and the prose disagree.
+ *
+ * Two kinds of disagreement reach here and they are not equally knowable. When
+ * the map edit *just happened* the store recorded exactly what it was, so the
+ * bar can name the scene and offer the matching change. When it did not — the
+ * counts are simply out of step, after a reload or a hand-typed break — no
+ * amount of counting says *which* pair drifted, so the only honest offers are
+ * the ones that append at the end and guess at nothing.
+ *
+ * Both routes are confirmed and both keep an undo. See §7's first hard rule:
+ * there is no undo model that covers silently rearranging finished paragraphs,
+ * which is why nothing here happens without being asked for.
+ */
+export function DriftBar({ ch }: { ch: Chapter }) {
+  const drift = useStore((s) => s.manuscriptDrift);
+  const undo = useStore((s) => s.manuscriptUndo);
+  const reconcile = useStore((s) => s.reconcileManuscript);
+  const undoManuscript = useStore((s) => s.undoManuscript);
+  const clearDrift = useStore((s) => s.clearManuscriptDrift);
+  const addScene = useStore((s) => s.addScene);
+  const askConfirm = useStore((s) => s.askConfirm);
+
+  const text = ch.manuscript;
+  const mine = drift?.chapterId === ch.id ? drift : null;
+  const myUndo = undo?.chapterId === ch.id ? undo : null;
+
+  if (myUndo) {
+    return (
+      <Bar tone="calm">
+        <span className="flex-1">{myUndo.label}</span>
+        <BarButton onClick={undoManuscript}>Undo</BarButton>
+      </Bar>
+    );
+  }
+
+  if (text === undefined) return null;
+  const breaks = breakCount(text);
+  const wanted = ch.sceneLinks.length;
+  if (breaks === wanted && !mine) return null;
+
+  // A recorded operation: name the scene and offer the matching change.
+  if (mine?.op.kind === "merge") {
+    const i = mine.op.index;
+    // Merge into the scene above, the way an emptied to-do row merges upward.
+    // The first scene has nothing above it, so it merges forward instead.
+    const breakIdx = i > 0 ? i - 1 : 0;
+    const into = i > 0 ? i : 1;
+    return (
+      <Bar tone="warn">
+        <span className="flex-1">
+          Scene {i + 1} is gone from the map, but its prose is still in the manuscript.
+        </span>
+        <BarButton
+          onClick={() =>
+            askConfirm({
+              message: `Merge that prose into scene ${into}?`,
+              detail: "Nothing is deleted. The two scenes' prose runs together as one.",
+              confirmLabel: "Merge",
+              onConfirm: () =>
+                reconcile(ch.id, removeBreak(text, breakIdx), `Prose merged into scene ${into}.`),
+            })
+          }
+        >
+          Merge into scene {into}
+        </BarButton>
+        <BarButton onClick={clearDrift}>Leave it</BarButton>
+      </Bar>
+    );
+  }
+
+  if (mine?.op.kind === "reorder") {
+    const { from, to } = mine.op;
+    return (
+      <Bar tone="warn">
+        <span className="flex-1">
+          Scene {from + 1} moved to position {to + 1} on the map. The prose is still in its old
+          order.
+        </span>
+        <BarButton
+          onClick={() =>
+            askConfirm({
+              message: "Reorder the prose to match the map?",
+              detail:
+                "The scene's writing moves with it. Blank lines between scenes are tidied up, so this is worth an undo if it isn't what you meant.",
+              confirmLabel: "Reorder",
+              onConfirm: () =>
+                reconcile(ch.id, applyReorder(text, from, to), "Prose reordered to match the map."),
+            })
+          }
+        >
+          Reorder the prose
+        </BarButton>
+        <BarButton onClick={clearDrift}>Leave it</BarButton>
+      </Bar>
+    );
+  }
+
+  // No recorded operation — counts only. Append, and guess at nothing.
+  const extra = breaks - wanted;
+  if (extra > 0) {
+    return (
+      <Bar tone="warn">
+        <span className="flex-1">
+          The manuscript has {extra} more scene {extra === 1 ? "break" : "breaks"} than this chapter
+          has scenes.
+        </span>
+        <BarButton
+          onClick={() => {
+            for (let i = 0; i < extra; i++) addScene(ch.id);
+          }}
+        >
+          Add {extra} {extra === 1 ? "scene" : "scenes"}
+        </BarButton>
+      </Bar>
+    );
+  }
+  const missing = wanted - breaks;
+  return (
+    <Bar tone="warn">
+      <span className="flex-1">
+        {missing} {missing === 1 ? "scene has" : "scenes have"} no scene break in the manuscript.
+      </span>
+      <BarButton
+        onClick={() =>
+          reconcile(
+            ch.id,
+            appendBreaks(text, missing),
+            `${missing} scene ${missing === 1 ? "break" : "breaks"} added at the end.`
+          )
+        }
+      >
+        Add {missing} at the end
+      </BarButton>
+    </Bar>
+  );
+}
+
+function Bar({ tone, children }: { tone: "warn" | "calm"; children: React.ReactNode }) {
+  return (
+    <div
+      className="mx-[22px] mb-[10px] flex flex-wrap items-center gap-[10px] rounded-xl border px-[14px] py-[10px] text-[12px] font-medium text-ink"
+      style={{
+        borderColor: tone === "warn" ? "var(--but)" : "var(--rule)",
+        background:
+          tone === "warn" ? "color-mix(in srgb, var(--but) 7%, transparent)" : "var(--card)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BarButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="shrink-0 rounded-lg border border-rule bg-card px-3 py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+    >
+      {children}
+    </button>
   );
 }
 

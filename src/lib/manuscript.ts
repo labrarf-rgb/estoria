@@ -119,3 +119,60 @@ export function seedManuscript(sceneCount: number): string {
   if (sceneCount <= 1) return "";
   return `\n${new Array(sceneCount - 1).fill(SCENE_BREAK).join("\n\n")}\n`;
 }
+
+// ---- Edits ------------------------------------------------------------------
+//
+// All of these are surgical: they splice at an offset rather than rebuild the
+// document, because rebuilding would silently reformat prose the writer laid out
+// by hand. `applyReorder` is the one exception, and it is the one operation the
+// brief requires a confirm and an undo for.
+
+/**
+ * Open a new, empty section at `sectionIdx` — the prose half of `+ Add scene`.
+ * Adding a break is the only way the map is allowed to touch the manuscript, and
+ * it is allowed because it is purely additive: no character of prose moves.
+ */
+export function insertBreak(text: string, sectionIdx: number): string {
+  const secs = sections(text);
+  if (sectionIdx >= secs.length) return `${text}\n\n${SCENE_BREAK}\n\n`;
+  const at = secs[Math.max(0, sectionIdx)].start;
+  return `${text.slice(0, at)}${SCENE_BREAK}\n\n${text.slice(at)}`;
+}
+
+/**
+ * Drop break `breakIdx`, joining the sections either side of it. Nothing is
+ * deleted but the three asterisks and the blank lines that surrounded them —
+ * the prose of both scenes survives, run together into one.
+ */
+export function removeBreak(text: string, breakIdx: number): string {
+  const secs = sections(text);
+  const a = secs[breakIdx];
+  const b = secs[breakIdx + 1];
+  if (!a || !b) return text;
+  const head = text.slice(0, a.end).replace(/\s+$/, "");
+  const tail = text.slice(b.start).replace(/^\s+/, "");
+  return `${head}\n\n${tail}`;
+}
+
+/**
+ * Move a section, matching a reorder the writer just made on the map.
+ *
+ * Unlike the others this rebuilds the document, so the blank lines between
+ * sections are normalised — unavoidable when the sections themselves change
+ * order. It is why this is offered rather than done, behind a confirm, with the
+ * previous text kept for an undo.
+ */
+export function applyReorder(text: string, from: number, to: number): string {
+  const parts = sections(text).map((s) => text.slice(s.start, s.end).trim());
+  if (from < 0 || from >= parts.length) return text;
+  const [moved] = parts.splice(from, 1);
+  parts.splice(Math.max(0, Math.min(to, parts.length)), 0, moved);
+  return parts.join(`\n\n${SCENE_BREAK}\n\n`);
+}
+
+/** Add `n` empty sections at the end — the count-only way out of drift. */
+export function appendBreaks(text: string, n: number): string {
+  let out = text;
+  for (let i = 0; i < n; i++) out += `\n\n${SCENE_BREAK}\n\n`;
+  return out;
+}
