@@ -1,5 +1,6 @@
 import { Fragment, useMemo } from "react";
 import { useStore } from "@/store/useStore";
+import { inlineTokens } from "@/lib/inline";
 import { isWritten, paragraphs, sections } from "@/lib/manuscript";
 import type { Chapter, ConnType } from "@/types";
 
@@ -135,26 +136,22 @@ function SceneRule({ type }: { type: ConnType }) {
  * both honest and reversible.
  */
 function Inline({ text }: { text: string }) {
-  // Ordered longest-first so `***` is claimed before `**`, and `**` before `*`.
-  const RE = /(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`)/g;
-  const out: React.ReactNode[] = [];
-  let last = 0;
-  for (const m of text.matchAll(RE)) {
-    const at = m.index ?? 0;
-    if (at > last) out.push(text.slice(last, at));
-    const t = m[0];
-    if (t.startsWith("***")) out.push(<strong key={at}><em>{t.slice(3, -3)}</em></strong>);
-    else if (t.startsWith("**")) out.push(<strong key={at}>{t.slice(2, -2)}</strong>);
-    else if (t.startsWith("`"))
-      out.push(
-        <code key={at} className="rounded bg-chip px-[4px] font-mono text-[13px]">
-          {t.slice(1, -1)}
-        </code>
-      );
-    else out.push(<em key={at}>{t.slice(1, -1)}</em>);
-    last = at + t.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  // Single newlines inside a paragraph are soft wraps, exactly as markdown says.
-  return <>{out.map((n, i) => (typeof n === "string" ? <Fragment key={i}>{n}</Fragment> : n))}</>;
+  // Tokenized by the shared parser, so what is emphasised here and what is
+  // emphasised in the .docx export can never drift apart. See lib/inline.ts.
+  return (
+    <>
+      {inlineTokens(text).map((t, i) => {
+        if (t.code)
+          return (
+            <code key={i} className="rounded bg-chip px-[4px] font-mono text-[13px]">
+              {t.text}
+            </code>
+          );
+        let node: React.ReactNode = t.text;
+        if (t.italic) node = <em>{node}</em>;
+        if (t.bold) node = <strong>{node}</strong>;
+        return <Fragment key={i}>{node}</Fragment>;
+      })}
+    </>
+  );
 }

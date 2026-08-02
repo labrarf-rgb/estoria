@@ -603,6 +603,53 @@ must say which is which.
 
 ---
 
+
+#### ✅ BUILT
+
+**Word count.** `words` is a cache of the manuscript, recomputed on the save
+rhythm rather than per keystroke, and still a stored field — deriving at the
+eight call sites would put a manuscript scan inside every render. Counting
+strips markdown first (`**tension**` is one word) and ignores `***`, which is
+punctuation the format requires rather than anything anyone wrote.
+
+Both safety rules from §5 are in and were verified against a chapter carrying a
+hand-typed 3,000: **opening the manuscript left it alone** (seeding breaks is not
+writing), and the first real prose **promoted 3,000 into `target`** and set
+`words` to the live count. Board and rail cards read `15 / 3k words`; the modal
+stops offering to hand-edit a count it now keeps itself, and grew a target field.
+
+One wart, deliberately chosen: deleting every word of a chapter freezes its last
+count instead of showing 0, because the alternative rule is the one that turns an
+80,000-word project into a 0.
+
+**Exports.** A second export, kept apart from the map export in a tabbed modal
+that says which is which — the map one is Obsidian-shaped, this one is prose for
+a person.
+
+- **`.docx` in standard manuscript format**: 12pt Times, double spaced, one inch
+  margins, half-inch indents, title page, `#` scene breaks, and a running
+  `Surname / Title / page` header. `StoryDoc` gained an optional `author`, set
+  from the export panel, because a title block needs a name and nothing else in
+  the app had one. **No name is invented when none is given.**
+- **`.md` / `.txt`** — concatenation, exactly as predicted, because `***` was
+  already a thematic break.
+- **A ZIP writer** (`lib/zip.ts`, ~110 lines, stored not deflated) rather than a
+  dependency. `lib/inline.ts` now holds the inline-markdown tokenizer that the
+  reading view and the `.docx` runs *both* use, so emphasis cannot render one way
+  on screen and another in the file an agent reads.
+- **An unwritten scene is not a scene break.** Breaks with nothing under them are
+  dropped, or a half-drafted chapter hands a beta reader a page of `#` with no
+  story between them.
+
+**Verified:** Python's `zipfile` confirms every CRC and all six parts parse as
+XML, and the ZIP the browser produces walks correctly from its end-of-central-
+directory record. **Not verified: that Microsoft Word itself opens it** — there
+is no Word on this machine. Worth opening the file once before relying on it.
+
+**Still not done from this phase:** the print stylesheet that was to make `Cmd+P`
+produce a typeset PDF from the prose view. Now cheaper than when it was written,
+since the editor's View mode is the same renderer.
+
 ## 9. Still open
 
 1. ~~What scrolls the carousel~~ — **answered in Phase 0.** The caret drives it,

@@ -263,6 +263,13 @@ export interface StoryDoc {
   schemaVersion: number;
   id: string;
   projectTitle: string;
+  /**
+   * Who wrote it. Used only by the standard-manuscript-format export, which
+   * needs a name for the title block and the running header — nothing else in
+   * the app reads it, and no name is invented when it is absent. Optional, so
+   * every existing document already has the shape; no `SCHEMA_VERSION` bump.
+   */
+  author?: string;
   seriesMode: boolean;
 
   /**

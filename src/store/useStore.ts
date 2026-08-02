@@ -184,6 +184,8 @@ interface StoreState extends UiState {
 
   // ---- project ----
   setProjectTitle: (title: string) => void;
+  /** Author name, used only by the standard-manuscript-format export. */
+  setAuthor: (author: string) => void;
   listProjects: () => ProjectMeta[];
   switchProject: (id: string) => void;
   newProject: (opts: { series: boolean; keepCurrent: boolean }) => void;
@@ -597,6 +599,9 @@ export const useStore = create<StoreState>()(
 
       // ---- project ----
       setProjectTitle: (title) => set((s) => ({ doc: { ...s.doc, projectTitle: title } })),
+
+      setAuthor: (author) =>
+        set((s) => ({ doc: { ...s.doc, author: author.trim() ? author : undefined } })),
 
       listProjects: () => {
         const s = get();

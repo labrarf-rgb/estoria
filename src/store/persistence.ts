@@ -777,6 +777,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     schemaVersion: SCHEMA_VERSION,
     id: typeof d.id === "string" && d.id ? d.id : `story-${Date.now().toString(36)}`,
     projectTitle: title,
+    // Only the .docx export reads this, but it must survive a round trip
+    // through a file like any other field the user set.
+    ...(typeof d.author === "string" && d.author ? { author: d.author } : {}),
     // Cross-app field stamped by whichever app last wrote the file — must
     // survive normalization or every open would look like a fresh write.
     ...(typeof d.modifiedAt === "string" && d.modifiedAt ? { modifiedAt: d.modifiedAt } : {}),
