@@ -24,7 +24,7 @@ export const manuscriptWordCount = (doc: StoryDoc): number =>
   doc.chapters.reduce((n, c) => n + (c.manuscript ? countWords(c.manuscript) : 0), 0);
 
 const chapterHeading = (c: Chapter): string =>
-  c.title.trim() ? `Chapter ${c.num} — ${c.title.trim()}` : `Chapter ${c.num}`;
+  c.title.trim() ? `Chapter ${c.num}. ${c.title.trim()}` : `Chapter ${c.num}`;
 
 /**
  * `.md` — concatenation, and nothing to strip. The prose is already markdown and

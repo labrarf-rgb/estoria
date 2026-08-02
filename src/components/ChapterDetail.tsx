@@ -577,7 +577,7 @@ export function ChapterDetail() {
                   type="number"
                   min={0}
                   value={ch.target ?? ""}
-                  placeholder="—"
+                  placeholder="none"
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     patchChapter(ch.id, {
