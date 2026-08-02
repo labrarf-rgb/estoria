@@ -205,7 +205,9 @@ export function Footer() {
         ? " · synced to file"
         : " · file changed elsewhere, press Sync";
   const saveText = failed
-    ? "Couldn't save: browser storage is full. Export your project to keep a copy."
+    ? status.reason === "prose"
+      ? "Couldn't save this chapter's writing. It's held safely until the next save, but export your project to keep a copy."
+      : "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
       ? "Saving..."
       : (status.savedAt

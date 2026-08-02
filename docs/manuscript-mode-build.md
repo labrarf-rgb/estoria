@@ -483,6 +483,62 @@ localStorage crash-pad holding only the in-flight chapter, recovered on load.
 `StorageAdapter` needs widening to keyed access — already called for in SPECS §8
 ("a small widening: `list()` / per-id load/save") and §9 item 1.
 
+---
+
+#### ✅ BUILT
+
+`store/prose.ts` (the IndexedDB store, the split, the crash pad) and a rewritten
+persist shim in `store/persistence.ts`. Every mitigation above is in, including
+the crash pad, which turned out to be load-bearing rather than optional.
+
+- **The serialize is deferred, not just the write.** The old shim received an
+  already-stringified value, so `JSON.stringify` over the whole store ran per
+  keystroke and the debounce threw all but the last away. `createJSONStorage` is
+  gone; the storage is an object-form `PersistStorage` that owns its own
+  serialization, so `setItem` is one assignment. **Measured on the reference
+  project: 40 keystrokes stringified 26KB total (~0ms), then one 188KB
+  serialization when the timer fired.** Before, that would have been 40 × 188KB,
+  on the main thread, while someone was drafting.
+- **Prose has its own faster stream** (200ms, against the map's 500ms), plus
+  write-through on blur and on leaving a chapter.
+- **Migration is automatic and needs no code.** A document written before the
+  split still carries its prose inline; the load leaves it there and the first
+  save lifts it out. Verified: a blob with inline prose came back with the prose
+  in IndexedDB and the field gone from localStorage.
+- **The crash pad is proven, not just written.** With IndexedDB writes forced to
+  fail, the prose was still in the synchronous pad, survived a reload, was
+  restored into the editor, and then written to IndexedDB with the pad cleared.
+- **Prose failure is reported, not masked.** The two writes are separate and the
+  map is far likelier to succeed, so its "saved" would have painted over a prose
+  failure a second later — the exact silent-failure bug SPECS §9 item 2 exists
+  to have fixed. `SaveStatus` grew a `reason`, and the footer now says something
+  true for each.
+- **No IndexedDB, no problem.** If it is unavailable or refuses to open, prose
+  stays in the localStorage blob exactly as before: quota-bound and slower, but
+  never lost.
+- **The file contract holds.** Verified by capturing an actual `Save project
+  (.json)`: the file carries `manuscript` on its chapters at schema 8. `StoryDoc`
+  is still whole in memory and in every file, so export, Sync, backup, import
+  and Android are untouched.
+
+**Two things deliberately not done here:**
+
+1. **`StorageAdapter` is not widened.** That item is about *per-project* files
+   for the Drive adapter (SPECS §8, §9 item 1); prose is a different backend on
+   a different key shape, and forcing it through that interface would have made
+   both worse. It stays open, and it belongs to the Drive milestone.
+2. **`splitProse` walks all four chapter locations** — top level, `draftData`,
+   and both again inside every stashed book. Missing one would strip prose from a
+   board the writer had merely navigated away from, so if that walk ever needs
+   changing, change it there and nowhere else.
+
+**Found and fixed in passing:** `persistence.ts` contained two raw NUL bytes (a
+separator in `migrateRefsToAssets`, plus one in the comment describing it), which
+made `grep` and `ripgrep` treat the whole file as binary and silently return
+nothing. Replaced with `\u0000` escapes — byte-identical at runtime, and the file
+is searchable again. Worth knowing, because "grep found nothing in that file"
+was not evidence of anything.
+
 ### Phase 3 — fork ergonomics
 
 Needed only because prose forks:

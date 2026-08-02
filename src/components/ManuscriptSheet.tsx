@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { flushNow } from "@/store/persistence";
 import {
   applyReorder,
   appendBreaks,
@@ -110,8 +111,12 @@ export function ManuscriptSheet({
 
   // Keep the carousel honest when the prose is replaced under it (a version
   // switch, a chapter switch), rather than pointing at an offset that is now
-  // somewhere else entirely.
-  useEffect(() => setCaret(0), [ch.id]);
+  // somewhere else entirely. Leaving a chapter also forces the prose out: the
+  // chapter you just left is the one nobody is going to notice losing.
+  useEffect(() => {
+    setCaret(0);
+    return flushNow;
+  }, [ch.id]);
 
   /**
    * A scene clicked on the timeline opens this chapter on that beat. With the
@@ -195,6 +200,10 @@ export function ManuscriptSheet({
         onSelect={readCaret}
         onClick={readCaret}
         onKeyUp={readCaret}
+        // Write-through on blur. The prose debounce is short, but "I stopped
+        // typing and clicked away" is the moment a writer assumes their words
+        // are safe, and it costs nothing to make that true.
+        onBlur={flushNow}
         spellCheck
         placeholder="Write the chapter here. A *** on its own line is a scene break."
         className={`block w-full resize-none rounded-b-xl bg-transparent px-[max(24px,calc(50%-330px))] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint ${

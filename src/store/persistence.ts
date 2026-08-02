@@ -15,6 +15,18 @@ import {
   type WorldEntry,
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
+import {
+  clearPad,
+  loadAllProse,
+  mergeProse,
+  proseStoreAvailable,
+  readPad,
+  splitProse,
+  staleKeys,
+  writePad,
+  writeProse,
+} from "@/store/prose";
+import type { PersistStorage } from "zustand/middleware";
 
 /**
  * StorageAdapter — the single seam between Estoria and where stories live.
@@ -36,6 +48,8 @@ export interface StorageAdapter {
 const STORAGE_KEY = "estoria:store:v1";
 /** Legacy duplicate copy once written by the old double-write shim. */
 const LEGACY_KEY = "estoria:doc:v1";
+/** Where a blob we could not parse is set aside instead of being overwritten. */
+const UNREADABLE_KEY = "estoria:unreadable";
 
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private key: string = STORAGE_KEY) {}
@@ -65,6 +79,13 @@ export interface SaveStatus {
   state: "idle" | "saving" | "saved" | "error";
   /** Epoch ms of the last successful save (0 = none this session). */
   savedAt: number;
+  /**
+   * Which write failed. The map goes to localStorage, where a failure is nearly
+   * always the quota; prose goes to IndexedDB, where it is not — and telling a
+   * writer their storage is full when it isn't sends them to delete things they
+   * did not need to.
+   */
+  reason?: "storage" | "prose";
 }
 
 let saveStatus: SaveStatus = { state: "idle", savedAt: 0 };
@@ -87,65 +108,264 @@ function setSaveStatus(next: SaveStatus): void {
 
 // ---- Debounced write-through shim for zustand persist ------------------------
 
+/** What `partialize` hands us. Only the two fields carrying prose are named. */
+export interface PersistedShape {
+  doc: StoryDoc;
+  projectStash?: Record<string, StoryDoc>;
+  /** The prefs `partialize` also persists; nothing here reads them. */
+  [key: string]: unknown;
+}
+type Stored = { state: PersistedShape; version?: number };
+
 /**
- * Auto-save is debounced: zustand persist calls setItem on *every* state
- * change (each keystroke re-serializes the whole store, images included), so
- * we hold the latest snapshot and write once things go quiet. The pending
- * snapshot is flushed synchronously on unload/hide so nothing is lost.
+ * Auto-save, in two streams.
+ *
+ * zustand persist calls `setItem` on *every* state change, so this holds the
+ * latest snapshot and writes once things go quiet. **What is deferred is the
+ * serialize, not just the write** — the old shim took an already-stringified
+ * value, so `JSON.stringify` over the whole store ran per keystroke and the
+ * debounce discarded all but the last result. Now `setItem` costs one
+ * assignment and the work happens on the timer.
+ *
+ * The map goes to localStorage on a 500ms trailing timer; **prose goes to
+ * IndexedDB on a much shorter one**, because prose is the thing being typed and
+ * the window between a keystroke and it reaching disk is the window in which it
+ * can be lost. See `store/prose.ts` for the split and the crash pad.
  */
 const SAVE_DEBOUNCE_MS = 500;
-let pendingSave: string | null = null;
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const PROSE_DEBOUNCE_MS = 200;
 
-function flushSave(): void {
+let pending: Stored | null = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let proseTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Whether prose is being kept in IndexedDB. Decided once, on load. When it is
+ * false — no IndexedDB, or a private mode that refuses to open one — every
+ * manuscript simply stays in the localStorage blob exactly as before, quota
+ * limits and all. Slower and smaller, but never lost.
+ */
+let proseEnabled = false;
+/** What IndexedDB is believed to hold, so only changed chapters are written. */
+let lastProse = new Map<string, string>();
+/**
+ * Set when a prose write fails, cleared when one succeeds.
+ *
+ * Without this the footer lies: the map write and the prose write are separate,
+ * the map is much more likely to succeed, and its "saved" would paint straight
+ * over the prose failure a second later. Silent save failure is the exact bug
+ * SPECS §9 item 2 exists to have fixed, and splitting the write in two is a
+ * fresh chance to reintroduce it.
+ */
+let proseFailed = false;
+
+interface Split {
+  src: Stored;
+  stripped: Stored;
+  prose: Map<string, string>;
+  projectIds: Set<string>;
+}
+let splitCache: Split | null = null;
+
+/** Lift the prose out of the active project and every stashed one. */
+function currentSplit(): Split | null {
+  if (!pending) return null;
+  if (splitCache && splitCache.src === pending) return splitCache;
+
+  const value = pending;
+  if (!proseEnabled) {
+    splitCache = { src: value, stripped: value, prose: new Map(), projectIds: new Set() };
+    return splitCache;
+  }
+
+  const prose = new Map<string, string>();
+  const projectIds = new Set<string>();
+  const take = (d: StoryDoc): StoryDoc => {
+    const out = splitProse(d);
+    projectIds.add(d.id);
+    for (const [k, v] of out.prose) prose.set(k, v);
+    return out.doc;
+  };
+
+  const state = value.state;
+  const doc = take(state.doc);
+  let stashChanged = false;
+  const stash: Record<string, StoryDoc> = {};
+  for (const [id, d] of Object.entries(state.projectStash ?? {})) {
+    stash[id] = take(d);
+    if (stash[id] !== d) stashChanged = true;
+  }
+
+  const stripped: Stored =
+    doc === state.doc && !stashChanged
+      ? value
+      : { ...value, state: { ...state, doc, ...(state.projectStash ? { projectStash: stash } : {}) } };
+
+  splitCache = { src: value, stripped, prose, projectIds };
+  return splitCache;
+}
+
+/**
+ * Write the changed manuscripts.
+ *
+ * Order matters and is the whole safety argument: the synchronous pad first,
+ * then the asynchronous IndexedDB write, then the pad is cleared only for the
+ * keys that actually landed. A tab closed anywhere in the middle loses nothing.
+ */
+function flushProse(): void {
+  if (proseTimer != null) {
+    clearTimeout(proseTimer);
+    proseTimer = null;
+  }
+  const split = currentSplit();
+  if (!split || !proseEnabled) return;
+
+  const dirty = new Map<string, string>();
+  for (const [k, v] of split.prose) if (lastProse.get(k) !== v) dirty.set(k, v);
+  const stale = staleKeys(split.prose, new Set(lastProse.keys()), split.projectIds);
+  if (dirty.size === 0 && stale.length === 0) return;
+
+  writePad(dirty);
+  void writeProse(dirty, stale)
+    .then(() => {
+      for (const [k, v] of dirty) lastProse.set(k, v);
+      for (const k of stale) lastProse.delete(k);
+      clearPad(dirty.keys());
+      proseFailed = false;
+    })
+    .catch(() => {
+      // The pad still holds this text and is deliberately not cleared, so the
+      // words survive the failure — but the writer is told, because prose that
+      // only exists in a recovery pad is not prose that is safely saved.
+      proseFailed = true;
+      setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "prose" });
+    });
+}
+
+function flushMap(): void {
   if (saveTimer != null) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  if (pendingSave == null) return;
-  const value = pendingSave;
-  pendingSave = null;
+  const split = currentSplit();
+  if (!split) return;
+  pending = null;
+  splitCache = null;
+  const value = JSON.stringify(split.stripped);
   void activeAdapter
     .save(value)
-    .then(() => setSaveStatus({ state: "saved", savedAt: Date.now() }))
-    .catch(() => setSaveStatus({ state: "error", savedAt: saveStatus.savedAt }));
+    .then(() => {
+      // Only the map landed. Saying "saved" while the prose write is failing
+      // would be the more comforting lie and the more expensive one.
+      if (proseFailed) return;
+      setSaveStatus({ state: "saved", savedAt: Date.now() });
+    })
+    .catch(() => setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "storage" }));
+}
+
+/** Everything, now. Prose before the map, so the pad is written either way. */
+function flushSave(): void {
+  flushProse();
+  flushMap();
 }
 
 if (typeof window !== "undefined") {
-  // LocalStorageAdapter.save runs synchronously up to its (absent) first
-  // await, so a flush here still lands before the page goes away.
+  // `LocalStorageAdapter.save` and the prose pad both run synchronously up to
+  // their (absent) first await, so a flush here still lands before the page
+  // goes away. The IndexedDB write will not finish — the pad is what covers it.
   window.addEventListener("beforeunload", flushSave);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushSave();
   });
 }
 
+/** Force everything out now — used on blur and when leaving a chapter. */
+export function flushNow(): void {
+  flushSave();
+}
+
 /**
- * Storage shim for zustand's persist middleware. Reads and writes go through
- * `activeAdapter` (async reads are supported by persist), so swapping the
- * backend never requires touching the store.
+ * Storage for zustand's persist middleware, in object form rather than through
+ * `createJSONStorage`: owning the serialization is what lets the prose be
+ * lifted out *before* `JSON.stringify` ever sees it.
  */
-export const zustandStorage = {
-  getItem: (name: string): Promise<string | null> => {
-    // `name` is the persist key; the adapter owns its own key (they match —
-    // see STORAGE_KEY). Kept for the Web-Storage-shaped contract.
-    void name;
+export const zustandStorage: PersistStorage<PersistedShape> = {
+  getItem: async (name: string) => {
+    void name; // the adapter owns its key; see STORAGE_KEY
     try {
       // One-time cleanup: reclaim the quota eaten by the old duplicate copy.
       localStorage.removeItem(LEGACY_KEY);
     } catch {
       // ignore
     }
-    return activeAdapter.load();
+    // Settled before the early returns below: a browser opening Estoria for the
+    // first time has nothing to load, and would otherwise keep prose inline
+    // until its next reload.
+    proseEnabled = await proseStoreAvailable();
+
+    const raw = await activeAdapter.load();
+    if (!raw) return null;
+
+    let parsed: Stored;
+    try {
+      parsed = JSON.parse(raw) as Stored;
+    } catch {
+      // Unreadable. Returning null starts the app on a fresh document, which
+      // then saves straight over this — so keep a copy first. It is the only
+      // chance anyone has of getting the text back out by hand, and it costs
+      // one write on a path that should never run.
+      try {
+        localStorage.setItem(`${UNREADABLE_KEY}:${Date.now()}`, raw);
+      } catch {
+        // Nothing left to do: no room to keep it, and no way to read it.
+      }
+      return null;
+    }
+    if (!parsed?.state?.doc || !proseEnabled) return parsed ?? null;
+
+    let stored: Map<string, string>;
+    try {
+      stored = await loadAllProse();
+    } catch {
+      proseEnabled = false;
+      return parsed;
+    }
+    // What IndexedDB holds, recorded before the pad goes over the top — so a
+    // pad entry that never reached IndexedDB reads as dirty and is written.
+    lastProse = new Map(stored);
+    const merged = new Map(stored);
+    for (const [k, v] of Object.entries(readPad())) merged.set(k, v);
+
+    // Documents written before this split still carry their prose inline; it
+    // survives here untouched and moves to IndexedDB on the next save. That is
+    // the whole migration.
+    const state = parsed.state;
+    const stash: Record<string, StoryDoc> = {};
+    for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = mergeProse(d, merged);
+    return {
+      ...parsed,
+      state: {
+        ...state,
+        doc: mergeProse(state.doc, merged),
+        ...(state.projectStash ? { projectStash: stash } : {}),
+      },
+    };
   },
-  setItem: (name: string, value: string): void => {
+
+  setItem: (name: string, value: Stored) => {
     void name;
-    pendingSave = value;
+    // One assignment. Everything expensive waits for the timers below.
+    pending = value;
     if (saveStatus.state !== "saving") setSaveStatus({ ...saveStatus, state: "saving" });
+    if (proseTimer != null) clearTimeout(proseTimer);
+    proseTimer = setTimeout(flushProse, PROSE_DEBOUNCE_MS);
     if (saveTimer != null) clearTimeout(saveTimer);
-    saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
+    saveTimer = setTimeout(flushMap, SAVE_DEBOUNCE_MS);
   },
-  removeItem: (name: string): void => {
+
+  removeItem: (name: string) => {
+    // Deliberately leaves the manuscripts alone. Nothing in the app clears the
+    // store, and prose is the last thing to destroy on an ambiguous signal.
     try {
       localStorage.removeItem(name);
     } catch {
@@ -277,13 +497,13 @@ const migId = (prefix: string) => `${prefix}-mig-${Date.now().toString(36)}-${(m
 function migrateRefsToAssets(doc: StoryDoc): StoryDoc {
   const assets: Asset[] = doc.assets.map((a) => ({ ...a }));
   const assetById = new Map(assets.map((a) => [a.id, a]));
-  const minted = new Map<string, string>(); // `${refId} ${content}` -> assetId
+  const minted = new Map<string, string>(); // `${refId}\u0000${content}` -> assetId
 
   const contentKey = (r: { kind?: RefKind; label?: string; body?: string; src?: string }) =>
     JSON.stringify([r.kind === "IMAGE" ? "IMAGE" : "NOTE", r.label ?? "", r.body ?? "", r.src ?? ""]);
 
   const mint = (r: LegacyRef, refId: string): string => {
-    const key = `${refId} ${contentKey(r)}`;
+    const key = `${refId}\u0000${contentKey(r)}`;
     const hit = minted.get(key);
     if (hit) return hit;
     const id = migId("a");

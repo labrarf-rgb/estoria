@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
@@ -1983,7 +1983,7 @@ export const useStore = create<StoreState>()(
     {
       name: "estoria:store:v1",
       version: SCHEMA_VERSION,
-      storage: createJSONStorage(() => zustandStorage),
+      storage: zustandStorage,
       partialize: (s) => ({
         doc: s.doc,
         projectStash: s.projectStash,
