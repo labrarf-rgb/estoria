@@ -3,7 +3,7 @@
   "private": true,
   "version": "3.0.0",
   "type": "module",
-  "description": "Estoria — map your story and write it.",
+  "description": "Estoria | Map and Write Your Story",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
