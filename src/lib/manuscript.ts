@@ -163,6 +163,43 @@ export function paragraphs(text: string): string[] {
     .filter((p) => p.trim().length > 0);
 }
 
+// ---- Counting ---------------------------------------------------------------
+
+/**
+ * Words in a manuscript.
+ *
+ * Markdown is stripped first, or `**tension**` counts as two — and the scene
+ * breaks are dropped, because `***` is punctuation the format requires rather
+ * than anything the writer wrote. Tokens with no letter or digit in them (a lone
+ * em dash, a stray bullet) are not words either.
+ */
+export function countWords(markdown: string): number {
+  const flat = markdown
+    .split("\n")
+    .filter((l) => !isBreak(l))
+    .join("\n")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)/gm, "")
+    .replace(/[*_~`]/g, "");
+  return (flat.match(/\S+/g) ?? []).filter((t) => /[\p{L}\p{N}]/u.test(t)).length;
+}
+
+/** `1.2k` / `840` — the shape the board and rail cards have always used. */
+export const shortCount = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
+
+/**
+ * The card's word line. With a target set it becomes a progress reading, which
+ * is the number a planning tool can show and a text editor cannot — the whole
+ * reason `words` and `target` are two fields rather than one (§5).
+ */
+export function wordsMeta(words: number, target?: number): string {
+  return target && target > 0
+    ? `${shortCount(words)} / ${shortCount(target)} words`
+    : `${shortCount(words)} words`;
+}
+
 // ---- Borrowed labels --------------------------------------------------------
 
 /** Abbreviations whose full stop does not end a sentence. */

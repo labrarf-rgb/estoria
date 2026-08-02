@@ -192,7 +192,24 @@ export interface Chapter {
   summary?: string;
   /** Chapter-level notes (separate from pinned references). */
   notes?: string;
+  /**
+   * Words in this chapter. Historically hand-typed and meaning *planned*; once
+   * the chapter has prose it is a **cache of the real count**, recomputed from
+   * `manuscript` and written back. Deliberately still a stored field — eight
+   * places read it (board, rail, toolbar, series map, export header, markdown
+   * export, importer), and deriving at those call sites instead would put a
+   * manuscript scan inside every render.
+   */
   words: number;
+  /**
+   * The hand-set goal for this chapter, kept apart from `words` because that
+   * field used to mean *planned* — the AI import prompt literally says "estimate
+   * from scene length" — and auto-updating it would silently redefine it as
+   * *actual*. The gap between the two is the most motivating number a planning
+   * tool can show, so it is worth the extra field. Absent until set; the first
+   * time real prose appears, an existing hand-typed `words` is promoted here.
+   */
+  target?: number;
   /** Board position. */
   x: number;
   y: number;

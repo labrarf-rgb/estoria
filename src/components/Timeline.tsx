@@ -5,10 +5,9 @@ import { SCENE_TEXT_MAX, isOverCap, sceneSpan } from "@/lib/sceneFit";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
-import { borrowedLabel } from "@/lib/manuscript";
+import { borrowedLabel, wordsMeta, writtenCount } from "@/lib/manuscript";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
-import { writtenCount } from "@/lib/manuscript";
 import type { Chapter, ConnType, Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -443,7 +442,7 @@ export function Timeline() {
                       {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
                     </span>
                     <span className="text-faint">·</span>
-                    <span>{(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words</span>
+                    <span>{wordsMeta(c.words, c.target)}</span>
                   </div>
                 </div>
               ))}

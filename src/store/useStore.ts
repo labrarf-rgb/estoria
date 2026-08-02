@@ -18,7 +18,7 @@ import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
-import { breakCount, insertBreak } from "@/lib/manuscript";
+import { breakCount, countWords, insertBreak } from "@/lib/manuscript";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -237,6 +237,8 @@ interface StoreState extends UiState {
    * map is never allowed to reshape finished paragraphs on its own initiative.
    */
   reconcileManuscript: (chId: string, text: string, label: string) => void;
+  /** Refresh `words` from the prose. Debounced by its caller, not by itself. */
+  recomputeWords: (chId: string) => void;
   undoManuscript: () => void;
   setManuscriptState: (state: ManuscriptState) => void;
   clearManuscriptDrift: () => void;
@@ -1176,6 +1178,40 @@ export const useStore = create<StoreState>()(
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
+            },
+          };
+        }),
+
+      /**
+       * `words` as a cache of the manuscript.
+       *
+       * Two rules, both about not destroying a number the writer typed:
+       *
+       *  - **Never auto-zero.** Every book written before this feature has a
+       *    hand-typed count and no manuscript, and a naive recompute would show
+       *    an 80,000-word project as 0. So a count of zero is never written; it
+       *    only ever moves when there is real prose to move it to. (The cost is
+       *    that emptying a chapter freezes its last count, which is the safe
+       *    side of that trade.)
+       *  - **Promote, don't overwrite.** The first time real prose appears, the
+       *    number already there was a *plan*, so it moves to `target` instead of
+       *    being replaced. That is what turns the board into a progress reading
+       *    rather than quietly redefining what the old number meant.
+       */
+      recomputeWords: (chId) =>
+        set((s) => {
+          const c = s.doc.chapters.find((x) => x.id === chId);
+          if (!c || c.manuscript === undefined) return {};
+          const n = countWords(c.manuscript);
+          if (n === 0) return {};
+          const promote = c.target === undefined && c.words > 0;
+          if (n === c.words && !promote) return {};
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((x) =>
+                x.id === chId ? { ...x, ...(promote ? { target: x.words } : {}), words: n } : x
+              ),
             },
           };
         }),

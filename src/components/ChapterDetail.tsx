@@ -10,7 +10,7 @@ import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { DriftBar, ManuscriptSheet, SheetViewToggle } from "@/components/ManuscriptSheet";
-import { borrowedLabel, writtenCount } from "@/lib/manuscript";
+import { borrowedLabel, countWords, writtenCount } from "@/lib/manuscript";
 import type { ManuscriptState } from "@/store/useStore";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
@@ -88,6 +88,18 @@ export function ChapterDetail() {
   // this one has a wrong side to land on — opening the sheet unable to type
   // because a previous session left it in View is a trap, not a preference.
   const [sheetView, setSheetView] = useState<"edit" | "read">("edit");
+  // `words` follows the prose, on the same rhythm as the save rather than per
+  // keystroke: each edit resets the timer, so counting a long chapter happens
+  // once when the typing stops. Lives here, not in the sheet, so a drift-bar
+  // reconciliation with the manuscript minimized still updates the count.
+  const recomputeWords = useStore((s) => s.recomputeWords);
+  const manuscriptText = ch?.manuscript;
+  useEffect(() => {
+    if (!chIdRef.current || manuscriptText === undefined) return;
+    const id = chIdRef.current;
+    const t = setTimeout(() => recomputeWords(id), 700);
+    return () => clearTimeout(t);
+  }, [manuscriptText, openCh, recomputeWords]);
   // The modal is one scroll container under a sticky header, so the carousel
   // has to know how tall that header is to stick *below* it rather than under
   // it. Measured rather than guessed: the summary line wraps, and the banner on
@@ -329,6 +341,8 @@ export function ChapterDetail() {
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
   // The layout belonging to the size on screen. Falling back to the other one
   // covers the frame between a size toggle and the store catching up.
+  // Does this chapter's count come from its prose rather than from the keyboard?
+  const counted = ch.manuscript !== undefined && countWords(ch.manuscript) > 0;
   const positions = (expanded ? ch.scenePos : ch.scenePosCompact) ?? ch.scenePos ?? [];
   const boxW = sceneBoxRef.current?.clientWidth ?? 0;
 
@@ -516,16 +530,53 @@ export function ChapterDetail() {
             )}
 
             <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
-              <label className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]">
+              {/* Counted, not typed, once the chapter has prose — so the field
+                  stops being editable rather than silently ignoring edits. A
+                  chapter with nothing written keeps the hand-typed estimate it
+                  has always had. */}
+              {counted ? (
+                <span
+                  className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]"
+                  title="Counted from the manuscript, and updated as you write."
+                >
+                  <span className="font-mono text-[12px] font-medium text-ink">
+                    {ch.words.toLocaleString()}
+                  </span>
+                  <span className="font-mono text-[11px] font-medium text-soft">words</span>
+                </span>
+              ) : (
+                <label className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]">
+                  <input
+                    type="number"
+                    min={0}
+                    value={ch.words}
+                    onChange={(e) => patchChapter(ch.id, { words: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                    className="w-[56px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield]"
+                    title="Words in this chapter. Once you write in it, this is counted for you."
+                  />
+                  <span className="font-mono text-[11px] font-medium text-soft">words</span>
+                </label>
+              )}
+              <label
+                className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]"
+                title="How long you mean this chapter to be. The gap is the progress."
+              >
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-faint">
+                  Target
+                </span>
                 <input
                   type="number"
                   min={0}
-                  value={ch.words}
-                  onChange={(e) => patchChapter(ch.id, { words: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                  className="w-[56px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield]"
-                  title="Words in this chapter"
+                  value={ch.target ?? ""}
+                  placeholder="—"
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    patchChapter(ch.id, {
+                      target: e.target.value.trim() === "" || isNaN(v) ? undefined : Math.max(0, v),
+                    });
+                  }}
+                  className="w-[52px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield] placeholder:text-faint"
                 />
-                <span className="font-mono text-[11px] font-medium text-soft">words</span>
               </label>
               <span className="font-mono text-[11.5px] font-medium text-faint">
                 · {ch.scenes.length} scenes

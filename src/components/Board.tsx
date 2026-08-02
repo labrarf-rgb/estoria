@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { wordsMeta } from "@/lib/manuscript";
 import { CARD_W, CARD_H, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
@@ -389,7 +390,7 @@ export function Board() {
                     {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
                   </span>
                   <span className="text-faint">·</span>
-                  <span>{(c.words / 1000).toFixed(1).replace(/\.0$/, "")}k words</span>
+                  <span>{wordsMeta(c.words, c.target)}</span>
                 </div>
               </div>
             </div>
