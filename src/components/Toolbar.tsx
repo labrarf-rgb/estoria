@@ -10,6 +10,8 @@ export function Toolbar() {
   const goToSeries = useStore((s) => s.goToSeries);
   const setLevel = useStore((s) => s.setLevel);
   const orient = useStore((s) => s.timelineOrient);
+  const pane = useStore((s) => s.timelinePane);
+  const setTimelinePane = useStore((s) => s.setTimelinePane);
   const zoom = useStore((s) => s.zoom);
   const theme = useStore((s) => s.theme);
   const newMenu = useStore((s) => s.newMenu);
@@ -295,6 +297,27 @@ export function Toolbar() {
             →
           </button>
         </div>
+        {/* Scenes / Prose — a pane toggle, not a fourth view: the rail either
+            side of it is the same rail. Shown only on the timeline, because
+            that is the only surface with a pane to change. */}
+        {view === "timeline" && (
+          <div className="flex rounded-[9px] bg-chip p-[3px]">
+            <button
+              title="Read the scene flow"
+              onClick={() => setTimelinePane("scenes")}
+              className={pane === "scenes" ? segOn : segOff}
+            >
+              Scenes
+            </button>
+            <button
+              title="Read the chapters' prose"
+              onClick={() => setTimelinePane("prose")}
+              className={pane === "prose" ? segOn : segOff}
+            >
+              Prose
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Side panels */}

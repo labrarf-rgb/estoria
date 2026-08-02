@@ -31,6 +31,7 @@ import {
   sceneColumnsForWidth,
   type Camera,
   type TimelineOrient,
+  type TimelinePane,
 } from "@/lib/layout";
 import { TEMPLATES } from "@/lib/templates";
 import { normalizeDoc, zustandStorage } from "@/store/persistence";
@@ -53,6 +54,12 @@ interface UiState {
   view: View;
   level: Level;
   timelineOrient: TimelineOrient;
+  /**
+   * What the timeline's pane shows (persisted). A **pane toggle, not a fourth
+   * view**: the rail, its cards, the active ring and the two-way scroll sync are
+   * identical either way, and only the contents of the pane change.
+   */
+  timelinePane: TimelinePane;
   zoom: number;
   panX: number;
   panY: number;
@@ -318,6 +325,7 @@ interface StoreState extends UiState {
   toggleTheme: () => void;
   setView: (v: View) => void;
   setOrient: (o: TimelineOrient) => void;
+  setTimelinePane: (p: TimelinePane) => void;
   setDragId: (id: string | null) => void;
   openChapter: (id: string) => void;
   openChapterAtScene: (id: string, index: number) => void;
@@ -532,6 +540,7 @@ const initialUi: UiState = {
   view: "board",
   level: "book",
   timelineOrient: "vertical",
+  timelinePane: "scenes",
   zoom: 0.66,
   panX: 34,
   panY: 28,
@@ -1836,6 +1845,7 @@ export const useStore = create<StoreState>()(
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setView: (v) => set({ view: v }),
       setOrient: (o) => set({ timelineOrient: o }),
+      setTimelinePane: (p) => set({ timelinePane: p }),
       setDragId: (id) => set({ dragId: id }),
       openChapter: (id) =>
         set((s) => {
@@ -1980,6 +1990,7 @@ export const useStore = create<StoreState>()(
         theme: s.theme,
         view: s.view,
         timelineOrient: s.timelineOrient,
+        timelinePane: s.timelinePane,
         onboarded: s.onboarded,
         chapterSectionsCollapsed: s.chapterSectionsCollapsed,
         refView: s.refView,

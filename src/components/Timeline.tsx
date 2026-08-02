@@ -6,6 +6,8 @@ import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
+import { ProseChapter } from "@/components/ProsePane";
+import { writtenCount } from "@/lib/manuscript";
 import type { Chapter, ConnType, Vec2 } from "@/types";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
@@ -118,11 +120,20 @@ function railConnector(a: Box, b: Box, vertical: boolean): string {
 export function Timeline() {
   const doc = useStore((s) => s.doc);
   const orient = useStore((s) => s.timelineOrient);
+  const paneMode = useStore((s) => s.timelinePane);
   const openChapter = useStore((s) => s.openChapter);
   const openChapterAtScene = useStore((s) => s.openChapterAtScene);
 
   const vertical = orient === "vertical";
+  const prose = paneMode === "prose";
   const fill: SceneFill = vertical ? "row" : "column";
+  /**
+   * Prose is a column of text, so a horizontal pane gives each chapter a
+   * fixed-width column that scrolls its own prose vertically while the pane
+   * still scrolls chapter-to-chapter along its axis. The rail, the ring and the
+   * sync are untouched either way — only what sits in the pane changes.
+   */
+  const PROSE_COL = 560;
 
   const paneRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -446,10 +457,24 @@ export function Timeline() {
                     Act {roman(c.act)}
                   </span>
                   <span className="flex-none font-mono text-[10.5px] font-medium text-faint">
-                    {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
+                    {prose
+                      ? `${writtenCount(c.manuscript ?? "")} of ${c.scenes.length} written`
+                      : `${c.scenes.length} ${c.scenes.length === 1 ? "scene" : "scenes"}`}
                   </span>
                 </div>
 
+                {prose ? (
+                  <div
+                    className={
+                      vertical
+                        ? "pb-[26px] pt-[4px]"
+                        : "mb-[18px] min-h-0 flex-1 overflow-y-auto pr-[10px] pt-[4px]"
+                    }
+                    style={vertical ? undefined : { width: PROSE_COL }}
+                  >
+                    <ProseChapter ch={c} width={vertical ? undefined : PROSE_COL - 10} />
+                  </div>
+                ) : (
                 <div
                   className={`relative overflow-hidden rounded-xl border border-rule ${
                     vertical ? "" : "mb-[18px] min-h-0 flex-1"
@@ -541,6 +566,7 @@ export function Timeline() {
                     </>
                   )}
                 </div>
+                )}
               </div>
             );
           })}
@@ -551,6 +577,24 @@ export function Timeline() {
           >
             End of book
           </div>
+          {/* Room past the last chapter, so the last chapters can still reach
+              the leading edge when jumped to.
+              A prose column is a fixed 560px against a scene grid that fills the
+              pane, so the tail of the book has far less content behind it to
+              scroll against: without this the pane bottoms out before the
+              chapter you clicked gets there, and the ring stays on the one
+              before it. Only in prose mode, where the narrow column caused it. */}
+          {prose && (
+            <div
+              aria-hidden
+              className="flex-none"
+              style={
+                vertical
+                  ? { height: Math.max(0, pane.h - 260) }
+                  : { width: Math.max(0, pane.w - PROSE_COL - 44) }
+              }
+            />
+          )}
         </div>
       </div>
     </div>

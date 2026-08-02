@@ -10,8 +10,11 @@
 > before any code. Everything here is scoped to this repo; the file is not
 > self-contained away from the codebase it describes.
 >
-> **Status: Phases 0 and 1 are built** on `feature/manuscript-mode`
-> (2026-08-01) — see §8 for what each shipped. Phases 2-5 are not started.
+> **Status: Phases 0, 1 and 4 are built** on `feature/manuscript-mode`
+> (2026-08-01) — see §8 for what each shipped. Phase 4 was taken out of order,
+> deliberately: it is the cheapest large win, and Phase 2's storage work only
+> starts to bite once there is real prose to store, which there is not yet.
+> Phases 2, 3 and 5 are not started.
 >
 > **The riskiest assumption held.** Asked directly on 2026-08-01, the author's
 > verdict on Phase 0 was *"seeing beats while drafting manuscript is something
@@ -491,11 +494,40 @@ Needed only because prose forks:
   fork you abandon is stranded with no path out.
 - **Word counts in the version menu**, so a fork's cost is visible beforehand.
 
-### Phase 4 — timeline prose mode
+### Phase 4 — timeline prose mode — ✅ BUILT
 
 Same rail, same cards, same active ring, same two-way scroll sync. Only the
 pane's contents change; `Scenes / Prose` is a pane toggle beside the existing
 ↓ / → control. Cheapest large win in the feature.
+
+**It was.** `timelinePane` in the store (persisted), a `Scenes / Prose` segment
+in the toolbar shown only on the timeline, and `components/ProsePane.tsx`. The
+rail, the act bands, the link curves, the ring and the scroll sync are all
+untouched — the toggle swaps what sits in the pane and nothing else.
+
+- **This is where the `***` contract pays for itself.** The break renders as the
+  centred rule a scene break has always looked like, and reading mode decorates
+  that rule with the causal type from `sceneLinks[i]` — the therefore and but the
+  map already knows, shown over the prose without ever being stored in it.
+- **A small inline renderer, not a library.** Bold-italic, bold, italic and
+  code, and paragraphs on blank lines. Anything it doesn't know stays the literal
+  characters the writer typed, which is honest and reversible. This is the View
+  half of §2's Edit/View toggle; Edit still shows `***` literally, per §4.
+- **The prose is selectable.** The clickable affordance is a small `Scene N`
+  marker that appears on hover, not a wrapper around the text — a reading view
+  you cannot copy out of is not a reading view. Clicking it opens the chapter at
+  that scene *with the sheet open*, flipping `manuscriptState` out of `min` if
+  it was there, so reading leads into writing in one click.
+- **Horizontal keeps working**: each chapter becomes a fixed 560px column that
+  scrolls its own prose vertically, while the pane still scrolls chapter to
+  chapter along its axis.
+
+**One thing this surfaced, fixed here:** a prose column is a fixed 560px against
+a scene grid that fills the pane, so the tail of the book has much less content
+behind it to scroll against. The pane bottomed out before a jumped-to chapter
+reached the leading edge, and the ring stayed on the chapter before it. Fixed
+with trailing room past "End of book", in prose mode only. **The same shape of
+bug is latent in Scenes mode** for the very last chapter and was not touched.
 
 ### Phase 5 — word count (§5) and exports
 

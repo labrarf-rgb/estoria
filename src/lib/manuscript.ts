@@ -120,6 +120,18 @@ export function seedManuscript(sceneCount: number): string {
   return `\n${new Array(sceneCount - 1).fill(SCENE_BREAK).join("\n\n")}\n`;
 }
 
+/**
+ * A section's prose, split into paragraphs on blank lines. What reading mode
+ * lays out — the scene's own text, with the break that ended it already
+ * accounted for by `sections`.
+ */
+export function paragraphs(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+$/, "").replace(/^\n+/, ""))
+    .filter((p) => p.trim().length > 0);
+}
+
 // ---- Edits ------------------------------------------------------------------
 //
 // All of these are surgical: they splice at an offset rather than rebuild the

@@ -98,6 +98,13 @@ export function autoArrange(chapters: Chapter[], arrangeN: number, cols = 4): Ar
 
 export type TimelineOrient = "vertical" | "horizontal";
 
+/**
+ * What the timeline's pane renders: the scene flow, or the chapter's prose.
+ * A toggle on the one pane rather than a separate view — the rail either side
+ * of it is the same rail (docs/manuscript-mode-build.md §8 phase 4).
+ */
+export type TimelinePane = "scenes" | "prose";
+
 /** Sequential timeline positions for an arbitrary book list — no act grouping. */
 export function timelineBookPositions(
   books: { id: string }[],
