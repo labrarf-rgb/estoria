@@ -8,8 +8,24 @@
 > is the 2026-08-02 entry in [`SESSIONS.md`](SESSIONS.md). Everything below is
 > scoped to this repo.
 >
-> Branch: `feature/manuscript-mode`, 21 commits, **not merged, not pushed, not
-> deployed**. Written 2026-08-02. Delete this file when the restructure lands,
+> ## ⚠️ Work on the branch, not `main`
+>
+> ```bash
+> git checkout feature/manuscript-mode
+> ```
+>
+> Everything described here is on **`feature/manuscript-mode`** — 22 commits,
+> **not merged, not pushed, not deployed**. `main` has none of it. Run the dev
+> server on a **separate port** so the branch's browser storage stays apart from
+> whatever you normally develop against (localStorage and IndexedDB are keyed by
+> origin, and origin includes the port):
+>
+> ```bash
+> npx vite --port 5199 --strictPort
+> ```
+>
+> There is a `.claude/launch.json` entry named `estoria-manuscript` that does
+> exactly this. Written 2026-08-02. Delete this file when the restructure lands,
 > folding what survives into [`SPECS.md`](SPECS.md) §4.
 
 ---
@@ -44,7 +60,7 @@ One chapter, two modals, and a switch between them.
 |---|---|
 | **Manuscript modal** | Its own modal. Carries the **chapter** (number + title), the **word count**, a **view of the scenes**, and the writing pane. |
 | **Story map modal** | The chapter modal as it is today, minus the Manuscript section. |
-| **The switch** | A button to toggle between **Manuscript mode** and **Story map mode**, present in both. |
+| **The switch** | A button to toggle between the two, **on the chapter's meta line** — the row carrying the word count, the scene count and Idea / Draft / Done. In Story map mode it reads *Manuscript*; in Manuscript mode it reads *Story map*. One button, always in the same place, naming where it takes you. |
 | **Memory** | Remember which of the two was last opened, and open that one next time a chapter is opened. |
 | **Controls** | Each modal keeps its own collapse/expand and its own buttons. |
 
@@ -83,8 +99,11 @@ before proposing anything that re-couples prose to scenes.
    one side** is the shape §9 item 16 suggested: it gives the prose the window,
    needs no stickiness, and leaves one scroll context instead of two. Decide
    this deliberately — it is the main thing the restructure is for.
-3. **The mode switch**, in both modals, swapping the open chapter between them
-   without closing and reopening.
+3. **The mode switch**, on the meta line in both modals (see §2), swapping the
+   open chapter between them without closing and reopening. The meta line already
+   exists in `ChapterDetail`'s header — the words chip, the target, the scene
+   count and the status picker — so the manuscript modal needs the same row, which
+   is also where its word count and status belong.
 4. **Remember the last mode** — one persisted flag beside `manuscriptExpanded`'s
    replacement, not per chapter.
 5. **Strip the Manuscript section out of `ChapterDetail`**: the section header,
@@ -126,3 +145,27 @@ Unrelated to this restructure, but do not let them fall off:
   because a stale modal was open.
 - SPECS §9 item 15, the 2px timeline card clip at half screen — pre-existing and
   still the author's call.
+
+---
+
+## 7. Estoria is not only a story map any more
+
+Adding a place to write changes what the product *is*, and the copy has not
+caught up. **This is a v3**, from a `0.1.0` that was never touched since the
+first commit; the build number keeps counting from where it is (it is the git
+commit count, so it carries on by itself).
+
+- `package.json` is already at **`3.0.0`**, with the description changed to
+  *"Estoria — map your story and write it."*
+- **Still to sweep:** nine places still describe Estoria as a story-mapping tool
+  and nothing else — `README.md`, `index.html`, `docs/SPECS.md` §1,
+  `src/lib/markdown.ts` (the export header and the AI import prompt) and
+  `src/lib/templates.ts`. The export and import strings are the careful ones:
+  the Android app reads the same files and the import prompt is a documented
+  format, so change the prose around them, not the field separators or the
+  schema they describe (see SPECS §3 "Conventions").
+- The `About` modal shows `v… · build N · sha · time` from
+  `window.__ESTORIA_BUILD__`, so it picks the new version up from
+  `package.json` with no further work.
+- **House style still applies to every new string**: no em dashes in anything the
+  user reads (SPECS §3).

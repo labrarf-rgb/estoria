@@ -1,9 +1,9 @@
 {
   "name": "estoria",
   "private": true,
-  "version": "0.1.0",
+  "version": "3.0.0",
   "type": "module",
-  "description": "Estoria — a visual story-mapping tool for novelists.",
+  "description": "Estoria — map your story and write it.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
