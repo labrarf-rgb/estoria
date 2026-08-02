@@ -14,7 +14,7 @@
 > git checkout feature/manuscript-mode
 > ```
 >
-> Everything described here is on **`feature/manuscript-mode`** — 22 commits,
+> Everything described here is on **`feature/manuscript-mode`** (28 commits),
 > **not merged, not pushed, not deployed**. `main` has none of it. Run the dev
 > server on a **separate port** so the branch's browser storage stays apart from
 > whatever you normally develop against (localStorage and IndexedDB are keyed by
@@ -27,6 +27,45 @@
 > There is a `.claude/launch.json` entry named `estoria-manuscript` that does
 > exactly this. Written 2026-08-02. Delete this file when the restructure lands,
 > folding what survives into [`SPECS.md`](SPECS.md) §4.
+
+---
+
+## 0. Start here
+
+### How to open the session
+
+```
+Read docs/manuscript-modal-build.md and follow it. Do §4 only, and settle §5 first.
+```
+
+**Scope it out loud, and scope it to one of these.** This file covers three
+separable jobs, and a session handed all of them will do the interesting one and
+leave the others half-done. Pick:
+
+- **`§4 only, settle §5 first`** — the modal restructure. The main event.
+- **`§8 only`** — the scale test. Worth doing *first* if you want the design
+  informed by real numbers, because it may change what §4 should build.
+- Anything in §6, which are small and independent.
+
+### What to read, and nothing else
+
+Context is the budget. Read this file, then:
+
+- [`SPECS.md`](SPECS.md) **§4** for what manuscript mode already does, and **§9
+  items 15-16** for the open backlog.
+- [`SESSIONS.md`](SESSIONS.md), the **2026-08-02 entry only**, if you need to
+  know why something is shaped the way it is.
+
+Do **not** read the whole of SPECS or the session log front to back. §3 below
+lists what is already built so you do not go looking for it, and
+`archives/manuscript-mode-brainstorm.md` holds rejected alternatives, which is
+only worth opening if a decision here looks arbitrary.
+
+### Before any code
+
+Everything is on `feature/manuscript-mode`, unmerged. Run on the isolated port
+(see the banner above) so the branch's browser storage stays apart from your
+everyday project.
 
 ---
 
@@ -148,33 +187,18 @@ Unrelated to this restructure, but do not let them fall off:
 
 ---
 
-## 7. Estoria is not only a story map any more
+## 7. Naming and version
 
-Adding a place to write changes what the product *is*, and the copy has not
-caught up. **This is a v3**, from a `0.1.0` that was never touched since the
-first commit; the build number keeps counting from where it is (it is the git
-commit count, so it carries on by itself).
+**Done, 2026-08-02.** The app is `v3.0.0` and is named for what it does now:
+*Estoria | Map and Write Your Story*, in the browser tab, the README, SPECS §1
+and the AI import prompt. The record, including the one edit that had to be made
+carefully and the two mentions deliberately left alone, is in
+[`archives/manuscript-mode-v3-repositioning.md`](archives/manuscript-mode-v3-repositioning.md).
 
-- `package.json` is already at **`3.0.0`**, with the description changed to
-  *"Estoria — map your story and write it."*
-- **Swept.** `index.html`'s `<title>` (which is what the browser tab shows, and
-  which now has a `meta description` beside it), `README.md`'s opening line,
-  `SPECS.md` §1, and the AI import prompt in `src/lib/markdown.ts`. That last one
-  was the careful edit: the Android app reads the same files and the prompt
-  documents a format, so **only the sentence describing the app changed** and the
-  schema, field separators and headings it specifies did not.
-- **Deliberately left:** the remaining hits name the `Story Mapping WebApp
-  Prototype/` folder, which is a real directory on disk and the design reference
-  (SPECS §1), and the source guides the templates came from
-  (`src/lib/templates.ts`). Renaming the folder is a separate job; misquoting the
-  guides would be wrong.
-- The `About` modal shows `v… · build N · sha · time` from
-  `window.__ESTORIA_BUILD__`, so it picks the new version up from
-  `package.json` with no further work.
-- **House style still applies to every new string**: no em dashes in anything the
-  user reads (SPECS §3).
-
----
+**What this means for new work here:** every user-facing string you add follows
+house style (SPECS §3) — no em dashes in labels, tooltips, empty states, confirm
+dialogs or exported text, and write the way a person talks rather than the way a
+manual does.
 
 ## 8. Scale: does this survive a real book collection?
 

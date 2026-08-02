@@ -117,9 +117,10 @@ estoria/
 ├─ docs/SESSIONS.md           # dated session log (history; §N refs point here)
 ├─ docs/archives/            # closed records — read for background, don't work from
 │  ├─ REVIEW-FINDINGS.md     #   3 code reviews + 1 task brief, all items closed
-│  └─ manuscript-mode-brainstorm.md  # why manuscript mode is shaped as it is:
-│                            #   the rejected alternatives, kept after the build
-│                            #   brief itself was folded into §4 and deleted
+│  ├─ manuscript-mode-brainstorm.md  # why manuscript mode is shaped as it is:
+│  │                         #   the rejected alternatives, kept after the build
+│  │                         #   brief itself was folded into §4 and deleted
+│  └─ manuscript-mode-v3-repositioning.md  # the v3 rename, closed
 ├─ Story Mapping WebApp Prototype/   # design reference (not built on)
 └─ src/
    ├─ main.tsx                # React root
