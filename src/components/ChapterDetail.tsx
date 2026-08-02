@@ -9,7 +9,7 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
+import { ManuscriptSheet, PullFromVersion } from "@/components/ManuscriptSheet";
 import { countWords, hasProse } from "@/lib/manuscript";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
@@ -80,10 +80,9 @@ export function ChapterDetail() {
   // persists: a planning session stays minimized and never sees prose, a
   // drafting session stays open and doesn't re-open the sheet per chapter.
   // The manuscript is an ordinary collapsible section like every other one in
-  // this modal, with its own Expand/Collapse for size — the same two controls
-  // the scene canvas has, rather than a mode of its own.
-  const manuscriptExpanded = useStore((s) => s.manuscriptExpanded);
-  const setManuscriptExpanded = useStore((s) => s.setManuscriptExpanded);
+  // this modal. Its Expand/Collapse is the *same* control the scene canvas has,
+  // not a second one: both grow their area and both widen the modal, so one
+  // flag drives both and the two buttons always agree.
   // `?? ` rather than a plain read: a store persisted before these two sections
   // existed has no key for them, and `undefined` would silently mean "open" —
   // which is the wrong default for the manuscript, whose whole point is that a
@@ -491,7 +490,7 @@ export function ChapterDetail() {
         ref={modalRef}
         onMouseDown={stop}
         className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-          expanded || manuscriptExpanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+          expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
         }`}
       >
         {/* Header */}
@@ -1126,20 +1125,7 @@ export function ChapterDetail() {
                   if (manuscriptCollapsed) exitMoveMode();
                   toggleSection("manuscript");
                 }}
-                right={
-                  manuscriptOpen ? (
-                    <div className="flex items-center gap-[8px]">
-                      <SheetViewToggle view={sheetView} onChange={setSheetView} />
-                      <button
-                        onClick={() => setManuscriptExpanded(!manuscriptExpanded)}
-                        className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                        title={manuscriptExpanded ? "Shrink the writing area" : "Expand the writing area"}
-                      >
-                        {manuscriptExpanded ? "Collapse" : "Expand"}
-                      </button>
-                    </div>
-                  ) : undefined
-                }
+                right={undefined}
               />
             </div>
           );
@@ -1153,8 +1139,10 @@ export function ChapterDetail() {
               ch={ch}
               scroller={modalRef}
               stickyTop={headerH}
-              expanded={manuscriptExpanded}
+              expanded={expanded}
               view={sheetView}
+              onView={setSheetView}
+              onExpanded={setSceneFlowExpanded}
             />
           </>
         )}

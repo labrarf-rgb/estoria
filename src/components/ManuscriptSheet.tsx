@@ -33,6 +33,8 @@ export function ManuscriptSheet({
   stickyTop,
   expanded,
   view,
+  onView,
+  onExpanded,
 }: {
   ch: Chapter;
   /** The chapter modal's scroll container — see `stickyTop`. */
@@ -43,6 +45,8 @@ export function ManuscriptSheet({
   expanded: boolean;
   /** Edit (the textarea) or View (the same markdown, rendered). */
   view: "edit" | "read";
+  onView: (v: "edit" | "read") => void;
+  onExpanded: (v: boolean) => void;
 }) {
   const setManuscript = useStore((s) => s.setManuscript);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -105,6 +109,10 @@ export function ManuscriptSheet({
         className="sticky z-[1] shrink-0 rounded-t-xl border-b border-rule bg-bg"
         style={{ top: stickyTop }}
       >
+        {/* The manuscript's own controls live here, inside the sticky block,
+            rather than up in the section header — scroll into a long chapter
+            and the header goes away, taking Edit/View and the size control with
+            it, which is exactly when you want them. */}
         <div className="flex items-center gap-[8px] px-[16px] pb-[6px] pt-[10px]">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-faint">
             Scene flow
@@ -113,6 +121,18 @@ export function ManuscriptSheet({
             {ch.scenes.length} {ch.scenes.length === 1 ? "beat" : "beats"}
           </span>
           <div className="flex-1" />
+          <SheetViewToggle view={view} onChange={onView} />
+          <button
+            onClick={() => onExpanded(!expanded)}
+            className="rounded-lg border border-rule bg-card px-[10px] py-[4px] text-[11.5px] font-medium text-ink hover:border-faint"
+            title={
+              expanded
+                ? "Shrink the writing area and the scene canvas"
+                : "Expand the writing area and the scene canvas"
+            }
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
           {confirmed && (
             <span
               className="rounded-full px-[8px] py-[1px] text-[10px] font-semibold uppercase tracking-wide"

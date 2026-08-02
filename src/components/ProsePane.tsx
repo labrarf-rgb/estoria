@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { inlineTokens, type InlineToken } from "@/lib/inline";
 import { parseBlocks, taskItem, type Block } from "@/lib/manuscript";
@@ -21,9 +21,15 @@ export function ProseChapter({
   ch,
   width,
   maxWidth = 660,
+  onOpen,
 }: {
   ch: Chapter;
   width?: number;
+  /**
+   * Given by the timeline: click the prose to go and write it. Omitted by the
+   * editor's own View mode, which is already in the chapter.
+   */
+  onOpen?: () => void;
   /**
    * The reading measure. 660px suits the timeline, where the prose is one column
    * inside a much wider pane. The editor's own View mode passes `"none"`, because
@@ -59,8 +65,32 @@ export function ProseChapter({
     );
   }
 
+  /**
+   * A press that doesn't move is a click; a press that moves is a text
+   * selection. The same rule the board uses for cards, and the reason the prose
+   * can be both a way in and something you can still select and copy out of.
+   */
+  const press = useRef<{ x: number; y: number } | null>(null);
+
   return (
-    <div data-print-chapter className="mx-auto" style={{ width, maxWidth }}>
+    <div
+      data-print-chapter
+      className={`mx-auto ${onOpen ? "cursor-pointer" : ""}`}
+      style={{ width, maxWidth }}
+      title={onOpen ? `Open chapter ${ch.num} and write` : undefined}
+      onMouseDown={onOpen ? (e) => (press.current = { x: e.clientX, y: e.clientY }) : undefined}
+      onMouseUp={
+        onOpen
+          ? (e) => {
+              const p = press.current;
+              press.current = null;
+              if (!p) return;
+              if (Math.abs(e.clientX - p.x) > 4 || Math.abs(e.clientY - p.y) > 4) return;
+              onOpen();
+            }
+          : undefined
+      }
+    >
       {blocks.map((b, i) => (
         <BlockView key={i} block={b} />
       ))}

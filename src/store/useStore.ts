@@ -112,13 +112,17 @@ interface UiState {
   refView: RefView;
   /** Tall/short state per expandable-textarea surface (persisted, global). */
   textareaExpanded: Record<TextareaKey, boolean>;
-  /** Chapter-modal scene-flow canvas size (persisted). */
-  sceneFlowExpanded: boolean;
   /**
-   * Sheet size, the same two-state shape the scene canvas has: the writing area
-   * grows, it does not become a separate mode. Persisted.
+   * How much room the chapter modal gives its two working areas — the scene
+   * canvas and the manuscript sheet — and, with it, how wide the modal is.
+   *
+   * **One flag for both**, because both `Expand` buttons widen the same modal:
+   * two independent size toggles with one shared consequence meant expanding
+   * the manuscript silently gave the canvas more room while its own control
+   * still read "Expand". Named for the canvas because that is where it started
+   * and the name is what the persisted preference is keyed on.
    */
-  manuscriptExpanded: boolean;
+  sceneFlowExpanded: boolean;
   /**
    * The prose as it was before the last reconciliation, for a single undo.
    * `previous` is `undefined` when the chapter had never been written in — that
@@ -217,7 +221,6 @@ interface StoreState extends UiState {
   /** Refresh `words` from the prose. Debounced by its caller, not by itself. */
   recomputeWords: (chId: string) => void;
   undoManuscript: () => void;
-  setManuscriptExpanded: (expanded: boolean) => void;
 
   // ---- chapter refs (pure links into the shared asset pool) ----
   addChapterRef: (chId: string, kind: RefKind, refId?: string) => void;
@@ -546,7 +549,6 @@ const initialUi: UiState = {
   refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
-  manuscriptExpanded: false,
   manuscriptUndo: null,
   panelExpanded: false,
 };
@@ -1199,7 +1201,6 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      setManuscriptExpanded: (expanded) => set({ manuscriptExpanded: expanded }),
 
       // ---- chapter refs (pure links into the shared asset pool) ----
       // Adding a note/image creates a shared Asset first, then pins a link to it
@@ -2011,7 +2012,6 @@ export const useStore = create<StoreState>()(
         refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
-        manuscriptExpanded: s.manuscriptExpanded,
         panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed
