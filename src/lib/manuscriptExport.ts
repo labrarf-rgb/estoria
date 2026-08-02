@@ -1,5 +1,5 @@
 import type { Chapter, StoryDoc } from "@/types";
-import { countWords, parseBlocks, type Block } from "@/lib/manuscript";
+import { countWords, parseBlocks, taskItem, type Block } from "@/lib/manuscript";
 import { inlineTokens } from "@/lib/inline";
 import { zipStore } from "@/lib/zip";
 
@@ -80,10 +80,9 @@ const runsFor = (line: string): string =>
   inlineTokens(line)
     .filter((t) => t.text)
     .map((t) => {
-      const rPr =
-        t.bold || t.italic
-          ? `<w:rPr>${t.bold ? "<w:b/>" : ""}${t.italic ? "<w:i/>" : ""}</w:rPr>`
-          : "";
+      const marks =
+        (t.bold ? "<w:b/>" : "") + (t.italic ? "<w:i/>" : "") + (t.strike ? "<w:strike/>" : "");
+      const rPr = marks ? `<w:rPr>${marks}</w:rPr>` : "";
       return `<w:r>${rPr}<w:t xml:space="preserve">${esc(t.text)}</w:t></w:r>`;
     })
     .join("");
@@ -126,7 +125,11 @@ function docxBlock(b: Block, indent: boolean): string[] {
     case "quote":
       return [para(runsFor(b.text), { indent: true })];
     case "ul":
-      return b.items.map((it) => para(runsFor(BULLET_CHAR + " " + it), { indent: true }));
+      return b.items.map((it) => {
+        const task = taskItem(it);
+        const mark = task ? (task.done ? "\u2612 " : "\u2610 ") : BULLET_CHAR + " ";
+        return para(runsFor(mark + (task ? task.text : it)), { indent: true });
+      });
     case "ol":
       return b.items.map((it, i) => para(runsFor(String(i + 1) + ". " + it), { indent: true }));
     default:

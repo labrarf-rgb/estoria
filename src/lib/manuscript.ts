@@ -94,6 +94,16 @@ export function parseBlocks(text: string): Block[] {
 
 
 /**
+ * A GFM task-list item, if that is what this bullet is. Read-only wherever it
+ * is shown: the markdown you typed is the source of truth, so a checkbox here
+ * reports the text rather than offering to rewrite it.
+ */
+export function taskItem(item: string): { done: boolean; text: string } | null {
+  const m = item.match(/^\[([ xX])\]\s+(.*)$/);
+  return m ? { done: m[1].toLowerCase() === "x", text: m[2] } : null;
+}
+
+/**
  * Prose split into paragraphs on blank lines. What reading mode lays out, and
  * what the exporters walk.
  */

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { inlineTokens, type InlineToken } from "@/lib/inline";
-import { parseBlocks, type Block } from "@/lib/manuscript";
+import { parseBlocks, taskItem, type Block } from "@/lib/manuscript";
 import type { Chapter } from "@/types";
 
 /**
@@ -73,7 +73,9 @@ function BlockView({ block }: { block: Block }) {
     case "hr":
       return <hr className="my-[26px] border-0 border-t" style={{ borderColor: "var(--rule)" }} />;
     case "h": {
-      const size = block.level === 1 ? 22 : block.level === 2 ? 18.5 : 16;
+      // Six real sizes, not three: `####` parsed correctly but looked exactly
+      // like `###`, which makes a hierarchy you cannot see.
+      const size = [22, 19, 17, 15.5, 14.5, 13.5][block.level - 1] ?? 15.5;
       return (
         <div
           className="mb-[10px] mt-[22px] font-serif font-semibold text-ink"
@@ -94,12 +96,37 @@ function BlockView({ block }: { block: Block }) {
       );
     case "ul":
       return (
-        <ul className="mb-[14px] list-disc pl-[24px] font-serif text-[15.5px] leading-[1.85] text-ink">
-          {block.items.map((it, i) => (
-            <li key={i} className="mb-[4px]">
-              <Inline text={it} />
-            </li>
-          ))}
+        <ul
+          className={`mb-[14px] pl-[24px] font-serif text-[15.5px] leading-[1.85] text-ink ${
+            block.items.every((it) => taskItem(it)) ? "list-none pl-[6px]" : "list-disc"
+          }`}
+        >
+          {block.items.map((it, i) => {
+            const task = taskItem(it);
+            return (
+              <li key={i} className="mb-[4px]">
+                {task ? (
+                  <span className="flex items-start gap-[8px]">
+                    <span
+                      aria-hidden
+                      className="mt-[6px] flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border text-[9px] font-bold leading-none text-bg"
+                      style={{
+                        borderColor: task.done ? "var(--therefore)" : "var(--faint)",
+                        background: task.done ? "var(--therefore)" : "transparent",
+                      }}
+                    >
+                      {task.done ? "✓" : ""}
+                    </span>
+                    <span className={task.done ? "text-soft line-through" : undefined}>
+                      <Inline text={task.text} />
+                    </span>
+                  </span>
+                ) : (
+                  <Inline text={it} />
+                )}
+              </li>
+            );
+          })}
         </ul>
       );
     case "ol":
@@ -133,6 +160,7 @@ function Inline({ text }: { text: string }) {
             </code>
           );
         let node: React.ReactNode = t.text;
+        if (t.strike) node = <s>{node}</s>;
         if (t.italic) node = <em>{node}</em>;
         if (t.bold) node = <strong>{node}</strong>;
         return <span key={i}>{node}</span>;
