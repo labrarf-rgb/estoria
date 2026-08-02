@@ -9,7 +9,7 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
-import { ManuscriptSheet, PullFromVersion } from "@/components/ManuscriptSheet";
+import { ManuscriptSheet, PullFromVersion, SheetViewToggle } from "@/components/ManuscriptSheet";
 import { countWords, hasProse } from "@/lib/manuscript";
 import { type ChapterStatus, type ConnType, type Vec2 } from "@/types";
 
@@ -113,6 +113,18 @@ export function ChapterDetail() {
   const modalRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerH, setHeaderH] = useState(0);
+  // The manuscript's own header sticks under the modal's, and the beat guide
+  // under that — so each needs to know the height of what it sits below.
+  const manHeaderRef = useRef<HTMLDivElement>(null);
+  const [manHeaderH, setManHeaderH] = useState(0);
+  useEffect(() => {
+    const el = manHeaderRef.current;
+    if (!el) return setManHeaderH(0);
+    const ro = new ResizeObserver(() => setManHeaderH(el.offsetHeight));
+    ro.observe(el);
+    setManHeaderH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [openCh, manuscriptOpen]);
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
@@ -1116,7 +1128,16 @@ export function ChapterDetail() {
         {(() => {
           const proseWords = ch.manuscript ? countWords(ch.manuscript) : 0;
           return (
-            <div className="px-[26px] pt-[18px]">
+            <div
+              ref={manHeaderRef}
+              // Sticky, so the controls in line with the label stay reachable
+              // however far into a chapter you scroll — the beat guide below
+              // then pins under this rather than under the modal header.
+              className={`bg-panel px-[26px] pt-[18px] ${
+                manuscriptOpen ? "sticky z-[3] pb-[10px]" : ""
+              }`}
+              style={manuscriptOpen ? { top: headerH } : undefined}
+            >
               <SectionHeader
                 label="Manuscript"
                 count={proseWords ? `${proseWords.toLocaleString()} words` : undefined}
@@ -1125,7 +1146,24 @@ export function ChapterDetail() {
                   if (manuscriptCollapsed) exitMoveMode();
                   toggleSection("manuscript");
                 }}
-                right={undefined}
+                right={
+                  manuscriptOpen ? (
+                    <div className="flex items-center gap-[8px]">
+                      <SheetViewToggle view={sheetView} onChange={setSheetView} />
+                      <button
+                        onClick={() => setSceneFlowExpanded(!expanded)}
+                        className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                        title={
+                          expanded
+                            ? "Shrink the writing area and the scene canvas"
+                            : "Expand the writing area and the scene canvas"
+                        }
+                      >
+                        {expanded ? "Collapse" : "Expand"}
+                      </button>
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
           );
@@ -1138,11 +1176,9 @@ export function ChapterDetail() {
             <ManuscriptSheet
               ch={ch}
               scroller={modalRef}
-              stickyTop={headerH}
+              stickyTop={headerH + manHeaderH}
               expanded={expanded}
               view={sheetView}
-              onView={setSheetView}
-              onExpanded={setSceneFlowExpanded}
             />
           </>
         )}
