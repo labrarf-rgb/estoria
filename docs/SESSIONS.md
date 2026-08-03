@@ -3523,3 +3523,40 @@ preview pane is hidden, so the window was driven by setting `scrollTop` and
 dispatching `scroll` by hand. That exercises the app's real handler, but it
 means **the smooth-scroll landing after a rail click was never watched with
 eyes** — the geometry is verified, the animation is not. Worth one look.
+
+---
+
+## 2026-08-02 (h) — Merged and shipped
+
+`feature/manuscript-mode` merged into `main` as a **fast-forward, 34 commits**,
+pushed, and deployed. `npm run deploy` verified prod is serving the exact commit:
+**`a5e606f` live at https://www.labrarf.com/estoria** (four polls; GitHub Pages
+served the previous build for ~40s first, which is normal).
+
+The branch carried: manuscript mode as its own modal, reference material tabbed,
+bulk scene and chapter moves, the toolbar scoped to the board, the timeline card
+height, the scale test, and the three perf fixes that came out of it.
+
+### Spec drift found on the way out, and fixed
+
+§4's "Read the book as prose" row still described the timeline's manuscript pane
+as if every chapter rendered. It has been windowed since (g), and that row is
+where someone would look for how the pane behaves — the note about it living
+only in §9 item 17 would have read as a backlog entry rather than a description
+of the shipped thing. The row now carries the windowing, the header-plus-spacer
+rule, and the `beforeprint` / `flushSync` print path.
+
+Everything else in §4 was already current: the two-modal rows (225-226), the
+tabbed reference material (237), multi-scene and multi-chapter moves (238-239),
+and the board-only toolbar (241) all landed with their commits.
+
+### Still open, none of it blocking
+
+- **SPECS §9 items 11, 12, 13** — untouched by this branch: per-book markdown
+  export, cursor-anchored wheel zoom, images inline as data URLs.
+- **`ExportModal` counts every chapter on open** (78ms at 30 chapters). The
+  leftover of item 19, and the third instance of the same pattern — `countWords`
+  in a render path is almost always wrong, because `words` is its cache.
+- **One thing needs eyes**: the smooth-scroll landing after a rail click in the
+  windowed pane. `requestAnimationFrame` is suspended while the preview pane is
+  hidden, so the geometry was verified but the animation was never watched.
