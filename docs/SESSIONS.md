@@ -3459,3 +3459,67 @@ app's worst number and the only real remaining limit.**
 - **Memory: 125MB heap** with the 42.4MB document loaded. Fine.
 - **Startup: 108ms**, `loadAllProse` 165ms. Fine.
 - **Timeline manuscript pane: ~1.2s at 300k words in one version.** The limit.
+
+---
+
+## 2026-08-02 (g) — Windowing the timeline's manuscript pane
+
+The last real limit, and the one the previous entry called the app's worst
+number: 1,242ms of frozen UI in production to open the timeline's manuscript
+pane, on a single 300k-word book. Fixed by rendering only the chapters near the
+one you are reading.
+
+| | Before | After |
+|---|---|---|
+| Blocked main thread, **production** | 1,242ms | **0** (no long task at all) |
+| Blocked, dev | 415ms | **91ms** |
+| DOM nodes | 14,602 | **1,748** |
+| Chapters rendered | 30 | **3–5** |
+
+### What made it more than a `slice()`
+
+Three things depended on every chapter being in the DOM, and each needed
+handling rather than accepting.
+
+**`Cmd+P` prints this view.** It is not a separate exporter — the print
+stylesheet *is* the PDF route (SPECS §4), so a windowed page would print a book
+with holes in it. `beforeprint` renders every chapter, and **`flushSync` is what
+makes that land before the print dialog snapshots the page** — a plain
+`setState` would not have flushed in time. `afterprint` restores the window.
+Verified in a production build: 3 chapters → 30 in 320ms, then back to 3.
+
+**The rail's two-way sync and `jumpTo` read each group's offset.** So every
+chapter's *header* renders whether or not its prose does, and the spacer beneath
+it reserves the chapter's height. `scrollHeight` measured 525,539px before and
+after scrolling the whole book — the geometry does not move.
+
+**`jumpTo` had a latent ordering bug once the window existed.** It measured the
+target's offset and *then* set `activeId` — but the window moves with `activeId`,
+so it was computing a scroll target against spacer heights that were one render
+away from changing, and would land short of the chapter you clicked. It now
+`flushSync`es the state first and measures after.
+
+### Spacer heights
+
+Measured once a chapter has been on screen; before that, `words × px-per-word`
+calibrated from whatever *has* been measured at the current pane width, so the
+estimate improves as you read. Cold error over 21 never-rendered chapters:
+**0.2%** — 735px in 367,000. That surfaces as slight scrollbar drift that
+self-corrects, never as a mis-aimed jump, because the jump measures post-render.
+
+### One more instance of the item 14 bug
+
+The pane's per-chapter header was calling `countWords(c.manuscript)` on every
+render — a regex sweep of every manuscript in the book, exactly the Toolbar
+shape. That was most of the 290ms still showing after the first windowing pass;
+with the cached `c.words` instead it dropped to 91ms. **Worth searching for this
+pattern rather than waiting to trip over it:** `countWords` in a render path is
+almost always wrong, because `words` exists as its cache.
+
+### Verification note
+
+Scroll events do not fire and `requestAnimationFrame` does not run while the
+preview pane is hidden, so the window was driven by setting `scrollTop` and
+dispatching `scroll` by hand. That exercises the app's real handler, but it
+means **the smooth-scroll landing after a rail click was never watched with
+eyes** — the geometry is verified, the animation is not. Worth one look.

@@ -910,21 +910,47 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     screen** (Session 56) — a clipped descender on the last line, not lost words.
     Measured at a 760px window: 4 of 421 scenes, worst 2px.
 
-17. ⚠️ **The timeline's manuscript pane renders every chapter's prose at once —
-    and it is now the app's worst number, on an ordinary book.** One book's
-    active version (30 chapters, 301.7k words): **14,602 DOM nodes, 4,399 prose
-    blocks, 1.67M characters of text**, and **1,242ms of blocked main thread**
-    in a **production** build to switch into the pane (dev measured 415–478ms;
-    production is slower here because it gets further, faster, before yielding).
+17. ✅ **Fixed 2026-08-02 (g) — the pane is windowed.** Only the chapter you are
+    reading and its two neighbours either side render their prose; the rest keep
+    their header and a spacer of their own height.
 
-    **Read the scope carefully.** This is driven by the **active version's**
-    prose, not by total project size — so it is *not* an extreme-scale problem.
-    301.7k words is one long novel, the length the feature is meant to serve. A
-    writer with a single epic-fantasy-length book and no series at all hits this.
+    | | Before | After |
+    |---|---|---|
+    | Blocked main thread, **production** | 1,242ms | **0** (no long task) |
+    | Blocked main thread, dev | 415ms | **91ms** |
+    | DOM nodes | 14,602 | **1,748** |
+    | Chapters rendered | 30 | **3–5** |
 
-    Fix: window it, or render only the chapters near the viewport. Predicted by
-    the build brief §8 item 5; item 14's fix does not touch it, since the cost is
-    genuinely building the nodes.
+    **The three things windowing had to not break, and how:**
+
+    - **`Cmd+P` prints this view — it *is* the PDF export**, so a windowed page
+      would print a book with holes in it. `beforeprint` renders every chapter
+      and `flushSync` is what lands it before the dialog snapshots the page
+      (320ms for 30 chapters); `afterprint` puts the window back.
+    - **The rail's two-way sync and `jumpTo` read each group's offset**, so every
+      chapter's header renders whether or not its prose does, and the spacer
+      reserves the right height.
+    - **`jumpTo` now `flushSync`es `activeId` before measuring.** The window
+      moves with `activeId`, so measuring first would compute the scroll target
+      against spacer heights that are one render away from changing, and land
+      short of the chapter you clicked.
+
+    Spacer heights are measured once a chapter has been on screen, and estimated
+    from `words × px-per-word` before that — calibrated from whatever *has* been
+    measured at this pane width, so it improves as you read. Cold estimate error
+    over 21 unrendered chapters: **0.2%** (735px in 367,000), which shows up as
+    slight scrollbar drift that self-corrects, never as a mis-aimed jump.
+
+    Also fixed in the same pass: the pane's per-chapter header was calling
+    `countWords` on every render — the same shape as the item 14 Toolbar bug, a
+    regex sweep of every manuscript in the book. It reads the cached `c.words`
+    now, which is what that cache is for.
+
+    *Original finding:* the pane rendered every chapter's prose at once — 14,602
+    DOM nodes, 4,399 prose blocks, 1.67M characters, 1,242ms blocked in
+    production. Predicted by the build brief §8 item 5. Worth remembering that
+    the scope was **one book's active version at 301.7k words** — one long novel,
+    not an extreme document — so this was never an extreme-scale problem.
 
 18. **`writePad` fails silently when localStorage is full.** The crash pad
     catches `QuotaExceededError` and ignores it, so the symptom is the safety

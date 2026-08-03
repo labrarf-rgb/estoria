@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useStore } from "@/store/useStore";
 import { sceneGrid, sceneMetrics, type SceneBox, type SceneFill } from "@/lib/layout";
 import { SCENE_TEXT_MAX, isOverCap, sceneSpan } from "@/lib/sceneFit";
 import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
-import { countWords, wordsMeta } from "@/lib/manuscript";
+import { wordsMeta } from "@/lib/manuscript";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType, Vec2 } from "@/types";
@@ -147,6 +148,40 @@ export function Timeline() {
 
   const [pane, setPane] = useState({ w: 0, h: 0 });
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  /**
+   * Prose windowing (SPECS §9 item 17).
+   *
+   * Rendering every chapter's prose at once put 14,602 nodes and 1.67M
+   * characters in the DOM and blocked the main thread for **1.2 seconds** on one
+   * 300k-word book — an ordinary novel, not an extreme document. Only the
+   * chapters near the one you are reading are rendered; the rest keep their
+   * header and a spacer of the right height.
+   *
+   * **The header always renders, for every chapter.** The rail's two-way sync
+   * and `jumpTo` both read each group's offset (`groupStart`), so the groups
+   * have to exist and be in the right place whether or not their prose does.
+   */
+  const PROSE_WINDOW = 2;
+  const proseRefs = useRef(new Map<string, HTMLDivElement>());
+  /** Measured prose heights, so a spacer replaces a chapter with its own size. */
+  const proseH = useRef(new Map<string, number>());
+  /**
+   * `Cmd+P` prints this view — it *is* the PDF export, so a windowed page would
+   * print a book with holes in it. `beforeprint` renders every chapter, and
+   * `flushSync` is what makes that land before the dialog snapshots the page.
+   */
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    const on = () => flushSync(() => setPrinting(true));
+    const off = () => setPrinting(false);
+    window.addEventListener("beforeprint", on);
+    window.addEventListener("afterprint", off);
+    return () => {
+      window.removeEventListener("beforeprint", on);
+      window.removeEventListener("afterprint", off);
+    };
+  }, []);
   // Card boxes for the rail's link curves. The rail is a flow layout (act bands
   // wrapping cards), so the only way to know where a card landed is to measure
   // it after render, relative to the rail's own content box.
@@ -228,10 +263,18 @@ export function Timeline() {
 
   const jumpTo = (id: string) => {
     const el = paneRef.current;
-    const g = groupRefs.current.get(id);
-    if (!el || !g) return;
+    if (!el || !groupRefs.current.get(id)) return;
     suppressUntil.current = Date.now() + 800;
-    setActiveId(id);
+    /**
+     * `flushSync`, because the prose window moves with `activeId` and the
+     * chapters around the target are about to stop being spacers. Measuring
+     * first would compute the scroll target against heights that are one render
+     * away from changing, and land short of the chapter you clicked. Rendering
+     * before measuring is what keeps the jump exact.
+     */
+    flushSync(() => setActiveId(id));
+    const g = groupRefs.current.get(id);
+    if (!g) return;
     const start = groupStart(g);
     if (vertical) el.scrollTo({ top: start - 2, behavior: "smooth" });
     else el.scrollTo({ left: start - 22, behavior: "smooth" });
@@ -307,6 +350,50 @@ export function Timeline() {
     }
     return out;
   }, [doc.chapters, availW, availH, fill]);
+
+  /** Which chapters render their prose: the one you are reading, and its neighbours. */
+  const proseShown = useMemo(() => {
+    if (!prose) return null; // scenes mode renders as it always has
+    if (printing) return null; // printing wants the whole book
+    const i = Math.max(0, doc.chapters.findIndex((c) => c.id === activeId));
+    const lo = Math.max(0, i - PROSE_WINDOW);
+    const hi = Math.min(doc.chapters.length - 1, i + PROSE_WINDOW);
+    return new Set(doc.chapters.slice(lo, hi + 1).map((c) => c.id));
+  }, [prose, printing, doc.chapters, activeId]);
+
+  // Record what a rendered chapter actually measured, so its spacer is its own
+  // height rather than a guess the next time it scrolls out.
+  useLayoutEffect(() => {
+    if (!prose || !vertical) return;
+    for (const [id, el] of proseRefs.current) {
+      const h = el.offsetHeight;
+      if (h > 0) proseH.current.set(id, h);
+    }
+  });
+
+  /**
+   * A spacer's height. Measured if this chapter has ever been on screen;
+   * otherwise `words × px-per-word`, calibrated from whatever *has* been
+   * measured at this pane width so the estimate improves as you read. The
+   * fallback constant only ever applies before the first chapter renders.
+   */
+  const estimateProseH = useCallback(
+    (c: Chapter): number => {
+      const known = proseH.current.get(c.id);
+      if (known) return known;
+      let px = 0;
+      let words = 0;
+      for (const [id, h] of proseH.current) {
+        const ch = doc.chapters.find((x) => x.id === id);
+        if (!ch?.manuscript) continue;
+        px += h;
+        words += ch.words || 1;
+      }
+      const perWord = words > 0 ? px / words : 2.2;
+      return Math.max(120, Math.round((c.words || 0) * perWord));
+    },
+    [doc.chapters]
+  );
 
   return (
     <div className={`flex min-h-0 flex-1 ${vertical ? "flex-row" : "flex-col"}`}>
@@ -483,14 +570,42 @@ export function Timeline() {
                     Act {roman(c.act)}
                   </span>
                   <span className="flex-none font-mono text-[10.5px] font-medium text-faint">
+                    {/* The cached `words`, not a fresh count: this header renders
+                        once per chapter, so counting here was a regex sweep of
+                        every manuscript in the book on every render — the same
+                        shape as the Toolbar bug in SPECS §9 item 14. `words` is
+                        maintained as a cache of the prose for exactly this. Zero
+                        when nothing is written, since `words` never auto-zeroes
+                        and would otherwise show a planning estimate as if it
+                        were prose. */}
                     {prose
-                      ? `${countWords(c.manuscript ?? "").toLocaleString()} words`
+                      ? `${(c.manuscript ? c.words : 0).toLocaleString()} words`
                       : `${c.scenes.length} ${c.scenes.length === 1 ? "scene" : "scenes"}`}
                   </span>
                 </div>
 
                 {prose ? (
+                  proseShown && !proseShown.has(c.id) ? (
+                    /* Out of the window: a spacer of this chapter's own height,
+                       so the scrollbar and every `groupStart` above and below it
+                       stay where they were. Marked `data-print-skip` as belt and
+                       braces — printing renders the real prose instead. */
+                    <div
+                      data-print-skip
+                      aria-hidden
+                      className={vertical ? "" : "mb-[18px] min-h-0 flex-1"}
+                      style={
+                        vertical
+                          ? { height: estimateProseH(c) }
+                          : { width: PROSE_COL }
+                      }
+                    />
+                  ) : (
                   <div
+                    ref={(n) => {
+                      if (n) proseRefs.current.set(c.id, n);
+                      else proseRefs.current.delete(c.id);
+                    }}
                     className={
                       vertical
                         ? "pb-[26px] pr-[clamp(8px,3%,48px)] pt-[4px]"
@@ -515,6 +630,7 @@ export function Timeline() {
                       }}
                     />
                   </div>
+                  )
                 ) : (
                 <div
                   className={`relative overflow-hidden rounded-xl border border-rule ${
