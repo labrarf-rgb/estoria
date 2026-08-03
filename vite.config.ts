@@ -89,6 +89,14 @@ export default defineConfig(({ mode }) => {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
     // PORT lets a harness assign a free port; default stays 5173 for plain `npm run dev`.
-    server: { port: Number(process.env.PORT) || 5173, open: !process.env.PORT },
+    server: {
+      port: Number(process.env.PORT) || 5173,
+      open: !process.env.PORT,
+      // Dev only. Unlocks the JS Self-Profiling API (`new Profiler(...)`) in
+      // Chrome, which is how the per-keystroke cost in SPECS §9 item 14 was
+      // attributed. Costs nothing when unused and never reaches production —
+      // this block configures the dev server only.
+      headers: { "Document-Policy": "js-profiling" },
+    },
   };
 });

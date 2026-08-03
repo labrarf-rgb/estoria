@@ -793,7 +793,35 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     every autosave/export and is the main localStorage-quota risk. Plan: store
     image blobs separately (IndexedDB locally / own Drive files later),
     reference by id. Coordinate with the Drive adapter design (§8).
-14. ⚠️ **Perf — no longer cosmetic. Measured 2026-08-02 (d); the top scale
+14. ✅ **Fixed 2026-08-02 (f) — one line, found with a profiler.** The cause was
+    `activeProseWords` in [`Toolbar.tsx`](../src/components/Toolbar.tsx): a
+    `reduce` of `countWords` over **every chapter's manuscript**, computed on
+    every render of a component that is always mounted, to answer the yes/no
+    question "would forking copy anything?". On a 300k-word book that is a regex
+    sweep of 1.7M characters per keystroke. It is now a `some`, which stops at
+    the first chapter with prose.
+
+    **Measured on the 42.4MB / 7.5M-word fixture:**
+
+    | | Before | After |
+    |---|---|---|
+    | Scene beat, dev build | 52.2ms | **7.3ms** |
+    | Prose field, dev build | 58.2ms | **12.9ms** |
+    | Scene beat, **production** | — | **3.2ms** |
+    | Prose field (56k-char chapter), **production**, warm | — | **7.9ms** |
+
+    **The document-size dependence is gone**: 7.3ms at 42MB now matches 7.0ms at
+    6.5MB. The whole table below was one unmemoized reduce.
+
+    Two notes for whoever reads the numbers. Everything before this was measured
+    on a **dev build**, where React's `jsx-dev-runtime` was 41.5% of the profile;
+    production is faster again. And a burst measured immediately after switching
+    into manuscript mode reads ~40ms from one-time warm-up — re-measure warm.
+
+    *The investigation below is kept because the ruled-out list is the useful
+    part: it is what stops the next person re-deriving it.*
+
+    ⚠️ **Was: perf — no longer cosmetic. Measured 2026-08-02 (d); the top scale
     problem. Cause NOT yet identified — do not start fixing from this item's
     original prescription.**
 
@@ -882,14 +910,21 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     screen** (Session 56) — a clipped descender on the last line, not lost words.
     Measured at a 760px window: 4 of 421 scenes, worst 2px.
 
-17. **The timeline's manuscript pane renders every chapter's prose at once.**
-    Measured 2026-08-02 (d) on one book's active version (30 chapters, 301.7k
-    words): **14,602 DOM nodes, 4,399 prose blocks, 1.67M characters of text**,
-    and **478ms of blocked main thread** to switch into the pane (189ms to
-    switch out). It works, but half a second of frozen UI is the worst single
-    number in the scale test. Fix: window it, or render only the chapters near
-    the viewport. Predicted by the build brief §8 item 5, now confirmed with
-    numbers.
+17. ⚠️ **The timeline's manuscript pane renders every chapter's prose at once —
+    and it is now the app's worst number, on an ordinary book.** One book's
+    active version (30 chapters, 301.7k words): **14,602 DOM nodes, 4,399 prose
+    blocks, 1.67M characters of text**, and **1,242ms of blocked main thread**
+    in a **production** build to switch into the pane (dev measured 415–478ms;
+    production is slower here because it gets further, faster, before yielding).
+
+    **Read the scope carefully.** This is driven by the **active version's**
+    prose, not by total project size — so it is *not* an extreme-scale problem.
+    301.7k words is one long novel, the length the feature is meant to serve. A
+    writer with a single epic-fantasy-length book and no series at all hits this.
+
+    Fix: window it, or render only the chapters near the viewport. Predicted by
+    the build brief §8 item 5; item 14's fix does not touch it, since the cost is
+    genuinely building the nodes.
 
 18. **`writePad` fails silently when localStorage is full.** The crash pad
     catches `QuotaExceededError` and ignores it, so the symptom is the safety
@@ -901,8 +936,9 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     failing quietly. Worth re-measuring on Safari and Firefox, which cap
     localStorage far lower and where the pad still runs.
 
-19. **`countWords` runs unmemoized in `ManuscriptModal`'s render** (3.3ms on a
-    10k-word chapter, on every keystroke). Introduced 2026-08-02 (c) with the
-    modal; `useMemo` on the prose is the whole fix. Small next to item 14, and
-    in the same code path, so fix them together. `ExportModal` has the same
-    shape at a different cadence: **78ms** to count 30 chapters when it opens.
+19. ✅ **Fixed 2026-08-02 (f)** — `countWords` in `ManuscriptModal`'s render is
+    now behind `useMemo`. *Original finding:* it ran unmemoized (3.3ms on a
+    10k-word chapter, on every keystroke), introduced 2026-08-02 (c) with the
+    modal. Still open in the same shape but at a much rarer cadence:
+    **`ExportModal` takes 78ms** to count 30 chapters when it opens, and
+    `Timeline.tsx` counts per chapter in its rail render.

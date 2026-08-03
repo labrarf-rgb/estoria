@@ -3371,3 +3371,91 @@ this session came from that and was discarded. The measurement that holds is a
 doc-backed field: a scene beat, or the prose textarea. And measure like against
 like — the series-map tree (5 book cards) and the board tree (30 chapter cards)
 are not comparable surfaces.
+
+---
+
+## 2026-08-02 (f) — The profiler, and a one-line fix
+
+The previous entry ruled out React, serialization, storage and the store, and
+labelled the remainder a hypothesis about allocation and GC. The hypothesis was
+wrong too. A profiler found it in one run.
+
+### Enabling the profiler
+
+Chrome's JS Self-Profiling API needs a `Document-Policy: js-profiling` header,
+now set in `vite.config.ts` under `server.headers` — **dev server only**, so it
+never reaches production, and it costs nothing when unused. `new Profiler(...)`
+then samples at 1ms while a keystroke burst runs.
+
+### What it found
+
+Leaf frames across 25 keystrokes on the 42.4MB fixture:
+
+```
+ 41.5%  (anon) @ react_jsx-dev-runtime.js:239     <- dev-build overhead
+   22%  countWords @ manuscript.ts:62
+ 12.2%  (anon) @ manuscript.ts:64
+ 12.2%  commitMutationEffectsOnFiber
+```
+
+`countWords` was a third of it, in **story map mode**, where nothing on screen
+shows a manuscript word count. The call site was `Toolbar.tsx`:
+
+```ts
+const activeProseWords = doc.chapters.reduce(
+  (a, c) => a + (c.manuscript ? countWords(c.manuscript) : 0), 0);
+```
+
+Used once, as `activeProseWords > 0` — a **yes/no question**, answered by an
+exact count over every chapter's prose, on every render of a component that is
+always mounted. On a 300k-word book that is a regex sweep of 1.7M characters per
+keystroke.
+
+The irony is three lines up: `versionWords` right above it reads the cached
+`c.words` and carries a comment explaining the menu "should not scan four
+manuscripts to open".
+
+`some` replaces `reduce`, stopping at the first chapter with prose. `countWords`
+is kept inside it rather than a `.trim()` test, so "has prose" keeps agreeing
+with the number shown everywhere else (a chapter holding only `***` counts zero).
+
+### Results
+
+| | Before | After |
+|---|---|---|
+| Scene beat, dev | 52.2ms | **7.3ms** |
+| Prose field, dev | 58.2ms | **12.9ms** |
+| Scene beat, **production** | — | **3.2ms** |
+| Prose field (56k chapter), **production**, warm | — | **7.9ms** |
+
+**The document-size dependence is gone.** 7.3ms at 42MB now matches 7.0ms at
+6.5MB. The whole curve in the previous entry was one unmemoized reduce. Item 19
+(`countWords` unmemoized in `ManuscriptModal`) is fixed in the same pass.
+
+### Two corrections to how the earlier numbers were read
+
+**Everything before this was a dev build.** React's `jsx-dev-runtime` was 41.5%
+of the profile; production is faster again, and the 42.4MB fixture was imported
+into a real production build through the actual file picker to confirm it.
+
+**A burst measured immediately after switching into manuscript mode reads
+~40ms** from one-time warm-up, then settles to ~8ms. One intermediate reading
+this session was taken cold and looked like a regression. Re-measure warm.
+
+### What did not improve, and matters more than it did
+
+The timeline's manuscript pane is untouched by this — its cost is genuinely
+building 14,602 DOM nodes — and in **production it blocks for 1,242ms**.
+
+The scope is the thing to notice: that is **one book's active version at 301.7k
+words**, driven by the active version's prose and not by total project size. It
+is not an extreme-scale problem. A writer with a single epic-fantasy-length novel
+and no series at all waits over a second to open that pane. **Item 17 is now the
+app's worst number and the only real remaining limit.**
+
+### Where the limits actually sit now
+
+- **Typing: no size-dependent limit.** Flat 3–8ms in production at 42.4MB.
+- **Memory: 125MB heap** with the 42.4MB document loaded. Fine.
+- **Startup: 108ms**, `loadAllProse` 165ms. Fine.
+- **Timeline manuscript pane: ~1.2s at 300k words in one version.** The limit.

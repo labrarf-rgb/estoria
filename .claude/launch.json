@@ -15,6 +15,13 @@
       "port": 5199
     },
     {
+      "name": "estoria-prod-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--port", "5200", "--strictPort"],
+      "port": 5200,
+      "url": "http://localhost:5200"
+    },
+    {
       "name": "portfolio-static",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8899", "-d", "/Users/rfcl/Portfolio-Website"],

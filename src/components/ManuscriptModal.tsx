@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { flushNow } from "@/store/persistence";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
@@ -71,7 +71,10 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
   const [view, setView] = useState<"edit" | "read">("edit");
 
   const text = ch.manuscript ?? "";
-  const proseWords = text ? countWords(text) : 0;
+  // Memoized because this component re-renders on every keystroke and the count
+  // is a full regex sweep of the chapter: 3.3ms on a 10k-word chapter, spent
+  // again for each character typed into it.
+  const proseWords = useMemo(() => (text ? countWords(text) : 0), [text]);
 
   // Leaving a chapter forces the prose out, and so does leaving for the story
   // map: the chapter you just left is the one nobody is going to notice losing.

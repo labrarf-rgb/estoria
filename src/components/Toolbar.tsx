@@ -100,11 +100,22 @@ export function Toolbar() {
       (a, c) => a + c.words,
       0
     );
-  /** Whether forking would actually copy anything, i.e. whether to ask. */
-  const activeProseWords = doc.chapters.reduce(
-    (a, c) => a + (c.manuscript ? countWords(c.manuscript) : 0),
-    0
-  );
+  /**
+   * Whether forking would actually copy anything, i.e. whether to ask.
+   *
+   * **A question, not a number.** This used to `reduce` `countWords` over every
+   * chapter's manuscript — an exact total, computed on every render of a
+   * component that is always mounted, to answer a yes/no. On a 300k-word book
+   * that is a regex sweep of 1.7M characters per keystroke, and it was **the**
+   * cost behind SPECS §9 item 14 (52ms per keystroke at 42MB, profiled to
+   * `countWords`). `some` stops at the first chapter with prose, so the common
+   * answer costs one chapter instead of thirty.
+   *
+   * Kept `countWords` rather than a `.trim()` test so the meaning does not
+   * drift: a chapter holding only `***` counts zero words, and "has prose" must
+   * keep agreeing with the number shown everywhere else.
+   */
+  const hasProseToFork = doc.chapters.some((c) => (c.manuscript ? countWords(c.manuscript) > 0 : false));
   const onSeriesMap = doc.seriesMode && level === "series";
   // The book timeline is a scrolling surface with no camera, so a zoom readout
   // there would report a number that controls nothing.
@@ -286,7 +297,7 @@ export function Toolbar() {
             ) : (
               <button
                 onClick={() => {
-                  if (activeProseWords > 0) return setForkChoice(true);
+                  if (hasProseToFork) return setForkChoice(true);
                   addDraft();
                   setVersionMenu(false);
                 }}
