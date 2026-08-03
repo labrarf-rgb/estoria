@@ -3286,3 +3286,88 @@ The architecture is sound and the storage design is vindicated. Merging is not
 blocked by anything found here, but **§9 item 14 should be fixed before this is
 called done at scale** — it is the difference between an app that handles a real
 book collection and one that only holds it.
+
+---
+
+## 2026-08-02 (e) — The round-trip, and a wrong diagnosis corrected
+
+Two jobs: finish the half of §8 that was left undone, and find out what the
+per-keystroke cost actually is. The second one overturned what the previous
+entry concluded, which is the more important result of the two.
+
+### Round trip: passes, and now properly checked
+
+The brief asked whether a document at this size "can be written, re-read and
+round-tripped at all". Measured on the 42.4MB fixture, through the real code
+path — `normalizeDoc` → `splitProse` → `mergeProse` → `stampModified` →
+`JSON.stringify` → `JSON.parse` → `normalizeDoc`:
+
+- **Fingerprints identical end to end** (`1b930aaae9a824e3`). Write 26ms,
+  re-read 27ms, 42.4MB in and 42.4MB out.
+- **The at-rest split is lossless** — the fingerprint after a split/merge cycle
+  matches the one before it.
+
+**With a control, because the test is worthless without one.** Changing a single
+character of prose deep inside chapter 8 *does* change the fingerprint, and
+touching only `modifiedAt` does *not*. So the identical result means the content
+really is identical, rather than the fingerprint ignoring prose.
+
+### The previous entry's diagnosis was wrong
+
+2026-08-02 (d) concluded the per-keystroke cost "tracks the number of chapters
+on the board (3 → 30 cards)". That was inferred from two fixtures that differed
+in more than one way. It is **wrong**, and SPECS §9 item 14 has been corrected.
+
+Controls that killed it — same 30 chapters, same 30 board cards, same 750
+manuscripts, varying only what else the document contains:
+
+| Fixture | Document | Per-keystroke median |
+|---|---|---|
+| a30 | 1 book, 1 version, 30 chapters, **0.3MB** | **8.4ms** |
+| b30 | 5×5, 750 manuscripts, **6.5MB** | **7.0ms** |
+| m14 | 5×5, 750 manuscripts, **15.8MB** | **23.3ms** |
+| m28 | 5×5, 750 manuscripts, **29.1MB** | **26.2ms** |
+| big | 5×5, 750 manuscripts, **42.4MB** | **52.2ms** |
+
+**30 board cards are free. 750 stashed manuscripts are free. Bytes are not.**
+
+### What the cost is not
+
+Each ruled out by measurement rather than reading:
+
+- **Not React.** A UI-only state change re-renders the same tree in **0.3ms**.
+  With **no chapter modal mounted at all**, a doc edit still costs **42ms**.
+- **Not the edited field, and not the open chapter's prose.** Shrinking the open
+  chapter from 56,130 characters to 51 left it at 49ms in the same document.
+- **Not serialization or storage.** Instrumented per keystroke: 0.17ms of
+  `JSON.stringify`, **zero** `localStorage` writes, zero `JSON.parse`. The
+  persist `setItem` is a single assignment, and both flushes are debounced
+  (200ms prose, 500ms map), so neither runs inside a keystroke. `splitProse` is
+  reached only from the debounced flush.
+
+What is left is the document update path allocating a new object graph per
+keystroke against a large retained heap — ~3MB per keystroke, heap up 59MB
+across 20. **That is a hypothesis, not a finding.** Naming the line needs a
+profiler, and that is the next job; the point of writing it down is that the
+obvious fix (narrower selectors) is now known *not* to be the answer, so nobody
+should start there.
+
+### The limit to plan against
+
+Comfortable below **~7MB** total document. Past one frame (16ms) somewhere
+around **10MB — roughly 1.5M words across every book and version**, not per
+book. At 42MB it is 52ms median and 73ms p90, which is visible lag on every
+keypress in the app.
+
+Note the variance: p90 runs 2–3× the median at every size (31ms at 6.5MB, 73ms
+at 42MB), which is consistent with GC and is why the medians alone understate
+how it feels.
+
+### Method notes
+
+The toolbar's `EditableName` keeps its value in **local state while editing** and
+commits on blur, so typing into it measures nothing — one intermediate reading
+this session came from that and was discarded. The measurement that holds is a
+doc-backed field: a scene beat, or the prose textarea. And measure like against
+like — the series-map tree (5 book cards) and the board tree (30 chapter cards)
+are not comparable surfaces.

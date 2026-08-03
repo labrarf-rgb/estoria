@@ -794,19 +794,53 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     image blobs separately (IndexedDB locally / own Drive files later),
     reference by id. Coordinate with the Drive adapter design (§8).
 14. ⚠️ **Perf — no longer cosmetic. Measured 2026-08-02 (d); the top scale
-    problem.** Components subscribe to the whole `doc`, so every keystroke
-    re-renders the full tree — including the board behind an open modal.
-    **Per-keystroke React commit: 6.8ms at 3 chapters, 52–58ms at 750**, which
-    is roughly four dropped frames on every character. The control that proves
-    it is the field size: a **123-character scene beat costs 52ms, the same as a
-    56,000-character manuscript**, so the cost is the document, not the field,
-    not the prose and not manuscript mode. It tracks the chapter count on the
-    board (3 → 30 cards). The fix is the one this item always named — narrower
-    selectors, so editing a chapter does not re-render the board. Numbers and
-    method in [`SESSIONS.md`](SESSIONS.md), 2026-08-02 (d).
-    *Original finding (filed as cosmetic):* `ChapterDetail` subscribes to the
-    whole `doc` (every keystroke re-renders the full modal — fine at current
-    scale, use narrower selectors if it ever feels sluggish).
+    problem. Cause NOT yet identified — do not start fixing from this item's
+    original prescription.**
+
+    Every keystroke in any doc-backed field costs, and the cost tracks **total
+    document size in bytes** — across all books and versions, including the ones
+    not on screen:
+
+    | Document | Per-keystroke median | p90 |
+    |---|---|---|
+    | 0.3MB (1 book, 30 chapters) | 8.4ms | 31ms |
+    | 6.5MB (5×5, 750 manuscripts) | 7.0ms | 31ms |
+    | 15.8MB (5×5, 2.5M words) | 23.3ms | 52ms |
+    | 29.1MB (5×5, 5.0M words) | 26.2ms | 64ms |
+    | 42.4MB (5×5, 7.5M words) | 52.2ms | 73ms |
+
+    **What it is not**, each ruled out by measurement:
+
+    - **Not the number of chapters or board cards.** 30 chapters in a 0.3MB
+      document is 8.4ms; the same 30 cards in a 42MB document is 52ms.
+    - **Not the number of manuscripts.** 750 manuscripts at 6.5MB is 7.0ms.
+    - **Not the field being edited.** A 123-character scene beat costs the same
+      as a 56,000-character manuscript.
+    - **Not the open chapter's prose.** Shrinking the open chapter from 56,130
+      characters to 51 left it at 49ms in the same document.
+    - **Not React rendering.** A UI-only state change re-renders the same tree
+      in **0.3ms**, and the cost is still 42ms with **no chapter modal mounted
+      at all**.
+    - **Not serialization or storage.** Per keystroke: 0.17ms of
+      `JSON.stringify`, zero `localStorage` writes, zero `JSON.parse`.
+      `setItem` is one assignment and both flushes are debounced (200/500ms),
+      so neither runs inside a keystroke.
+
+    What is left is the document *update* path — allocating a new object graph
+    per keystroke against a large retained heap (~3MB allocated per keystroke;
+    heap grew 59MB across 20). That is a hypothesis, not a finding: naming the
+    actual line needs a profiler run, and **that is the first job**, because the
+    original prescription below (narrower selectors) is now known not to
+    address it. Numbers and method in [`SESSIONS.md`](SESSIONS.md), 2026-08-02 (d).
+
+    **Practical limit until it is fixed:** comfortable below ~7MB total
+    document; past one frame (16ms) somewhere around 10MB, roughly 1.5M words
+    across every book and version.
+
+    *Original finding (filed as cosmetic, and its fix is now known not to be
+    the answer):* `ChapterDetail` subscribes to the whole `doc` (every keystroke
+    re-renders the full modal — fine at current scale, use narrower selectors if
+    it ever feels sluggish).
     *(The other half of this item — "delete-chapter confirm shows the base
     `ch.title` rather than the draft-resolved title" — is moot since schema v4
     (Session 36b): versions are standalone forks, so `ch.title` **is** the
