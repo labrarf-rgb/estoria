@@ -3147,3 +3147,142 @@ behaviour silently runs the pre-edit code until a full reload. And dispatching
 `mousemove` + `mouseup` in one JS task means the coalescing rAF never runs
 between them, which looks exactly like a broken hit test. Reload, and spread
 synthetic pointer events across calls.
+
+---
+
+## 2026-08-02 (d) — The scale test (build brief §8)
+
+The brief's target, run for the first time: **300k words per version, 5 versions,
+5 books** — 25 manuscripts, 7.5M words, 41.8M characters of prose in a 42MB
+`.estoria.json`. Nothing in manuscript mode had been run against more than a few
+thousand words before this.
+
+**The headline: the storage architecture holds up completely, and the render path
+does not.** Every prediction in §8 about serialization, hashing and the at-rest
+split was wrong in the app's favour. The one thing §8 did not predict is the
+thing that makes the app feel broken at scale.
+
+### The fixture
+
+`scripts/make-fixture.mjs` — a generator, not hand-typed data, seeded so the same
+arguments give a byte-identical file. It is imported through the normal path
+(`readProjectFile` → `normalizeDoc` → `openDoc`), so the split, the counts and
+the fingerprint all see what a user would produce.
+
+```bash
+node --max-old-space-size=8192 scripts/make-fixture.mjs --out public/big.estoria.json
+```
+
+Fixtures go in `public/` (gitignored) because Vite refuses `/@fs` reads outside
+the project root — and must be **deleted afterwards**, since `public/` is copied
+into `dist/` on build.
+
+### What passed, with numbers
+
+Everything the brief expected to break, on a 42MB / 7.5M-word document:
+
+| | Predicted | Measured |
+|---|---|---|
+| `JSON.parse` of the whole file | main-thread stall | **28ms** |
+| `normalizeDoc` | — | **1ms** |
+| `splitProse` / `mergeProse` over 750 chapters | "measure it rather than assume" | **1ms each** |
+| Sync fingerprint (SHA-256 over canonical JSON) | "can it be cheaper?" | **77ms** |
+| `JSON.stringify` for export/backup | 45M chars on the main thread | **11ms** |
+| `loadAllProse()` at startup | "45MB of strings before first paint" | **165ms**, 750 entries |
+| Time to DOMContentLoaded, cold | — | **108ms** |
+| Peak heap, all 25 manuscripts loaded | ~90MB | **64–68MB** |
+
+Two of the brief's assumptions were simply wrong. **41.8M characters is ~42MB in
+memory, not 84MB** — V8 stores ASCII as one-byte strings, so the UTF-16 doubling
+never happens. And `splitProse` is O(nothing) because it moves string
+*references*; it never copies the prose.
+
+**The at-rest split works exactly as designed.** With the full fixture loaded,
+localStorage holds **1.36MB** and the persisted chapters have no `manuscript` key
+at all; the 42MB of prose is in IndexedDB. Total origin usage 18MB.
+
+### The crash pad: real bug, wrong threshold
+
+`writePad` does silently swallow `QuotaExceededError` — that part of §8 is right,
+and the symptom is the safety net not being there with nothing said. But the
+threshold is nowhere near where the brief put it. Measured ceiling on Chrome:
+
+| Pad payload | Result |
+|---|---|
+| 300k words in one chapter (3.15MB) | survives |
+| 12MB | survives |
+| 40MB / 20.9M chars | survives |
+| **80MB / 41.9M chars** | **survives** |
+| 160MB | fails, silently, nothing stored |
+
+So the pad tolerates ~40M characters, roughly **16× the ~2.5M the brief assumed**,
+and the realistic worst case here (one 10k-word chapter, 56k chars, 0.11MB) is
+three orders of magnitude clear of it. The fix is still worth doing, because a
+silent failure is the wrong failure, but it is **not urgent and not a data-loss
+risk at any plausible size**. Note this was measured on Chrome only; Safari and
+Firefox cap localStorage far lower, and the pad runs there too.
+
+### The finding that matters: per-keystroke cost scales with document size
+
+Typing anywhere in the app, measured as the synchronous React commit inside the
+`input` dispatch (React 18 flushes discrete events synchronously):
+
+| Document | Field being edited | Median commit |
+|---|---|---|
+| 3 chapters, 3.2k words | prose, 6,010 chars | **6.8ms** |
+| 750 chapters, 7.5M words | prose, 56,297 chars | **58.2ms** (p90 78ms) |
+| 750 chapters, 7.5M words | **scene beat, 123 chars** | **52.2ms** (p90 73ms) |
+
+The control is the third row. **A 123-character field costs the same as a
+56,000-character one** — so the cost is not the prose, not the textarea, and not
+manuscript mode. It is the whole document re-rendering on every keystroke, and it
+tracks the number of chapters on the board (3 → 30 cards, 6.8ms → 52ms).
+
+This is **SPECS §9 item 14**, filed as "Perf (cosmetic) — fine at current scale,
+use narrower selectors if it ever feels sluggish". At the target scale it is
+58ms per character: about four dropped frames on every keypress, on every
+editable field in the app. It should be reclassified as the blocking scale
+problem, and the fix is the one already written there — narrower selectors, so
+that editing a chapter does not re-render the board behind the modal.
+
+### Timeline manuscript pane: §8 item 5 confirmed
+
+It renders **every** chapter's prose into the DOM at once: 30 chapters, 4,399
+prose blocks, **14,602 DOM nodes**, 1.67M characters of text. Switching into the
+pane blocks the main thread for **478ms**; switching out, 189ms. That is one
+book's active version. It needs windowing, as predicted.
+
+### Smaller things
+
+- `countWords` runs **unmemoized on every render** in `ManuscriptModal` (3.3ms on
+  a 10k-word chapter) — introduced this session, trivially fixable with `useMemo`,
+  and small next to the 52ms above.
+- `ExportModal` counts every chapter on open: **78ms** for 30 chapters.
+- **Not measured: a save-settle with Sync configured.** Sync needs a real folder
+  pick, which needs a user gesture. Without Sync the settle blocks **76ms**; the
+  fingerprint measured standalone is 77ms, so a synced settle is likely ~150ms.
+  Worth confirming by hand.
+
+### A methodology trap worth not repeating
+
+`await import('/src/store/useStore.ts')` from the console gives a **second store
+instance**, not the app's — Vite hands HMR-updated modules a `?t=` query, so the
+app and the console hold different module records. Store writes from the console
+then go nowhere visible, which reads exactly like a broken feature: `openChapter`
+set `openCh` and no modal appeared.
+
+Worse, the obvious check gives a **false pass** — toggling the theme and seeing
+the DOM agree proves nothing if the two instances happen to hold the same value.
+Drive the UI with real clicks and read state from the DOM. Pure functions
+(`countWords`, `splitProse`, `fingerprint`) are unaffected and safe to measure by
+import.
+
+Also: `requestAnimationFrame` never fires while the preview pane is hidden, so
+any rAF-based measurement hangs. Measure synchronously around `dispatchEvent`.
+
+### Where this leaves the branch
+
+The architecture is sound and the storage design is vindicated. Merging is not
+blocked by anything found here, but **§9 item 14 should be fixed before this is
+called done at scale** — it is the difference between an app that handles a real
+book collection and one that only holds it.

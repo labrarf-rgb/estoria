@@ -220,11 +220,15 @@ export interface Chapter {
   /** World-entry ids referenced in this chapter. */
   worldRefs?: string[];
   /**
-   * The chapter's prose, as markdown. Scenes are separated by `***` thematic
-   * breaks — real markdown a novelist types anyway, rather than a marker they
-   * would have to work around; see docs/SPECS.md §4 ("The `***` contract"). A `***` is
-   * the prose form of a connector, so a written chapter holds exactly
-   * `sceneLinks.length` breaks, and the causal type is never stored in the prose.
+   * The chapter's prose, as markdown — one string, **not divided by the
+   * scenes**. An earlier design separated them with `***` thematic breaks and
+   * kept prose and beats in step; it was dropped, because the app *seeded*
+   * those breaks and a fresh nine-scene chapter opened on eight rows of `***`
+   * with nothing between them. So a `***` here is a plain thematic break
+   * meaning nothing more than it says, a chapter may hold any number of them or
+   * none, and adding, deleting or reordering a beat leaves every word where it
+   * is. See docs/SPECS.md §4 ("The beats are a guide, not a structure") — and
+   * do not reintroduce the coupling without reading it first.
    *
    * Absent until the chapter is written in. Optional on purpose: that is what
    * every existing document already has, so this field needs no

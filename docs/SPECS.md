@@ -349,9 +349,11 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   layers: `normalizeDocJson` (`Normalize.kt`) builds each chapter with
 >   `val out = p.toMutableMap()` and only *overwrites* known keys, and
 >   `ExtrasSerializer` (`StoryDoc.kt`) captures unknown keys into `extra` on
->   decode and merges them back on encode. **Worth adding on the Android side:**
->   a regression test for a chapter carrying an unknown field, so that
->   passthrough is not lost to a future refactor.
+>   decode and merges them back on encode. **Guarded by tests on that side**
+>   (2026-08-02): `RoundTripTest` already covered the active board, and now also
+>   covers a chapter in a `draftData` version and one in a stashed `bookData`
+>   book — the two places forked prose lives, and a different normalize path
+>   from the active board's. Recorded in that repo's §4(a) and session log.
 > - **Two consequences to remember rather than fix.** A **prose-only edit on web
 >   registers as a real change on Android**, because its conflict detection
 >   hashes the canonical encoding — that is correct, not a bug. And the web app
@@ -359,7 +361,10 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   hand-typed field, so a round trip can recompute a typed number away. That is
 >   the first place the two apps would visibly disagree; if Android ever grows a
 >   manuscript field, it should adopt the same two rules (never auto-zero, and
->   promote the old number into `target` rather than overwriting it).
+>   promote the old number into `target` rather than overwriting it). Note the
+>   direction: Android **should not** derive `words` before it has a manuscript
+>   of its own, since every pre-manuscript book there has a hand-typed count and
+>   no prose to recompute from.
 > - **The Timeline reading view is web-app only (Session 51) — by decision, not
 >   by omission.** The user scoped it to the web app, and it is built so that
 >   choice costs the phone nothing: it is pure presentation over data that
@@ -788,9 +793,20 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     every autosave/export and is the main localStorage-quota risk. Plan: store
     image blobs separately (IndexedDB locally / own Drive files later),
     reference by id. Coordinate with the Drive adapter design (§8).
-14. **Perf (cosmetic)**: `ChapterDetail` subscribes to the whole `doc`
-    (every keystroke re-renders the full modal — fine at current scale, use
-    narrower selectors if it ever feels sluggish).
+14. ⚠️ **Perf — no longer cosmetic. Measured 2026-08-02 (d); the top scale
+    problem.** Components subscribe to the whole `doc`, so every keystroke
+    re-renders the full tree — including the board behind an open modal.
+    **Per-keystroke React commit: 6.8ms at 3 chapters, 52–58ms at 750**, which
+    is roughly four dropped frames on every character. The control that proves
+    it is the field size: a **123-character scene beat costs 52ms, the same as a
+    56,000-character manuscript**, so the cost is the document, not the field,
+    not the prose and not manuscript mode. It tracks the chapter count on the
+    board (3 → 30 cards). The fix is the one this item always named — narrower
+    selectors, so editing a chapter does not re-render the board. Numbers and
+    method in [`SESSIONS.md`](SESSIONS.md), 2026-08-02 (d).
+    *Original finding (filed as cosmetic):* `ChapterDetail` subscribes to the
+    whole `doc` (every keystroke re-renders the full modal — fine at current
+    scale, use narrower selectors if it ever feels sluggish).
     *(The other half of this item — "delete-chapter confirm shows the base
     `ch.title` rather than the draft-resolved title" — is moot since schema v4
     (Session 36b): versions are standalone forks, so `ch.title` **is** the
@@ -831,3 +847,28 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     *Original finding:* **A timeline scene card can still clip by ~2px at half
     screen** (Session 56) — a clipped descender on the last line, not lost words.
     Measured at a 760px window: 4 of 421 scenes, worst 2px.
+
+17. **The timeline's manuscript pane renders every chapter's prose at once.**
+    Measured 2026-08-02 (d) on one book's active version (30 chapters, 301.7k
+    words): **14,602 DOM nodes, 4,399 prose blocks, 1.67M characters of text**,
+    and **478ms of blocked main thread** to switch into the pane (189ms to
+    switch out). It works, but half a second of frozen UI is the worst single
+    number in the scale test. Fix: window it, or render only the chapters near
+    the viewport. Predicted by the build brief §8 item 5, now confirmed with
+    numbers.
+
+18. **`writePad` fails silently when localStorage is full.** The crash pad
+    catches `QuotaExceededError` and ignores it, so the symptom is the safety
+    net quietly not being there. **Not urgent, and the threshold is far higher
+    than assumed:** measured on Chrome, the pad takes ~40M characters (80MB)
+    before it fails — about 16× the ~2.5M the build brief predicted, and three
+    orders of magnitude above the realistic worst case (one 10k-word chapter is
+    0.11MB). Fix by capping what the pad accepts and *saying so* rather than
+    failing quietly. Worth re-measuring on Safari and Firefox, which cap
+    localStorage far lower and where the pad still runs.
+
+19. **`countWords` runs unmemoized in `ManuscriptModal`'s render** (3.3ms on a
+    10k-word chapter, on every keystroke). Introduced 2026-08-02 (c) with the
+    modal; `useMemo` on the prose is the whole fix. Small next to item 14, and
+    in the same code path, so fix them together. `ExportModal` has the same
+    shape at a different cadence: **78ms** to count 30 chapters when it opens.

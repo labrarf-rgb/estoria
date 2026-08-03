@@ -20,3 +20,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# scale-test fixtures (scripts/make-fixture.mjs) - never committed, they are ~100MB
+public/*.estoria.json
