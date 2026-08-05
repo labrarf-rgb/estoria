@@ -25,20 +25,35 @@
   --and: oklch(0.55 0.04 70);
 }
 
+/*
+ * Dark is its own lightness ladder, not an inversion of light. The floor sits
+ * at OKLCH L ~0.24 rather than near-black: surfaces should read as warm dark
+ * grey, because a black background is harsh in a way that contradicts the
+ * paper feeling the light theme is built on. Each surface above another gets a
+ * small +L step (bg 0.24 → panel 0.28 → card 0.31), the hue stays in the light
+ * palette's warm brown, and chroma stays low so nothing turns muddy.
+ *
+ * `chip` sits just above `bg`, below `panel`. That mirrors light, where chip is
+ * the recessed trough a control group sits in and `hover:bg-card` lifts out of
+ * it. Inverting that pair would make the resting state louder than the hover.
+ *
+ * Accents reuse the light hue with L raised ~8 points so they clear contrast
+ * against the lighter floor.
+ */
 [data-theme="dark"] {
-  --bg: #15130e;
-  --panel: #1d1a14;
-  --card: #26221a;
-  --ink: #ece4d3;
-  --soft: #a89c86;
-  --faint: #6c6353;
-  --line: #39342a;
-  --rule: #2d2920;
-  --chip: #252119;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 26px rgba(0, 0, 0, 0.5);
-  --therefore: oklch(0.7 0.12 156);
-  --but: oklch(0.68 0.15 36);
-  --and: oklch(0.66 0.04 75);
+  --bg: #231f19;
+  --panel: #2b2721;
+  --card: #352f29;
+  --ink: #e4ddd3;
+  --soft: #aaa49b;
+  --faint: #79746d;
+  --line: #4c4740;
+  --rule: #605a52;
+  --chip: #272320;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
+  --therefore: oklch(0.62 0.09 152);
+  --but: oklch(0.63 0.13 33);
+  --and: oklch(0.63 0.04 70);
 }
 
 @theme inline {
