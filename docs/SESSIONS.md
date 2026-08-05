@@ -3560,3 +3560,69 @@ and the board-only toolbar (241) all landed with their commits.
 - **One thing needs eyes**: the smooth-scroll landing after a rail click in the
   windowed pane. `requestAnimationFrame` is suspended while the preview pane is
   hidden, so the geometry was verified but the animation was never watched.
+
+---
+
+## 2026-08-04 — Dark mode rebuilt as a lightness ladder
+
+Two commits shipped and deployed: **`bc0fe5d` live at
+https://www.labrarf.com/estoria** (four polls before Pages caught up, as usual).
+Prod CSS was checked directly for the new tokens; `#15130e` is gone from it.
+
+The tagline change already sitting in the tree (`Welcome.tsx`, `AboutModal.tsx`)
+went out as its own commit rather than riding along with the theme.
+
+### What the old dark theme actually got wrong
+
+It was a near-black inversion, floor at **OKLCH L 0.187**, and it failed three
+things that were measured rather than eyeballed:
+
+- `faint` at **2.67:1 on `card`**, under the 3:1 floor. Scene and word counts
+  were dimmest exactly where they sat deepest in the stack.
+- `line` and `rule` at **1.28:1 and 1.09:1 against `card`** — the hairlines this
+  design uses *instead of* boxes and shadows were effectively not drawn.
+- `chip` above `panel` but below `card`, so a control group's resting state and
+  its `hover:bg-card` were in the wrong order.
+
+### The false start worth remembering
+
+The first pass fixed all three numbers and was still wrong, because it kept the
+near-black floor (L 0.187) and pushed contrast *up* from there. The local copy of
+the `design-pref-rfcl` skill still carried the superseded palette, so it built to
+`--bg: #15130e` and never saw the approved ladder. **The skill on this machine
+lives only under `local-agent-mode-sessions/`, which looks session-scoped** — the
+canonical copy belongs somewhere durable, or this drift repeats.
+
+All four skill files (SKILL.md + web/mobile/presentation refs) were patched to
+the approved spec on the way through.
+
+### Judgement calls the reference palette does not cover
+
+Estoria has tokens the reference does not. `chip` → `#272320`, between bg and
+panel, mirroring its light-mode role. `but` and `and` took the same +0.08 L step
+as `therefore`. **`--therefore-hover`, `--success-*` and `--error-*` were
+deliberately not added**: the light theme has no counterparts, so they would be
+dark-only variables that break silently the moment something used them in light.
+
+### Two trade-offs carried on purpose, both approved
+
+- **`rule` is now lighter than `line` in dark, and darker in light.** Their roles
+  invert between themes, so dividers read heavier than borders in dark. The theme
+  toggle button (`border-rule`) is the visible instance.
+- **`faint` on `card` is 2.85:1**, just under 3:1. `#807b73` clears it at 3.14:1
+  and moves L only from 0.561 to 0.585, if it ever becomes worth the change.
+
+### Spec drift
+
+None to fix: SPECS.md never named a dark palette, so nothing in it went false.
+But §4's `Light/dark theme` row was the one **empty notes cell** in that table,
+which is why the ladder was easy to get wrong twice. It now carries the rule, the
+`chip` reasoning, and both trade-offs above.
+
+### Still open, unchanged by this session
+
+- **SPECS §9 items 11, 12, 13** — per-book markdown export, cursor-anchored wheel
+  zoom, images inline as data URLs.
+- **`ExportModal` counts every chapter on open** (78ms at 30 chapters).
+- **The smooth-scroll landing after a rail click still needs eyes** — carried
+  over from (h); geometry verified, animation never watched.
