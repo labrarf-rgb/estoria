@@ -28,7 +28,7 @@ export function AboutModal() {
         <div className="px-[26px] pb-[8px] pt-[24px]">
           <div className="font-serif text-[24px] font-semibold text-ink">Estoria</div>
           <div className="mt-[4px] text-[13px] leading-[1.55] text-soft">
-            A visual map for your chapters, scenes, characters and worlds.
+            Map and Write Your Story. Chapters, scenes, characters and worlds.
           </div>
           <div className="mt-[14px] space-y-[5px] text-[12px] leading-[1.5] text-soft">
             <div>

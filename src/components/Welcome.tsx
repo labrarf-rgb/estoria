@@ -20,7 +20,7 @@ export function Welcome() {
           <div>
             <div className="font-serif text-[22px] font-semibold text-ink">Welcome to Estoria</div>
             <div className="text-[12.5px] font-medium text-soft">
-              A visual map for your chapters, scenes, characters and worlds.
+              Map and Write Your Story. Chapters, scenes, characters and worlds.
             </div>
           </div>
         </div>
