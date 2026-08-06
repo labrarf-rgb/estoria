@@ -3709,3 +3709,35 @@ was judged not worth the geometry.
   wheel zoom, images inline as data URLs.
 - **`ExportModal` counts every chapter on open** (78ms at 30 chapters).
 - **The smooth-scroll landing after a rail click still needs eyes.**
+
+---
+
+## 2026-08-05 (b) — The theme button matches the portfolio site
+
+The toolbar's theme control was a 36px rounded square, filled with `card`,
+holding a half-filled circle glyph. The portfolio site at labrarf.com — the
+same site Estoria is deployed inside, at `/estoria` — has used a different
+control all along: a 36px **circle**, transparent, hairline `rule` border, a
+15px Feather **moon** while light is on and a **sun** while dark is on, with a
+200ms hover that darkens the border, lifts the text to `ink`, and fills the
+background with `card`. Estoria now uses that one, token-for-token against its
+own palette (`rule` / `soft` / `ink` / `card`, not the site's variables), so the
+two chrome bars read as one product.
+
+The glyph moved into a small `ThemeIcon` component rather than staying inline:
+two 9-element SVGs in the middle of the toolbar's JSX buried the control it
+belongs to.
+
+The button's `aria-label` now names the *action* — "Toggle dark mode" while
+light is on — matching the site. It used to carry a `title` naming the current
+state ("Dark theme"), which read as a label for what you were about to get and
+said the opposite.
+
+**Left alone deliberately:** when the toolbar is too narrow it collapses zoom
+and theme into the ⋯ menu, where theme is a labelled row (`Theme — Light`), not
+a button. The site has no equivalent surface, and a menu row reading its own
+state is right there.
+
+Verified in the running app: the button computes to a circle with a transparent
+background and the moon path in light; clicking it flips `data-theme` to `dark`,
+swaps the label to "Toggle light mode", and renders the sun. `tsc -b` clean.
