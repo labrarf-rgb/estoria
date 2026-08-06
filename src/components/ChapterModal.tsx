@@ -33,15 +33,38 @@ export function ChapterModal() {
   // `words` follows the prose on the save rhythm rather than per keystroke: each
   // edit resets the timer, so counting a long chapter happens once, when the
   // typing stops.
-  const chIdRef = useRef<string | null>(null);
-  chIdRef.current = ch?.id ?? null;
+  //
+  // **And the timer has to be flushed, not dropped.** Closing the chapter — or
+  // stepping to the next one — inside those 700ms used to clear a pending count
+  // and leave it cleared: the board went back to the number from before that
+  // last burst of typing, and nothing would correct it until you came back and
+  // typed again. `pending` holds the chapter still owed a count, so the same
+  // unmount that flushes the prose settles the number too.
+  const chId = ch?.id ?? null;
+  const pending = useRef<string | null>(null);
   const manuscriptText = ch?.manuscript;
   useEffect(() => {
-    if (!chIdRef.current || manuscriptText === undefined) return;
-    const id = chIdRef.current;
-    const t = setTimeout(() => recomputeWords(id), 700);
+    if (!chId || manuscriptText === undefined) return;
+    pending.current = chId;
+    const t = setTimeout(() => {
+      if (pending.current === chId) pending.current = null;
+      recomputeWords(chId);
+    }, 700);
     return () => clearTimeout(t);
-  }, [manuscriptText, openCh, recomputeWords]);
+  }, [manuscriptText, chId, recomputeWords]);
+
+  // Keyed on the chapter, so this cleanup runs both when the arrows step to
+  // another one and when the modal closes — and `pending` still names the
+  // chapter being left, since a cleanup runs before the next render's effect.
+  useEffect(
+    () => () => {
+      const owed = pending.current;
+      if (!owed) return;
+      pending.current = null;
+      recomputeWords(owed);
+    },
+    [chId, recomputeWords]
+  );
 
   if (!ch) return null;
   return mode === "manuscript" ? <ManuscriptModal ch={ch} /> : <ChapterDetail />;

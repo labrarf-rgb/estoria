@@ -3741,3 +3741,66 @@ state is right there.
 Verified in the running app: the button computes to a circle with a transparent
 background and the moon path in light; clicking it flips `data-theme` to `dark`,
 swaps the label to "Toggle light mode", and renders the sun. `tsc -b` clean.
+
+---
+
+## 2026-08-06 — Every word count comes from the words
+
+Estoria shows a word count in six places — the board card, the timeline rail
+card and its manuscript header, the toolbar's `24.4k words · 8 chapters`, the
+version menu, and the series map's per-book line. All six read one stored field,
+`Chapter.words`, and until today exactly **one** thing refreshed it: a 700ms
+debounce inside `ChapterModal`. Everything else that can change prose left the
+number where it was.
+
+Six ways it could lie, all now closed:
+
+1. **Closing the manuscript within 700ms of typing.** The effect cleanup cleared
+   the pending timer and nothing rescheduled it, so the last burst of writing
+   never reached the count — and reopening the chapter did not fix it, because
+   only *typing* started the timer. A `pending` ref now names the chapter still
+   owed a count, and a cleanup keyed on the chapter flushes it: the same unmount
+   that already forced the prose out settles the number.
+2. **A manuscript pulled from another version**, and **3.** its undo. The undo
+   record grew `previousWords` / `previousTarget`, because putting the text back
+   while leaving the count where the pull moved it is the same lie in reverse,
+   and a chapter that had no prose before the pull has nothing to recount.
+4. **A structure-only fork** stripped every manuscript and kept every count, so
+   an experiment with none of the writing reported the parent's whole book — in
+   the toolbar, the version menu *and* the series map.
+5/6. **Imports, Sync pulls and backup restores**, which arrive with whatever
+   counts the file happened to carry against whatever prose it holds.
+
+The fix is one function, `syncChapterWords` in `lib/manuscript.ts`, and every
+path calls it. `reconcileWords` walks a whole document through the same function
+at `openDoc` / `replaceDoc` — reusing `prose.ts`'s chapter walk, now exported as
+`mapChapters`, because a second walk written next to it is the one that forgets
+the stashed books. Deliberately **not** at hydration: `mergeProse` has just put
+every project's manuscripts back, those counts were written by this app on the
+save rhythm, and scanning a library to confirm them would be the §9 item 14
+mistake moved to startup.
+
+**One rule changed, with the user's call:** emptying a chapter used to freeze its
+last count rather than show 0. It now reads 0. `manuscript` stays `undefined`
+until someone types, so a defined-and-empty one means the words were deleted —
+and the plan the old number represented is already promoted into `target`, which
+is what made the freeze unnecessary. A pre-prose chapter with a hand-typed count
+and no manuscript is still never touched.
+
+Verified in the running app on the sample story, with the debounce temporarily
+widened to 5s so the race was reproducible by hand: typed 14 words and closed
+the chapter immediately — card `14 / 3.2k words`, toolbar 27.6k → 24.4k, timer
+never fired. Emptied the same chapter and closed — `0 / 3.2k words`, plan intact.
+Forked structure-only — fork reads `0 / 3.2k` where the main draft reads
+`14 / 3.2k`. Made it a series — the map's book line agrees with the toolbar.
+Reloaded — both versions came back with the counts they were saved with, save
+status `Saved in this browser`. `tsc -b` and `npm run build` clean.
+
+### Still open, unchanged by this session
+
+- **SPECS §9 items 11, 12, 13** — per-book markdown export, cursor-anchored
+  wheel zoom, images inline as data URLs.
+- **`ExportModal` counts every chapter on open** (78ms at 30 chapters). Now the
+  odd one out: it is the last surface that counts prose instead of reading the
+  cache this pass made trustworthy.
+- **The smooth-scroll landing after a rail click still needs eyes.**

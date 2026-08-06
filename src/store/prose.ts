@@ -198,8 +198,12 @@ export function clearPad(keys: Iterable<string>): void {
  * Rebuilds only what actually changes — a container whose chapters all came back
  * identical is returned as-is, so a project with no prose costs one walk and no
  * allocation.
+ *
+ * Exported because the word-count reconcile has exactly the same problem: it has
+ * to reach every chapter a document holds, and a second walk written next to
+ * this one would be the one that forgets the stashed books.
  */
-function mapDoc(doc: StoryDoc, fn: (bookId: string, draftId: string, c: Chapter) => Chapter): StoryDoc {
+export function mapChapters(doc: StoryDoc, fn: (bookId: string, draftId: string, c: Chapter) => Chapter): StoryDoc {
   const mapList = (bookId: string, draftId: string, cs: Chapter[]): Chapter[] => {
     let changed = false;
     const next = cs.map((c) => {
@@ -253,7 +257,7 @@ function mapDoc(doc: StoryDoc, fn: (bookId: string, draftId: string, c: Chapter)
  */
 export function splitProse(doc: StoryDoc): { doc: StoryDoc; prose: Map<string, string> } {
   const prose = new Map<string, string>();
-  const stripped = mapDoc(doc, (bookId, draftId, c) => {
+  const stripped = mapChapters(doc, (bookId, draftId, c) => {
     if (c.manuscript === undefined) return c;
     prose.set(proseKey({ projectId: doc.id, bookId, draftId, chapterId: c.id }), c.manuscript);
     const { manuscript: _lifted, ...rest } = c;
@@ -265,7 +269,7 @@ export function splitProse(doc: StoryDoc): { doc: StoryDoc; prose: Map<string, s
 /** Put the manuscripts back, so the store only ever sees a whole `StoryDoc`. */
 export function mergeProse(doc: StoryDoc, prose: Map<string, string>): StoryDoc {
   if (prose.size === 0) return doc;
-  return mapDoc(doc, (bookId, draftId, c) => {
+  return mapChapters(doc, (bookId, draftId, c) => {
     const text = prose.get(proseKey({ projectId: doc.id, bookId, draftId, chapterId: c.id }));
     return text === undefined || text === c.manuscript ? c : { ...c, manuscript: text };
   });

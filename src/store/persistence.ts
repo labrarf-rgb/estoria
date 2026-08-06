@@ -15,9 +15,11 @@ import {
   type WorldEntry,
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
+import { syncChapterWords } from "@/lib/manuscript";
 import {
   clearPad,
   loadAllProse,
+  mapChapters,
   mergeProse,
   proseStoreAvailable,
   readPad,
@@ -805,6 +807,25 @@ export function normalizeDoc(raw: unknown): StoryDoc {
   // v4 → v5: refs become pure links into the shared asset pool. Runs last, so
   // v3-overlay docs have already been materialized into v4 forks (order matters).
   return migrateRefsToAssets(normalized);
+}
+
+/**
+ * Bring every `words` in a document back in line with the prose beside it.
+ *
+ * **A boundary pass, not a render-time one.** A file can arrive from anywhere —
+ * an export written by the Android app, a Sync folder, a hand-edited JSON, an
+ * AI-structured import — carrying whatever count it likes against whatever
+ * manuscripts it holds, and nothing downstream re-reads the prose. So the counts
+ * are settled once, at the door.
+ *
+ * Deliberately **not** run at hydration, where `mergeProse` has just put every
+ * project's manuscripts back: the counts there were written by this app on the
+ * save rhythm and are already right, and scanning a whole library of prose to
+ * confirm it would be the SPECS §9 item 14 mistake at startup instead of per
+ * keystroke. Imports are one user-initiated moment where one scan is invisible.
+ */
+export function reconcileWords(doc: StoryDoc): StoryDoc {
+  return mapChapters(doc, (_bookId, _draftId, c) => syncChapterWords(c));
 }
 
 /** Parse a project file picked from disk. Throws on malformed/unrecognized files. */

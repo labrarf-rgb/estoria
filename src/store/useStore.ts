@@ -18,7 +18,7 @@ import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
-import { countWords } from "@/lib/manuscript";
+import { syncChapterWords, withoutProse } from "@/lib/manuscript";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -34,7 +34,7 @@ import {
   type TimelinePane,
 } from "@/lib/layout";
 import { TEMPLATES } from "@/lib/templates";
-import { normalizeDoc, zustandStorage } from "@/store/persistence";
+import { normalizeDoc, reconcileWords, zustandStorage } from "@/store/persistence";
 import type { RefView } from "@/components/ui/ViewToggle";
 
 export type View = "board" | "timeline";
@@ -171,7 +171,20 @@ interface UiState {
    * is a real state to go back to, and pulling text in from another version is
    * exactly when someone wants it back.
    */
-  manuscriptUndo: { chapterId: string; previous: string | undefined; label: string } | null;
+  /**
+   * The one-shot undo behind a manuscript pull. It carries the chapter's `words`
+   * and `target` as well as its prose, because the pull recomputes both — and an
+   * undo that put the text back while leaving the count where the pull moved it
+   * would be the same lie in reverse. `syncChapterWords` cannot rebuild them: a
+   * chapter that had no prose before the pull has nothing to recount.
+   */
+  manuscriptUndo: {
+    chapterId: string;
+    previous: string | undefined;
+    previousWords: number;
+    previousTarget: number | undefined;
+    label: string;
+  } | null;
   /**
    * Right-hand panel size (Characters / World / Notes), persisted and shared by
    * all three. `false` = the 460px drawer, which leaves the board beside it live
@@ -730,7 +743,11 @@ export const useStore = create<StoreState>()(
           let id = incoming.id || uid("story");
           if (id === s.doc.id || stash[id]) id = uid("story");
           delete stash[id];
-          const doc: StoryDoc = withMainDraft({ ...incoming, id, schemaVersion: SCHEMA_VERSION });
+          // Same reason as `replaceDoc`: an opened file's counts are only as
+          // good as whatever last wrote them, and the board is about to show them.
+          const doc: StoryDoc = reconcileWords(
+            withMainDraft({ ...incoming, id, schemaVersion: SCHEMA_VERSION })
+          );
           return {
             doc,
             projectStash: stash,
@@ -1331,36 +1348,19 @@ export const useStore = create<StoreState>()(
         })),
 
       /**
-       * `words` as a cache of the manuscript.
-       *
-       * Two rules, both about not destroying a number the writer typed:
-       *
-       *  - **Never auto-zero.** Every book written before this feature has a
-       *    hand-typed count and no manuscript, and a naive recompute would show
-       *    an 80,000-word project as 0. So a count of zero is never written; it
-       *    only ever moves when there is real prose to move it to. (The cost is
-       *    that emptying a chapter freezes its last count, which is the safe
-       *    side of that trade.)
-       *  - **Promote, don't overwrite.** The first time real prose appears, the
-       *    number already there was a *plan*, so it moves to `target` instead of
-       *    being replaced. That is what turns the board into a progress reading
-       *    rather than quietly redefining what the old number meant.
+       * `words` as a cache of the manuscript, for the chapter being typed in.
+       * The rules live in `syncChapterWords` — this is the debounced caller, and
+       * every other path that can change prose calls the same function, so no
+       * two of them can drift apart.
        */
       recomputeWords: (chId) =>
         set((s) => {
           const c = s.doc.chapters.find((x) => x.id === chId);
-          if (!c || c.manuscript === undefined) return {};
-          const n = countWords(c.manuscript);
-          if (n === 0) return {};
-          const promote = c.target === undefined && c.words > 0;
-          if (n === c.words && !promote) return {};
+          if (!c) return {};
+          const next = syncChapterWords(c);
+          if (next === c) return {};
           return {
-            doc: {
-              ...s.doc,
-              chapters: s.doc.chapters.map((x) =>
-                x.id === chId ? { ...x, ...(promote ? { target: x.words } : {}), words: n } : x
-              ),
-            },
+            doc: { ...s.doc, chapters: s.doc.chapters.map((x) => (x.id === chId ? next : x)) },
           };
         }),
 
@@ -1371,16 +1371,21 @@ export const useStore = create<StoreState>()(
           const src = s.doc.draftData[fromDraftId]?.chapters.find((c) => c.id === chId);
           if (!src || src.manuscript === undefined) return {};
           const name = s.doc.drafts.find((d) => d.id === fromDraftId)?.name ?? "another version";
+          const before = s.doc.chapters.find((c) => c.id === chId);
           return {
             manuscriptUndo: {
               chapterId: chId,
-              previous: s.doc.chapters.find((c) => c.id === chId)?.manuscript,
+              previous: before?.manuscript,
+              previousWords: before?.words ?? 0,
+              previousTarget: before?.target,
               label: `This chapter's writing was pulled from ${name}.`,
             },
             doc: {
               ...s.doc,
+              // A whole manuscript arriving is exactly the event the count has to
+              // follow, and nothing else recomputes it on this path.
               chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? { ...c, manuscript: src.manuscript } : c
+                c.id === chId ? syncChapterWords({ ...c, manuscript: src.manuscript }) : c
               ),
             },
           };
@@ -1395,7 +1400,16 @@ export const useStore = create<StoreState>()(
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) =>
-                c.id === u.chapterId ? { ...c, manuscript: u.previous } : c
+                c.id === u.chapterId
+                  ? {
+                      ...c,
+                      manuscript: u.previous,
+                      words: u.previousWords,
+                      ...(u.previousTarget === undefined
+                        ? { target: undefined }
+                        : { target: u.previousTarget }),
+                    }
+                  : c
               ),
             },
           };
@@ -1531,9 +1545,12 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      // Sync pulls and backup restores land here. `reconcileWords` because the
+      // file's counts were written by whatever wrote the file — another device,
+      // the Android app, a hand edit — against prose this app is about to show.
       replaceDoc: (doc) =>
         set({
-          doc: withMainDraft({ ...doc, schemaVersion: SCHEMA_VERSION }),
+          doc: reconcileWords(withMainDraft({ ...doc, schemaVersion: SCHEMA_VERSION })),
           view: "board",
           arrangeN: 0,
           openCh: null,
@@ -1967,11 +1984,11 @@ export const useStore = create<StoreState>()(
           const fork = cloneVersionData(activeVersionData(s.doc));
           // Structure only: the fork gets the map and none of the writing, which
           // is what makes a re-arrangement experiment free rather than something
-          // that doubles the manuscript on disk to try.
+          // that doubles the manuscript on disk to try. The counts come out with
+          // the prose — `withoutProse` zeroes what was written and keeps what was
+          // only ever planned.
           const chapters =
-            opts?.copyProse === false
-              ? fork.chapters.map(({ manuscript: _drop, ...rest }) => rest as Chapter)
-              : fork.chapters;
+            opts?.copyProse === false ? fork.chapters.map(withoutProse) : fork.chapters;
           return {
             doc: {
               ...s.doc,

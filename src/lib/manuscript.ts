@@ -20,6 +20,8 @@
  * sections, drift and reconciliation.
  */
 
+import type { Chapter } from "@/types";
+
 export type Block =
   | { kind: "p" | "quote"; text: string }
   | { kind: "h"; level: number; text: string }
@@ -131,6 +133,61 @@ export function countWords(markdown: string): number {
 
 /** Has this chapter been written in at all? */
 export const hasProse = (text: string | undefined): boolean => !!text && countWords(text) > 0;
+
+/**
+ * Refresh one chapter's `words` cache from its prose. **The single definition of
+ * that cache** — every path that can change a manuscript goes through here, so
+ * the board, the rail, the toolbar, the version menu and the series map cannot
+ * disagree with each other or with what is written.
+ *
+ * Two rules survive from when the recompute lived in the store:
+ *
+ *  - **A chapter with no manuscript is never touched.** Every book written
+ *    before prose existed carries a hand-typed count and no text, and counting
+ *    what isn't there would report an 80,000-word project as 0.
+ *  - **Promote, don't overwrite.** The first time real prose appears the number
+ *    already there was a *plan*, so it moves to `target` rather than being
+ *    replaced — `words` used to mean *planned* (the AI import prompt says
+ *    "estimate from scene length"), and the gap between the two is the reading
+ *    the board exists to show.
+ *
+ * What changed: an empty manuscript now counts as **0** rather than freezing the
+ * last number. `manuscript` stays `undefined` until someone types, so a defined
+ * one that counts zero means the words were deleted — and the old plan is safe
+ * in `target` by the rule above. A count that quietly refuses to fall is the
+ * kind of lying number this whole pass is about.
+ */
+export function syncChapterWords(c: Chapter): Chapter {
+  if (c.manuscript === undefined) return c;
+  const n = countWords(c.manuscript);
+  const promote = c.target === undefined && c.words > 0;
+  if (n === c.words && !promote) return c;
+  return { ...c, ...(promote ? { target: c.words } : {}), words: n };
+}
+
+/** The same, over a board. Returns the array it was given when nothing moved. */
+export function syncWords(chapters: Chapter[]): Chapter[] {
+  let changed = false;
+  const next = chapters.map((c) => {
+    const n = syncChapterWords(c);
+    if (n !== c) changed = true;
+    return n;
+  });
+  return changed ? next : chapters;
+}
+
+/**
+ * A chapter with the prose taken out — what a structure-only fork gets. The
+ * count has to come out with it, or the fork reports the parent's word total
+ * against none of its writing. The plan is promoted on the way, so what the fork
+ * shows is `0 / 3.2k`: an experiment that has everything to write.
+ */
+export function withoutProse(c: Chapter): Chapter {
+  if (c.manuscript === undefined) return c;
+  const { manuscript: _drop, ...rest } = c;
+  const promote = rest.target === undefined && rest.words > 0;
+  return { ...rest, ...(promote ? { target: rest.words } : {}), words: 0 };
+}
 
 /** `1.2k` / `840` — the shape the board and rail cards have always used. */
 export const shortCount = (n: number): string =>
