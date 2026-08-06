@@ -3804,3 +3804,12 @@ status `Saved in this browser`. `tsc -b` and `npm run build` clean.
   odd one out: it is the last surface that counts prose instead of reading the
   cache this pass made trustworthy.
 - **The smooth-scroll landing after a rail click still needs eyes.**
+
+**Shipped** the same day: `2ee18f7` pushed to `origin/main` and deployed —
+prod reported the commit at `https://www.labrarf.com/estoria`.
+
+**Spec drift found while shipping, both now corrected:** §4 still described the
+chapter modal's recompute as something a close *clears*, which is exactly what
+this session stopped being true; and §9 item 19 still listed `Timeline.tsx` as
+counting per chapter in its rail render, which item 17's pass had already moved
+to the cache. `ExportModal` remains the one real instance of that shape.
