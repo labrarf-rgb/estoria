@@ -119,7 +119,7 @@ export function timelineBookPositions(
 }
 
 /** Grid spacing for the series-map auto-arrange. */
-const BOOK_GAP_X = 60;
+export const BOOK_GAP_X = 60;
 const BOOK_GAP_Y = 70;
 const BOOK_MARGIN = 40;
 

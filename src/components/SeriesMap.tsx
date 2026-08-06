@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { readFileAsDataURL } from "@/lib/files";
-import { BOOK_W, BOOK_H, timelineBookPositions, fitBooksToContent } from "@/lib/layout";
-import type { BookStatus } from "@/types";
+import { BOOK_W, BOOK_H, BOOK_GAP_X, timelineBookPositions, fitBooksToContent } from "@/lib/layout";
+import type { BookMeta, BookStatus } from "@/types";
 
 const STATUSES: BookStatus[] = ["drafting", "planned", "idea"];
 const STATUS_LABEL: Record<BookStatus, string> = {
@@ -10,6 +10,30 @@ const STATUS_LABEL: Record<BookStatus, string> = {
   planned: "Planned",
   idea: "Idea",
 };
+
+/**
+ * "Send this to the end of the series" — the book equivalent of the board's end
+ * slot. A drop onto a card lands the book *before* it, so the tail of the
+ * series has no card left to aim at; this is a card-sized target one gap past
+ * the last book that isn't the one being dragged.
+ *
+ * `null` when the dragged book is already last, where the move is a no-op.
+ */
+function bookEndSlot(
+  books: BookMeta[],
+  draggedId: string
+): { anchorId: string; x: number; y: number } | null {
+  if (books[books.length - 1]?.id === draggedId) return null;
+  const rest = books.filter((b) => b.id !== draggedId);
+  const anchor = rest[rest.length - 1];
+  if (!anchor) return null;
+  return { anchorId: anchor.id, x: anchor.x + BOOK_W + BOOK_GAP_X, y: anchor.y };
+}
+
+/** Is a dragged card's centre over `slot`? */
+function overSlot(slot: { x: number; y: number }, cx: number, cy: number): boolean {
+  return cx >= slot.x && cx <= slot.x + BOOK_W && cy >= slot.y && cy <= slot.y + BOOK_H;
+}
 
 /** The series-level story map: each book is a draggable card; books connect with
  *  labeled lines. Double-click a book to drill into its chapter board. */
@@ -47,6 +71,15 @@ export function SeriesMap() {
   // reorder target — dropping on it offers a resequence via confirmation.
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const dropTargetRef = useRef<string | null>(null);
+  // The end-of-series slot (see `bookEndSlot`). Held as the id of the book it
+  // is anchored to, since the slot is a place and has no id of its own.
+  const [endAnchorId, setEndAnchorId] = useState<string | null>(null);
+  const endAnchorRef = useRef<string | null>(null);
+  // Only drawn once a drag is genuinely under way, so a press that never moves
+  // doesn't flash a ghost card onto the map. The map drag itself lives in a ref
+  // (`drag`), so the id is mirrored into state for the render to anchor against.
+  const [dragMoved, setDragMoved] = useState(false);
+  const [mapDragId, setMapDragId] = useState<string | null>(null);
   // Position + hit-test are coalesced to one update per animation frame
   // (rather than once per native mousemove) so the dragged card, its
   // connector threads, and the highlight all stay in lockstep during a fast
@@ -100,17 +133,25 @@ export function SeriesMap() {
             if (!drag.current || !pendingDragPos.current) return;
             const { x, y } = pendingDragPos.current;
             moveBook(drag.current.id, x, y);
+            setDragMoved(true);
             const cx = x + BOOK_W / 2;
             const cy = y + BOOK_H / 2;
-            const hit = useStore
-              .getState()
-              .doc.books.find(
-                (b) => b.id !== drag.current!.id && cx >= b.x && cx <= b.x + BOOK_W && cy >= b.y && cy <= b.y + BOOK_H
-              );
+            const books = useStore.getState().doc.books;
+            const hit = books.find(
+              (b) => b.id !== drag.current!.id && cx >= b.x && cx <= b.x + BOOK_W && cy >= b.y && cy <= b.y + BOOK_H
+            );
             const hitId = hit?.id ?? null;
             if (dropTargetRef.current !== hitId) {
               dropTargetRef.current = hitId;
               setDropTargetId(hitId);
+            }
+            // A card under the cursor wins; the slot lives in the gap past the
+            // last one, so they only compete if books are stacked.
+            const slot = hitId ? null : bookEndSlot(books, drag.current.id);
+            const anchor = slot && overSlot(slot, cx, cy) ? slot.anchorId : null;
+            if (endAnchorRef.current !== anchor) {
+              endAnchorRef.current = anchor;
+              setEndAnchorId(anchor);
             }
           });
         }
@@ -146,25 +187,52 @@ export function SeriesMap() {
           cancelAnimationFrame(dragRaf.current);
           dragRaf.current = null;
         }
+        // Where the card came to rest, kept for the hit-test below.
+        let finalPos = { x: drag.current.ox, y: drag.current.oy };
         if (pendingDragPos.current) {
-          moveBook(drag.current.id, pendingDragPos.current.x, pendingDragPos.current.y);
+          finalPos = pendingDragPos.current;
+          moveBook(drag.current.id, finalPos.x, finalPos.y);
           pendingDragPos.current = null;
         }
         const draggedId = drag.current.id;
-        const targetId = dropTargetRef.current;
+        // Re-test against the card's *final* position rather than trusting the
+        // refs. Those are only written inside the coalescing rAF, and the
+        // cancel above means a drag ending in the same frame as its last move
+        // never ran one — so they can be a frame stale, or never set at all on
+        // a quick flick. Same reason the board re-tests at release.
+        const books0 = useStore.getState().doc.books;
+        const cx = finalPos.x + BOOK_W / 2;
+        const cy = finalPos.y + BOOK_H / 2;
+        const targetId =
+          books0.find(
+            (b) => b.id !== draggedId && cx >= b.x && cx <= b.x + BOOK_W && cy >= b.y && cy <= b.y + BOOK_H
+          )?.id ?? null;
+        let endId: string | null = null;
+        if (!targetId) {
+          const slot = bookEndSlot(books0, draggedId);
+          if (slot && overSlot(slot, cx, cy)) endId = slot.anchorId;
+        }
         drag.current = null;
-        if (targetId) {
+        setDragMoved(false);
+        setMapDragId(null);
+        if (targetId || endId) {
           const books = useStore.getState().doc.books;
           const dragged = books.find((b) => b.id === draggedId);
-          const target = books.find((b) => b.id === targetId);
-          if (dragged && target) {
-            const after = dragged.x > target.x;
+          const target = targetId ? books.find((b) => b.id === targetId) ?? null : null;
+          if (dragged && (target || endId)) {
+            // A drop onto a card always lands before it — the direction the
+            // card was carried in from says nothing about where it belongs.
+            // The tail of the series has its own slot (see `bookEndSlot`).
+            const where = target ? `before "${target.title}"` : "to the end of the series";
             askConfirm({
               message: "Reorder books?",
-              detail: `"${dragged.title}" will move ${after ? "after" : "before"} "${target.title}", and the map will re-arrange to match.`,
+              detail: `"${dragged.title}" will move ${where}, and the map will re-arrange to match.`,
               confirmLabel: "Reorder",
               onConfirm: () => {
-                reorderBook(draggedId, target.id, after);
+                // `reorderBook` places relative to one book: "before this card"
+                // is `after: false` against it, and "at the end" is `after:
+                // true` against the last book that isn't moving.
+                reorderBook(draggedId, target ? target.id : endId!, !target);
                 autoArrangeSeries();
               },
             });
@@ -172,6 +240,8 @@ export function SeriesMap() {
         }
         dropTargetRef.current = null;
         setDropTargetId(null);
+        endAnchorRef.current = null;
+        setEndAnchorId(null);
       }
       if (timelineDrag.current) {
         const { id, fromIdx } = timelineDrag.current;
@@ -238,6 +308,9 @@ export function SeriesMap() {
     return () => vp.removeEventListener("wheel", onWheel);
   }, [timeline, orient]);
 
+  // Drawn only mid-drag on the map: a target, not furniture.
+  const endGhost = !timeline && mapDragId && dragMoved ? bookEndSlot(doc.books, mapDragId) : null;
+
   const chapterCount = (bookId: string) =>
     bookId === doc.activeBookId
       ? doc.chapters.length
@@ -264,6 +337,7 @@ export function SeriesMap() {
       return;
     }
     drag.current = { id, mx: e.clientX, my: e.clientY, ox: x, oy: y };
+    setMapDragId(id);
   };
 
   const onCardClick = (id: string) => {
@@ -352,6 +426,31 @@ export function SeriesMap() {
         })}
 
         {/* Book cards */}
+        {/* The end-of-series drop slot. Map only: the timeline reorders by live
+            reflow, where dragging past the last card already lands at the end. */}
+        {endGhost && (
+          <div
+            className="flex items-center justify-center rounded-2xl border border-dashed text-[10.5px] font-medium uppercase tracking-[0.14em]"
+            style={{
+              position: "absolute",
+              left: endGhost.x,
+              top: endGhost.y,
+              width: BOOK_W,
+              height: BOOK_H,
+              zIndex: 4,
+              pointerEvents: "none",
+              borderColor: endAnchorId ? "color-mix(in srgb, var(--but) 60%, var(--rule))" : "var(--rule)",
+              color: endAnchorId ? "var(--but)" : "var(--faint)",
+              background: endAnchorId ? "color-mix(in srgb, var(--but) 8%, transparent)" : "transparent",
+              boxShadow: endAnchorId
+                ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent)"
+                : "none",
+            }}
+          >
+            End of series
+          </div>
+        )}
+
         {doc.books.map((b, i) => {
           const isActive = b.id === doc.activeBookId;
           const isConnectSource = connectFrom === b.id;

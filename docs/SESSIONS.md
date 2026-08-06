@@ -3626,3 +3626,86 @@ which is why the ladder was easy to get wrong twice. It now carries the rule, th
 - **`ExportModal` counts every chapter on open** (78ms at 30 chapters).
 - **The smooth-scroll landing after a rail click still needs eyes** — carried
   over from (h); geometry verified, animation never watched.
+
+## 2026-08-05 — A drop lands before the card it hits, and the end gets a slot
+
+Asked for one thing: dragging a chapter onto another should drop it **before**
+that chapter, not after.
+
+### What the old rule actually was
+
+`const after = dragged.x > target.x` — and `dragged.x` is the card's *final*
+position, the one it has while sitting on top of the target. So the comparison
+was not "which side did you drag in from", it was "did your card's origin come
+to rest a few pixels right of the target's origin". The same gesture onto the
+same card could land on either side of it. Replaced with an unconditional
+`before` on both the chapter board and the series map.
+
+### The question that changed the shape of the work
+
+With `before` unconditional, the tail of the book is unreachable: there is no
+card past the last one to aim at. Raised it before writing anything, and the
+answer was to make the space past the last card mean what it looks like it
+means. So there is now an **end slot** — a dashed, card-sized ghost reading
+`End of book` (`End of series` on the map), one grid gap past the last chapter
+that isn't itself moving. Drop a card on it and it goes to the end.
+
+Three things it does that are easy to miss:
+
+- **It hides when the move would be a no-op.** If the cards being dragged are
+  already the tail, there is nothing to offer, so no ghost and no hit test.
+  `chapters.length - 1 - indexOf(anchor) === moving.size` is the whole test.
+- **It waits for the drag to be real.** Every press on a card sets `dragId`, so
+  drawing off that alone flashed a ghost onto the board on every click. It keys
+  off a `dragMoved` state set inside the drag's rAF instead.
+- **It needed no store change.** "At the end" is `after: true` against the last
+  chapter left standing, so `reorderChapter` / `reorderChapters` / `reorderBook`
+  keep their signatures, and the block path anchors past the last chapter *not*
+  in the selection.
+
+### One fix pulled in, deliberately
+
+`SeriesMap`'s map drop read its target from a ref only written inside the
+coalescing rAF — the exact frame-staleness the board fixed when multi-chapter
+reorder landed, never applied here. A quick flick onto the new end slot would
+have silently done nothing. It now re-tests against the card's final position at
+release, like the board. Out of the literal ask, but the alternative was
+shipping a new affordance on a known-unreliable hit test.
+
+### Verified in the running app, not just typechecked
+
+Drove real and synthetic drags against the dev server on the sample story:
+
+- Chapter dropped onto another **landing right of its origin** — the case the
+  old rule called "after" — confirmed `will move before "Crossing the Salt"`,
+  and the resulting order matched.
+- Chapter dropped on the end slot → `will move to the end of the book`, and it
+  landed 8th.
+- **Last** chapter dragged past the end → no dialog, order untouched (the no-op
+  guard).
+- Two chapters modifier-selected, dropped on a third → `The 2 selected chapters
+  will move before "What Pip Knew"`, block order preserved.
+- Book dropped onto another on the series map → `will move before "True North"`;
+  book dropped on the end slot → `will move to the end of the series`, and it
+  became book 3.
+- Both ghosts screenshotted mid-drag. No console errors.
+
+Worth recording about the harness: the preview pane reports `document.hidden`,
+so `requestAnimationFrame` only fires when a screenshot forces a paint. The
+board's drop path survives that because it re-tests at release — which is also
+how the series map behaves now. The live highlight and ghost need a frame, so
+they were captured by stepping the drag screenshot by screenshot.
+
+### Known trade-off, accepted
+
+When the last card sits at the right edge of an auto-arranged row, its end slot
+extends past that edge into empty canvas rather than wrapping to where the next
+row would start. It is transient and only visible mid-drag; row-aware placement
+was judged not worth the geometry.
+
+### Still open, unchanged by this session
+
+- **SPECS §9 items 11, 12, 13** — per-book markdown export, cursor-anchored
+  wheel zoom, images inline as data URLs.
+- **`ExportModal` counts every chapter on open** (78ms at 30 chapters).
+- **The smooth-scroll landing after a rail click still needs eyes.**

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { wordsMeta } from "@/lib/manuscript";
-import { CARD_W, CARD_H, fitToContent, type Camera } from "@/lib/layout";
+import { CARD_W, CARD_H, GRID_GAP_X, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
@@ -24,6 +24,45 @@ function connectorPath(a: { x: number; y: number }, b: { x: number; y: number })
   const y2 = b.y + CARD_H / 2;
   const dx = Math.max(40, Math.abs(x2 - x1) * 0.5);
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+/**
+ * The chapters a drag is carrying: the whole selection when the card picked up
+ * belongs to it, otherwise just that card. Same rule the drop path uses, so the
+ * end slot is anchored against exactly the chapters that are about to move.
+ */
+function movingSet(selected: Set<string>, draggedId: string): Set<string> {
+  return selected.has(draggedId) ? selected : new Set([draggedId]);
+}
+
+/**
+ * Where "send this to the end of the book" lives on the board.
+ *
+ * Dropping a card onto another always lands it *before* that card, so the tail
+ * of the sequence has no card left to aim at. This is the slot that stands in
+ * for one: a card-sized target a single grid gap past the last chapter that
+ * isn't itself moving — the empty space just after the last card, which is
+ * where you'd already be dragging to.
+ *
+ * `null` when the moving chapters *are* the tail. There is no reorder to offer
+ * then, so nothing is drawn and nothing hit-tests.
+ */
+function endSlot(
+  chapters: Chapter[],
+  moving: Set<string>
+): { anchorId: string; x: number; y: number } | null {
+  const rest = chapters.filter((c) => !moving.has(c.id));
+  const anchor = rest[rest.length - 1];
+  if (!anchor) return null;
+  // Everything past the anchor is already moving; if that accounts for all of
+  // it, the block is sitting at the end and appending it would be a no-op.
+  if (chapters.length - 1 - chapters.indexOf(anchor) === moving.size) return null;
+  return { anchorId: anchor.id, x: anchor.x + CARD_W + GRID_GAP_X, y: anchor.y };
+}
+
+/** Is a dragged card's centre over `slot`? */
+function overSlot(slot: { x: number; y: number }, cx: number, cy: number): boolean {
+  return cx >= slot.x && cx <= slot.x + CARD_W && cy >= slot.y && cy <= slot.y + CARD_H;
 }
 
 /**
@@ -62,6 +101,14 @@ export function Board() {
   // Mirrored into a ref for the window-level handlers.
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const dropTargetRef = useRef<string | null>(null);
+  // The same, for the end-of-book slot (see `endSlot`), which is a place rather
+  // than a card and so cannot be named by an id.
+  const [overEnd, setOverEnd] = useState(false);
+  const overEndRef = useRef(false);
+  // The end slot is only drawn once a drag is genuinely under way. Every press
+  // on a card sets `dragId`, so keying the ghost off that alone would flash it
+  // on the board each time someone clicked a chapter open.
+  const [dragMoved, setDragMoved] = useState(false);
   // Position + hit-test are coalesced to one update per animation frame
   // (rather than once per native mousemove, which can fire faster than the
   // screen repaints) so the dragged card, its connectors, and the highlight
@@ -109,17 +156,25 @@ export function Board() {
             if (!drag.current || !pendingDragPos.current) return;
             const { x, y } = pendingDragPos.current;
             moveChapter(drag.current.id, x, y);
+            setDragMoved(true);
             const cx = x + CARD_W / 2;
             const cy = y + CARD_H / 2;
-            const hit = useStore
-              .getState()
-              .doc.chapters.find(
-                (c) => c.id !== drag.current!.id && cx >= c.x && cx <= c.x + CARD_W && cy >= c.y && cy <= c.y + CARD_H
-              );
+            const chapters = useStore.getState().doc.chapters;
+            const hit = chapters.find(
+              (c) => c.id !== drag.current!.id && cx >= c.x && cx <= c.x + CARD_W && cy >= c.y && cy <= c.y + CARD_H
+            );
             const hitId = hit?.id ?? null;
             if (dropTargetRef.current !== hitId) {
               dropTargetRef.current = hitId;
               setDropTargetId(hitId);
+            }
+            // A card under the cursor wins: the slot sits in the gap past the
+            // last card, so the two only ever compete if cards are stacked.
+            const slot = hitId ? null : endSlot(chapters, movingSet(selectedRef.current, drag.current.id));
+            const end = !!slot && overSlot(slot, cx, cy);
+            if (overEndRef.current !== end) {
+              overEndRef.current = end;
+              setOverEnd(end);
             }
           });
         }
@@ -159,50 +214,65 @@ export function Board() {
         // last move never ran one — so the ref can be a frame stale, or never
         // set at all on a quick flick.
         let targetId: string | null = null;
+        let endAnchorId: string | null = null;
         if (!click) {
           const cx = finalPos.x + CARD_W / 2;
           const cy = finalPos.y + CARD_H / 2;
+          const chapters = useStore.getState().doc.chapters;
           targetId =
-            useStore
-              .getState()
-              .doc.chapters.find(
-                (c) =>
-                  c.id !== draggedId &&
-                  cx >= c.x &&
-                  cx <= c.x + CARD_W &&
-                  cy >= c.y &&
-                  cy <= c.y + CARD_H
-              )?.id ?? null;
+            chapters.find(
+              (c) =>
+                c.id !== draggedId &&
+                cx >= c.x &&
+                cx <= c.x + CARD_W &&
+                cy >= c.y &&
+                cy <= c.y + CARD_H
+            )?.id ?? null;
+          if (!targetId) {
+            const slot = endSlot(chapters, movingSet(selectedRef.current, draggedId));
+            if (slot && overSlot(slot, cx, cy)) endAnchorId = slot.anchorId;
+          }
         }
         drag.current = null;
         setDragId(null);
+        setDragMoved(false);
         if (click) openChapter(draggedId);
-        if (targetId) {
+        if (targetId || endAnchorId) {
           const chapters = useStore.getState().doc.chapters;
           const dragged = chapters.find((c) => c.id === draggedId);
-          const target = chapters.find((c) => c.id === targetId);
+          const target = targetId ? chapters.find((c) => c.id === targetId) ?? null : null;
           // Dragging a card that is part of a selection moves the whole
           // selection; dragging an unselected card moves just that card, so the
           // ordinary single reorder is untouched by a selection sitting idle
           // elsewhere on the board. A drop *onto* a selected card is refused by
           // the store, so it is not offered here either.
           const sel = selectedRef.current;
-          const block = sel.has(draggedId) && !sel.has(targetId) ? [...sel] : null;
-          if (dragged && target) {
-            const after = dragged.x > target.x;
-            const where = after ? "after" : "before";
+          const block = sel.has(draggedId) && !(targetId && sel.has(targetId)) ? [...sel] : null;
+          if (dragged && (target || endAnchorId)) {
+            // A drop on a card always lands before it — which way the card was
+            // carried in from says nothing about where its author wants it, and
+            // a rule that reads the drag direction means the same gesture onto
+            // the same card can land on either side of it. The end of the book
+            // is reached by its own slot instead (see `endSlot`).
+            const where = target ? `before "${target.title}"` : "to the end of the book";
             askConfirm({
               message: block ? `Reorder ${block.length} chapters?` : "Reorder chapters?",
               detail: block
-                ? `The ${block.length} selected chapters will move ${where} "${target.title}", keeping the order they're in now. The board will re-arrange to match.`
-                : `"${dragged.title}" will move ${where} "${target.title}", and the board will re-arrange to match.`,
+                ? `The ${block.length} selected chapters will move ${where}, keeping the order they're in now. The board will re-arrange to match.`
+                : `"${dragged.title}" will move ${where}, and the board will re-arrange to match.`,
               confirmLabel: "Reorder",
               onConfirm: () => {
+                // The store places relative to one chapter, so "before this
+                // card" is `after: false` against the card it was dropped on,
+                // and "at the end" is `after: true` against the last chapter
+                // that isn't moving.
+                const anchorId = target ? target.id : endAnchorId!;
+                const after = !target;
                 if (block) {
-                  reorderChapters(block, target.id, after);
+                  reorderChapters(block, anchorId, after);
                   setSelected(new Set());
                 } else {
-                  reorderChapter(draggedId, target.id, after);
+                  reorderChapter(draggedId, anchorId, after);
                 }
                 autoArrangeBoard();
               },
@@ -211,6 +281,8 @@ export function Board() {
         }
         dropTargetRef.current = null;
         setDropTargetId(null);
+        overEndRef.current = false;
+        setOverEnd(false);
       }
       pan.current = null;
     };
@@ -331,6 +403,10 @@ export function Board() {
     void e;
   };
 
+  // Drawn only mid-drag: it is a target, not furniture, and a permanent ghost
+  // card past the end of the book would read as a chapter that isn't there.
+  const endGhost = dragId && dragMoved ? endSlot(doc.chapters, movingSet(selected, dragId)) : null;
+
   const charById = (id: string) => doc.characters.find((c) => c.id === id);
   const castOf = (c: Chapter) => c.chars.flatMap((id) => charById(id) ?? []);
   const titleOf = (c: Chapter) => c.title;
@@ -378,6 +454,32 @@ export function Board() {
             );
           })}
         </svg>
+
+        {/* The end-of-book drop slot. Sits below the cards and takes no pointer
+            events of its own — the drop is decided by hit-testing the dragged
+            card's centre in `onUp`, exactly as a drop onto a card is. */}
+        {endGhost && (
+          <div
+            className="flex items-center justify-center rounded-xl border border-dashed text-[10.5px] font-medium uppercase tracking-[0.14em]"
+            style={{
+              position: "absolute",
+              left: endGhost.x,
+              top: endGhost.y,
+              width: CARD_W,
+              height: CARD_H,
+              zIndex: 4,
+              pointerEvents: "none",
+              borderColor: overEnd ? "color-mix(in srgb, var(--but) 60%, var(--rule))" : "var(--rule)",
+              color: overEnd ? "var(--but)" : "var(--faint)",
+              background: overEnd ? "color-mix(in srgb, var(--but) 8%, transparent)" : "transparent",
+              boxShadow: overEnd
+                ? "0 0 0 3px color-mix(in srgb, var(--but) 32%, transparent), 0 10px 26px color-mix(in srgb, var(--but) 20%, transparent)"
+                : "none",
+            }}
+          >
+            End of book
+          </div>
+        )}
 
         {/* Chapter cards */}
         {doc.chapters.map((c) => {
@@ -498,7 +600,7 @@ export function Board() {
             {selected.size} {selected.size === 1 ? "chapter" : "chapters"} selected
           </span>
           <span className="text-[11.5px] text-faint">
-            drag one onto another chapter to move them all there
+            drop one on a chapter to move them all before it
           </span>
           <span className="mx-[2px] h-[20px] w-px bg-rule" />
           <button
