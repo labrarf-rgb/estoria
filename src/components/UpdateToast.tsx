@@ -15,7 +15,11 @@ export function UpdateToast() {
   if (!applyUpdate || hidden) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[46px] z-[60] flex justify-center">
+    // Above every scrim in the app (modals reach 80). At 60 it rendered *under*
+    // the welcome screen and the dialogs — dimmed by their backdrop and
+    // unclickable, which is worse than not showing it at all. It's a small pill
+    // at the bottom edge, so it never covers a centred dialog's controls.
+    <div className="pointer-events-none fixed inset-x-0 bottom-[46px] z-[90] flex justify-center">
       <div className="pointer-events-auto flex items-center gap-[12px] rounded-full border border-rule bg-card px-[16px] py-[9px] shadow-[var(--shadow)]">
         <span className="text-[12.5px] text-ink">A new version of Estoria is ready.</span>
         <button
