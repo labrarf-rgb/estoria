@@ -47,12 +47,38 @@ async function dropAllCaches() {
 }
 
 /**
+ * Drop shell caches belonging to neither this worker nor the one currently
+ * running the app.
+ *
+ * `activate` can't be the only place this happens. A worker that installs but
+ * never activates — because the reader hasn't taken the update yet — still
+ * fills a cache, so someone who visits across several deploys without ever
+ * reloading collects one whole app shell per deploy. This runs at install
+ * instead, which bounds it to two: the running one, and the one waiting.
+ *
+ * `registration.active` is how an installing worker finds out which version is
+ * in charge; its `?v=` is that worker's cache name.
+ */
+async function dropSupersededShells() {
+  const keep = new Set([SHELL]);
+  const active = self.registration.active?.scriptURL;
+  if (active) keep.add(`estoria-shell-${new URL(active).searchParams.get("v") || "dev"}`);
+  const names = await caches.keys();
+  await Promise.all(
+    names
+      .filter((n) => n.startsWith("estoria-shell-") && !keep.has(n))
+      .map((n) => caches.delete(n)),
+  );
+}
+
+/**
  * Precache the shell at install time by reading index.html and pulling the
  * hashed /assets/ URLs out of it. Without this, a first visit would cache
  * nothing (the worker doesn't control the page that loaded it), and Estoria
  * would only work offline from the second visit on.
  */
 async function precache() {
+  await dropSupersededShells(); // free the space before claiming more of it
   const cache = await caches.open(SHELL);
   const urls = new Set(["./", "./manifest.webmanifest", "./favicon-32.png", "./icon-192.png"]);
   try {
