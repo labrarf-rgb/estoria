@@ -198,7 +198,7 @@ estoria/
   **One deliberate exception, and it is not copy:** the em dashes emitted by
   `lib/markdown.ts` are **field separators in the export format**
   (`- **Name** — role | archetype`). The importer parses them
-  (`markdown.ts:272`, `:331`), the AI import prompt documents them literally,
+  (`parseCharacters`, `parseWorld`), the AI import prompt documents them literally,
   and the Android app reads the same files, so "cleaning" them would desync
   every vault already on disk. Leave them.
 
@@ -388,6 +388,17 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   user's text to satisfy a layout constraint only one app has.** Not a schema
 >   change and not a cross-app event; recorded only so the number is not mistaken
 >   for a model constraint later.
+> - **The `#### Manuscript` import block (2026-08-06) is a web-side addition to
+>   the *AI import prompt's* markdown schema, not to `.estoria.json` — so it is
+>   **not a cross-app event**, and prose written on either side still travels
+>   between them through the JSON's existing `Chapter.manuscript` as before.
+>   Worth knowing anyway: `Estoria-aa/lib/MarkdownImport.kt` has its own copy of
+>   this parser and knows nothing about the block, and its scene regex is
+>   `^\d+[.)]\s+`, so a *Map + manuscript* file imported **on the phone** would
+>   drop every chapter's prose and could read a prose paragraph that happens to
+>   begin `1. ` as a scene. The web app avoids exactly that by splitting the
+>   block off before scene matching. If Android ever grows the same import mode,
+>   port the split first; until then, import those files on the web.
 > - The planned Google sign-in + Drive work (§8) is intended to be **shared** by
 >   both apps (same Google identity, one Drive file). Decisions made for the web
 >   OAuth/Drive setup should not preclude a second (Android) OAuth client under

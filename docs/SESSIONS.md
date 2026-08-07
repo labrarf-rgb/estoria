@@ -3889,3 +3889,18 @@ four-part prose key. `tsc -b` clean.
   purpose (§4, "two exports with different purposes"); the manuscript export
   already covers the other direction. So a prose import does not round-trip
   through the Obsidian file — it round-trips through the project file.
+
+**Shipped** the same day: `e1f2e95` pushed to `origin/main` and deployed — prod
+reported the commit at `https://www.labrarf.com/estoria`.
+
+**Spec drift found while shipping, both now corrected:** §3's em-dash exception
+still cited `markdown.ts:272` / `:331` for the two parsers that read the
+separator, and both numbers had drifted (they are `parseCharacters` and
+`parseWorld`, now around `:317` and `:379`) — the citation is by function name
+now, so the next edit to this file cannot invalidate it. And §8's cross-project
+notes said nothing about the new `#### Manuscript` block: it is not a cross-app
+event, since it changes the *import prompt's* markdown schema and not
+`.estoria.json`, but Android carries its own copy of this parser, does not know
+the block, and has the same `^\d+[.)]\s+` scene regex the web split now guards
+against — so that file should be imported on the web until Android ports the
+split.
