@@ -3914,17 +3914,20 @@ works offline.
 
 ### The icon
 
-Ray's artwork — a tilted story card, the paper stock of the board, a green
-`therefore` dot and four ink rules. Rebuilt as SVG so it holds up at 16px in a
-tab as well as 512 on a home screen: `public/icon.svg` (transparent, the mark
-itself) and `public/icon-maskable.svg` (full-bleed on `#e9e0cd`, card at 0.72
-so no platform's crop can clip a corner).
+Ray's artwork: a tilted story card in the board's paper stock, a green
+`therefore` dot, four ink rules, soft drop shadow. `public/icon-source.png`
+(1024²) is the source of truth and `scripts/make-icons.sh` derives everything
+from it — 512/192/32, a maskable 512, a 180 apple-touch icon.
 
-`scripts/make-icons.sh` renders the PNGs — 512/192/32, a maskable 512, and a
-180 apple-touch icon at a fuller 0.85 since Apple applies only its own rounded
-rect. It rasterizes through headless Chrome rather than ImageMagick, whose
-internal SVG renderer gets stroke geometry on rotated groups wrong. The PNGs
-are committed; the script runs by hand when the art changes, never in a build.
+*First attempt, discarded:* the image was only ever in the chat, never on
+disk, so it was traced as SVG from sight. Ray put the real file in the repo and
+the trace was out — flat where the original has a shadow, and even in the edges
+where the original is weighted. Tracing artwork you can see but can't read is
+not worth it; ask for the file. The SVGs are gone.
+
+Every size is flattened onto `#e9e0cd` rather than left transparent, on Ray's
+call: an app icon is never seen on nothing, and a transparent one reads as a
+cutout on a dark dock with its shadow falling on air.
 
 ### Installable, and offline
 
@@ -3958,9 +3961,36 @@ are committed; the script runs by hand when the art changes, never in a build.
   the one-click Install button the moment that event arrives.
 - `npm run build` clean, no console errors.
 
+### The way back out (added the same session, at Ray's call)
+
+A service worker is the first thing Estoria ships that keeps running on someone
+else's machine after a bad deploy, so both exits were built before they were
+needed:
+
+- **Fleet-wide** — `KILL_SWITCH = true` at the top of `public/sw.js`, commit,
+  deploy. Every copy skips waiting, drops every `estoria-` cache, unregisters
+  and answers nothing. It reaches clients even behind a broken cached shell,
+  because the browser always re-fetches `sw.js` from the network on navigation:
+  a cache can't hide the switch from itself. It reloads nobody — the session in
+  front of the user stays up and their *next* load is uncontrolled.
+- **One person** — `…/estoria/?sw=off`, a link that fits in a reply, with
+  `?sw=on` to allow it again. Sticky via a localStorage flag: the first cut
+  wasn't, and testing showed the reload at the end of the teardown promptly
+  re-registered the worker — a decent cache repair, no use at all if the worker
+  is the problem. Runs from `main.tsx` before React renders, since the shell
+  it's rescuing someone from may be why the app won't mount.
+
+Both verified against the production preview: armed, one visit left zero
+registrations and zero caches with the app still running; disarmed, the next
+visit re-registered `sw.js?v=140` and refilled the shell cache. `?sw=off` left
+nothing behind and survived a plain reload; `?sw=on` brought it back.
+
 ### Not done, deliberately
 
 - No push and no deploy — this is committed on `feature/installable-app` and
   waiting on Ray.
+- No SVG favicon. The artwork is a raster with a soft shadow; a vector version
+  would be a second thing to keep in sync with it, and 32px is small enough
+  that the downscale holds up.
 - No iOS-specific splash screens. They're a pile of per-device PNGs for a
   case (Estoria on an iPhone) that the board isn't laid out for anyway.

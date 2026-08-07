@@ -16,9 +16,35 @@
  * from under someone mid-sentence. See src/lib/sw.ts.
  */
 
+/**
+ * KILL SWITCH — flip to `true`, commit, `npm run deploy`.
+ *
+ * Every installed copy then tears itself down on its next visit: caches
+ * deleted, registration unregistered, every request straight to the network.
+ * This is the way back out if a cached shell ever goes bad, and it's here
+ * because there is otherwise no way to reach code that's already on someone
+ * else's machine.
+ *
+ * It works even when the shell is badly broken, because a service worker
+ * script is never served by itself — the browser re-fetches sw.js from the
+ * network on navigation, so a deployed `true` reaches clients regardless of
+ * what's in their cache.
+ *
+ * It does NOT reload anyone: it clears the caches and steps out of the way, so
+ * the session in front of the user keeps working and their next load is a
+ * plain, uncontrolled one. Flip it back to `false` when the cause is fixed.
+ */
+const KILL_SWITCH = false;
+
 const BUILD = new URL(self.location.href).searchParams.get("v") || "dev";
 const SHELL = `estoria-shell-${BUILD}`;
 const FONTS = "estoria-fonts"; // survives builds — the webfonts don't change
+
+/** Delete every cache this app has ever created. */
+async function dropAllCaches() {
+  const names = await caches.keys();
+  await Promise.all(names.filter((n) => n.startsWith("estoria-")).map((n) => caches.delete(n)));
+}
 
 /**
  * Precache the shell at install time by reading index.html and pulling the
@@ -28,7 +54,7 @@ const FONTS = "estoria-fonts"; // survives builds — the webfonts don't change
  */
 async function precache() {
   const cache = await caches.open(SHELL);
-  const urls = new Set(["./", "./manifest.webmanifest", "./icon.svg", "./icon-192.png"]);
+  const urls = new Set(["./", "./manifest.webmanifest", "./favicon-32.png", "./icon-192.png"]);
   try {
     const res = await fetch("./", { cache: "reload" });
     const html = await res.text();
@@ -42,11 +68,21 @@ async function precache() {
   await Promise.all([...urls].map((u) => cache.add(u).catch(() => {})));
 }
 
-self.addEventListener("install", (e) => e.waitUntil(precache()));
+self.addEventListener("install", (e) => {
+  // Disarmed: take over immediately rather than waiting politely behind the
+  // worker we're here to replace.
+  if (KILL_SWITCH) return void self.skipWaiting();
+  e.waitUntil(precache());
+});
 
 self.addEventListener("activate", (e) =>
   e.waitUntil(
     (async () => {
+      if (KILL_SWITCH) {
+        await dropAllCaches();
+        await self.registration.unregister();
+        return;
+      }
       const names = await caches.keys();
       await Promise.all(
         names
@@ -72,6 +108,9 @@ async function cacheFirst(req, cacheName) {
 }
 
 self.addEventListener("fetch", (e) => {
+  // Disarmed: answer nothing, so every request goes to the network exactly as
+  // it would with no worker installed at all.
+  if (KILL_SWITCH) return;
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);

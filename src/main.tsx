@@ -4,10 +4,16 @@ import "./index.css";
 // Side-effect import: the install prompt event fires before React mounts, so
 // its listener has to be registered at startup (see lib/install.ts).
 import "@/lib/install";
+import { resetIfRequested } from "@/lib/sw";
 import { App } from "@/App";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+// "?sw=off" tears out the service worker and its caches, then reloads. It runs
+// before anything else because the shell it rescues someone from could be the
+// reason the app fails to render at all. See lib/sw.ts.
+if (!resetIfRequested()) {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
