@@ -3915,8 +3915,8 @@ works offline.
 ### The icon
 
 Ray's artwork: a tilted story card in the board's paper stock, a green
-`therefore` dot, four ink rules, soft drop shadow. `public/icon-source.png`
-(1024²) is the source of truth and `scripts/make-icons.sh` derives everything
+`therefore` dot, four ink rules, soft drop shadow. `art/icon-source.png`
+(1024², outside `public/` so the master isn't shipped) is the source of truth and `scripts/make-icons.sh` derives everything
 from it — 512/192/32, a maskable 512, a 180 apple-touch icon.
 
 *First attempt, discarded:* the image was only ever in the chat, never on
@@ -3925,9 +3925,18 @@ the trace was out — flat where the original has a shadow, and even in the edge
 where the original is weighted. Tracing artwork you can see but can't read is
 not worth it; ask for the file. The SVGs are gone.
 
-Every size is flattened onto `#e9e0cd` rather than left transparent, on Ray's
-call: an app icon is never seen on nothing, and a transparent one reads as a
-cutout on a dark dock with its shadow falling on air.
+*Second correction:* the first pass downscaled the source as-is, which left
+the card small and adrift inside the transparent margin the artwork carries.
+Ray sent a crop showing what he meant — the card filling the frame — so every
+size now trims to the artwork and pads back to square.
+
+Corners were settled by rendering both options at 128/64/32 on a dark dock and
+a light one rather than by argument. The plain sizes stay transparent: on a
+dark dock the cream tile reads as two rectangles competing, and at 32px the
+transparent card holds up better. Maskable and apple-touch are flattened onto
+`#e9e0cd` anyway — not by preference, but because a maskable icon must be
+full-bleed by spec and iOS puts solid black behind a transparent apple-touch
+icon.
 
 ### Installable, and offline
 
