@@ -83,6 +83,26 @@ export function isStandalone(): boolean {
   );
 }
 
+/**
+ * Running inside an iframe.
+ *
+ * Chrome never fires `beforeinstallprompt` in a frame — installability belongs
+ * to the top-level page — so a framed Estoria can't offer the real button, and
+ * the browser's own install menu would target the *host* page rather than this
+ * one. Production hits this: labrarf.com/estoria-app.html is a full-page iframe
+ * around /estoria/.
+ *
+ * A cross-origin parent makes `window.top` throw on access, which is itself
+ * proof of being framed.
+ */
+export function isFramed(): boolean {
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
 export type Browser = "chromium" | "safari" | "ios-safari" | "firefox" | "other";
 
 /**

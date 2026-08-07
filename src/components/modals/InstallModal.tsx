@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop } from "@/components/ui/Overlay";
-import { detectBrowser, promptInstall, useCanInstall, type Browser } from "@/lib/install";
+import {
+  detectBrowser,
+  isFramed,
+  promptInstall,
+  useCanInstall,
+  type Browser,
+} from "@/lib/install";
 
 /**
  * File → Install Estoria.
@@ -57,6 +63,11 @@ export function InstallModal() {
     else setDismissed(true);
   };
 
+  // Embedded (labrarf.com/estoria-app.html iframes this app). No prompt can
+  // fire in a frame, and the browser's install menu would take the page around
+  // us instead — so the honest move is to hand over a top-level tab rather than
+  // give steps that install the wrong thing.
+  const framed = isFramed();
   const steps = STEPS[detectBrowser()];
 
   return (
@@ -78,7 +89,24 @@ export function InstallModal() {
             <li>· Same projects, same browser storage — nothing moves or is copied</li>
           </ul>
 
-          {canInstall && !dismissed ? (
+          {framed ? (
+            <div className="mt-[16px]">
+              <div className="text-[12.5px] leading-[1.55] text-soft">
+                Estoria is running inside another page here, and a browser can only
+                install a page that's open on its own. Open it in its own tab and the
+                Install option will be waiting in the same menu.
+              </div>
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="mt-[12px] inline-block rounded-lg bg-ink px-[14px] py-[7px] text-[13px] font-semibold text-bg"
+              >
+                Open Estoria in its own tab
+              </a>
+            </div>
+          ) : canInstall && !dismissed ? (
             <div className="mt-[16px] text-[12px] text-faint">
               Your browser can do this in one step.
             </div>
@@ -104,9 +132,9 @@ export function InstallModal() {
             onClick={close}
             className="rounded-lg border border-rule bg-card px-[14px] py-[7px] text-[13px] font-medium text-ink hover:border-faint"
           >
-            {canInstall && !dismissed ? "Not now" : "Close"}
+            {canInstall && !dismissed && !framed ? "Not now" : "Close"}
           </button>
-          {canInstall && !dismissed && (
+          {canInstall && !dismissed && !framed && (
             <button
               onClick={onInstall}
               className="rounded-lg bg-ink px-[14px] py-[7px] text-[13px] font-semibold text-bg"
