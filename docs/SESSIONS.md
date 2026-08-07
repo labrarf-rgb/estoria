@@ -3880,6 +3880,26 @@ parsed as the three real beats, not five. Opened it — card 01 reads
 IndexedDB holds the chapter's prose verbatim, `***` and quotes intact, under the
 four-part prose key. `tsc -b` clean.
 
+### Found while verifying, and fixed
+
+- **The welcome screen still showed a serif `E` in a black box**, a placeholder
+  from before there was artwork. Now `AppIcon` — the same file the tab, the
+  install prompt and the dock use — in a 64px circle. Ray picked the circle from
+  four variants rendered side by side in the running app, on the rule that the
+  card keeps its full 40px and the circle grows to hold it, rather than the card
+  shrinking to fit. (57px is where a rotated 40px square just fits, and reads as
+  a near-miss.) The `E` boxes Ray saw elsewhere were Chrome's fallback favicon.
+- **Superseded shell caches were piling up.** They were only swept on activate,
+  but a worker that installs and then *waits* — because the reader hasn't taken
+  the update — has already filled its cache. Three were sitting in the test
+  browser. The sweep runs at install too now, keeping this worker's cache and
+  the running one's; an installing worker finds the latter through
+  `registration.active`, whose `?v=` is its cache name. Bounded at two.
+- **The update toast was unclickable** whenever it mattered most: at `z-60` it
+  rendered under the welcome screen (70) and the modals (80), dimmed by their
+  backdrop and dead to a click. Found by clicking Reload during onboarding and
+  watching nothing happen. Now above them.
+
 ### Not done, deliberately
 
 - **Merging an import into the open project.** Import still opens a new one.
@@ -3904,3 +3924,123 @@ event, since it changes the *import prompt's* markdown schema and not
 the block, and has the same `^\d+[.)]\s+` scene regex the web split now guards
 against — so that file should be imported on the web until Android ports the
 split.
+
+## 2026-08-06 (c) — Estoria installs as an app
+
+Estoria could be saved as a Chrome app before this, but it came with a generic
+icon and the browser's default guesses at its name, and it needed the network
+to open. Now it's a real installable app with its own artwork, and the shell
+works offline.
+
+### The icon
+
+Ray's artwork: a tilted story card in the board's paper stock, a green
+`therefore` dot, four ink rules, soft drop shadow. `art/icon-source.png`
+(1024², outside `public/` so the master isn't shipped) is the source of truth and `scripts/make-icons.sh` derives everything
+from it — 512/192/32, a maskable 512, a 180 apple-touch icon.
+
+*First attempt, discarded:* the image was only ever in the chat, never on
+disk, so it was traced as SVG from sight. Ray put the real file in the repo and
+the trace was out — flat where the original has a shadow, and even in the edges
+where the original is weighted. Tracing artwork you can see but can't read is
+not worth it; ask for the file. The SVGs are gone.
+
+*Second correction:* the first pass downscaled the source as-is, which left
+the card small and adrift inside the transparent margin the artwork carries.
+Ray sent a crop showing what he meant — the card filling the frame — so every
+size now trims to the artwork and pads back to square.
+
+Corners were settled by rendering both options at 128/64/32 on a dark dock and
+a light one rather than by argument. The plain sizes stay transparent: on a
+dark dock the cream tile reads as two rectangles competing, and at 32px the
+transparent card holds up better. Maskable and apple-touch are flattened onto
+`#fffdf6` (`--card`, matching the welcome circle's surround — on the canvas
+colour a card reads as one object among many) anyway — not by preference, but because a maskable icon must be
+full-bleed by spec and iOS puts solid black behind a transparent apple-touch
+icon.
+
+### Installable, and offline
+
+- `public/manifest.webmanifest` — standalone display, paper background, the
+  icon set. Every URL in it is relative, because `public/` bypasses Vite and a
+  relative URL resolves against the manifest itself: `/` in dev, `/estoria/`
+  in prod, with nothing to configure. The `<link>` tags in `index.html` use
+  root-absolute paths instead, which Vite *does* rewrite with the base.
+- `public/sw.js` — app-shell cache. Registered as `sw.js?v=<build>` so the
+  existing commit-count build number is both what triggers an update and what
+  keys the cache. `version.json` is explicitly never cached; it's what
+  `npm run deploy` verifies against.
+- `src/lib/install.ts` — captures `beforeinstallprompt` at module scope
+  (it fires before React mounts) and exposes it through `useSyncExternalStore`.
+- File → **Install Estoria** — one button on Chromium, per-browser directions
+  on Safari/iOS/Firefox, hidden entirely once running standalone.
+- `UpdateToast` — a new build waits rather than taking over, so no reload ever
+  lands mid-sentence.
+
+### Verified in the running app
+
+- Production preview at `/estoria/`: worker registered as `sw.js?v=139`, scope
+  `/estoria/`, manifest `start_url` and `scope` both resolving to
+  `/estoria/`, icons to `/estoria/icon-192.png`.
+- Precache after one visit held the shell HTML, both hashed assets, the
+  manifest and icons, plus four webfont files in `estoria-fonts`.
+- **Stopped the server and reloaded** — the board rendered in full, Spectral
+  and Hanken Grotesk included. Offline is real, not theoretical.
+- File menu shows Install Estoria above About; the dialog shows the Chromium
+  steps in the in-app browser (no `beforeinstallprompt` there), and swaps to
+  the one-click Install button the moment that event arrives.
+- `npm run build` clean, no console errors.
+
+### The way back out (added the same session, at Ray's call)
+
+A service worker is the first thing Estoria ships that keeps running on someone
+else's machine after a bad deploy, so both exits were built before they were
+needed:
+
+- **Fleet-wide** — `KILL_SWITCH = true` at the top of `public/sw.js`, commit,
+  deploy. Every copy skips waiting, drops every `estoria-` cache, unregisters
+  and answers nothing. It reaches clients even behind a broken cached shell,
+  because the browser always re-fetches `sw.js` from the network on navigation:
+  a cache can't hide the switch from itself. It reloads nobody — the session in
+  front of the user stays up and their *next* load is uncontrolled.
+- **One person** — `…/estoria/?sw=off`, a link that fits in a reply, with
+  `?sw=on` to allow it again. Sticky via a localStorage flag: the first cut
+  wasn't, and testing showed the reload at the end of the teardown promptly
+  re-registered the worker — a decent cache repair, no use at all if the worker
+  is the problem. Runs from `main.tsx` before React renders, since the shell
+  it's rescuing someone from may be why the app won't mount.
+
+Both verified against the production preview: armed, one visit left zero
+registrations and zero caches with the app still running; disarmed, the next
+visit re-registered `sw.js?v=140` and refilled the shell cache. `?sw=off` left
+nothing behind and survived a plain reload; `?sw=on` brought it back.
+
+### Found while verifying, and fixed
+
+- **The welcome screen still showed a serif `E` in a black box**, a placeholder
+  from before there was artwork. Now `AppIcon` — the same file the tab, the
+  install prompt and the dock use — in a 64px circle. Ray picked the circle from
+  four variants rendered side by side in the running app, on the rule that the
+  card keeps its full 40px and the circle grows to hold it, rather than the card
+  shrinking to fit. (57px is where a rotated 40px square just fits, and reads as
+  a near-miss.) The `E` boxes Ray saw elsewhere were Chrome's fallback favicon.
+- **Superseded shell caches were piling up.** They were only swept on activate,
+  but a worker that installs and then *waits* — because the reader hasn't taken
+  the update — has already filled its cache. Three were sitting in the test
+  browser. The sweep runs at install too now, keeping this worker's cache and
+  the running one's; an installing worker finds the latter through
+  `registration.active`, whose `?v=` is its cache name. Bounded at two.
+- **The update toast was unclickable** whenever it mattered most: at `z-60` it
+  rendered under the welcome screen (70) and the modals (80), dimmed by their
+  backdrop and dead to a click. Found by clicking Reload during onboarding and
+  watching nothing happen. Now above them.
+
+### Not done, deliberately
+
+- No push and no deploy — this is committed on `feature/installable-app` and
+  waiting on Ray.
+- No SVG favicon. The artwork is a raster with a soft shadow; a vector version
+  would be a second thing to keep in sync with it, and 32px is small enough
+  that the downscale holds up.
+- No iOS-specific splash screens. They're a pile of per-device PNGs for a
+  case (Estoria on an iPhone) that the board isn't laid out for anyway.

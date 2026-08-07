@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
+import { isStandalone } from "@/lib/install";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -500,6 +501,14 @@ export function Toolbar() {
             <span className="text-[12.5px] font-semibold text-ink">Contact</span>
             <span className="text-[11px] font-normal text-soft">Questions, feedback, or say hello</span>
           </a>
+          {/* Pointless once Estoria is already running in its own window. */}
+          {!isStandalone() && (
+            <MenuItem
+              title="Install Estoria"
+              sub="Own window and icon, works offline"
+              onClick={() => setPanel("showInstall", true)}
+            />
+          )}
           <MenuItem title="About Estoria" onClick={() => setPanel("showAbout", true)} />
         </Popover>
       </div>

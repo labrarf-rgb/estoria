@@ -31,6 +31,7 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 | `npm run build` | Typecheck + production build to `dist/` |
 | `npm run typecheck` | Types only |
 | `npm run preview` | Serve the production build |
+| `npm run icons` | Regenerate the app icon PNGs from `public/*.svg` (needs ImageMagick + Chrome) |
 | `npm run deploy` | Build + publish to www.labrarf.com/estoria, then verify the deployed commit is live (refuses a dirty tree) |
 
 ## Versioning / confirming a deploy

@@ -119,6 +119,7 @@ interface UiState {
   showProjects: boolean;
   showBackups: boolean;
   showAbout: boolean;
+  showInstall: boolean;
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
@@ -423,7 +424,8 @@ export type PanelKey =
   | "showNewBook"
   | "showProjects"
   | "showBackups"
-  | "showAbout";
+  | "showAbout"
+  | "showInstall";
 
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
@@ -645,6 +647,7 @@ const initialUi: UiState = {
   showProjects: false,
   showBackups: false,
   showAbout: false,
+  showInstall: false,
   selChar: null,
   selWorld: null,
   selBook: null,

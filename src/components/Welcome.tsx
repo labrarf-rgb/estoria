@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 /** First-launch chooser: explore the sample story, or start a fresh project. */
 export function Welcome() {
@@ -14,8 +15,11 @@ export function Welcome() {
     >
       <div className="w-[min(720px,100%)] overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-[12px] border-b border-rule px-[28px] py-[22px]">
-          <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px] bg-ink font-serif text-[18px] font-semibold text-bg">
-            E
+          {/* The card keeps its full 40px and the circle is sized to hold it —
+              57px is where a rotated 40px square just fits, so 64 leaves the
+              corners room to breathe rather than grazing the edge. */}
+          <div className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-full border border-rule bg-card">
+            <AppIcon size={40} />
           </div>
           <div>
             <div className="font-serif text-[22px] font-semibold text-ink">Welcome to Estoria</div>

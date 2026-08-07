@@ -18,7 +18,9 @@ import { NewBookModal } from "@/components/modals/NewBookModal";
 import { ProjectsModal } from "@/components/modals/ProjectsModal";
 import { BackupsModal } from "@/components/modals/BackupsModal";
 import { AboutModal } from "@/components/modals/AboutModal";
+import { InstallModal } from "@/components/modals/InstallModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { UpdateToast } from "@/components/UpdateToast";
 
 export function App() {
   const theme = useStore((s) => s.theme);
@@ -59,9 +61,11 @@ export function App() {
       <ProjectsModal />
       <BackupsModal />
       <AboutModal />
+      <InstallModal />
       <ConfirmDialog />
       <Lightbox />
       <Welcome />
+      <UpdateToast />
     </div>
   );
 }
