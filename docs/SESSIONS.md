@@ -4035,10 +4035,18 @@ nothing behind and survived a plain reload; `?sw=on` brought it back.
   backdrop and dead to a click. Found by clicking Reload during onboarding and
   watching nothing happen. Now above them.
 
-### Not done, deliberately
+### Shipped
 
-- No push and no deploy — this is committed on `feature/installable-app` and
-  waiting on Ray.
+Merged to `main` and deployed the same session. Prod verified directly rather
+than assumed: `version.json` reports `95da87d` / build 148; `manifest.webmanifest`
+serves as `application/manifest+json`; all five icons and `sw.js` return 200;
+`KILL_SWITCH` reads `false` in the deployed worker; `icon-source.png` 404s,
+confirming the 450KB master isn't being served. Loading
+`https://www.labrarf.com/estoria/` registered `sw.js?v=148` at scope
+`/estoria/` and precached the shell — index, both hashed assets, manifest and
+icons — on the first visit.
+
+### Not done, deliberately
 - No SVG favicon. The artwork is a raster with a soft shadow; a vector version
   would be a second thing to keep in sync with it, and 32px is small enough
   that the downscale holds up.
