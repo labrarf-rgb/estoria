@@ -4052,3 +4052,44 @@ icons — on the first visit.
   that the downscale holds up.
 - No iOS-specific splash screens. They're a pile of per-device PNGs for a
   case (Estoria on an iPhone) that the board isn't laid out for anyway.
+
+## 2026-08-06 (d) — The install button was unreachable in production
+
+Ray: the Install button appears on `localhost:5200/estoria/`, but the live app
+at labrarf.com shows manual instructions instead.
+
+**Cause.** Production reached Estoria through `estoria-app.html`, a full-page
+iframe around `/estoria/`. `beforeinstallprompt` only fires for a top-level
+page, so inside the frame there was nothing to offer. Worse, the fallback steps
+were wrong twice over: Chrome's install menu would have targeted the wrapper,
+which carries no manifest of its own, producing a plain shortcut rather than
+Estoria with its name and icon. Localhost was fine only because it loads
+`/estoria/` directly.
+
+**Two fixes, because there were two problems.**
+
+- *The app now tells the truth when framed.* `isFramed()` in `lib/install.ts`
+  (a cross-origin parent makes `window.top` throw, which is itself the answer),
+  and `InstallModal` swaps its steps for an explanation and a link that opens
+  Estoria top-level. This stays useful for old links and any other embedder.
+- *The site stopped wrapping it.* `estoria.html`'s two demo buttons link
+  straight to `/estoria/`. The wrapper only ever gave the app a URL on the
+  site; same-origin — the thing that makes the folder picker work — comes from
+  serving `/estoria/` out of the portfolio repo, not from the iframe. So it
+  bought nothing and cost the install. Recorded in the portfolio's SITE-GUIDE
+  as a rule, since it will recur: any project that ships a manifest must be
+  linked directly, never wrapped.
+
+### Verified in production
+
+- `estoria.html` serves two `href="/estoria/"` links and zero to the wrapper.
+- `/estoria/version.json` reports `3cdb718`, build 151.
+- The framed copy is present in the shipped bundle.
+- The framed branch itself was checked before shipping, against a local replica
+  of the production wrapper: explanation, a working "Open Estoria in its own
+  tab", and no dead Install button.
+
+### Drift corrected in the specs
+
+§8's hosting notes still described `estoria-app.html` as iframing `/estoria/`
+as the live arrangement. Rewritten, with the reason the wrapper is gone.

@@ -641,14 +641,20 @@ extensions that go beyond the original to-do.** The web behavior is now:
 
 ### Hosting migration (updated 2026-07-02 — see Session 22)
 
-- **The embed is now a same-origin copy.** The built app is synced into the
-  portfolio repo (`Portfolio-Website/estoria/`, via `npm run deploy` — the old
-  `sync:portfolio` script it replaced in Session 42)
-  and served at **www.labrarf.com/estoria/**; `estoria-app.html` iframes
-  `/estoria/`. Reason: Chromium blocks the File System Access pickers
-  (backup folder) in cross-origin iframes with no `allow` delegation, so the
-  old github.io iframe couldn't offer folder backups. Same-origin fixes it
-  and keeps Ray's URL on top.
+- **The app is served same-origin, and no longer embedded.** The built app is
+  synced into the portfolio repo (`Portfolio-Website/estoria/`, via
+  `npm run deploy` — the old `sync:portfolio` script it replaced in Session 42)
+  and served at **www.labrarf.com/estoria/**. Same-origin was the fix for
+  Chromium blocking the File System Access pickers (backup folder) in
+  cross-origin iframes with no `allow` delegation, so the old github.io iframe
+  couldn't offer folder backups.
+- **`estoria.html` links straight to `/estoria/` (2026-08-06).** It used to
+  point at `estoria-app.html`, a full-page iframe around `/estoria/`, and that
+  wrapper made the app uninstallable: `beforeinstallprompt` never fires in a
+  frame, and the browser's install menu would have targeted the wrapper, which
+  carries no manifest. Same-origin comes from serving `/estoria/` out of the
+  portfolio repo, not from the iframe, so the wrapper bought nothing. It still
+  exists for old links, and the app detects being framed (below).
 - **Privatizing this repo is no longer blocked on Vercel.** The live demo now
   ships from the (public) portfolio repo as build output; the estoria source
   repo's own Pages site (`labrarf-rgb.github.io/estoria/`) is a secondary
@@ -747,6 +753,15 @@ install. A new build sits in `waiting` and `UpdateToast` offers a reload;
 swapping the running code out mid-session would reload the page under someone
 in the middle of a sentence. Dismissing is safe — the update lands on the next
 reload regardless.
+
+**A frame blocks installing, so the dialog says so.** `beforeinstallprompt`
+only fires for a top-level page. Inside an iframe there is no prompt to offer,
+*and* the browser's own install menu would target the host page rather than
+Estoria — so manual steps there would install the wrong thing. `isFramed()`
+catches it and the dialog offers a top-level tab instead. A cross-origin parent
+makes `window.top` throw on access, which is itself proof of being framed, so
+the check holds both ways. This was live for one deploy: production reached
+Estoria through `estoria-app.html`, an iframe wrapper, now unlinked.
 
 **Getting back out — two switches.** A service worker is the one thing Estoria
 ships that keeps running on someone else's machine after a bad deploy, so both
