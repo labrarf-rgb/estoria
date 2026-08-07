@@ -3880,6 +3880,26 @@ parsed as the three real beats, not five. Opened it — card 01 reads
 IndexedDB holds the chapter's prose verbatim, `***` and quotes intact, under the
 four-part prose key. `tsc -b` clean.
 
+### Found while verifying, and fixed
+
+- **The welcome screen still showed a serif `E` in a black box**, a placeholder
+  from before there was artwork. Now `AppIcon` — the same file the tab, the
+  install prompt and the dock use — in a 64px circle. Ray picked the circle from
+  four variants rendered side by side in the running app, on the rule that the
+  card keeps its full 40px and the circle grows to hold it, rather than the card
+  shrinking to fit. (57px is where a rotated 40px square just fits, and reads as
+  a near-miss.) The `E` boxes Ray saw elsewhere were Chrome's fallback favicon.
+- **Superseded shell caches were piling up.** They were only swept on activate,
+  but a worker that installs and then *waits* — because the reader hasn't taken
+  the update — has already filled its cache. Three were sitting in the test
+  browser. The sweep runs at install too now, keeping this worker's cache and
+  the running one's; an installing worker finds the latter through
+  `registration.active`, whose `?v=` is its cache name. Bounded at two.
+- **The update toast was unclickable** whenever it mattered most: at `z-60` it
+  rendered under the welcome screen (70) and the modals (80), dimmed by their
+  backdrop and dead to a click. Found by clicking Reload during onboarding and
+  watching nothing happen. Now above them.
+
 ### Not done, deliberately
 
 - **Merging an import into the open project.** Import still opens a new one.
@@ -3993,6 +4013,26 @@ Both verified against the production preview: armed, one visit left zero
 registrations and zero caches with the app still running; disarmed, the next
 visit re-registered `sw.js?v=140` and refilled the shell cache. `?sw=off` left
 nothing behind and survived a plain reload; `?sw=on` brought it back.
+
+### Found while verifying, and fixed
+
+- **The welcome screen still showed a serif `E` in a black box**, a placeholder
+  from before there was artwork. Now `AppIcon` — the same file the tab, the
+  install prompt and the dock use — in a 64px circle. Ray picked the circle from
+  four variants rendered side by side in the running app, on the rule that the
+  card keeps its full 40px and the circle grows to hold it, rather than the card
+  shrinking to fit. (57px is where a rotated 40px square just fits, and reads as
+  a near-miss.) The `E` boxes Ray saw elsewhere were Chrome's fallback favicon.
+- **Superseded shell caches were piling up.** They were only swept on activate,
+  but a worker that installs and then *waits* — because the reader hasn't taken
+  the update — has already filled its cache. Three were sitting in the test
+  browser. The sweep runs at install too now, keeping this worker's cache and
+  the running one's; an installing worker finds the latter through
+  `registration.active`, whose `?v=` is its cache name. Bounded at two.
+- **The update toast was unclickable** whenever it mattered most: at `z-60` it
+  rendered under the welcome screen (70) and the modals (80), dimmed by their
+  backdrop and dead to a click. Found by clicking Reload during onboarding and
+  watching nothing happen. Now above them.
 
 ### Not done, deliberately
 
