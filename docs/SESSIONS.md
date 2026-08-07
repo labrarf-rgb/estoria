@@ -3954,7 +3954,8 @@ Corners were settled by rendering both options at 128/64/32 on a dark dock and
 a light one rather than by argument. The plain sizes stay transparent: on a
 dark dock the cream tile reads as two rectangles competing, and at 32px the
 transparent card holds up better. Maskable and apple-touch are flattened onto
-`#e9e0cd` anyway — not by preference, but because a maskable icon must be
+`#fffdf6` (`--card`, matching the welcome circle's surround — on the canvas
+colour a card reads as one object among many) anyway — not by preference, but because a maskable icon must be
 full-bleed by spec and iOS puts solid black behind a transparent apple-touch
 icon.
 

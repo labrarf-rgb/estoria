@@ -21,7 +21,10 @@
 # and there the card reads as one object rather than a cream tile with a card
 # inside it. But a maskable icon must be full-bleed by spec, and iOS puts solid
 # black behind a transparent apple-touch icon — so those two are flattened onto
-# the board's paper (#e9e0cd) instead of being left to the platform.
+# the board's card stock (#fffdf6) instead of being left to the platform. Not
+# --bg, the darker cream the canvas is drawn on: a card sitting on the canvas
+# reads as one object among many, where the near-white lets its own edges and
+# shadow do the containing — the same surround the welcome screen's circle uses.
 #
 # The maskable inset: Android/ChromeOS/macOS crop an installed icon to their own
 # shape, and the guaranteed-visible region is the centre 80% circle (radius 205
@@ -38,7 +41,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLIC="$ROOT/public"
 SRC="$ROOT/art/icon-source.png"
-PAPER="#e9e0cd" # --bg in the light theme
+PAPER="#fffdf6" # --card in the light theme: the surround the welcome circle uses
 
 command -v magick >/dev/null || { echo "✗ ImageMagick (magick) not found — brew install imagemagick"; exit 1; }
 [ -f "$SRC" ] || { echo "✗ Missing $SRC"; exit 1; }

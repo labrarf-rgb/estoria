@@ -765,10 +765,12 @@ The icon *is* the card, not a card sitting on something.
 The plain sizes (512/192/32 — dock, tab strip, install prompt) keep their
 transparency: composited onto a real surface the card reads as one object,
 where a cream tile makes it two rectangles competing, with a visible seam on a
-dark dock. The other two are flattened onto `#e9e0cd`, not by preference but
+dark dock. The other two are flattened onto `#fffdf6` (`--card`), not by preference but
 because the platform would otherwise decide for us: a maskable icon must be
 full-bleed by spec, and iOS puts solid black behind a transparent apple-touch
-icon.
+icon. Card stock rather than `--bg`: on the canvas colour a card reads as one
+object among many, where the near-white lets its own border and shadow do the
+containing — the surround the welcome circle uses.
 
 The maskable variant is inset to 370px of bounding box. What has to clear the
 centre-80% safe circle (radius 205 of 512) is the card's *corners*, at half its
