@@ -3813,3 +3813,79 @@ chapter modal's recompute as something a close *clears*, which is exactly what
 this session stopped being true; and §9 item 19 still listed `Timeline.tsx` as
 counting per chapter in its rail render, which item 17's pass had already moved
 to the cache. `ExportModal` remains the one real instance of that shape.
+
+---
+
+## 2026-08-06 (b) — An import can bring the prose with it
+
+Import mapped a draft and left the draft behind: you got chapters, scenes, cast
+and world, and then an empty manuscript under every card you had just described.
+The text was already in the file you fed the AI. It simply had nowhere to land.
+
+**The prompt now has two modes.** A segmented toggle in step 1 — *Map only* /
+*Map + manuscript* — swaps what `importPrompt(prose)` returns. With prose on the
+schema gains one block per chapter, last after `Characters:`:
+
+```
+#### Manuscript
+<the chapter's text, copied exactly, blank line between paragraphs, *** at a scene break>
+```
+
+Off by default, and that is the whole argument for the toggle: a map is a summary
+of a book and costs a page or two, while the prose *is* the book. Sending a
+finished novel through a chat model to get back what you already have is only
+worth it when you actually want it in Estoria.
+
+**The fidelity rules grew a prose half.** Copy word for word — no tightening, no
+re-punctuating, not even an obvious typo fixed. Never a summary or a
+`[chapter continues]` in place of text; a chapter is either whole or its block is
+left out. A chapter that is outlined but not written gets no block at all, since
+an empty one is worse than none. And when the book is too long for one reply the
+prompt asks for **parts split at chapter boundaries**, numbering continuing, to
+be joined end to end — the failure mode being avoided is a model that quietly
+compresses the last third to make it fit.
+
+**The parser takes the prose off first.** `parseActChapters` finds
+`#### Manuscript` (plus the drifts: `**Manuscript**`, `#### Prose`, `Full text:`)
+and splits the chunk there before the line loop runs. That order is the fix
+rather than a tidiness: prose paragraphs that open `- ` or `1. ` are ordinary
+sentences, and the scene matcher — deliberately loose since Session 43, because
+AIs drift from `1.` to `-` freely — would have read them as beats. The chunker
+never confused `####` with a new chapter (`^###\s+` wants whitespace after the
+third hash), so the block stays inside the chapter it belongs to.
+
+**No new counting code.** `manuscript` stays `undefined` when the block is
+missing or holds no words, which is the value `syncChapterWords` reads as *never
+drafted*; `openDoc` already runs `reconcileWords`, whose own comment calls an
+import "one user-initiated moment where one scan is invisible". So the AI's
+`· 3,200 words` estimate is promoted to `target` by the existing promote-don't-
+overwrite rule and the real count replaces it. A chapter that arrived written
+opens as `draft` instead of `idea`, and the summary card gains
+`· N written · N,NNN words` when any prose came through.
+
+`summarizeImport` was deleted on the way — a second, weaker scanner of the same
+file that nothing had called since the real parser landed in Session 9. It would
+have needed the two new fields to keep compiling, and the honest value for both
+was "ask the parser".
+
+### Verified in the running app
+
+Dev server, sample story open, File → Import markdown. The toggle swaps the
+prompt in place (`THIS RUN CARRIES THE PROSE TOO` appears). Fed it a two-chapter
+file where chapter 1 has a manuscript containing a line starting `- `, a line
+starting `1. `, and a `***`, and chapter 2 has none: summary read
+`2 chapters · 4 scenes · 1 characters · 1 world · 1 written · 27 words`; scenes
+parsed as the three real beats, not five. Opened it — card 01 reads
+`27 / 3.2k words` with a draft dot, card 02 reads `2k words` and stays an idea.
+IndexedDB holds the chapter's prose verbatim, `***` and quotes intact, under the
+four-part prose key. `tsc -b` clean.
+
+### Not done, deliberately
+
+- **Merging an import into the open project.** Import still opens a new one.
+  Matching imported chapters onto existing ones needs rules and an overwrite
+  warning, and neither is worth inventing before someone wants it.
+- **The map export still carries no prose.** `buildMarkdown` exports the map on
+  purpose (§4, "two exports with different purposes"); the manuscript export
+  already covers the other direction. So a prose import does not round-trip
+  through the Obsidian file — it round-trips through the project file.

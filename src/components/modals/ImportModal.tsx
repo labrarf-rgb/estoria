@@ -8,6 +8,7 @@ export function ImportModal() {
   const setPanel = useStore((s) => s.setPanel);
   const openDoc = useStore((s) => s.openDoc);
   const [copied, setCopied] = useState(false);
+  const [withProse, setWithProse] = useState(false);
   const [parsed, setParsed] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!show) return null;
@@ -17,7 +18,7 @@ export function ImportModal() {
     setPanel("showImport", false);
   };
 
-  const prompt = importPrompt();
+  const prompt = importPrompt(withProse);
   const copyPrompt = () => {
     navigator.clipboard?.writeText(prompt).catch(() => {});
     setCopied(true);
@@ -84,6 +85,32 @@ export function ImportModal() {
               Paste it along with your manuscript. The AI returns a markdown file that breaks your
               story into chapters and scenes, sets up characters, and maps the world.
             </p>
+            <div className="mb-[11px] flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex rounded-lg bg-chip p-[3px]">
+                {[
+                  { v: false, label: "Map only" },
+                  { v: true, label: "Map + manuscript" },
+                ].map((o) => (
+                  <button
+                    key={o.label}
+                    onClick={() => {
+                      setWithProse(o.v);
+                      setCopied(false);
+                    }}
+                    className={`rounded-md px-[10px] py-[4px] text-[11.5px] font-medium ${
+                      withProse === o.v ? "bg-card text-ink" : "text-soft hover:bg-card"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11.5px] leading-[1.45] text-faint">
+                {withProse
+                  ? "Each chapter also comes back with its text, ready to keep writing. A long book may need the AI to answer in parts."
+                  : "Chapters, scenes, characters and world — the map, without the prose."}
+              </span>
+            </div>
             <div className="relative overflow-hidden rounded-[11px] border border-rule bg-card">
               <pre className="m-0 max-h-[200px] overflow-auto whitespace-pre-wrap p-4 font-mono text-[11.5px] leading-[1.6] text-ink">
                 {prompt}
@@ -98,8 +125,9 @@ export function ImportModal() {
           </Step>
           <Step n={2} title="Upload the markdown file it gives you">
             <p className="mb-[11px] text-[12.5px] leading-[1.5] text-soft">
-              Estoria reads the chapters, scenes, characters and world straight off the file and
-              opens it as a new project (your current one stays in My Projects).
+              Estoria reads the chapters, scenes, characters and world straight off the file — plus
+              any chapter text it carries, which lands in that chapter's manuscript — and opens it
+              as a new project (your current one stays in My Projects).
             </p>
             <label
               onDragOver={onDragOver}
@@ -134,6 +162,13 @@ export function ImportModal() {
                   <div className="mt-[2px] font-mono text-[11.5px] font-medium text-soft">
                     {parsed.summary.chapters} chapters · {parsed.summary.scenes} scenes ·{" "}
                     {parsed.summary.characters} characters · {parsed.doc.world.length} world
+                    {parsed.summary.written > 0 && (
+                      <>
+                        {" "}
+                        · {parsed.summary.written} written ·{" "}
+                        {parsed.summary.words.toLocaleString()} words
+                      </>
+                    )}
                   </div>
                 </div>
                 <button

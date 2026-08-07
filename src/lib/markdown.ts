@@ -10,6 +10,7 @@ import {
   type WorldEntry,
 } from "@/types";
 import { displaySummary } from "@/lib/drafts";
+import { countWords } from "@/lib/manuscript";
 import { CARD_W, CARD_H } from "@/lib/layout";
 
 const CONN_LABEL: Record<ConnType, string> = {
@@ -150,11 +151,25 @@ export function buildMarkdown(doc: StoryDoc): string {
   return md;
 }
 
-/** The copy-paste prompt that turns any manuscript into Estoria markdown. */
-export function importPrompt(): string {
+/**
+ * The copy-paste prompt that turns any manuscript into Estoria markdown.
+ *
+ * With `prose` on, each chapter also carries its own text under a `#### Manuscript`
+ * heading, which lands in `chapter.manuscript` and opens in the prose pane. It is
+ * off by default: the map is a summary of a book and costs a page or two, while
+ * the prose is the book, and pushing a finished novel through a chat model to get
+ * back what you already have is a poor trade unless you actually want it there.
+ */
+export function importPrompt(prose = false): string {
   return [
     "ROLE: You are a careful manuscript-structuring assistant for an app called Estoria, where a novelist maps a story and writes it. You convert an EXISTING draft into one structured Markdown file. You are an organizer, not a co-author.",
     "",
+    ...(prose
+      ? [
+          "THIS RUN CARRIES THE PROSE TOO: as well as mapping the story, you copy each chapter's actual text into the file, word for word, so I get my manuscript back alongside the map. Copying is transcription, not editing — see the fidelity rules.",
+          "",
+        ]
+      : []),
     "MY MATERIAL: I will either paste it at the bottom of this message, or attach it as a file. If a file is attached, use the file and ignore the empty paste area. If both are present, use the attachment.",
     "",
     "ABSOLUTE FIDELITY RULES (read carefully):",
@@ -164,6 +179,13 @@ export function importPrompt(): string {
     "- Summaries must paraphrase what actually happens in my text, not what you imagine could happen.",
     "- It is fine to split the draft into chapters/scenes and to identify characters/places that ARE present. That organizing is the whole job. Inventing is not.",
     "- If my material is only partial (e.g. a few chapters), output only those. Do not pad it out to feel complete.",
+    ...(prose
+      ? [
+          "- The prose you copy must be my exact words. Do not rewrite, tighten, correct, modernise, re-punctuate, or 'clean up' a single sentence — not even an obvious typo. Transcribe it.",
+          "- Never summarise a chapter in place of its text, and never write a placeholder like '[chapter continues]' or '(rest of chapter unchanged)'. Either the whole chapter is there or its Manuscript block is left out.",
+          "- A chapter that is outlined but not yet written gets no Manuscript block at all. An empty one is worse than none.",
+        ]
+      : []),
     "",
     "OUTPUT FORMAT:",
     "- Output ONE Markdown file and nothing else: no preamble, no explanation, no code fences around it.",
@@ -192,8 +214,22 @@ export function importPrompt(): string {
     "2. <scene> (but)",
     "3. <scene>",
     "Characters: <names in this chapter>",
+    ...(prose
+      ? [
+          "",
+          "#### Manuscript",
+          "<the chapter's text, copied exactly, as normal Markdown paragraphs separated by a blank line. Keep my paragraph breaks and dialogue as they are. Use *** on its own line where the draft has a scene break. Do not put a heading, a chapter title, or a scene number inside this block.>",
+        ]
+      : []),
     "",
     "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
+    ...(prose
+      ? [
+          "",
+          "MANUSCRIPT RULES: The `#### Manuscript` heading is what Estoria looks for, so spell it exactly that way, put it last in the chapter (after `Characters:`), and end it at the next `###` chapter or `##` act heading. The scenes list stays a short beat-by-beat map even when the full text is right below it — the two are read separately.",
+          "IF THE BOOK IS TOO LONG for one reply: do NOT compress it. Give me the file in parts — part 1 with the `# title`, `## Characters`, `## World` and as many chapters as fit, then each later part starting at the next `## Act` or `### <n>.` heading and continuing the same numbering. Stop at a chapter boundary, never mid-chapter, and wait for me to say 'continue'. I will join the parts end to end into one file.",
+        ]
+      : []),
     "",
     "--- MY MATERIAL BELOW (or attached as a file) ---",
     "<paste your draft / outline / notes here, or attach the file instead>",
@@ -205,22 +241,9 @@ export interface ImportSummary {
   chapters: number;
   scenes: number;
   characters: number;
-}
-
-/** Lightweight scan of an imported markdown file for a confirmation summary. */
-export function summarizeImport(name: string, text: string): ImportSummary {
-  const chapters = (text.match(/^###\s+/gm) || []).length;
-  const charsBlock = /^##\s+Characters/im.test(text)
-    ? (text.split(/^##\s+Characters/im)[1] || "").split(/^##\s/m)[0].match(/^[-*]\s+\*\*/gm)
-    : null;
-  const wikis = new Set((text.match(/\[\[([^\]]+)\]\]/g) || []).map((s) => s.slice(2, -2)));
-  const scenes = (text.match(/^\d+\.\s+/gm) || []).length;
-  return {
-    name,
-    chapters,
-    scenes,
-    characters: charsBlock ? charsBlock.length : wikis.size,
-  };
+  /** Chapters that arrived with prose in them, and the words they hold. */
+  written: number;
+  words: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +409,25 @@ interface ParsedChapter {
   scenes: string[];
   sceneLinks: ConnType[];
   charNames: string[];
+  manuscript?: string;
+}
+
+/**
+ * The heading that opens a chapter's prose: `#### Manuscript`, which is what the
+ * prompt asks for, plus the forms an AI drifts into (`**Manuscript**`, `#### Prose`,
+ * `Full text:`). Everything after it belongs to the chapter's manuscript, so the
+ * line-by-line pass below has to stop where this matches — prose paragraphs
+ * beginning `- ` or `1. ` would otherwise be read as scenes.
+ */
+const MANUSCRIPT_HEADING = /^\s*(?:#{2,6}\s*)?[_*]{0,2}(manuscript|prose|full text)[_*]{0,2}\s*:?\s*$/i;
+
+/** Trim blank lines off both ends without touching the indentation inside. */
+function trimBlankEdges(lines: string[]): string[] {
+  let a = 0;
+  let b = lines.length;
+  while (a < b && !lines[a].trim()) a++;
+  while (b > a && !lines[b - 1].trim()) b--;
+  return lines.slice(a, b);
 }
 
 function parseActChapters(act: number, body: string[]): ParsedChapter[] {
@@ -415,11 +457,19 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
     }
     const title = clean(rest) || `Chapter ${num}`;
 
+    // The prose comes off the end first: from `#### Manuscript` to the end of the
+    // chapter is text, not structure, and must not meet the scene matcher below.
+    const body = chunk.slice(1);
+    const proseAt = body.findIndex((l) => MANUSCRIPT_HEADING.test(l));
+    const map = proseAt >= 0 ? body.slice(0, proseAt) : body;
+    const proseLines = proseAt >= 0 ? trimBlankEdges(body.slice(proseAt + 1)) : [];
+    const manuscript = proseLines.join("\n");
+
     let summary = "";
     const scenes: string[] = [];
     const sceneTags: ConnType[] = [];
     const charNames: string[] = [];
-    for (const line of chunk.slice(1)) {
+    for (const line of map) {
       const t = line.trim();
       if (!t) continue;
       const quote = t.match(/^>\s*(.*)$/);
@@ -465,6 +515,10 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       scenes: scenes.length ? scenes : ["New scene."],
       sceneLinks: sceneTags.slice(0, Math.max(0, (scenes.length || 1) - 1)),
       charNames,
+      // Left `undefined` when nothing was written, because that is the value the
+      // word-count rules read as "never drafted" (see `syncChapterWords`). A block
+      // holding only `***` or stray punctuation counts as nothing.
+      ...(countWords(manuscript) > 0 ? { manuscript } : {}),
     });
   }
   return out;
@@ -559,6 +613,8 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
       scenes: pc.scenes,
       sceneLinks: pc.sceneLinks,
       refs: [],
+      // A chapter that arrived with its text in it is written, not an idea.
+      ...(pc.manuscript ? { manuscript: pc.manuscript, status: "draft" as const } : {}),
     };
   });
 
@@ -599,11 +655,14 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
     bookData: {},
   };
 
+  const written = chapters.filter((c) => c.manuscript);
   const summary: ImportSummary = {
     name: fileName,
     chapters: chapters.length,
     scenes: chapters.reduce((a, c) => a + c.scenes.length, 0),
     characters: characters.length,
+    written: written.length,
+    words: written.reduce((a, c) => a + countWords(c.manuscript ?? ""), 0),
   };
 
   return { doc, summary };
