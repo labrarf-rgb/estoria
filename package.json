@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
+    "icons": "./scripts/make-icons.sh",
     "deploy": "./scripts/deploy.sh"
   },
   "dependencies": {

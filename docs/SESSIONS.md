@@ -3904,3 +3904,63 @@ event, since it changes the *import prompt's* markdown schema and not
 the block, and has the same `^\d+[.)]\s+` scene regex the web split now guards
 against — so that file should be imported on the web until Android ports the
 split.
+
+## 2026-08-06 (c) — Estoria installs as an app
+
+Estoria could be saved as a Chrome app before this, but it came with a generic
+icon and the browser's default guesses at its name, and it needed the network
+to open. Now it's a real installable app with its own artwork, and the shell
+works offline.
+
+### The icon
+
+Ray's artwork — a tilted story card, the paper stock of the board, a green
+`therefore` dot and four ink rules. Rebuilt as SVG so it holds up at 16px in a
+tab as well as 512 on a home screen: `public/icon.svg` (transparent, the mark
+itself) and `public/icon-maskable.svg` (full-bleed on `#e9e0cd`, card at 0.72
+so no platform's crop can clip a corner).
+
+`scripts/make-icons.sh` renders the PNGs — 512/192/32, a maskable 512, and a
+180 apple-touch icon at a fuller 0.85 since Apple applies only its own rounded
+rect. It rasterizes through headless Chrome rather than ImageMagick, whose
+internal SVG renderer gets stroke geometry on rotated groups wrong. The PNGs
+are committed; the script runs by hand when the art changes, never in a build.
+
+### Installable, and offline
+
+- `public/manifest.webmanifest` — standalone display, paper background, the
+  icon set. Every URL in it is relative, because `public/` bypasses Vite and a
+  relative URL resolves against the manifest itself: `/` in dev, `/estoria/`
+  in prod, with nothing to configure. The `<link>` tags in `index.html` use
+  root-absolute paths instead, which Vite *does* rewrite with the base.
+- `public/sw.js` — app-shell cache. Registered as `sw.js?v=<build>` so the
+  existing commit-count build number is both what triggers an update and what
+  keys the cache. `version.json` is explicitly never cached; it's what
+  `npm run deploy` verifies against.
+- `src/lib/install.ts` — captures `beforeinstallprompt` at module scope
+  (it fires before React mounts) and exposes it through `useSyncExternalStore`.
+- File → **Install Estoria** — one button on Chromium, per-browser directions
+  on Safari/iOS/Firefox, hidden entirely once running standalone.
+- `UpdateToast` — a new build waits rather than taking over, so no reload ever
+  lands mid-sentence.
+
+### Verified in the running app
+
+- Production preview at `/estoria/`: worker registered as `sw.js?v=139`, scope
+  `/estoria/`, manifest `start_url` and `scope` both resolving to
+  `/estoria/`, icons to `/estoria/icon-192.png`.
+- Precache after one visit held the shell HTML, both hashed assets, the
+  manifest and icons, plus four webfont files in `estoria-fonts`.
+- **Stopped the server and reloaded** — the board rendered in full, Spectral
+  and Hanken Grotesk included. Offline is real, not theoretical.
+- File menu shows Install Estoria above About; the dialog shows the Chromium
+  steps in the in-app browser (no `beforeinstallprompt` there), and swaps to
+  the one-click Install button the moment that event arrives.
+- `npm run build` clean, no console errors.
+
+### Not done, deliberately
+
+- No push and no deploy — this is committed on `feature/installable-app` and
+  waiting on Ray.
+- No iOS-specific splash screens. They're a pile of per-device PNGs for a
+  case (Estoria on an iPhone) that the board isn't laid out for anyway.
