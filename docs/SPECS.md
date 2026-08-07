@@ -108,10 +108,15 @@ surfaced in the footer). Still to do before a Drive adapter: widen
 
 ```
 estoria/
-├─ index.html                 # Vite entry, loads Google Fonts
+├─ index.html                 # Vite entry: Google Fonts, icons, manifest, theme-color
 ├─ vite.config.ts             # React + Tailwind plugins, "@/" alias, build-info +
 │                             #   version.json plugins (§ Session 42)
 ├─ tsconfig*.json             # app + node TS projects
+├─ public/                    # copied verbatim into dist/ — manifest.webmanifest,
+│                             #   sw.js, and the five generated icon PNGs
+├─ art/icon-source.png        # the icon master (1024²). Outside public/ so a file
+│                             #   nobody downloads isn't served
+├─ scripts/make-icons.sh      # `npm run icons`: regenerate the icon PNGs from art/
 ├─ scripts/deploy.sh          # `npm run deploy`: build → portfolio repo → verify live
 ├─ docs/SPECS.md              # ← you are here: current state, §§1-9
 ├─ docs/SESSIONS.md           # dated session log (history; §N refs point here)
@@ -159,6 +164,10 @@ estoria/
    │  │                       #   pinned, across books + versions)
    │  ├─ prune.ts             # sweep records left with no content in them
    │  ├─ ids.ts               # uid() — shared by the store and draft records
+   │  ├─ install.ts           # the install prompt: captures `beforeinstallprompt`,
+   │  │                       #   detects standalone (§8 "Installing Estoria")
+   │  ├─ sw.ts                # service-worker registration, the update handshake,
+   │  │                       #   and the `?sw=off` escape hatch
    │  └─ files.ts             # file → data URL reading
    └─ components/
       ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
@@ -171,13 +180,14 @@ estoria/
       ├─ Footer.tsx           # autosave status, Sync button, folder icon
       ├─ SyncHistoryPopover.tsx / SyncFileList.tsx   # file history + restore
       ├─ Welcome.tsx · Lightbox.tsx · ConfirmDialog.tsx
+      ├─ UpdateToast.tsx      # "a new version is ready" — above every scrim (z-90)
       ├─ ui/                  # Overlay (Scrim/Drawer/SizeButton/CloseButton/stop),
       │                       #   Popover, RefList, ViewToggle, ExpandableTextarea,
-      │                       #   AssetLinkPicker
+      │                       #   AssetLinkPicker, AppIcon
       ├─ panels/              # CharactersPanel, WorldPanel, NotesPanel — modal
       │                       #   `Drawer`s, one at a time (§4 "Panel sizes")
       └─ modals/              # Export, Import, Templates, Projects, NewBook,
-                              #   Backups, SyncConflict, About
+                              #   Backups, SyncConflict, About, Install
 ```
 
 ### Conventions
@@ -283,11 +293,17 @@ npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build to dist/
 npm run typecheck  # types only
 npm run preview    # serve the production build
+npm run icons      # regenerate the app icons from art/icon-source.png (ImageMagick)
 npm run deploy     # build + publish to www.labrarf.com/estoria, then verify it's live
 ```
 
 `deploy` refuses a dirty tree — commit first, so the SHA prod reports is real.
 See §8 "Deploy runbook".
+
+The service worker is production-only, so `npm run dev` never has one: to
+exercise offline, the install prompt or the update toast, use `npm run preview`
+(the app is at `/estoria/` there, not `/`). `npm run icons` is by hand only —
+it never runs during a build or a deploy.
 
 Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 (`.vscode/extensions.json`) for Tailwind IntelliSense + ESLint/Prettier.
