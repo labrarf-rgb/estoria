@@ -4239,3 +4239,25 @@ writes. `buildMarkdown` is untouched, so **the export format did not change.**
 - Drift file with every row of the table above plus `1.`-, `-`- and `3)`-marked
   beats: five beats parsed, none of the five decoys, characters still read.
 - `npm run build` clean; no console errors.
+
+### Shipped
+
+Both entries above went out together as `3663eeb` (build 155), plus one spec
+fix found while reviewing for drift: §4's board-connectors row still described
+`ConnType` as three values, so it now says a chapter link *can* carry `"none"`
+(neutral colour) while nothing on the board sets one.
+
+**Verified in production**
+
+- `/estoria/version.json` reports `3663eeb`, build 155.
+- The app boots at `www.labrarf.com/estoria/` with no console errors of its own.
+  (`script.js` throws an `addEventListener` on null — that is the **portfolio
+  site's** script on the surrounding page, not Estoria's bundle, and it predates
+  this deploy.)
+
+**Spec drift check** — the rest of §4/§8 matches the code: scene-link fallbacks
+read `"none"` at all three render sites, the chapter-link fallbacks that stay
+`"therefore"` are all board-level, and the export/import rules are the ones the
+round-trip tests exercise. The one claim that is **stated but unverified** is
+what the phone does with a v9 file; §8 says so in those words rather than
+guessing.
