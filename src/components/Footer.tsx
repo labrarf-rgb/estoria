@@ -8,6 +8,7 @@ import {
   recordLocalEdit,
   resolveConflict,
   syncProject,
+  type Resolution,
 } from "@/lib/sync";
 import { SyncConflictModal, type SyncConflict } from "@/components/modals/SyncConflictModal";
 import { SyncHistoryPopover } from "@/components/SyncHistoryPopover";
@@ -47,7 +48,9 @@ export function Footer() {
   const [dirName, setDirName] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
-  const [conflict, setConflict] = useState<(SyncConflict & { remote: StoryDoc }) | null>(null);
+  const [conflict, setConflict] = useState<
+    (SyncConflict & { remote: StoryDoc; local: StoryDoc }) | null
+  >(null);
   /** Relation of the folder file to local state, shown on the autosave line. */
   const [mirror, setMirror] = useState<"unknown" | "current" | "behind">("unknown");
   // Folder-icon popover: live file / backups / conflict copies, with restore.
@@ -88,7 +91,11 @@ export function Footer() {
     setSyncState("busy");
     setMsg(null);
     try {
-      let res = await syncProject(useStore.getState().doc);
+      // The doc the compare was run against. A conflict's diff — and any merge
+      // built from it — has to be applied to this exact snapshot, not to
+      // whatever the store holds by the time the user decides.
+      let compared = useStore.getState().doc;
+      let res = await syncProject(compared);
       if (res.kind === "no-folder") {
         // First run (or lost permission): pick the Estoria folder, then retry.
         const name = await chooseBackupFolder();
@@ -98,7 +105,8 @@ export function Footer() {
           return;
         }
         setDirName(name);
-        res = await syncProject(useStore.getState().doc);
+        compared = useStore.getState().doc;
+        res = await syncProject(compared);
       }
       switch (res.kind) {
         case "no-folder":
@@ -121,7 +129,7 @@ export function Footer() {
         case "conflict":
           setSyncState("idle");
           setMirror("behind");
-          setConflict(res);
+          setConflict({ ...res, local: compared });
           return;
       }
     } catch (e) {
@@ -133,16 +141,19 @@ export function Footer() {
     }
   };
 
-  const resolveSyncConflict = async (keep: "mine" | "theirs") => {
+  const resolveSyncConflict = async (keep: Resolution) => {
     if (!conflict) return;
     try {
       const res = await resolveConflict(useStore.getState().doc, conflict.remote, keep);
       if (res.applied) replaceDoc(res.applied);
       setConflict(null);
+      const copies = res.conflictFileNames.join(" and ");
       syncDone(
-        keep === "mine"
-          ? `Synced · kept this version, file copy saved as ${res.conflictFileName}`
-          : `Synced · loaded file version, your copy saved as ${res.conflictFileName}`
+        typeof keep === "object"
+          ? `Synced · merged version written, both copies saved as ${copies}`
+          : keep === "mine"
+            ? `Synced · kept this version, file copy saved as ${copies}`
+            : `Synced · loaded file version, your copy saved as ${copies}`
       );
     } catch {
       setConflict(null);
@@ -321,6 +332,8 @@ export function Footer() {
       {conflict && (
         <SyncConflictModal
           conflict={conflict}
+          local={conflict.local}
+          remote={conflict.remote}
           onResolve={resolveSyncConflict}
           onClose={() => setConflict(null)}
         />

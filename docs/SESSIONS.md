@@ -4304,3 +4304,78 @@ if it ever reads as inconsistent rather than as depth.
   the only lit things on the field.
 - Light theme unchanged by construction (same hex as before).
 - `npm run typecheck` and `npm run build` clean.
+
+## 2026-08-08 — A conflict can be settled piece by piece
+
+The Cross-app Sync contract has said since it was written that per-entity merge
+"remains the later evolution" (§8, "Conflicts (v1)"). It is here. A conflict
+dialog that could only offer keep-all-mine or keep-all-theirs made the user
+throw away real work in one direction or the other every time both devices had
+touched the same project — and the thing they most wanted to say, "that chapter
+from the phone, everything else from here", was the one thing it couldn't hear.
+
+### What landed
+
+- **Every difference is now addressable.** `diffDocs` used to produce printed
+  lines; it produces units with a structural `DiffAddress` and a stable `key`.
+  Two consequences beyond the merge itself: chapters are diffed **per book**
+  instead of globbed across every book (a chapter needs an address, and the
+  grouping is more honest anyway), and each changed field now carries **both
+  sides' rendered values** — real sentences to read against each other, counts
+  for lists, word counts for prose, character *names* rather than ids.
+- **`lib/merge.ts`** builds the merged project from `{ [key]: "mine" | "theirs" }`.
+  Absent key means mine, so committing without touching a row is exactly
+  keep-mine — which is what makes the merge safe to default into.
+- **The dialog gained a second mode.** The summary is untouched as the fast
+  path; "Compare & merge…" opens a review list with a per-row `This app / The
+  file` toggle, an effect label ("will be added", "will be removed", "taking
+  file's"), an expandable field-level compare, bulk controls and a live tally.
+- **A merge preserves both copies**, `-conflict-<stamp>-local` and `…-file`,
+  since neither side loses whole. Both still badge as Conflict copy in the
+  folder history.
+
+### Two decisions worth keeping
+
+**The unit is the whole entity.** Fields are shown on both sides but not
+individually selectable: taking half a chapter can produce one neither device
+ever had — `sceneLinks` are positional, so a merged chapter could carry seams
+for scenes that aren't there. For the same reason chapter connections, draft
+versions, series-map links and board view settings stay whole-side units; a
+per-link merge could keep a link pointing at a chapter that wasn't kept.
+
+**References come along.** Take a chapter from the file and it may cast a
+character this copy has never seen. Rather than write the dangling id (§9 item
+5's bug class), the record is brought in from whichever side has it, and the
+dialog names every one *before* the user commits. This deliberately overrides
+the referenced row's own default — a chapter that references a character it
+doesn't have is broken data, and the disclosure is what makes the override
+honest rather than silent.
+
+### Not a cross-app event
+
+Nothing about `.estoria.json` changed. The merged output is an ordinary schema
+v9 document and the conflict-copy naming is device-local, so **Android needs
+nothing** and can keep offering the whole-file choice indefinitely. The four
+rules to mirror, if that side ever builds its own, are recorded in §8.
+
+### Fixed in passing
+
+The conflict dialog's primary buttons were `text-white` on `background:
+var(--ink)`, which is white-on-light and unreadable in dark mode — every other
+dialog in the app uses `bg-ink text-bg`. They do now too.
+
+### Verified
+
+- 22 checks against synthetic diverged documents (esbuild + node, throwaway):
+  empty choices fingerprint-match keep-mine and all-theirs fingerprint-match
+  keep-theirs; a file-only chapter drags its cast in with no dangling id; a
+  chapter in a stashed book lands in that book; **a chapter still lands in the
+  right book when the two copies disagree about which book is active**; an
+  only-here row set to the file is removed; field detail carries both values;
+  keys are stable across runs.
+- Dialog driven in the running dev server against a diverged sample story
+  (temporary harness, since reproducing a real conflict needs two devices):
+  both modes, both themes, toggles, bulk set, expanded compare, and the resolve
+  callback firing with a merged doc. Row layout stacks below `sm` — a 92px
+  effect column can't share a phone-width row.
+- `npm run typecheck` clean.

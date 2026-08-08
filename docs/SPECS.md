@@ -281,6 +281,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. **Which version is "main" is chosen by the user** (v7, Session 54) — a star per row in the version menu writes `mainDraftId`. Before this, `"main"` was a hardcoded id fixed at seed time, so a writer whose real book lived in a fork got the amber "changes stay in this version" banner on their actual work and could not delete the empty stub. Promotion is a **relabel only**: no board is copied or swapped, which is what keeps pinned refs (they record a draft id) pointing at the text they were pinned to. The demoted version becomes ordinary and deletable. `resolveMainDraftId` pins the marker to a version that exists, defaulting a missing pointer to the seed id — so pre-v7 files behave exactly as they used to. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
+| Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
 | App | Version / build stamp | ✅ | About shows `v… · build N · sha · time` from `window.__ESTORIA_BUILD__`; `npm run deploy` verifies the commit is live (Sessions 41–42). |
 
@@ -604,8 +605,37 @@ web half shipped later the same day (Session 24). **The contract:**
   user picks keep-mine/keep-theirs; the copy NOT kept is written as
   `<slug>-conflict-<stamp>.estoria.json` (web: into the Estoria folder;
   Android: stashed in app storage, exportable) so it can never override the
-  canonical file and can be merged manually later. Per-entity merge by ids
-  remains the later evolution.
+  canonical file and can be merged manually later. ~~Per-entity merge by ids
+  remains the later evolution.~~
+- **Conflicts (v2): per-entity merge — ✅ landed on the web 2026-08-08, and it
+  is a *device-local* behavior, not a change to the file contract.** Each difference is now an addressable unit (`DiffAddress` in
+  `lib/sync.ts`) and the dialog's second mode lets the user take each one from
+  either side; `lib/merge.ts` builds the result. Nothing about
+  `.estoria.json` changed, so **Android needs nothing** — it can keep offering
+  the whole-file choice indefinitely and both apps still reconcile. Four rules
+  are worth mirroring if that side ever builds its own:
+  - **The unit is the whole entity**, never a field. Fields are *shown* on both
+    sides, but taking half a chapter can produce one neither device ever had
+    (`sceneLinks` that no longer match the scenes they sit between).
+  - **Chapters are addressed by book id, not by slot.** The active book's board
+    is top-level and the rest are stashed, and the two copies can disagree about
+    which book is active — so a merge pulls both docs into per-book boards,
+    applies the choices there, and only then decides what sits on top.
+  - **Some things stay whole-side units** because their parts only mean
+    something together: chapter connections, draft versions, series-map links,
+    board view settings. Per-link merging would let a kept link point at a
+    chapter that wasn't kept.
+  - **References are closed over.** A chapter taken from the file may cast a
+    character this copy has never seen; the record it points at is brought in
+    too (reported to the user first) rather than written as a dangling id — the
+    bug class §9 item 5 records.
+- **A merge preserves BOTH copies, not one.** There is no losing side to a
+  merge, so `resolveConflict` writes `<slug>-conflict-<stamp>-local.estoria.json`
+  *and* `…-file.estoria.json` before the merged doc becomes the canonical file.
+  That keeps the v1 promise ("the copy NOT kept can never override the canonical
+  file and can be merged manually later") true of a merge as well, and both read
+  as **Conflict copy** in the folder history, whose badge matches on the
+  `-conflict-` prefix.
 - **Check cadence:** on open/focus + a user-set foreground interval
   (Android default 5 min; suggest mirroring), prompting to review — never
   auto-applying.
