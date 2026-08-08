@@ -153,7 +153,10 @@ estoria/
    │  │                       #   view and the .docx runs so they cannot drift
    │  ├─ zip.ts               # minimal store-only ZIP writer (a .docx is a ZIP)
    │  ├─ templates.ts         # story-structure skeletons (34 cards, 3 facets)
-   │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, file history
+   │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, addressable
+   │  │                       #   conflict diff, file history
+   │  ├─ merge.ts             # per-entity conflict merge over sync.ts's diff, incl.
+   │  │                       #   reference closure (§8 "Conflicts (v2)")
    │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ entities.ts          # character/world lookup helpers
@@ -187,7 +190,8 @@ estoria/
       ├─ panels/              # CharactersPanel, WorldPanel, NotesPanel — modal
       │                       #   `Drawer`s, one at a time (§4 "Panel sizes")
       └─ modals/              # Export, Import, Templates, Projects, NewBook,
-                              #   Backups, SyncConflict, About, Install
+                              #   Backups, SyncConflict (summary + compare/merge),
+                              #   About, Install
 ```
 
 ### Conventions
@@ -678,9 +682,11 @@ extensions that go beyond the original to-do.** The web behavior is now:
   `lib/sync.ts`; `Popover` grew a `side="above"` mode for bottom anchors).
 - Implementation: `lib/sync.ts` (fingerprint = SHA-256 over key-sorted,
   `modifiedAt`-stripped JSON of the `normalizeDoc`-normalized doc; three-way
-  compare; conflict copies; all folder ops serialized through one lock so the
-  mirror and a Sync click can't interleave), `lib/backup.ts` (folder handle +
-  `writeRotatingBackup`, `backupProject` removed), `SyncConflictModal`,
+  compare; addressable conflict diff; conflict copies; all folder ops
+  serialized through one lock so the mirror and a Sync click can't interleave),
+  `lib/merge.ts` (per-entity merge + reference closure, added 2026-08-08),
+  `lib/backup.ts` (folder handle + `writeRotatingBackup`, `backupProject`
+  removed), `SyncConflictModal` (summary + compare-and-merge modes),
   footer wiring in `Footer.tsx` (focus + 5-min notify-only check per the
   cadence bullet). `modifiedAt` stamped by `stampModified()` on every file
   write incl. exports; preserved through `normalizeDoc`.

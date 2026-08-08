@@ -4378,4 +4378,17 @@ dialog in the app uses `bg-ink text-bg`. They do now too.
   both modes, both themes, toggles, bulk set, expanded compare, and the resolve
   callback firing with a merged doc. Row layout stacks below `sm` — a 92px
   effect column can't share a phone-width row.
-- `npm run typecheck` clean.
+- `npm run typecheck` and `npm run build` clean.
+
+### Shipped
+
+Deployed as `0a48567` and confirmed live at www.labrarf.com/estoria (prod's
+`version.json` reported the commit on the fourth poll).
+
+**Drift check against SPECS.** Three places described the code as it was
+before `merge.ts` existed, all structural rather than behavioural, and all
+corrected in this commit: the §3 `lib/` tree had no `merge.ts` row and
+described `sync.ts` without its addressable diff; §8's "Implementation" bullet
+named every module in the sync path except the new one; and the §3 modals line
+still described `SyncConflict` as a single surface. Nothing in the file
+contract or the reconciliation rules had drifted.
