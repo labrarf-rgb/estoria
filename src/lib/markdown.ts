@@ -499,8 +499,21 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       // Bullets count as scenes too — AIs drift from `1.` to `-` freely, and
       // ignoring them silently emptied the chapter.
       const sceneM = t.match(/^(?:\d+[.)]|[-*+])\s+(.*)$/);
-      if (sceneM) {
-        let text = sceneM[1].trim();
+      // A *numbered* marker alone on its line is an **empty beat**, not a stray
+      // number. `buildMarkdown` writes a blank scene as `2. ` and the line
+      // arrives here trimmed to `2.`, so without this the scene vanishes and
+      // every later link shifts up one seam. Since v9 that is common rather
+      // than rare: an unlabeled seam writes no `_(therefore)_`, and it was
+      // only ever the tag that kept a blank scene's line matchable.
+      //
+      // Deliberately **not** `\s*` on the rule above, which would let the
+      // bullet branch match a lone `*`, an emphasised line (`*She lies here*`
+      // → a scene), `---`, `+1 …`, and read `3.5 hours later` as scene "5
+      // hours later". Bullets still require their space; only the numbered
+      // form, which is what this app writes, may stand alone.
+      const emptyScene = !sceneM && /^\d+[.)]\s*$/.test(t);
+      if (sceneM || emptyScene) {
+        let text = sceneM ? sceneM[1].trim() : "";
         // Untagged means unlabeled, not causal. `buildMarkdown` writes no tag
         // for a `"none"` seam, so this is what makes an export → import round
         // trip lossless. It does mean markdown from before v9 — or an AI file

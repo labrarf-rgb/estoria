@@ -4190,4 +4190,52 @@ nothing after the number. So blank scenes are lost more often than before.
 
 Not fixed here, because the repair is in the importer rather than the
 connectors, and loosening `\s+` to `\s*` changes how every other numbered line
-parses — that deserves its own look rather than a ride-along. Flagged to Ray.
+parses — that deserves its own look rather than a ride-along. Flagged to Ray,
+and **fixed in the next entry**, where the `\s*` idea turned out to be the wrong
+one.
+
+## 2026-08-07 (b) — A blank beat survives the round trip
+
+The v9 session flagged this on the way past: a scene with **empty text and no
+connector tag** was silently dropped on import. `buildMarkdown` writes a blank
+beat as `2. `, the parser trims that to `2.`, and the scene matcher required
+whitespace after the number — so the line matched nothing and the beat was gone,
+with every later link shifting up a seam.
+
+It predates v9, but v9 made it common. Before, every non-final scene carried a
+`_(therefore)_`-style tag, and it was the *tag* that kept a blank scene's line
+matchable. An unlabeled seam writes no tag, so the line is now bare far more
+often. This is the same failure the whole Session 43 family has: the file looks
+valid, the import reports success, and data quietly disappears.
+
+**The obvious one-character fix was the wrong one.** Loosening `\s+` to `\s*` on
+the shared rule also loosens the *bullet* branch, which then eats ordinary AI
+output. Checked against real drift patterns before deciding:
+
+| Line | `\s+` (before) | `\s*` (rejected) |
+| --- | --- | --- |
+| `*She lies here*` | not a beat | beat: `She lies here*` |
+| `**Turning point:** the reveal` | not a beat | beat: `*Turning point:** the reveal` |
+| `3.5 hours later, the tide turns` | not a beat | beat: `5 hours later, the tide turns` |
+| `---` | not a beat | beat: `--` |
+| `+1 for the plan` | not a beat | beat: `1 for the plan` |
+
+That is precisely the tolerance Session 43 was built to give, traded away for a
+blank line. The placeholder idea was dropped too: it puts a marker in the
+Obsidian vault to mean "nothing here", and an AI-written file would not use it,
+so blank scenes coming from an import would still vanish.
+
+**What landed instead:** a *numbered* marker alone on its line is an empty beat.
+Bullets keep needing their space — a lone `-` or `*` is far likelier to be an
+artifact than an empty beat, and the numbered form is the only one this app
+writes. `buildMarkdown` is untouched, so **the export format did not change.**
+
+### Verified
+
+- The reported case round-trips exactly: `['A','','C','']` with links
+  `['therefore','none','but']` returns identical in both.
+- Pristine sample, a doc seeded with `"none"` seams, and a chapter *starting*
+  with two blank scenes — all lossless on scenes and links.
+- Drift file with every row of the table above plus `1.`-, `-`- and `3)`-marked
+  beats: five beats parsed, none of the five decoys, characters still read.
+- `npm run build` clean; no console errors.
