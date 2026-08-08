@@ -17,6 +17,8 @@ const CONN_LABEL: Record<ConnType, string> = {
   therefore: "Therefore",
   but: "But",
   and: "And",
+  /** Unused: a `"none"` seam is written as the absence of a tag, not a word. */
+  none: "",
 };
 
 const ROMAN_UNITS: [number, string][] = [
@@ -112,9 +114,13 @@ export function buildMarkdown(doc: StoryDoc): string {
       .forEach((c) => {
         md += `\n### ${c.num}. ${c.title}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c)}\n\n**Scenes**\n`;
         c.scenes.forEach((s, j) => {
+          // An unlabeled seam writes no tag at all — which is exactly what
+          // `parseImportMarkdown` reads back as `"none"`, so the round trip
+          // holds without putting a `_(none)_` marker in the vault.
+          const link = c.sceneLinks[j];
           const conn =
-            j < c.scenes.length - 1 && c.sceneLinks[j]
-              ? `  _(${CONN_LABEL[c.sceneLinks[j]].toLowerCase()})_`
+            j < c.scenes.length - 1 && link && link !== "none"
+              ? `  _(${CONN_LABEL[link].toLowerCase()})_`
               : "";
           md += `${j + 1}. ${s}${conn}\n`;
         });
@@ -222,7 +228,7 @@ export function importPrompt(prose = false): string {
         ]
       : []),
     "",
-    "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
+    "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition — and leave the tag OFF entirely when the two scenes merely follow one another, or when the draft does not make the relationship clear. An untagged link is a real, valid answer: it means \"these are in this order and the draft has not said why\". Do not label every link just to have labelled it. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
     ...(prose
       ? [
           "",
@@ -495,9 +501,14 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       const sceneM = t.match(/^(?:\d+[.)]|[-*+])\s+(.*)$/);
       if (sceneM) {
         let text = sceneM[1].trim();
-        let link: ConnType = "therefore";
+        // Untagged means unlabeled, not causal. `buildMarkdown` writes no tag
+        // for a `"none"` seam, so this is what makes an export → import round
+        // trip lossless. It does mean markdown from before v9 — or an AI file
+        // that skipped some tags — imports those seams unlabeled where it used
+        // to import them as "therefore".
+        let link: ConnType = "none";
         // The tag may be wrapped in emphasis: `(but)`, `_(but)_`, `**(but)**`.
-        const tag = text.match(/[_*]{0,2}\((therefore|but|and)\)[_*]{0,2}\s*$/i);
+        const tag = text.match(/[_*]{0,2}\((therefore|but|and|none)\)[_*]{0,2}\s*$/i);
         if (tag) {
           link = tag[1].toLowerCase() as ConnType;
           text = text.slice(0, tag.index).trim();

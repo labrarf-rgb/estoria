@@ -11,6 +11,12 @@ const CONN_COLOR: Record<ConnType, string> = {
   therefore: "var(--therefore)",
   but: "var(--but)",
   and: "var(--and)",
+  /**
+   * Chapter links can hold `"none"` (they share `ConnType` with scene links),
+   * but nothing on the board sets one — the board has no cycle control. It gets
+   * the neutral line colour so a doc that arrives carrying one still draws.
+   */
+  none: "var(--line)",
 };
 
 const statusColor = (s: Chapter["status"]) =>

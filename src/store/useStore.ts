@@ -573,8 +573,13 @@ const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
  * Links are **positional** — a link is the gap between two scenes, not a
  * property of either — so pulling scene 3 out of 1·2·3·4 leaves 1·2·4 and the
  * gap that used to sit between 2 and 3 is gone. A gap that closes over removed
- * scenes cannot inherit a meaning from either side, so it defaults to
- * "therefore" rather than guessing.
+ * scenes cannot inherit a meaning from either side, so it opens as `"none"`.
+ *
+ * Before v9 that seam got a "therefore" instead, for want of anything better —
+ * which quietly asserted a causal link between two scenes that had never been
+ * adjacent. `"none"` says what is actually true: they are in this order, and
+ * nobody has yet said why. Links the subset *keeps* are untouched; only the
+ * seams this function opens are unlabeled.
  *
  * Shared by both scene moves, within a chapter and across two, so the two
  * cannot disagree about what happens to the links.
@@ -584,14 +589,28 @@ const sceneSubset = (scenes: string[], links: ConnType[], keep: number[]) => {
   const outLinks: ConnType[] = [];
   for (let j = 0; j < sorted.length - 1; j++) {
     const a = sorted[j];
-    outLinks.push(sorted[j + 1] === a + 1 ? links[a] ?? "therefore" : "therefore");
+    outLinks.push(sorted[j + 1] === a + 1 ? links[a] ?? "none" : "none");
   }
   return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
 };
 
 /**
+ * What a seam the *writer* just opened starts as: the type of the seam
+ * immediately before it, or `"therefore"` when it is the chapter's first.
+ *
+ * Adding a scene is deliberate, so unlike the churn seams above it is worth
+ * guessing at — and writers work in runs. A chapter carried on a chain of
+ * "therefore" gets another one; a stretch deliberately left unlabeled stays
+ * unlabeled instead of sprouting a causal claim at every new scene. `at` is the
+ * index the new link will occupy once spliced in.
+ */
+const inheritedLink = (links: ConnType[], at: number): ConnType => links[at - 1] ?? "therefore";
+
+/**
  * Splice a block of scenes into a list at `p`, re-joining whatever the
- * insertion splits apart with a neutral "therefore" on each new seam.
+ * insertion splits apart with an unlabeled `"none"` on each new seam — the app
+ * opened those two seams, not the writer, so it has nothing to say about them
+ * (see `sceneSubset`). The block's own internal links ride along intact.
  */
 const spliceSceneBlock = (
   scenes: string[],
@@ -607,9 +626,9 @@ const spliceSceneBlock = (
   const rightLinks = links.slice(at);
   const outLinks = ([] as ConnType[]).concat(
     leftLinks,
-    left.length > 0 && block.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+    left.length > 0 && block.scenes.length > 0 ? (["none"] as ConnType[]) : [],
     block.sceneLinks,
-    right.length > 0 && block.scenes.length > 0 ? (["therefore"] as ConnType[]) : [],
+    right.length > 0 && block.scenes.length > 0 ? (["none"] as ConnType[]) : [],
     rightLinks
   );
   return { scenes: outScenes, sceneLinks: outLinks };
@@ -1095,7 +1114,10 @@ export const useStore = create<StoreState>()(
             chapters: s.doc.chapters.map((c) => {
               if (c.id !== chId) return c;
               const scenes = c.scenes.concat("");
-              const sceneLinks = c.scenes.length > 0 ? c.sceneLinks.concat("therefore") : c.sceneLinks;
+              const sceneLinks =
+                c.scenes.length > 0
+                  ? c.sceneLinks.concat(inheritedLink(c.sceneLinks, c.sceneLinks.length))
+                  : c.sceneLinks;
               return {
                 ...c,
                 scenes,
@@ -1116,7 +1138,13 @@ export const useStore = create<StoreState>()(
               const scenes = c.scenes.slice();
               scenes.splice(idx, 0, "");
               const sceneLinks = c.sceneLinks.slice();
-              if (scenes.length > 1) sceneLinks.splice(Math.min(idx, sceneLinks.length), 0, "therefore");
+              if (scenes.length > 1) {
+                // The new scene splits a seam in two. The existing link stays
+                // on the left half; the right half is the new seam, and takes
+                // its type from the seam it split.
+                const at = Math.min(idx, sceneLinks.length);
+                sceneLinks.splice(at, 0, inheritedLink(sceneLinks, at));
+              }
               return {
                 ...c,
                 scenes,
@@ -1172,10 +1200,12 @@ export const useStore = create<StoreState>()(
               // Links are positional (the gap between adjacent scenes), so a
               // reorder drops the gap at the scene's old slot and opens a
               // fresh one at its new slot rather than trying to carry a
-              // "meaning" along with the moved scene.
+              // "meaning" along with the moved scene. The fresh seam is
+              // unlabeled: the move rearranged the story, and only the writer
+              // knows what the new adjacency means.
               const sceneLinks = c.sceneLinks.slice();
               if (sceneLinks.length) sceneLinks.splice(Math.min(fromIdx, sceneLinks.length - 1), 1);
-              if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "therefore");
+              if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "none");
 
               return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
             }),
@@ -1303,16 +1333,23 @@ export const useStore = create<StoreState>()(
           };
         }),
 
+      // Therefore → But → And → none → Therefore. `"none"` sits at the end so
+      // the three method values stay adjacent: cycling past "And" clears the
+      // seam, and one more click starts the method over.
+      //
+      // A missing entry is `"none"` (`indexOf` returns -1, so the next value is
+      // "therefore"), which is also what a first click on an unlabeled seam
+      // should do.
       cycleSceneLink: (chId, idx) =>
         set((s) => {
-          const order: ConnType[] = ["therefore", "but", "and"];
+          const order: ConnType[] = ["therefore", "but", "and", "none"];
           return {
             doc: {
               ...s.doc,
               chapters: s.doc.chapters.map((c) => {
                 if (c.id !== chId) return c;
                 const links = c.sceneLinks.slice();
-                links[idx] = order[(order.indexOf(links[idx]) + 1) % 3];
+                links[idx] = order[(order.indexOf(links[idx]) + 1) % order.length];
                 return { ...c, sceneLinks: links };
               }),
             },

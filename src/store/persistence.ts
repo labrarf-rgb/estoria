@@ -6,6 +6,7 @@ import {
   type Chapter,
   type ChapterLink,
   type Character,
+  type ConnType,
   type DraftVersion,
   type PinnedRef,
   type RefKind,
@@ -615,6 +616,30 @@ function normalizeArchived<T extends { archived?: boolean }>(raw: unknown): T[] 
 }
 
 /**
+ * Schema v8 → v9: `ConnType` gained a fourth value, `"none"` — a seam that
+ * connects two scenes without claiming a causal relationship between them.
+ *
+ * Nothing to convert: every v8 link value is a valid v9 one, and no v8 document
+ * contains `"none"`. What this does add is coercion, which the raw `.slice()`
+ * it replaces had none of. A value that isn't one of the four becomes `"none"`
+ * rather than being handed to the UI, because an unlabeled seam is the only
+ * fallback that invents nothing — degrading a stray value to `"therefore"`
+ * would assert exactly the causality v9 exists to stop asserting.
+ *
+ * The array is still truncated to the number of seams (`scenes.length - 1`) and
+ * still may be *shorter* than that; a missing entry reads as `"none"` at every
+ * call site, so short arrays need no padding here.
+ */
+function normalizeSceneLinks(raw: unknown, sceneCount: number): ConnType[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, Math.max(0, sceneCount - 1))
+    .map((v): ConnType =>
+      v === "therefore" || v === "but" || v === "and" || v === "none" ? v : "none"
+    );
+}
+
+/**
  * Schema v5 → v6: assets gained a third `kind` (`TODO`, with `items`) and an
  * `archived` flag. Nothing to convert — v5 assets are valid v6 assets — but a
  * file can still arrive malformed or from a *newer* app's unknown kind, so every
@@ -692,7 +717,7 @@ export function normalizeDoc(raw: unknown): StoryDoc {
       y: typeof p.y === "number" ? p.y : 90 + Math.floor(i / 4) * 224,
       chars: Array.isArray(p.chars) ? p.chars : [],
       scenes,
-      sceneLinks: Array.isArray(p.sceneLinks) ? p.sceneLinks.slice(0, scenes.length - 1) : [],
+      sceneLinks: normalizeSceneLinks(p.sceneLinks, scenes.length),
       refs: Array.isArray(p.refs) ? p.refs : [],
     };
   });

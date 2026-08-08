@@ -4093,3 +4093,101 @@ Estoria with its name and icon. Localhost was fine only because it loads
 
 §8's hosting notes still described `estoria-app.html` as iframing `/estoria/`
 as the live arrangement. Rewritten, with the reason the wrapper is gone.
+
+## 2026-08-07 — A connector is allowed to say nothing (schema v9)
+
+The but/therefore method is the point of the scene canvas, and until today it
+was also compulsory: `ConnType` held three values, every one of which asserts a
+relationship, so there was no way to write down "these two scenes are in this
+order and I have not decided why". Ray asked for a way to turn it off.
+
+The first shape considered was a global preference — one switch that hid every
+pill and dropped the tags from exports. It was planned in full, then dropped in
+favour of the option that had been passed over: **a fourth `ConnType`, `"none"`,
+per seam.** Which is the better fit, because the problem was never "I don't use
+this method"; it was "this particular seam has no answer yet".
+
+**The cycle** runs Therefore → But → And → none → Therefore. `"none"` sits at
+the end so the three method values stay adjacent, and clearing is one click past
+And.
+
+**An unlabeled seam still needs somewhere to click.** This is the one piece of
+the design that isn't obvious: if the pill simply vanishes, the seam becomes
+unreachable and the method is a one-way door. So `"none"` keeps the full hit box
+and shows a 7px hairline dot on the connector line, filling in on hover. The
+read-only surfaces — the timeline's scene pane and the manuscript beat rail —
+draw nothing at all, because there is nothing to read and no cycling to do.
+
+**The interesting half was the defaults, which Ray asked to revisit.** A seam
+gets created for you in three different ways, and `"therefore"` was hardcoded at
+every one — the code was candid about it, `sceneSubset` saying a closed-over gap
+"cannot inherit a meaning from either side, so it defaults to therefore rather
+than guessing". With `"none"` in the type that reasoning inverts: `"therefore"`
+*was* the guess. They now answer separately.
+
+- **Adding or inserting a scene inherits the seam before it** (`inheritedLink`,
+  falling back to `"therefore"` for a chapter's first). Adding a scene is
+  deliberate and writers work in runs, so a therefore-chain extends itself and a
+  stretch deliberately left blank stays blank.
+- **Churn is always `"none"`** — reordering, moving scenes between chapters, and
+  a gap closing over a removed scene. The app rearranged the story there, not
+  the writer; inventing a causal link between two scenes that had never been
+  adjacent is exactly what this change exists to stop.
+
+**Markdown had a round-trip trap.** `"none"` exports as the *absence* of a tag,
+which is right for the vault — a `_(none)_` marker would be a word for "no word
+here". But the importer read an untagged scene as `"therefore"`, so every
+unlabeled seam would have come back causal. Untagged now parses as `"none"`. The
+cost is real and was accepted out loud: markdown exported before today, or an AI
+file that skipped tags, imports those seams unlabeled where it used to import
+them as therefore. The import prompt was updated to match — it now tells the
+model that leaving a tag off is a valid answer rather than something to avoid.
+
+**Scope held to scene links.** Chapter links on the board share `ConnType` and
+can hold `"none"` (neutral line colour, for a doc that arrives carrying one),
+but the board has no cycle control and nothing sets one.
+
+### Schema and the phone
+
+`SCHEMA_VERSION` 8 → 9. No stored data changes shape, so the migration is a
+pass-through; what the bump buys is the honest signal that a document can now
+carry a value older readers don't know. `normalizeSceneLinks` replaces a bare
+`.slice()` and coerces anything unrecognised to `"none"` — never `"therefore"`,
+which would re-assert the causality v9 removes.
+
+**This opens a cross-app event, and §8 carries the warning.** The risk is
+semantic like v8's, not structural: a v9 file parses on Android, but if its
+normaliser folds an unknown link into `Therefore`, a round trip through the
+phone silently relabels every unlabeled seam as causal.
+
+### Verified
+
+Against the dev server, driving the real UI:
+
+- The cycle: But → And → unlabeled, with the pill replaced by the dot and an
+  18px hit target still present.
+- Inheritance both ways — a scene added after an unlabeled seam came in
+  unlabeled; after relabelling that seam Therefore, the next one inherited
+  Therefore.
+- Reorder: dragging a scene one slot right left `["none","none","therefore",
+  "therefore"]` — the fresh seam unlabeled, the surviving links shifted, no
+  invented therefore.
+- Round trip through the real `buildMarkdown` / `parseImportMarkdown`: the
+  pristine sample is byte-identical on links, a doc seeded with `"none"` seams
+  returns exactly, and no `(none)` marker appears in the output.
+- Both read-only surfaces render an unlabeled seam silently (manuscript rail,
+  timeline scene pane), light and dark.
+- `npm run typecheck` and `npm run build` clean.
+
+### Found while verifying, and left alone deliberately
+
+A scene with **empty text** and **no tag** is dropped on import. It exports as
+`2. ` (trailing space), the parser trims the line to `2.`, and the scene regex
+requires whitespace after the number, so it never matches. That rule predates
+this change, but v9 **widens** it: a blank scene used to carry a
+`_(therefore)_` tag that kept its line matchable, and an unlabeled one now has
+nothing after the number. So blank scenes are lost more often than before.
+
+Not fixed here, because the repair is in the importer rather than the
+connectors, and loosening `\s+` to `\s*` changes how every other numbered line
+parses — that deserves its own look rather than a ride-along. Flagged to Ray.

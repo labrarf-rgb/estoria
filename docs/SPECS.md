@@ -242,7 +242,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Export | Manuscript (prose) | ✅ | **A second export with a different purpose**, tabbed apart from the map export and never merged: that one is Obsidian-shaped structure, this one is prose for a person. `.docx` in **standard manuscript format** (12pt Times, double spaced, 1" margins, half-inch indents except the first paragraph of a scene, title page, `#` scene breaks, running `Surname / Title / page` header) — the one export agents and beta readers expect and Obsidian cannot produce. Plus `.md` / `.txt`. `StoryDoc` gained an optional `author` for the title block; **no name is invented when none is given**. A ZIP writer (`lib/zip.ts`, stored not deflated) rather than a dependency. A markdown thematic break in your prose exports as the centred `#` standard format uses for a passage break, because that is what the reading view shows — but nothing inserts one for you. |
 | Export | PDF, via print | ✅ | **Deliberately not an exporter.** `Cmd+P` from the timeline's Prose mode or the editor's View mode prints a typeset reading copy, through an `@media print` block in `index.css`. A PDF writer would be a second implementation of the reading view that could drift from it; this *is* the reading view, on paper. Screen-only furniture (chrome, hover affordances, the scroll spacer, unwritten scenes) is marked `data-print-skip`. |
 | App | Versions carry their prose | ✅ | Prose forks with the version, exactly as scenes do — "version" keeps meaning a version of the book. So: forking **asks whether to take the writing**, but only when there is prose to copy (with none, both answers are identical and the prompt is just a click); the version menu shows **word counts**, so a fork's cost is visible before you pay it; and a chapter can **pull its text from another version** (`Also written in …`), behind a confirm naming the version and the count, with one undo. Deliberately **not a merge engine** — merging prose is a hard problem and a bad one to half-solve. |
-| Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
+| Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and/unlabeled, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
+| Detail | A seam can be left unlabeled | ✅ | **Schema v9.** `ConnType` has a fourth value, `"none"`: the scenes are still connected and still ordered, the seam just makes no causal claim. The cycle runs Therefore → But → And → **none** → Therefore, so clearing a label is one click past And. An unlabeled seam draws **no pill** — a hairline dot on the line in the scene flow (which is the hit target, or there would be no way back into the method), and nothing at all on the read-only surfaces (timeline scene pane, manuscript beat rail). It exists because every other value asserts something, so the app had no honest way to open a seam the writer had not chosen. **What each source of a new seam does now:** adding or inserting a scene **inherits the seam before it** (`inheritedLink`, `"therefore"` when it is the chapter's first) — deliberate authoring, and writers work in runs, so a chain of therefores extends and a stretch left unlabeled stays unlabeled; a seam opened by **churn** — reorder, cross-chapter move, or a gap closing over a removed scene (`sceneSubset` / `spliceSceneBlock`) — is **always `"none"`**, because the app rearranged the story and only the writer knows what the new adjacency means. Before v9 all of these invented a `"therefore"`. **Scene links only** — chapter links on the board share `ConnType` and can hold `"none"` (drawn in the neutral line colour), but the board has no cycle control and nothing sets one. |
 | Detail | Scene layout remembered per canvas size | ✅ | The expanded and collapsed canvases fit different column counts, so each keeps **its own layout** (`scenePos` / `scenePosCompact`, v6). Toggling size swaps layouts instead of re-arranging — which is what used to throw the arrangement away. Auto-arrange tidies only the size you're looking at; structural edits keep both in step. |
 | Detail | Each modal keeps its own size | ✅ | Two flags, not one. `sceneFlowExpanded` drives the scene canvas and the story map modal's width; `manuscriptExpanded` drives the manuscript modal's. They were one flag while the manuscript was a section, because both `Expand` buttons widened the same modal and two independent toggles with one shared consequence meant expanding the manuscript silently gave the canvas more room. Separate surfaces make them genuinely separate preferences: a writer who wants the page wide has no opinion about the scene canvas at that moment. **`sceneFlowExpanded` keeps its name deliberately** — it is not only a width, since `scenePosKey` uses it to choose between `scenePos` and `scenePosCompact`, which are persisted *document* data, so renaming it would either drag a doc migration behind it or leave the flag and the layout key disagreeing. Now that it drives only the canvas, the name is no longer wrong. |
 | Detail | Reference material is tabbed | ✅ | Characters, World details, Chapter notes and Pinned references were four stacked collapsible sections, two above the scene canvas and two below, any number open at once — so the canvas could end up anywhere on a long scroll and a chapter opened to look at its scenes opened on its cast instead. Now **one tab strip above the canvas and one panel under it** (`ChapterTab`), so the canvas is always in the same place. Clicking the open tab closes it, which keeps the click-to-show-and-hide the sections had, and `null` (all closed) is a real state and the default. Counts ride on the tab; an empty tab shows no number at all rather than a grey `0`, and Chapter notes has nothing to count so it gets a dot when written in. **Story map only** — the manuscript modal shows the beats and nothing else, because reference material beside a writing surface is the crowding this branch exists to remove. `SectionHeader` and `chapterSectionsCollapsed` went with the change; Scene flow keeps its own chevron. |
@@ -269,7 +270,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Templates | Insert / replace skeletons | ✅ | 33 structures + blank starter (34 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 14 genre beat sheets (4 of them magical realism, Session 50); facet filter bar. The card's tag pill is **pinned to the right edge**, not trailed after the name (Session 54) — the name is what varies in length, so trailing it put the tag in a different place on every card, and on a two-line name it squeezed the pill until its own text wrapped. `items-start` keeps the tag on the name's first line; `shrink-0` is what stops the pill breaking. |
 | Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. |
 | Import | Manuscript comes with it | ✅ | A **Map only / Map + manuscript** toggle in step 1 swaps the copied prompt (2026-08-06). With prose on, each chapter carries its text under `#### Manuscript`, last in the chapter, ending at the next `###`/`##`; the parser lifts that block off the chunk **before** the scene matcher runs, or a paragraph beginning `- ` or `1. ` would be read as a beat. Prose lands in `chapter.manuscript` and the chapter opens as `draft` rather than `idea`. `manuscript` is left **undefined** when the block is missing or wordless, because that is the value `syncChapterWords` reads as "never drafted". No new counting code: `openDoc` already runs `reconcileWords`, so the AI's estimate is promoted to `target` and the real count takes over — cards read `27 / 3.2k words`. Off by default: the map costs a page, the prose is the whole book. The prompt asks for parts split at chapter boundaries rather than a compressed book, and forbids summaries or `[chapter continues]` in place of text. |
-| Export | Markdown (Obsidian) | ✅ | Copy + download. |
+| Export | Markdown (Obsidian) | ✅ | Copy + download. An **unlabeled** scene seam (`"none"`, v9) writes **no tag** rather than a `_(none)_` marker — the vault should not carry a word for "no word here" — and `parseImportMarkdown` reads an untagged scene back as `"none"`, which is what makes the round trip lossless. The cost is deliberate and one-way: markdown exported **before** v9, or an AI file that skipped tags, imports those seams unlabeled where it used to import them as `"therefore"`. The import prompt was updated to match, telling the model that leaving a tag off is a real answer. |
 | Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |
 | Series | Planner view + mode toggle | ✅ | Book cards editable in place (title, premise, status, cover, link labels). |
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. A map drop lands the book **before** the card it hit, with an **End of series** slot past the last book for the tail — same rule as the chapter board. The map drop also **re-tests at release** now (2026-08-05), instead of trusting a ref only written inside the coalescing rAF; it had the same frame-staleness the board fixed when multi-chapter reorder landed (see the "Drop target is hit-tested at release" row), and the new end slot would otherwise miss a quick flick. |
@@ -336,13 +337,31 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 > listed here only so web-side changes stay aware of it. What that awareness
 > means in practice:
 > - The Android app reads/writes the **same `.estoria.json` (currently schema
->   v8 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
+>   v9 — see `SCHEMA_VERSION` in `src/types.ts`; v4 = standalone version forks,
 >   v5 = asset-backed pinned refs, v6 = `TODO` assets + `archived` + per-mode
 >   scene layout, v7 = movable `mainDraftId`, v8 = `archived` on characters and
->   world entries **plus a reversal of what `archived` means**)**. Any
+>   world entries **plus a reversal of what `archived` means**, v9 = a fourth
+>   `ConnType`, `"none"`)**. Any
 >   change to the document model here is a **cross-app compatibility event** —
 >   coordinate schema bumps, don't silently reshape `StoryDoc`.
-> - **v6, v7 and v8 are CLOSED — both apps are on schema 8 (verified 2026-08-01).**
+> - **⚠️ v9 is OPEN — the web app is on schema 9, the phone is on 8 (2026-08-07).**
+>   `ConnType` gained a fourth value, `"none"`, for a scene seam that carries no
+>   causal claim (see the "A seam can be left unlabeled" row in §4). The risk here
+>   is **semantic, like v8's** rather than structural: nothing about the shape of
+>   `sceneLinks` changed, so a v9 document parses on the phone — it is the
+>   *meaning* of a value the phone has never seen that will not survive. Until
+>   `Estoria-aa` takes `ConnType.None`:
+>   - a v9 doc is **rejected outright** if the phone checks `schemaVersion`
+>     the way this app does (`SchemaTooNewError`), which is the good failure;
+>   - if it instead coerces unknown enum values, an unlabeled seam will most
+>     likely come back as whatever its fallback is — and if that fallback is
+>     `"therefore"`, round-tripping a doc through the phone **silently relabels
+>     every unlabeled seam as causal**, which is exactly the invention v9 exists
+>     to stop. Check which of the two it does before trusting a sync.
+>   What Android needs: the fourth value in `ConnType`, `Normalize` mapping an
+>   unrecognised link to `None` (not `Therefore`), no pill drawn for it, and — if
+>   it ever writes markdown — no tag for it, plus untagged parsing back to `None`.
+> - **v6, v7 and v8 are CLOSED — both apps were on schema 8 (verified 2026-08-01).**
 >   Each of these was an open cross-app event for several days, and the warnings
 >   that stood here are gone because the phone caught up, not because they
 >   stopped mattering. Confirmed in the Android source rather than from its
@@ -353,11 +372,12 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 >   `WorldEntry` **and** `Asset`. The v8 one was worth checking properly, because
 >   its risk was semantic rather than structural — and the phone documents the
 >   reversal on the field itself ("a v8 doc can hold an archived asset with live
->   pins"), so it took on the rule change and not merely the new field. Cross-app
->   Sync is bidirectional again. **What each version added is still recorded in
->   the bullet above and in [`SESSIONS.md`](SESSIONS.md); what is retired here is
->   only the "the phone cannot read our files yet" warning.** The next change to
->   `StoryDoc` starts a new event — reinstate a bullet like the ones removed.
+>   pins"), so it took on the rule change and not merely the new field. **What
+>   each version added is still recorded in the bullet above and in
+>   [`SESSIONS.md`](SESSIONS.md); what is retired here is only the "the phone
+>   cannot read our files yet" warning.** Cross-app Sync was bidirectional again
+>   from v8 until v9 opened above — which is the new event this note predicted,
+>   and it closes the same way: when the phone reads `"none"` and means it.
 > - **Manuscript mode added three optional fields and did NOT bump the schema.**
 >   `Chapter.manuscript` (the prose), `Chapter.target` (the hand-set word goal)
 >   and `StoryDoc.author` (the `.docx` title block) are all optional, which is

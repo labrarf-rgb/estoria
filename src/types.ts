@@ -10,10 +10,22 @@
  * are stashed in `bookData` and swapped in when you switch books.
  */
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
-/** Story-causality link type - the "but / therefore / and" method. */
-export type ConnType = "therefore" | "but" | "and";
+/**
+ * Story-causality link type - the "but / therefore / and" method.
+ *
+ * `"none"` (v9) is the opt-out: two scenes are still connected and still
+ * ordered, but the seam between them makes no causal claim. It exists because
+ * every other value asserts something about the relationship, so before v9 a
+ * seam the *app* opened (a reorder, a scene pulled out of a run) had to invent
+ * a "therefore" the writer never chose. `"none"` is what those seams get now.
+ *
+ * It renders as a plain line with no pill, and exports with no `(therefore)`
+ * tag — so an untagged scene in markdown reads back as `"none"`, not as a
+ * causal link (see `parseImportMarkdown`).
+ */
+export type ConnType = "therefore" | "but" | "and" | "none";
 
 /**
  * What a pinnable resource *is*. `TODO` arrived in schema v6 — a checklist that
@@ -238,7 +250,13 @@ export interface Chapter {
   manuscript?: string;
   /** Scene beats, in order. */
   scenes: string[];
-  /** Link type between scene i and i+1 (length = scenes.length - 1). */
+  /**
+   * Link type between scene i and i+1 (length = scenes.length - 1).
+   *
+   * Positional: a link is the *gap* between two adjacent scenes, never a
+   * property of either scene, so moving a scene never carries its links along.
+   * A missing entry reads as `"none"` — an unlabeled seam, not a causal one.
+   */
   sceneLinks: ConnType[];
   /**
    * Scene-node positions inside the detail canvas, for the **expanded** scene

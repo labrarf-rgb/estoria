@@ -47,6 +47,8 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
   but: { label: "But", color: "var(--but)" },
   and: { label: "And", color: "var(--and)" },
+  /** Never rendered — `Pill` draws nothing for an unlabeled seam. */
+  none: { label: "", color: "var(--line)" },
 };
 
 /** The rail's width. Enough for a beat at the 200-character cap in a few lines. */
@@ -282,7 +284,7 @@ function BeatRail({ ch }: { ch: Chapter }) {
             <div key={i}>
               {i > 0 && (
                 <div className="flex justify-center py-[6px]">
-                  <Pill type={ch.sceneLinks[i - 1] ?? "therefore"} />
+                  <Pill type={ch.sceneLinks[i - 1] ?? "none"} />
                 </div>
               )}
               <BeatCard num={i + 1} text={s} onOpen={() => openAtScene(ch.id, i)} />
@@ -324,6 +326,9 @@ function BeatCard({ num, text, onOpen }: { num: number; text: string; onOpen: ()
 }
 
 function Pill({ type }: { type: ConnType }) {
+  // An unlabeled seam says nothing, so it shows nothing. The gap between the
+  // two beat cards is left in place: they are still separate beats.
+  if (type === "none") return null;
   return (
     <span
       className="whitespace-nowrap rounded-full border bg-bg px-[8px] py-[2px] text-[9.5px] font-semibold uppercase tracking-wide"

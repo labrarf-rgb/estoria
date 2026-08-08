@@ -17,6 +17,9 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
   but: { label: "But", color: "var(--but)" },
   and: { label: "And", color: "var(--and)" },
+  // An unlabeled seam has no word to show; it renders as the quiet dot below
+  // rather than a pill, so `label` is never read for it.
+  none: { label: "", color: "var(--line)" },
 };
 
 /** The reference tabs, in order. See `ChapterTab` in the store. */
@@ -1043,7 +1046,26 @@ export function ChapterDetail() {
               ch.scenes.slice(0, -1).map((_, i) => {
                 const a = sceneCenter(i);
                 const b = sceneCenter(i + 1);
-                const type = ch.sceneLinks[i] ?? "therefore";
+                const type = ch.sceneLinks[i] ?? "none";
+                // An unlabeled seam still needs somewhere to click, or there
+                // would be no way back into the method once you cycled past it.
+                // It keeps the same hit box as a pill but shows only a hairline
+                // dot, which fills in on hover to say it can be clicked.
+                if (type === "none") {
+                  return (
+                    <button
+                      key={i}
+                      disabled={moveMode}
+                      onClick={() => cycleSceneLink(ch.id, i)}
+                      className="group/conn absolute z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full disabled:pointer-events-none"
+                      style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2 }}
+                      title={moveMode ? undefined : "Unlabeled — click to set Therefore / But / And"}
+                      aria-label="Unlabeled connector"
+                    >
+                      <span className="h-[7px] w-[7px] rounded-full border border-line bg-bg transition-colors group-hover/conn:border-faint group-hover/conn:bg-faint" />
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={i}
@@ -1056,7 +1078,7 @@ export function ChapterDetail() {
                       color: CONN[type].color,
                       borderColor: CONN[type].color,
                     }}
-                    title={moveMode ? undefined : "Click to cycle Therefore / But / And"}
+                    title={moveMode ? undefined : "Click to cycle Therefore / But / And / unlabeled"}
                   >
                     {CONN[type].label}
                   </button>
@@ -1227,7 +1249,7 @@ export function ChapterDetail() {
         <div className="px-[26px] pt-[8px] text-[11px] font-medium text-faint">
           {moveMode
             ? "Click scenes to select them · drag any selected scene to reorder them all together · or pick a chapter to send them to"
-            : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to toggle Therefore / But / And"}
+            : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to cycle Therefore / But / And, or past it to leave the seam unlabeled"}
         </div>
         </>
         )}

@@ -15,6 +15,8 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
   but: { label: "But", color: "var(--but)" },
   and: { label: "And", color: "var(--and)" },
+  /** Never rendered — an unlabeled seam draws no pill here. */
+  none: { label: "", color: "var(--line)" },
 };
 
 const statusColor = (s: Chapter["status"]) =>
@@ -708,7 +710,11 @@ export function Timeline() {
                       ))}
 
                       {c.scenes.slice(0, -1).map((_, i) => {
-                        const type = c.sceneLinks[i] ?? "therefore";
+                        const type = c.sceneLinks[i] ?? "none";
+                        // Read-only here, so an unlabeled seam shows nothing at
+                        // all — the connector curve already says the scenes are
+                        // in order. It is labeled from the chapter's scene flow.
+                        if (type === "none") return null;
                         const m = curveMid(sceneConnector(g.nodes[i], g.nodes[i + 1], fill).c);
                         return (
                           <span
