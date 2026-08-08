@@ -4261,3 +4261,46 @@ read `"none"` at all three render sites, the chapter-link fallbacks that stay
 round-trip tests exercise. The one claim that is **stated but unverified** is
 what the phone does with a v9 file; §8 says so in those words rather than
 guessing.
+
+## 2026-08-07 (c) — The canvas dots are pressed in, not glowing
+
+A one-token change, asked for as "what if the dots were dark instead of light".
+
+### What was wrong
+
+The dot grid on every canvas was painted with `--rule`, which in dark is
+`#605a52` — *lighter* than the `#231f19` floor it sits on. In light, `--rule`
+(`#e1d6bf`) is darker than the `#e9e0cd` background, so the same one line
+produced opposite relationships in the two themes: ink pressed into paper in
+light, specks glowing on top of the canvas in dark. Dark mode was rebuilt as its
+own lightness ladder rather than an inversion (2026-08-04), and this was one
+place the inversion had survived.
+
+### What landed
+
+A new `--dot` token. Light holds `#e1d6bf`, identical to `--rule`, so light is
+byte-for-byte what it was. Dark sets `#1a1712`, about 5 lightness points *under*
+`--bg`, which restores the light theme's ordering instead of copying its value.
+The four canvases that draw the grid — `Board`, `Timeline`, `ChapterDetail`,
+`SeriesMap` — now read `var(--dot)`.
+
+**Why a new token rather than repointing `--rule`.** `--rule` is also every
+hairline border, divider and input outline in the app; darkening it would have
+taken all of those with it, and those hairlines are the design's substitute for
+boxes and shadows.
+
+### Known and accepted
+
+Board and series map draw the grid on `--bg`; timeline and chapter draw it on
+`--panel` (`#2b2721`), which is two steps lighter. So the dots carry slightly
+more contrast in the panelled surfaces than on the open canvas — one token,
+not one weight. Flagged to the user before shipping; a second value is the fix
+if it ever reads as inconsistent rather than as depth.
+
+### Verified
+
+- Dark board and dark timeline compared before and after in the running dev
+  server. On the board the grid stops emitting and the cards and connectors are
+  the only lit things on the field.
+- Light theme unchanged by construction (same hex as before).
+- `npm run typecheck` and `npm run build` clean.

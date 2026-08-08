@@ -360,7 +360,7 @@ export function SeriesMap() {
       }}
       className="relative flex-1 overflow-hidden"
       style={{
-        backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
         backgroundSize: "26px 26px",
       }}
     >

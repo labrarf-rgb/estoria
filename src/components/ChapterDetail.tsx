@@ -1021,7 +1021,7 @@ export function ChapterDetail() {
             expanded ? "max-h-[58vh]" : "max-h-[40vh]"
           }`}
           style={{
-            backgroundImage: "radial-gradient(var(--rule) 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
             backgroundSize: "22px 22px",
           }}
         >
