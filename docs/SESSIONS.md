@@ -4392,3 +4392,76 @@ described `sync.ts` without its addressable diff; §8's "Implementation" bullet
 named every module in the sync path except the new one; and the §3 modals line
 still described `SyncConflict` as a single surface. Nothing in the file
 contract or the reconciliation rules had drifted.
+
+## 2026-08-08 (b) — Deleting scenes in bulk
+
+Deleting scenes was one at a time, by the ✕ on a card, while *moving* them had
+had a multi-select mode since Session 44. Clearing a run of beats after a
+restructure therefore meant one confirm dialog per beat, against a list that
+renumbered under you as you went.
+
+- **New store action `deleteScenes(chId, indices, cols?)`.** Deliberately not a
+  loop over `deleteScene`: every single delete renumbers each scene after it, so
+  a caller deleting 2 and 5 would have to track the shift itself and would get a
+  different answer depending on which order the two ran in — the same argument
+  that made `moveScenesWithin` a separate action rather than repeated
+  `reorderScene`. Indices are read against the list the writer sees and resolved
+  once. Links go through the shared `sceneSubset`, so a seam that closes over
+  deleted scenes comes back **unlabeled** rather than inheriting a causal claim
+  from either side. Positions are **filtered, not re-arranged** — surviving cards
+  stay where they were put, matching what the single delete already did.
+- **Clearing every scene leaves one blank scene**, never zero: the state a fresh
+  chapter starts in, and the one `moveScenesToChapter` already leaves an emptied
+  source chapter in. A chapter with zero scenes would not round-trip through the
+  markdown export. The confirm dialog says this outright when it applies.
+- **"Move scenes" is now "Select scenes"**, and the mode's header gained a
+  **Delete** button. One selection, two verbs — a second mode would have been the
+  same picking mechanic under another name. `moveMode` renamed to `selectMode`
+  throughout `ChapterDetail` so the name matches the job. Delete is outlined
+  rather than filled: moving is what the mode is usually for, and the destructive
+  verb should not be the loudest control on the row.
+- **The mode's controls are bare verbs, `Move ▾` and `Delete`.** The button that
+  opens the destination picker read "Select chapter", which named the *next step*
+  rather than the action and paired a noun against Delete's verb; the chevron
+  already says a menu follows. Neither button repeats "scene": the count sits
+  immediately to their left and the selection is lit on the canvas, so a third
+  mention would say what is already twice on screen. The hint line under the
+  canvas names the same two words rather than paraphrasing them ("then Move them
+  to a chapter, or Delete them"), so the instruction and the controls it explains
+  do not drift apart in wording.
+- **Fixed in passing: "1 scenes."** `ChapterMeta` was the one scene count in the
+  app with no singular form, so a one-scene chapter read "1 scenes" in the detail
+  meta row. Pre-existing, but a chapter reaches one scene easily now that a bulk
+  delete can clear one. The scene-flow header, the selection count, the
+  destination-picker chips and both move dialogs already pluralized.
+- **Stale comment corrected** in the scenes section of the store: it still said
+  `deleteScene` and `reorderScene` "raise the drift bar", but the drift bar went
+  away with the scene/prose binding (§4, "The beats are a guide, not a
+  structure"). The map has not mutated the manuscript for some time.
+
+### Drift check against SPECS
+
+The §3 component tree still described the chapter modal as it was before the
+manuscript moved out of it: it listed a `ManuscriptSheet.tsx` that no longer
+exists, credited it with a "scene carousel, drift bar" that went away with the
+scene/prose binding, and described `ChapterDetail` as carrying the manuscript.
+`ChapterModal` and `ChapterMeta` were missing entirely. Structural rather than
+behavioural, and corrected in this commit. The §4 rule the new Delete answers
+to — "one meaning per control: an ✕ detaches, a labelled Delete destroys" —
+already covered a labelled bulk Delete and needed no change.
+
+### Verified
+
+- Driven in the dev server against the sample story: a **non-contiguous** delete
+  (scenes 1 and 3 of 3) left scene 2 alone, in its own old position, with the
+  chapter reading 1 scene and the word count unchanged at 3200 — the prose is
+  not touched.
+- **Delete-all** on a rebuilt 3-scene chapter left exactly one blank scene, the
+  chapter intact, and the confirm read "Every scene in this chapter will be
+  permanently removed. The chapter stays, with one blank scene."
+- Selection is dropped on confirm, so the highlight does not carry over to
+  whatever scenes slid into the emptied slots.
+- The meta row reads "1 scene" after a bulk delete leaves one behind.
+- Both button labels checked in the running app, and the destination picker
+  still opens from the renamed control.
+- `npm run typecheck` clean.

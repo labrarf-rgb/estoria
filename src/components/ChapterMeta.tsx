@@ -80,7 +80,7 @@ export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
       </label>
 
       <span className="font-mono text-[11.5px] font-medium text-faint">
-        · {ch.scenes.length} scenes
+        · {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"}
       </span>
 
       <div className="flex rounded-lg bg-chip p-[3px]">
