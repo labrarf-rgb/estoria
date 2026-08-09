@@ -262,6 +262,9 @@ interface StoreState extends UiState {
   insertScene: (chId: string, atIdx: number, cols?: number) => void;
   updateScene: (chId: string, idx: number, text: string) => void;
   deleteScene: (chId: string, idx: number) => void;
+  /** Delete the given scene indices as one block. Emptying a chapter leaves it
+   *  the single blank scene a fresh chapter starts with, never zero. */
+  deleteScenes: (chId: string, indices: number[], cols?: number) => void;
   reorderScene: (chId: string, fromIdx: number, toIdx: number, cols?: number) => void;
   /** Move the given scene indices out of one chapter into another, inserted (in
    *  order) at `atIdx` in the destination's scene list (defaults to the end). */
@@ -1100,13 +1103,11 @@ export const useStore = create<StoreState>()(
 
       // ---- scenes ----
       //
-      // The four actions that change how many scenes a chapter has, or their
-      // order, all have to answer to the prose. Two of them can keep it in step
-      // by themselves, because opening an empty section moves no existing text
-      // (`addScene`, `insertScene`); the two that cannot — `deleteScene` and
-      // `reorderScene` — leave the prose alone and raise the drift bar instead.
-      // See the "Drift bar" row in docs/SPECS.md §4 — the map never mutates
-      // the manuscript.
+      // The actions that change how many scenes a chapter has, or their order,
+      // all leave the prose exactly where it is. The manuscript is not bound to
+      // the scenes: adding, deleting or reordering a beat changes the map and
+      // moves not one word. See the "The beats are a guide, not a structure"
+      // row in docs/SPECS.md — the map never mutates the manuscript.
       addScene: (chId, cols) =>
         set((s) => ({
           doc: {
@@ -1185,6 +1186,67 @@ export const useStore = create<StoreState>()(
             }),
           },
         })),
+
+      /**
+       * Delete a block of scenes in one go.
+       *
+       * Not a loop over `deleteScene`: every single delete renumbers each scene
+       * after it, so a caller deleting 2 and 5 would have to track the shift
+       * itself and would get a different result depending on which order the
+       * two ran in — the same reason `moveScenesWithin` exists rather than
+       * repeated `reorderScene`. Here the indices are all read against the list
+       * as the writer sees it, and resolved once.
+       *
+       * Links go through `sceneSubset`, so a seam that closes over deleted
+       * scenes comes back unlabeled: the app closed that gap, and only the
+       * writer can say what the new adjacency means.
+       *
+       * Positions are filtered rather than re-arranged, so the scenes that
+       * survive stay where they were put — deleting from the middle of a
+       * hand-arranged canvas leaves a hole, which is what the single delete
+       * does too, and is undone by Auto-arrange.
+       */
+      deleteScenes: (chId, indices, cols) =>
+        set((s) => {
+          const ch = s.doc.chapters.find((c) => c.id === chId);
+          if (!ch || indices.length === 0) return {};
+
+          const cut = new Set(indices.filter((i) => i >= 0 && i < ch.scenes.length));
+          if (cut.size === 0) return {};
+
+          const keep = ch.scenes.map((_, i) => i).filter((i) => !cut.has(i));
+          const next = sceneSubset(ch.scenes, ch.sceneLinks, keep);
+
+          // A chapter never drops below one scene. Clearing every scene leaves
+          // the blank one a fresh chapter starts with — the same state an
+          // emptied source chapter is left in by `moveScenesToChapter` — rather
+          // than a chapter the markdown round-trip could not represent.
+          const emptied = next.scenes.length === 0;
+
+          return {
+            doc: {
+              ...s.doc,
+              chapters: s.doc.chapters.map((c) =>
+                c.id !== chId
+                  ? c
+                  : emptied
+                  ? {
+                      ...c,
+                      scenes: [""],
+                      sceneLinks: [],
+                      ...scenePosBoth([""], s.sceneFlowExpanded, cols),
+                    }
+                  : {
+                      ...c,
+                      scenes: next.scenes,
+                      sceneLinks: next.sceneLinks,
+                      scenePos: (c.scenePos || []).filter((_, i) => !cut.has(i)),
+                      scenePosCompact: (c.scenePosCompact || []).filter((_, i) => !cut.has(i)),
+                    }
+              ),
+            },
+          };
+        }),
 
       reorderScene: (chId, fromIdx, toIdx, cols) =>
         set((s) => ({

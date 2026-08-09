@@ -46,6 +46,7 @@ export function ChapterDetail() {
   const insertScene = useStore((s) => s.insertScene);
   const updateScene = useStore((s) => s.updateScene);
   const deleteScene = useStore((s) => s.deleteScene);
+  const deleteScenes = useStore((s) => s.deleteScenes);
   const reorderScene = useStore((s) => s.reorderScene);
   const moveScenesToChapter = useStore((s) => s.moveScenesToChapter);
   const moveScenesWithin = useStore((s) => s.moveScenesWithin);
@@ -79,9 +80,12 @@ export function ChapterDetail() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
-  // Scene-move mode: pick scenes with checkboxes, then choose a destination
-  // chapter to append them to. Selection is keyed by scene index.
-  const [moveMode, setMoveMode] = useState(false);
+  // Scene select mode: pick scenes with checkboxes, then act on the block —
+  // send it to a chapter (this one included, which is a reorder) or delete it.
+  // One selection, two verbs: the picking is identical either way, so a second
+  // mode would only be the same mechanic under a different name. Selection is
+  // keyed by scene index.
+  const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [destPickerOpen, setDestPickerOpen] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -92,7 +96,7 @@ export function ChapterDetail() {
 
   // Scene drag-to-reorder: an existing card ("move"), the ghost from a
   // long-pressed Add-scene button ("new"), or the whole checked selection in
-  // move mode ("block"). Coordinates are canvas-local (relative to
+  // select mode ("block"). Coordinates are canvas-local (relative to
   // sceneBoxRef's content, including its scroll offset) so they line up
   // directly with scenePos / sceneAutoArrange output.
   type SceneDrag =
@@ -121,9 +125,9 @@ export function ChapterDetail() {
   dragRef.current = drag;
   const addScenePressRef = useRef(false);
   /**
-   * A press on a selected card in move mode, not yet a drag.
+   * A press on a selected card in select mode, not yet a drag.
    *
-   * In move mode a click on a card toggles its selection, so a block drag
+   * In select mode a click on a card toggles its selection, so a block drag
    * cannot start on mousedown or every attempt to pick the block up would also
    * deselect the card it started from. The press is held here and promoted to a
    * real drag only once the pointer has actually moved; if it never does, the
@@ -355,7 +359,7 @@ export function ChapterDetail() {
 
   // Leaving a chapter (prev/next nav or close) cancels an in-progress move.
   useEffect(() => {
-    setMoveMode(false);
+    setSelectMode(false);
     setSelected(new Set());
     setDestPickerOpen(false);
     setMoveDest(null);
@@ -462,8 +466,8 @@ export function ChapterDetail() {
   };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
-    if (moveMode) {
-      // Pressing a checked card in move mode arms a block drag; pressing an
+    if (selectMode) {
+      // Pressing a checked card in select mode arms a block drag; pressing an
       // unchecked one does nothing, so the click can still check it. Nothing is
       // committed here — see `pendingBlock` for why the drag cannot start until
       // the pointer moves.
@@ -536,8 +540,8 @@ export function ChapterDetail() {
       else next.add(i);
       return next;
     });
-  const exitMoveMode = () => {
-    setMoveMode(false);
+  const exitSelectMode = () => {
+    setSelectMode(false);
     setSelected(new Set());
     setDestPickerOpen(false);
     setMoveDest(null);
@@ -574,7 +578,35 @@ export function ChapterDetail() {
         sceneColumnsForWidth(remaining, boxW)
       );
     }
-    exitMoveMode();
+    exitSelectMode();
+  };
+
+  // Deleting the selection. Goes through the shared confirm rather than a
+  // dialog of its own — there is nothing to choose here, only to agree to.
+  const askDeleteSelected = () => {
+    const n = selected.size;
+    if (n === 0) return;
+    const all = n === ch.scenes.length;
+    askConfirm({
+      message: `Delete ${n} ${n === 1 ? "scene" : "scenes"}?`,
+      // Said plainly when it applies: clearing the chapter leaves the chapter,
+      // and finding one blank scene where you expected none should be the
+      // thing you were told would happen, not a surprise.
+      detail: all
+        ? "Every scene in this chapter will be permanently removed. The chapter stays, with one blank scene. Your written prose is not touched."
+        : "The scenes will be permanently removed. Your written prose is not touched.",
+      danger: true,
+      onConfirm: () => {
+        deleteScenes(
+          ch.id,
+          [...selected],
+          sceneColumnsForWidth(ch.scenes.length - n, boxW)
+        );
+        // Selection is by index, so leaving it standing would carry the
+        // highlight over to whatever scenes slid into those slots.
+        exitSelectMode();
+      },
+    });
   };
 
   return (
@@ -906,24 +938,45 @@ export function ChapterDetail() {
           <span className="font-mono text-[11px] font-medium text-faint">
             {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"}
           </span>
-          {scenesCollapsed ? null : moveMode ? (
+          {scenesCollapsed ? null : selectMode ? (
             <div className="ml-auto flex items-center gap-[9px]">
               <span className="text-[12px] font-medium text-soft">
                 {selected.size === 0
-                  ? "Click the scenes to move"
+                  ? "Click the scenes to pick them"
                   : `${selected.size} ${selected.size === 1 ? "scene" : "scenes"} selected`}
               </span>
               {selected.size > 0 && (
-                <button
-                  onClick={() => setDestPickerOpen((v) => !v)}
-                  className="flex items-center gap-[6px] rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
-                >
-                  Select chapter
-                  <span className="text-[9px]">▾</span>
-                </button>
+                <>
+                  {/* Bare verbs, Move and Delete — the row reads as the two
+                      things that can happen to the block. Neither repeats
+                      "scene": the count sits immediately to the left and the
+                      selection is lit up on the canvas, so naming it again in
+                      the button would say a third time what is already twice
+                      on screen. "Select chapter" named the *next step*
+                      instead, describing the dropdown rather than the action;
+                      the chevron already says a menu follows. */}
+                  <button
+                    onClick={() => setDestPickerOpen((v) => !v)}
+                    className="flex items-center gap-[6px] rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
+                    title="Choose a chapter to move the selected scenes to"
+                  >
+                    Move
+                    <span className="text-[9px]">▾</span>
+                  </button>
+                  {/* Outlined, not filled: the move is what this mode is
+                      usually for, and the destructive verb should not be the
+                      loudest thing on the row. */}
+                  <button
+                    onClick={askDeleteSelected}
+                    className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-soft hover:border-but hover:text-but"
+                    title="Delete the selected scenes"
+                  >
+                    Delete
+                  </button>
+                </>
               )}
               <button
-                onClick={exitMoveMode}
+                onClick={exitSelectMode}
                 className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
               >
                 Cancel
@@ -949,11 +1002,11 @@ export function ChapterDetail() {
                   still reorder a block within it. */}
               {(otherChapters.length > 0 || ch.scenes.length > 1) && ch.scenes.length > 0 && (
                 <button
-                  onClick={() => setMoveMode(true)}
+                  onClick={() => setSelectMode(true)}
                   className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                  title="Select several scenes to reorder together, or send to another chapter"
+                  title="Pick several scenes to reorder together, send to another chapter, or delete"
                 >
-                  Move scenes
+                  Select scenes
                 </button>
               )}
               <button
@@ -969,7 +1022,7 @@ export function ChapterDetail() {
         </div>
 
         {/* Destination dropdown — the "Select chapter" menu. */}
-        {moveMode && destPickerOpen && selected.size > 0 && (
+        {selectMode && destPickerOpen && selected.size > 0 && (
           <div className="mx-[26px] mb-[4px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
             <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-faint">
               Move to which chapter?
@@ -1055,11 +1108,11 @@ export function ChapterDetail() {
                   return (
                     <button
                       key={i}
-                      disabled={moveMode}
+                      disabled={selectMode}
                       onClick={() => cycleSceneLink(ch.id, i)}
                       className="group/conn absolute z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full disabled:pointer-events-none"
                       style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2 }}
-                      title={moveMode ? undefined : "Unlabeled — click to set Therefore / But / And"}
+                      title={selectMode ? undefined : "Unlabeled — click to set Therefore / But / And"}
                       aria-label="Unlabeled connector"
                     >
                       <span className="h-[7px] w-[7px] rounded-full border border-line bg-bg transition-colors group-hover/conn:border-faint group-hover/conn:bg-faint" />
@@ -1069,7 +1122,7 @@ export function ChapterDetail() {
                 return (
                   <button
                     key={i}
-                    disabled={moveMode} // Visible for context while selecting, but inert.
+                    disabled={selectMode} // Visible for context while selecting, but inert.
                     onClick={() => cycleSceneLink(ch.id, i)}
                     className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide disabled:pointer-events-none"
                     style={{
@@ -1078,7 +1131,7 @@ export function ChapterDetail() {
                       color: CONN[type].color,
                       borderColor: CONN[type].color,
                     }}
-                    title={moveMode ? undefined : "Click to cycle Therefore / But / And / unlabeled"}
+                    title={selectMode ? undefined : "Click to cycle Therefore / But / And / unlabeled"}
                   >
                     {CONN[type].label}
                   </button>
@@ -1095,14 +1148,14 @@ export function ChapterDetail() {
             {cardSlots.map((slot) => {
               const i = slot.idx;
               const s = ch.scenes[i];
-              const isSelected = moveMode && selected.has(i);
+              const isSelected = selectMode && selected.has(i);
               return (
                 <div
                   key={i}
                   data-scene-idx={i}
                   onMouseDown={(e) => onSceneDown(e, i)}
                   onClick={
-                    moveMode
+                    selectMode
                       ? () => {
                           // The click that ends a block drag must not also
                           // deselect the card it was picked up by.
@@ -1115,13 +1168,13 @@ export function ChapterDetail() {
                       : undefined
                   }
                   className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
-                    moveMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+                    selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
                   }`}
                   style={{ left: slot.pos.x, top: slot.pos.y, width: SCENE_W, minHeight: SCENE_H }}
                 >
                   {/* Hover the left/right edge of a card to drop a new scene in
                       before or after it, without leaving the scene canvas. */}
-                  {!drag && !moveMode && (
+                  {!drag && !selectMode && (
                     <>
                       <button
                         onMouseDown={(e) => e.stopPropagation()}
@@ -1165,7 +1218,7 @@ export function ChapterDetail() {
                     }
                   >
                     <div className="flex items-center gap-[6px]">
-                      {moveMode && (
+                      {selectMode && (
                         <span
                           className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] font-bold leading-none text-bg"
                           style={{
@@ -1195,7 +1248,7 @@ export function ChapterDetail() {
                           {s.trim().length} / {SCENE_TEXT_MAX}
                         </span>
                       )}
-                      {!moveMode && ch.scenes.length > 1 && (
+                      {!selectMode && ch.scenes.length > 1 && (
                         <button
                           onClick={() =>
                             askConfirm({
@@ -1218,12 +1271,12 @@ export function ChapterDetail() {
                       // thing this cap must not do. `writeScene` refuses it and
                       // says so.
                       onChange={(e) => writeScene(ch.id, i, s, e.target.value)}
-                      onMouseDown={(e) => !moveMode && e.stopPropagation()}
-                      readOnly={moveMode}
+                      onMouseDown={(e) => !selectMode && e.stopPropagation()}
+                      readOnly={selectMode}
                       rows={3}
                       placeholder="New scene"
                       className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint ${
-                        moveMode ? "pointer-events-none" : ""
+                        selectMode ? "pointer-events-none" : ""
                       }`}
                     />
                   </div>
@@ -1247,8 +1300,10 @@ export function ChapterDetail() {
           </div>
         </div>
         <div className="px-[26px] pt-[8px] text-[11px] font-medium text-faint">
-          {moveMode
-            ? "Click scenes to select them · drag any selected scene to reorder them all together · or pick a chapter to send them to"
+          {selectMode
+            ? // Names the two buttons rather than paraphrasing them, so the
+              // hint and the controls it explains use the same words.
+              "Click scenes to select them · drag any selected scene to reorder them all together · then Move them to a chapter, or Delete them"
             : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to cycle Therefore / But / And, or past it to leave the seam unlabeled"}
         </div>
         </>
