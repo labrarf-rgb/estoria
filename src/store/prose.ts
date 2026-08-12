@@ -64,16 +64,40 @@ function projectOf(key: string): string {
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/**
+ * How long to wait for `indexedDB.open` before giving up on it.
+ *
+ * It is not enough to handle `onerror` and `onblocked`: an open can simply
+ * never settle — a database left locked by an unclean shutdown, or a second
+ * window (an installed app and a browser tab are two) holding it. Without a
+ * bound, the load that awaits this never returns, hydration never finishes, and
+ * the app sits forever on a first-launch screen over an intact document. That
+ * is the failure this timeout exists to convert into an honest error.
+ */
+const OPEN_TIMEOUT_MS = 5000;
+
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("IndexedDB timed out"));
+    }, OPEN_TIMEOUT_MS);
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error("IndexedDB blocked"));
+    req.onsuccess = () => finish(() => resolve(req.result));
+    req.onerror = () => finish(() => reject(req.error));
+    req.onblocked = () => finish(() => reject(new Error("IndexedDB blocked")));
   });
   return dbPromise;
 }
@@ -85,6 +109,13 @@ function openDb(): Promise<IDBDatabase> {
  * **When it is not, prose simply stays in the localStorage blob**, exactly as it
  * did before this split existed. Slower and quota-bound, but never lost — a
  * writer on a browser we cannot use IndexedDB in still keeps their words.
+ *
+ * That is the whole answer only for a document whose prose was *never* moved
+ * out. For one whose prose is already in IndexedDB, "unavailable" does not mean
+ * "no prose" — it means we cannot see it, and handing the store a doc of blank
+ * chapters would be one auto-save away from making that permanent. The stored
+ * blob records which case it is (`proseExternal`), and `persistence.getItem`
+ * refuses to load rather than guess. See store/persistence.ts.
  */
 export async function proseStoreAvailable(): Promise<boolean> {
   if (typeof indexedDB === "undefined") return false;

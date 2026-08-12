@@ -34,7 +34,8 @@ import {
   type TimelinePane,
 } from "@/lib/layout";
 import { TEMPLATES } from "@/lib/templates";
-import { normalizeDoc, reconcileWords, zustandStorage } from "@/store/persistence";
+import { downloadProjectFile, normalizeDoc, reconcileWords, zustandStorage } from "@/store/persistence";
+import { markHydrated } from "@/store/hydration";
 import type { RefView } from "@/components/ui/ViewToggle";
 
 export type View = "board" | "timeline";
@@ -202,6 +203,15 @@ export interface ConfirmRequest {
   confirmLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
+  /**
+   * An action offered *beside* the choice, which does not answer it — the
+   * dialog stays open afterwards.
+   *
+   * It exists because "export it first" is useless advice when the thing
+   * raising the prompt is a full-screen overlay with the toolbar underneath it.
+   * If a confirm tells someone to save first, saving has to be on the confirm.
+   */
+  extraAction?: { label: string; onClick: () => void };
 }
 
 /** Lightweight descriptor for the project library list. */
@@ -412,6 +422,8 @@ interface StoreState extends UiState {
   closeLightbox: () => void;
 
   // ---- onboarding ----
+  /** Dismiss the chooser and keep the document that's already loaded. */
+  keepCurrent: () => void;
   useSample: () => void;
   startFresh: () => void;
 }
@@ -687,6 +699,46 @@ const initialUi: UiState = {
   manuscriptUndo: null,
   panelExpanded: false,
 };
+
+/**
+ * Is there anything in this document worth a confirmation prompt?
+ *
+ * The reference check comes first and does most of the work: on a real first
+ * launch the store still holds the very `sampleStory` object it was created
+ * with, so "has content" is true but "has anything of yours" is not.
+ *
+ * Exported because the welcome screen asks the same question for the opposite
+ * reason: to offer a way *not* to destroy what it found.
+ */
+export function docHasContent(doc: StoryDoc): boolean {
+  if (doc === sampleStory) return false;
+  return (
+    doc.chapters.length > 0 ||
+    doc.characters.length > 0 ||
+    doc.world.length > 0 ||
+    doc.assets.length > 0 ||
+    doc.storyNotes.trim().length > 0 ||
+    doc.books.length > 1 ||
+    Object.keys(doc.bookData).length > 0
+  );
+}
+
+/** Run `apply`, behind a confirm when it would discard real work. */
+function guardReplace(get: () => StoreState, message: string, apply: () => void): void {
+  const doc = get().doc;
+  if (!docHasContent(doc)) return apply();
+  get().askConfirm({
+    message,
+    detail: `"${doc.projectTitle}" is open and has work in it. This replaces it. Download a copy first if you want to keep it.`,
+    confirmLabel: "Replace",
+    danger: true,
+    onConfirm: apply,
+    // The prompt carries the escape rather than pointing at one. Raised from
+    // the welcome screen, the File menu it would otherwise be telling you to
+    // use is underneath a full-screen overlay.
+    extraAction: { label: "Download a copy", onClick: () => downloadProjectFile(doc) },
+  });
+}
 
 export const useStore = create<StoreState>()(
   persist(
@@ -2303,18 +2355,68 @@ export const useStore = create<StoreState>()(
       closeLightbox: () => set({ lightbox: null }),
 
       // ---- onboarding ----
-      useSample: () => set({ doc: sampleStory, onboarded: true, level: "book", view: "board" }),
+      //
+      // All three are reached from the one screen that shows when the app
+      // doesn't think there is a document. `keepCurrent` is the answer when it
+      // is wrong about that — and the whole point of the load lock is that it
+      // can be. The other two replace the open document outright, so they go
+      // through `guardReplace`: on a genuine first launch the doc is still the
+      // untouched default and it waves them through, and otherwise the confirm
+      // is what stands between a bad load and a lost manuscript.
+      keepCurrent: () => set({ onboarded: true, level: "book", view: "board" }),
+      useSample: () =>
+        guardReplace(get, "Replace the open project with the sample story?", () =>
+          set((s) => {
+            // The sample's authored coordinates run left to right across 2100px
+            // — legible as data, a long thin line as a board, and the first
+            // thing anyone ever sees of Estoria. Lay it out on load with the
+            // same auto-arrange the toolbar button uses, sized to *this* window
+            // rather than a fixed grid, so it opens as a map.
+            //
+            // Bumping `arrangeN` is also what makes the Board fit the result to
+            // the screen (see its arrange effect), so this needs no camera work.
+            const cols = bestColumns(sampleStory.chapters.length, s.boardW, s.boardH);
+            const { chapters, arrangeN } = autoArrange(sampleStory.chapters, s.arrangeN, cols);
+
+            // "Alt ending" is a standalone fork of this same board, so it takes
+            // the same positions: switching versions compares two endings, and
+            // it shouldn't rearrange the map underneath that comparison.
+            const placed = new Map(chapters.map((c) => [c.id, c]));
+            const draftData = Object.fromEntries(
+              Object.entries(sampleStory.draftData).map(([id, v]) => [
+                id,
+                {
+                  ...v,
+                  chapters: v.chapters.map((c) => {
+                    const p = placed.get(c.id);
+                    return p ? { ...c, x: p.x, y: p.y, rot: p.rot } : c;
+                  }),
+                },
+              ])
+            );
+
+            return {
+              doc: { ...sampleStory, chapters, draftData },
+              arrangeN,
+              onboarded: true,
+              level: "book",
+              view: "board",
+            };
+          })
+        ),
       startFresh: () =>
-        set({
-          doc: emptyStory(),
-          onboarded: true,
-          level: "book",
-          view: "board",
-          openCh: null,
-          showNewBook: false,
-          // Offer creation options right away.
-          showTemplates: true,
-        }),
+        guardReplace(get, "Start a new, empty project?", () =>
+          set({
+            doc: emptyStory(),
+            onboarded: true,
+            level: "book",
+            view: "board",
+            openCh: null,
+            showNewBook: false,
+            // Offer creation options right away.
+            showTemplates: true,
+          })
+        ),
     }),
     {
       name: "estoria:store:v1",
@@ -2365,3 +2467,9 @@ export const useStore = create<StoreState>()(
     }
   )
 );
+
+// Persist reads the store back asynchronously (see store/hydration.ts). Both
+// lines are needed: the callback for the normal case, and the check for the
+// race where hydration finished before this module got here.
+useStore.persist.onFinishHydration(() => markHydrated());
+if (useStore.persist.hasHydrated()) markHydrated();

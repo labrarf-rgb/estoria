@@ -57,12 +57,14 @@ const UNREADABLE_KEY = "estoria:unreadable";
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private key: string = STORAGE_KEY) {}
 
+  /**
+   * Failures propagate, deliberately. Returning `null` for them made "there is
+   * nothing stored" and "we could not read what is stored" the same answer, and
+   * the app's response to the first is to show the first-launch screen, whose
+   * buttons overwrite the second. `null` now means only ever *absent*.
+   */
   async load(): Promise<string | null> {
-    try {
-      return localStorage.getItem(this.key);
-    } catch {
-      return null;
-    }
+    return localStorage.getItem(this.key);
   }
 
   async save(serialized: string): Promise<void> {
@@ -76,6 +78,104 @@ export class LocalStorageAdapter implements StorageAdapter {
 /** The adapter the store auto-saves through. Swap this to change backends. */
 export const activeAdapter: StorageAdapter = new LocalStorageAdapter();
 
+// ---- Load outcome, and the write lock it controls ---------------------------
+
+/**
+ * Why a load could not produce the stored document.
+ *
+ *  - `unavailable` — the storage itself refused (denied, disabled, throwing).
+ *    We do not know whether there is a document behind it.
+ *  - `unreadable` — a document is there and would not parse. It has been copied
+ *    aside under `savedAs` (or nowhere, if even that write failed) so that a
+ *    human can still get the text back out.
+ *  - `prose-unreachable` — the map read fine, but it was written with its
+ *    manuscripts in IndexedDB and IndexedDB cannot be reached. Loading anyway
+ *    would show every chapter as blank and save it that way.
+ */
+export type LoadFailure =
+  | { code: "unavailable"; detail: string }
+  | { code: "unreadable"; savedAs: string | null }
+  | { code: "prose-unreachable"; detail: string };
+
+export type LoadState =
+  | { kind: "loading" }
+  | { kind: "ready" }
+  | { kind: "failed"; failure: LoadFailure };
+
+let loadState: LoadState = { kind: "loading" };
+const loadListeners = new Set<(s: LoadState) => void>();
+
+export function getLoadState(): LoadState {
+  return loadState;
+}
+
+/** Subscribe to load-state changes. Returns an unsubscribe function. */
+export function onLoadState(fn: (s: LoadState) => void): () => void {
+  loadListeners.add(fn);
+  return () => loadListeners.delete(fn);
+}
+
+function setLoadState(next: LoadState): void {
+  loadState = next;
+  loadListeners.forEach((fn) => fn(next));
+}
+
+/**
+ * The write lock.
+ *
+ * **Nothing is written until a load has told us what is already there.** This is
+ * the one invariant that makes every other kind of failure survivable: a load
+ * that fails, hangs, or has simply not finished yet leaves the store holding its
+ * defaults (the sample story, `onboarded: false`), and a single stray write of
+ * those defaults is the difference between a bad morning and a lost manuscript.
+ *
+ * Armed by a load that reaches a definite answer — including "there is genuinely
+ * nothing stored", which is a first launch and must be allowed to save. Left
+ * disarmed by every failure, until the reader explicitly chooses to go on
+ * (`armWrites`, from the recovery screen).
+ */
+let writesArmed = false;
+
+export function writesLocked(): boolean {
+  return !writesArmed;
+}
+
+/**
+ * Let saving proceed after a failed load — the reader has seen the recovery
+ * screen and chosen to start over anyway. The next change overwrites whatever
+ * could not be read, which is the point, so nothing calls this implicitly.
+ *
+ * Flushes immediately: everything the reader did while locked is still sitting
+ * in `pending`, and the choice to go on should land now, not on their next
+ * keystroke.
+ */
+export function armWrites(): void {
+  writesArmed = true;
+  setLoadState({ kind: "ready" });
+  setSaveStatus({ state: "idle", savedAt: 0 });
+  flushSave();
+}
+
+/**
+ * Blobs a previous load could not parse and set aside rather than overwrite.
+ * The recovery screen offers them for download — it is the last copy of that
+ * text, and getting it onto disk is worth more than anything else on offer.
+ */
+export function readUnreadableBackups(): { key: string; raw: string }[] {
+  const out: { key: string; raw: string }[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(`${UNREADABLE_KEY}:`)) continue;
+      const raw = localStorage.getItem(key);
+      if (raw) out.push({ key, raw });
+    }
+  } catch {
+    // Storage denied — nothing to offer, and the screen says so anyway.
+  }
+  return out.sort((a, b) => b.key.localeCompare(a.key)); // newest first
+}
+
 // ---- Save status (surfaced in the Footer) -----------------------------------
 
 export interface SaveStatus {
@@ -86,9 +186,10 @@ export interface SaveStatus {
    * Which write failed. The map goes to localStorage, where a failure is nearly
    * always the quota; prose goes to IndexedDB, where it is not — and telling a
    * writer their storage is full when it isn't sends them to delete things they
-   * did not need to.
+   * did not need to. `locked` is neither: nothing was attempted, because the
+   * load never established what is already stored (see `writesArmed`).
    */
-  reason?: "storage" | "prose";
+  reason?: "storage" | "prose" | "locked";
 }
 
 let saveStatus: SaveStatus = { state: "idle", savedAt: 0 };
@@ -118,7 +219,15 @@ export interface PersistedShape {
   /** The prefs `partialize` also persists; nothing here reads them. */
   [key: string]: unknown;
 }
-type Stored = { state: PersistedShape; version?: number };
+/**
+ * `proseExternal` is ours, not zustand's — it sits beside the state rather than
+ * in it, and records whether the manuscripts were lifted into IndexedDB when
+ * this blob was written. Without it, a doc with no inline prose is ambiguous
+ * between "has no prose" and "its prose is somewhere we can't currently read",
+ * and only the second must refuse to load. Absent on blobs written before this
+ * existed, which read as `false` — those still carry their prose inline.
+ */
+type Stored = { state: PersistedShape; version?: number; proseExternal?: boolean };
 
 /**
  * Auto-save, in two streams.
@@ -220,6 +329,7 @@ function flushProse(): void {
     clearTimeout(proseTimer);
     proseTimer = null;
   }
+  if (!writesArmed) return;
   const split = currentSplit();
   if (!split || !proseEnabled) return;
 
@@ -250,11 +360,15 @@ function flushMap(): void {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
+  if (!writesArmed) return;
   const split = currentSplit();
   if (!split) return;
   pending = null;
   splitCache = null;
-  const value = JSON.stringify(split.stripped);
+  // The marker travels with the blob it describes, so the next load knows
+  // whether these chapters are prose-free because there is none or because it
+  // lives in IndexedDB.
+  const value = JSON.stringify({ ...split.stripped, proseExternal: proseEnabled });
   void activeAdapter
     .save(value)
     .then(() => {
@@ -301,37 +415,83 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
     } catch {
       // ignore
     }
-    // Settled before the early returns below: a browser opening Estoria for the
-    // first time has nothing to load, and would otherwise keep prose inline
-    // until its next reload.
+
+    // Every `return null` below hands the store its defaults — the sample story
+    // and `onboarded: false`, i.e. the first-launch screen. That is the right
+    // answer for exactly one of these paths (nothing stored) and a catastrophe
+    // on the rest, so each failure arms nothing and says why instead.
+    const fail = (failure: LoadFailure) => {
+      setLoadState({ kind: "failed", failure });
+      setSaveStatus({ state: "error", savedAt: 0, reason: "locked" });
+      return null;
+    };
+    const ready = <T,>(value: T): T => {
+      writesArmed = true;
+      setLoadState({ kind: "ready" });
+      return value;
+    };
+
+    // Settled once, up front, so every path below — including the failures,
+    // which the reader may still choose to write over — agrees on where prose
+    // goes. A browser opening Estoria for the first time would otherwise keep
+    // prose inline until its next reload.
     proseEnabled = await proseStoreAvailable();
 
-    const raw = await activeAdapter.load();
-    if (!raw) return null;
+    let raw: string | null;
+    try {
+      raw = await activeAdapter.load();
+    } catch (e) {
+      return fail({ code: "unavailable", detail: e instanceof Error ? e.message : String(e) });
+    }
+
+    // Genuinely nothing stored: a first launch, and the one case that may write.
+    if (!raw) return ready(null);
 
     let parsed: Stored;
     try {
       parsed = JSON.parse(raw) as Stored;
     } catch {
-      // Unreadable. Returning null starts the app on a fresh document, which
-      // then saves straight over this — so keep a copy first. It is the only
-      // chance anyone has of getting the text back out by hand, and it costs
-      // one write on a path that should never run.
+      // Unreadable. Keep a copy before anything else touches this key — it is
+      // the only chance anyone has of getting the text back out by hand, and it
+      // costs one write on a path that should never run.
+      const savedAs = `${UNREADABLE_KEY}:${Date.now()}`;
+      let kept: string | null = savedAs;
       try {
-        localStorage.setItem(`${UNREADABLE_KEY}:${Date.now()}`, raw);
+        localStorage.setItem(savedAs, raw);
       } catch {
-        // Nothing left to do: no room to keep it, and no way to read it.
+        kept = null; // no room to keep it, and no way to read it
       }
-      return null;
+      return fail({ code: "unreadable", savedAs: kept });
     }
-    if (!parsed?.state?.doc || !proseEnabled) return parsed ?? null;
+
+    // Written with its manuscripts in IndexedDB? Then IndexedDB is not optional
+    // for this document, whatever it is for the browser.
+    const external = parsed?.proseExternal === true;
+
+    if (!parsed?.state?.doc) return ready(parsed ?? null);
+
+    if (!proseEnabled) {
+      if (external) {
+        return fail({
+          code: "prose-unreachable",
+          detail: "This browser's database for manuscripts could not be opened.",
+        });
+      }
+      return ready(parsed); // prose is inline here; nothing is missing
+    }
 
     let stored: Map<string, string>;
     try {
       stored = await loadAllProse();
-    } catch {
+    } catch (e) {
       proseEnabled = false;
-      return parsed;
+      if (external) {
+        return fail({
+          code: "prose-unreachable",
+          detail: e instanceof Error ? e.message : String(e),
+        });
+      }
+      return ready(parsed);
     }
     // What IndexedDB holds, recorded before the pad goes over the top — so a
     // pad entry that never reached IndexedDB reads as dirty and is written.
@@ -345,20 +505,29 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
     const state = parsed.state;
     const stash: Record<string, StoryDoc> = {};
     for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = mergeProse(d, merged);
-    return {
+    return ready({
       ...parsed,
       state: {
         ...state,
         doc: mergeProse(state.doc, merged),
         ...(state.projectStash ? { projectStash: stash } : {}),
       },
-    };
+    });
   },
 
   setItem: (name: string, value: Stored) => {
     void name;
     // One assignment. Everything expensive waits for the timers below.
     pending = value;
+    // Locked: hold the snapshot in memory (so arming later still saves it) but
+    // schedule nothing, and never show "Saving..." for a write that will not
+    // happen. The Footer says what is actually true.
+    if (!writesArmed) {
+      if (saveStatus.reason !== "locked") {
+        setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "locked" });
+      }
+      return;
+    }
     if (saveStatus.state !== "saving") setSaveStatus({ ...saveStatus, state: "saving" });
     if (proseTimer != null) clearTimeout(proseTimer);
     proseTimer = setTimeout(flushProse, PROSE_DEBOUNCE_MS);

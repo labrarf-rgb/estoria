@@ -102,6 +102,61 @@ The seam is ready for it: since Session 20 both reads and writes go through
 surfaced in the footer). Still to do before a Drive adapter: widen
 `StorageAdapter` to per-project granularity (§9 item 1).
 
+### The load lock (added 2026-08-11)
+
+**Nothing is written until a load has said what is already there.** One
+invariant, and it is the one that makes every other storage failure survivable.
+
+The hazard it closes: since the manuscripts moved to IndexedDB, reading the
+store is **asynchronous** — an IndexedDB open plus a full cursor read before
+`getItem` answers — so zustand's persist middleware hydrates asynchronously and
+the store holds its defaults until it lands. Those defaults are the sample story
+and `onboarded: false`, which is to say **the first-launch chooser, rendered
+over a document that exists**, with two buttons that replace it. A load that
+fails, hangs, or has merely not finished yet all arrive on screen as "you have
+no work here."
+
+Three parts, in `store/persistence.ts` unless noted:
+
+- **`writesArmed`.** `flushMap`, `flushProse` and `setItem` all no-op until a
+  load reaches a definite answer. A first launch with genuinely nothing stored
+  counts as definite and arms; every failure does not, and the Footer says
+  auto-save is paused rather than showing "Saving…" forever. `armWrites()` is
+  the reader's explicit override, from the recovery screen only.
+- **`null` means absent, and nothing else.** `LocalStorageAdapter.load` no
+  longer swallows throws. A failed read, an unparseable blob and an unreachable
+  prose store are each a `LoadFailure` with its own wording, not a shrug that
+  looks like a new user.
+- **The hydration gate** (`store/hydration.ts`). `Welcome` renders only once
+  persist has finished *and* the load succeeded; `Recovery` renders when it did
+  not. Kept outside the store deliberately — marking it in state would be a
+  state change, which persist answers with a write of the state we have only
+  just finished reading.
+- **A way out that destroys nothing.** When the chooser does come up over a
+  document that has work in it, "Keep working on this" leads, naming the project
+  and its size. Reaching that state means something is off — nothing sets
+  `onboarded: false` over real work — but "we are confused, pick which way to
+  destroy it" is not a question to ask a writer. The two replacing options stay,
+  behind confirms.
+- **A confirm that tells you to save first has to carry the save.**
+  `ConfirmRequest.extraAction` renders beside the choice and does not answer it,
+  so the dialog stays open. `guardReplace` uses it for "Download a copy".
+  Without it the advice was unfollowable: the welcome screen is a full-screen
+  overlay, and the File menu it was pointing at is underneath it.
+
+**`proseExternal`.** The stored blob records whether its manuscripts were lifted
+into IndexedDB. Without it, a doc with no inline prose is ambiguous between "has
+none" and "its prose is somewhere we currently cannot read", and loading the
+second shows every chapter blank and is one auto-save from making that true.
+Absent on older blobs, which read as `false` and still carry prose inline.
+
+**Durable storage** (`lib/storageDurability.ts`). Browser storage defaults to
+the *best-effort* bucket, which the browser may clear under disk pressure —
+silently, and taking localStorage and IndexedDB together, which from inside the
+app is indistinguishable from a first launch. `navigator.storage.persist()` is
+requested at startup; the answer is reported in About, because "best effort"
+means the Sync folder and exports are not optional.
+
 ---
 
 ## 3. Project layout
@@ -820,6 +875,29 @@ catches it and the dialog offers a top-level tab instead. A cross-origin parent
 makes `window.top` throw on access, which is itself proof of being framed, so
 the check holds both ways. This was live for one deploy: production reached
 Estoria through `estoria-app.html`, an iframe wrapper, now unlinked.
+
+**Only this build's shell, and only a real one (added 2026-08-11).** The
+navigation handler is network-first and files what it gets back as the offline
+shell, and `cacheShell` is the gate on that. Two ways it went wrong without one,
+both producing an app that will not start — worse than one that will not start
+*offline*:
+
+- **A different build.** A deploy lands. The new worker installs and *waits*,
+  because the reader hasn't taken the update yet, so the **old** worker's fetch
+  handler is what sees the new HTML — and `SHELL` is named from the running
+  worker's own `?v=`. The new markup lands in the old build's cache, whose
+  `/assets/` entries are the old hashes. Offline, that shell asks for scripts
+  nothing has and the window comes up blank. The stamp Vite injects
+  (`__ESTORIA_BUILD__`) is read back out of the HTML and has to match `BUILD`.
+- **Not an app at all.** `cache.put` will happily store a 404 or a 502 — unlike
+  `cache.add`, which is why precache never hit this. GitHub Pages serves both
+  mid-deploy and `deploy.sh` rsyncs with `--delete`, so the window is real.
+  Cached once, an error page *is* the offline shell until a successful
+  navigation replaces it.
+
+The same function is the only writer of `"./"` in both places, install and
+runtime, so precache no longer lists `"./"` among the URLs it `cache.add`s —
+that add would re-fetch and overwrite the checked copy.
 
 **Getting back out — two switches.** A service worker is the one thing Estoria
 ships that keeps running on someone else's machine after a bad deploy, so both

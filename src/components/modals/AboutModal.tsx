@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore";
+import { useDurability } from "@/lib/storageDurability";
 import { Scrim, stop } from "@/components/ui/Overlay";
 import { SCHEMA_VERSION } from "@/types";
 
@@ -6,6 +7,7 @@ import { SCHEMA_VERSION } from "@/types";
 export function AboutModal() {
   const show = useStore((s) => s.showAbout);
   const setPanel = useStore((s) => s.setPanel);
+  const durability = useDurability();
   if (!show) return null;
   const close = () => setPanel("showAbout", false);
 
@@ -35,6 +37,19 @@ export function AboutModal() {
               Your work auto-saves in this browser and can sync with the Estoria Android
               app through a shared folder (footer → Sync).
             </div>
+            {/* Whether the browser has promised to keep this origin's storage,
+                or only to keep it while it feels like it. The second answer is
+                the reason the Sync folder and exports exist, so it says so. */}
+            {durability === "best-effort" ? (
+              <div style={{ color: "var(--but)" }}>
+                This browser has not granted Estoria durable storage, so it may clear your
+                projects if the disk runs low. Keep a synced folder or an export.
+              </div>
+            ) : durability === "persistent" ? (
+              <div className="text-faint">
+                Storage is durable — only you can clear this browser's copy.
+              </div>
+            ) : null}
             <div className="text-faint">Project file format: .estoria.json (schema v{SCHEMA_VERSION})</div>
             <div className="text-faint">{stamp}</div>
           </div>

@@ -72,6 +72,43 @@ async function dropSupersededShells() {
 }
 
 /**
+ * Which build an index.html belongs to, read from the stamp Vite injects
+ * (`window.__ESTORIA_BUILD__={...,"build":"161",...}`) — the same commit count
+ * this worker was registered under. Null when there is no stamp to read.
+ */
+function htmlBuild(html) {
+  const m = html.match(/__ESTORIA_BUILD__=\{[^}]*"build":"([^"]+)"/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Store an index.html as the offline shell — but only if it is *this* worker's.
+ *
+ * Two ways that goes wrong without the check, and both produce an app that
+ * won't start, which is worse than one that won't start offline:
+ *
+ *  - **A different build.** A deploy lands; the old worker is still the active
+ *    one (a new version waits until the reader takes it) and its fetch handler
+ *    is what sees the new HTML. Filing it under `SHELL` puts the new build's
+ *    markup in the old build's cache, whose `/assets/` entries are the old
+ *    hashes. Offline, that shell asks for scripts nothing has, and the page
+ *    comes up blank.
+ *  - **Not an app at all.** `cache.put` will happily store a 404 or a 502.
+ *    GitHub Pages serves both mid-deploy, and `deploy.sh` rsyncs with
+ *    `--delete`, so the window is real. Cached once, an error page is the
+ *    offline shell until a successful navigation replaces it.
+ */
+async function cacheShell(res) {
+  if (!res.ok) return;
+  const html = await res.text();
+  const build = htmlBuild(html);
+  if (build !== null && build !== BUILD) return;
+  const cache = await caches.open(SHELL);
+  await cache.put("./", new Response(html, { headers: res.headers }));
+  return html;
+}
+
+/**
  * Precache the shell at install time by reading index.html and pulling the
  * hashed /assets/ URLs out of it. Without this, a first visit would cache
  * nothing (the worker doesn't control the page that loaded it), and Estoria
@@ -80,12 +117,18 @@ async function dropSupersededShells() {
 async function precache() {
   await dropSupersededShells(); // free the space before claiming more of it
   const cache = await caches.open(SHELL);
-  const urls = new Set(["./", "./manifest.webmanifest", "./favicon-32.png", "./icon-192.png"]);
+  // "./" is deliberately absent: `cacheShell` is the only thing that writes the
+  // shell, and a `cache.add("./")` here would re-fetch and overwrite it without
+  // any of the checks that function exists for.
+  const urls = new Set(["./manifest.webmanifest", "./favicon-32.png", "./icon-192.png"]);
   try {
     const res = await fetch("./", { cache: "reload" });
-    const html = await res.text();
-    for (const m of html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)) urls.add(m[1]);
-    await cache.put("./", new Response(html, { headers: res.headers }));
+    // A deploy can land between this worker installing and this fetch, so the
+    // same build check applies here as at runtime.
+    const html = await cacheShell(res);
+    if (html) {
+      for (const m of html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)) urls.add(m[1]);
+    }
   } catch {
     // Offline or a failed fetch during install: cache what we can and let the
     // runtime handler fill the rest in later. A rejected install would leave
@@ -160,8 +203,10 @@ self.addEventListener("fetch", (e) => {
       (async () => {
         try {
           const res = await fetch(req);
-          const cache = await caches.open(SHELL);
-          cache.put("./", res.clone());
+          // Refresh the offline shell off to the side: reading the body to
+          // check it (see `cacheShell`) must not hold up the page, and
+          // `waitUntil` is what keeps the worker alive long enough to finish.
+          e.waitUntil(cacheShell(res.clone()).catch(() => {}));
           return res;
         } catch {
           return (await caches.match("./")) ?? Response.error();

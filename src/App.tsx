@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { ChapterModal } from "@/components/ChapterModal";
 import { Lightbox } from "@/components/Lightbox";
 import { Welcome } from "@/components/Welcome";
+import { Recovery } from "@/components/Recovery";
 import { CharactersPanel } from "@/components/panels/CharactersPanel";
 import { WorldPanel } from "@/components/panels/WorldPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
@@ -65,6 +66,9 @@ export function App() {
       <ConfirmDialog />
       <Lightbox />
       <Welcome />
+      {/* Above everything: when the stored document couldn't be read, nothing
+          else on screen is safe to act on. See components/Recovery.tsx. */}
+      <Recovery />
       <UpdateToast />
     </div>
   );

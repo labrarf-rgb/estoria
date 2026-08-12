@@ -216,9 +216,11 @@ export function Footer() {
         ? " · synced to file"
         : " · file changed elsewhere, press Sync";
   const saveText = failed
-    ? status.reason === "prose"
-      ? "Couldn't save this chapter's writing. It's safe until the next save, but export your project to keep a copy."
-      : "Couldn't save: browser storage is full. Export your project to keep a copy."
+    ? status.reason === "locked"
+      ? "Auto-save is paused: Estoria couldn't read what's already saved here, and won't write over it. Reload, or export this to a file."
+      : status.reason === "prose"
+        ? "Couldn't save this chapter's writing. It's safe until the next save, but export your project to keep a copy."
+        : "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
       ? "Saving..."
       : (status.savedAt

@@ -4465,3 +4465,180 @@ already covered a labelled bulk Delete and needed no change.
 - Both button labels checked in the running app, and the destination picker
   still opens from the renamed control.
 - `npm run typecheck` clean.
+
+---
+
+## 2026-08-11 — Nothing is written until we know what's there
+
+Ray reported the app landing on the first-launch screen — "load a sample, or
+start a blank book" — over a project that was still there, and only not losing
+it because a copy was in Drive. Reviewed the install work he suspected. It is
+not the cause, but it removed what had been hiding a landmine underneath it.
+
+### The landmine
+
+Since the manuscripts moved to IndexedDB (§2, Session 46), reading the store is
+asynchronous: `zustandStorage.getItem` opens IndexedDB and reads every
+manuscript before it answers, so persist hydrates asynchronously and until it
+lands the store holds its defaults. `onboarded: false` is one of those defaults,
+and it is the only thing `Welcome` renders on. Nothing anywhere gated on
+hydration.
+
+So the first-launch chooser is what an existing writer's document looks like for
+as long as a load takes — and both its buttons call `set({ doc: … })`, which
+persist answers with a write over `estoria:store:v1`. Unconfirmed, and with no
+undo. Not clicking it is what saved the book, more than the Drive copy did.
+
+Underneath that, `null` was doing three jobs. `LocalStorageAdapter.load`
+swallowed throws and returned `null`; an unparseable blob returned `null`; and a
+browser with genuinely nothing stored returned `null`. "New user", "storage
+refused us" and "your data is corrupt" arrived at the same screen.
+
+And one more, found while fixing it: when IndexedDB could not be opened, the
+load handed the store a doc whose chapters had been *stripped* of their prose,
+because that is where the prose was. Every manuscript blank, and one auto-save
+from that being the truth.
+
+### The invariant
+
+**Nothing is written until a load has said what is already there.** Everything
+else here follows from it.
+
+- **`writesArmed`** in persistence.ts. `flushMap`, `flushProse` and `setItem`
+  no-op until a load reaches a definite answer — including "there is genuinely
+  nothing stored", which is a first launch and must be allowed to save. A load
+  that hangs never arms, which is the point: the hang is exactly when the
+  defaults are most dangerous.
+- **`null` means absent and nothing else.** Failures propagate as a typed
+  `LoadFailure` — `unavailable`, `unreadable`, `prose-unreachable` — each with
+  wording of its own.
+- **A hydration gate** (`store/hydration.ts`), kept outside the store: marking
+  it in state would be a state change, and persist answers those with a write of
+  the state we have only just finished reading. `Welcome` waits on it. A
+  "Opening your work…" panel appears if the load passes 600ms, because an empty
+  board reads as work that has gone missing, and a spinner on a 5ms load is
+  noise.
+- **`Recovery`** replaces the chooser when the load failed. It says nothing has
+  been overwritten, offers the set-aside copy as a download *first*, then a
+  reload; "start over" is the smallest button and the only one behind a confirm.
+  Auto-save stays locked the whole time, so nothing the reader does there can
+  make it worse.
+- **`proseExternal`** on the stored blob, so a prose-free doc is no longer
+  ambiguous between "has no prose" and "its prose is somewhere we can't reach".
+  Only the second refuses to load.
+- **A confirm on both onboarding buttons** when the open document has real work
+  in it — the backstop for whatever the above does not anticipate. Skipped on a
+  true first launch, where `doc` is still the very `sampleStory` object the store
+  was created with, so the reference check answers it.
+
+### The confirm was a dead end, found by Ray testing it
+
+That last item shipped half-built. Ray hit the chooser over a real project,
+clicked an option, and got a warning telling him to export first — with no way
+to export. The welcome screen is `fixed inset-0`, so the File menu the advice
+points at is underneath it. Checked it rather than assumed: `elementFromPoint`
+over the File button does not return the File button while the chooser is up.
+
+Two things wrong, and the second is the real one.
+
+- **A confirm that says "save first" has to carry the save.**
+  `ConfirmRequest.extraAction` renders beside the choice and deliberately does
+  not answer it — the dialog stays open, so you can download and *then* decide.
+  `guardReplace` passes "Download a copy".
+- **The chooser was asking the wrong question.** With a document loaded behind
+  it, both of its options destroy something and neither is right. It now leads
+  with **"Keep working on this"**, naming the project and its size ("Untitled
+  Voyage · 8 chapters · 4 characters · 4 world entries"), which resolves the
+  state without touching anything. `keepCurrent` just sets `onboarded: true`.
+  The other two stay where they were, behind their confirms.
+
+Verified: the band and the confirms appear only over a document with real work;
+a cleared profile still gets the plain two-option chooser and "Start fresh" goes
+straight through with no prompt. "Download a copy" fires `untitled-voyage
+.estoria.json` and leaves the dialog open. "Keep working on this" persists
+`onboarded: true` with all 8 chapters intact.
+
+### The sample opened as a long thin line
+
+Ray, on the same pass: "Explore the sample" laid the 8 chapters out left to
+right across ~2100px, so the first board anyone ever sees of Estoria was a
+horizontal run you had to scroll. The coordinates are authored that way in
+`data/sampleStory.ts` — readable as data, unreadable as a map.
+
+`useSample` now runs the same `autoArrange` the toolbar button does, with
+`bestColumns` sized to the **current window** rather than a fixed grid. No
+camera work needed: bumping `arrangeN` is already what makes the Board fit the
+arranged grid to the screen.
+
+The "Alt ending" version takes the same positions rather than being arranged
+separately. It is a standalone fork of the same board, and its whole purpose is
+comparing two endings — the map shouldn't move underneath that comparison.
+
+Left alone deliberately: the authored coordinates in `sampleStory.ts`. Baking a
+grid into the data would fossilize the layout constants there and still not
+adapt to the window. The one place the old line still shows is the board blurred
+behind the welcome scrim, before a choice is made.
+
+Verified at two window sizes from a cleared profile: 1440×900 gives a 3-wide
+arrangement, x-span 605px, all 8 cards on screen at 105%; 514×704 gives 2 wide
+and 4 rows, x-span 330px. Both down from ~2100. The alt fork matches the main
+board's `x`/`y`/`rot` per chapter and still carries its own c8 title.
+
+### And two things the install work did introduce
+
+- **The old worker was poisoning its own shell.** The navigation handler cached
+  whatever HTML came back under `SHELL`, which is named from the *running*
+  worker's `?v=`. After a deploy the new worker waits (by design) while the old
+  one keeps answering fetches — so the new build's markup landed in the old
+  build's cache, next to the old build's hashed assets. Offline, that shell asks
+  for scripts nothing has and the window comes up blank. `cacheShell` now reads
+  the `__ESTORIA_BUILD__` stamp back out of the HTML and refuses anything that
+  is not this worker's build.
+- **`cache.put` will store a 404.** Unlike `cache.add`, which is why precache
+  never hit it. GitHub Pages serves error pages mid-deploy and `deploy.sh`
+  rsyncs with `--delete`. Cached once, an error page is the offline shell until
+  a successful navigation replaces it. Same function, one `res.ok` check.
+
+### Durable storage
+
+Nothing had ever called `navigator.storage.persist()`. Every project Estoria
+holds was sitting in the browser's *best-effort* bucket, which Chrome may clear
+under disk pressure — silently, with no prompt, taking localStorage and
+IndexedDB together. From inside the app that is indistinguishable from a first
+launch, which is the shape of the report this session started from. Requested at
+startup now, and About reports the answer, because "best effort" means the Sync
+folder and exports are not optional.
+
+### Verified
+
+Driven in the dev server, each failure staged for real rather than mocked.
+
+- **Unreadable blob** (a store truncated to 60%, the shape of a save cut off
+  partway): `Recovery` shown, `Welcome` suppressed, the blob copied to
+  `estoria:unreadable:<ts>`, and `estoria:store:v1` **byte-identical
+  afterwards** — 8217 chars before and after adding two chapters and waiting
+  well past the 500ms debounce. The prose pad was not written either. Footer:
+  "Auto-save is paused…". Under the old code that sequence overwrote the
+  recoverable blob with the sample story.
+- **Prose unreachable**, staged by bumping the IndexedDB on disk to version 2 so
+  the app's `open(…, 1)` genuinely fails: `Recovery` with the prose wording,
+  writes locked, blob untouched. Previously this loaded a book of blank
+  chapters.
+- **The good path** in between: a valid `proseExternal` blob with its manuscript
+  in IndexedDB loaded by title, no `Welcome`, no `Recovery`, footer back to
+  "Saved in this browser".
+- **First launch** on a cleared profile: `Welcome` shown, saving armed.
+- **Shell poisoning**, in a production preview: with `sw.js?v=161` controlling
+  and the served `index.html` edited to claim build 162, `estoria-shell-161`
+  still holds a 161 shell and `estoria-shell-162` holds a 162 one. Both caches
+  internally consistent; before the fix the 161 cache would hold 162 markup.
+- Precache still fills the shell correctly (`"./"`, both hashed assets, manifest
+  and icons) despite `"./"` no longer being in its `cache.add` list.
+- `npm run typecheck` clean; `npm run build` clean.
+
+### Not done
+
+- **No deploy.** Committed only.
+- **`openDb` has a 5s timeout now**, which bounds the hang, but a *slow* open
+  still delays the load rather than proceeding without prose — deliberately, per
+  the invariant above.
