@@ -4642,3 +4642,41 @@ Driven in the dev server, each failure staged for real rather than mocked.
 - **`openDb` has a 5s timeout now**, which bounds the hang, but a *slow* open
   still delays the load rather than proceeding without prose — deliberately, per
   the invariant above.
+
+### Deployed
+
+`npm run deploy` → **build 162 / `84c8c61`**, live at
+https://www.labrarf.com/estoria. Verified beyond the script's own version.json
+poll: prod's `index.html` references `index-3p5pzjHh.js` / `index-ByV1r8kW.css`,
+matching the local `dist/`, and the deployed `sw.js` carries `cacheShell` with
+`KILL_SWITCH = false`. Loaded prod in a browser: app mounts, `sw.js?v=162` is
+the active worker with nothing waiting, exactly one cache
+(`estoria-shell-162`), no console errors.
+
+Ray's installed copy is still on the old worker until he takes the update
+toast, which is by design — and worth noting that the *first* load after this
+deploy is the last one that can hit the old shell-poisoning bug, since the fix
+has to be running to prevent it.
+
+### Drift check against SPECS
+
+Real drift, all from this session and all corrected here:
+
+- **§3 was missing three files** — `store/hydration.ts`, `lib/storageDurability
+  .ts`, `components/Recovery.tsx` — and described `Welcome.tsx` in a bare list
+  beside Lightbox and ConfirmDialog, which no longer says enough about what it
+  now gates on.
+- **§3 said UpdateToast sits "above every scrim (z-90)".** False since this
+  commit: Recovery is 95 and ConfirmDialog went to 100. Replaced with the whole
+  stacking order, top down, and the reason ConfirmDialog leads it — it is raised
+  *from* the screens below it, and a confirm rendering underneath its own
+  trigger is a button that appears not to work.
+- **§4 had no row for any of it.** Added three: the load lock, the chooser's
+  behaviour over an existing document, and the sample's arrangement.
+
+Checked and deliberately left alone: **§9 P1 item 2** still says the footer
+shows "Couldn't save — browser storage is full", which is now one of three
+reasons (`storage`, `prose`, `locked`). That section is a dated record of a
+2026-07-01 review with its findings marked fixed, not a description of current
+state — rewriting its history to match today's code would make it useless as
+history. The current behaviour is described in §2.

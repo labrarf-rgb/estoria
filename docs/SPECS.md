@@ -194,7 +194,10 @@ estoria/
    ├─ store/
    │  ├─ useStore.ts          # Zustand store: doc + UI state + all actions
    │  ├─ persistence.ts       # StorageAdapter, the two-stream save (map -> localStorage,
-   │  │                       #   prose -> IndexedDB), normalizeDoc, save-status, file I/O
+   │  │                       #   prose -> IndexedDB), the load lock + LoadFailure,
+   │  │                       #   normalizeDoc, save-status, file I/O
+   │  ├─ hydration.ts         # has persist finished reading the store back, and did it
+   │  │                       #   succeed — what Welcome/Recovery gate on (§2 "load lock")
    │  └─ prose.ts             # manuscripts at rest: the IndexedDB store, the doc
    │                          #   split/merge, and the synchronous crash pad
    ├─ lib/
@@ -226,6 +229,8 @@ estoria/
    │  │                       #   detects standalone (§8 "Installing Estoria")
    │  ├─ sw.ts                # service-worker registration, the update handshake,
    │  │                       #   and the `?sw=off` escape hatch
+   │  ├─ storageDurability.ts # asks `navigator.storage.persist()` at startup so the
+   │  │                       #   browser stops treating projects as evictable
    │  └─ files.ts             # file → data URL reading
    └─ components/
       ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
@@ -239,8 +244,16 @@ estoria/
       ├─ ProsePane.tsx        # prose rendering, shared by the timeline and the editor's View
       ├─ Footer.tsx           # autosave status, Sync button, folder icon
       ├─ SyncHistoryPopover.tsx / SyncFileList.tsx   # file history + restore
-      ├─ Welcome.tsx · Lightbox.tsx · ConfirmDialog.tsx
-      ├─ UpdateToast.tsx      # "a new version is ready" — above every scrim (z-90)
+      ├─ Welcome.tsx          # the first-launch chooser, gated on hydration, plus the
+      │                       #   "Opening your work…" panel for a slow load
+      ├─ Recovery.tsx         # shown instead when the load failed: what happened, the
+      │                       #   rescued copy, and a way on (§2 "load lock")
+      ├─ Lightbox.tsx · ConfirmDialog.tsx
+      ├─ UpdateToast.tsx      # "a new version is ready"
+      │                       #   Stacking order, top down: ConfirmDialog (100) —
+      │                       #   it guards the irreversible actions and is raised
+      │                       #   *from* the screens below it; Recovery (95);
+      │                       #   UpdateToast (90); Welcome (70); modals (60-80)
       ├─ ui/                  # Overlay (Scrim/Drawer/SizeButton/CloseButton/stop),
       │                       #   Popover, RefList, ViewToggle, ExpandableTextarea,
       │                       #   AssetLinkPicker, AppIcon
@@ -341,6 +354,9 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | App | Light/dark theme | ✅ | `data-theme` swap on the root repoints the tokens in `index.css`; Tailwind reads them through `@theme`. **Dark is its own lightness ladder, not an inversion of light** (2026-08-04): same warm brown hue at low chroma, floor at OKLCH L 0.24 rather than near-black (a black background reads harsh against a design whose premise is warm paper), and a small +L step per surface — bg 0.24 → panel 0.28 → card 0.31. Ink lands at L 0.90, not white. Accents reuse their light hue with L raised ~8 points to clear the lighter floor. **`chip` sits between bg and panel in both themes**, because it is the recessed trough a control group sits in and `hover:bg-card` lifts out of it; putting it above `card` makes the resting state louder than the hover. Two known trade-offs carried deliberately: `rule` is lighter than `line` in dark and darker in light, so dividers read heavier than borders there, and `faint` on `card` measures 2.85:1, just under the 3:1 floor. **The canvas dot grid is its own token, `dot`, and is the one value that does not follow `rule` into dark** (2026-08-07 c): in light, dots are ink on paper, *darker* than the surface under them; equal to `rule` in dark that flips, and the grid reads as light specks sitting on top of the canvas instead of texture pressed into it. So dark puts `dot` (`#1a1712`) *below* `bg` (`#231f19`) rather than above it, and light keeps `dot` identical to `rule` (`#e1d6bf`), unchanged. All four canvases share it — board, timeline scene pane, chapter story map, series map. It is a separate token because `rule` is also every hairline border in the app, and repointing `rule` would have darkened all of those too. **The grid is not equally weighted on all four**: board and series map draw it on `bg`, timeline and chapter draw it on `panel`, so the dots have slightly more contrast in the panelled surfaces. Consistent token, not identical weight; a second value would be the fix if that ever matters. **The toolbar's control is the portfolio site's button** (2026-08-05 b): a 36px transparent circle with a hairline `rule` border and a 15px Feather moon (light on) or sun (dark on), hovering to a darker border, `ink` glyph, and `card` fill over 200ms — Estoria ships inside that site at `/estoria`, so the two chrome bars should read as one product. Its `aria-label` names the action ("Toggle dark mode"), not the current state. When the toolbar is too narrow, theme collapses into the ⋯ menu as a labelled row instead, where stating the current state is right. |
 | App | Drafts (main/alt) | ✅ | Standalone forks since v4 (2026-07-17): toggle swaps the whole board (chapters/scenes/links/notes); add = deep copy of the current version. **Which version is "main" is chosen by the user** (v7, Session 54) — a star per row in the version menu writes `mainDraftId`. Before this, `"main"` was a hardcoded id fixed at seed time, so a writer whose real book lived in a fork got the amber "changes stay in this version" banner on their actual work and could not delete the empty stub. Promotion is a **relabel only**: no board is copied or swapped, which is what keeps pinned refs (they record a draft id) pointing at the text they were pinned to. The demoted version becomes ordinary and deletable. `resolveMainDraftId` pins the marker to a version that exists, defaulting a missing pointer to the seed id — so pre-v7 files behave exactly as they used to. |
 | Persist | Local auto-save | ✅ | Via zustand persist → LocalStorageAdapter (debounced; failures surfaced in footer). |
+| Persist | Nothing is written before the load answers | ✅ | The load lock (§2, 2026-08-11). Reading the store is async, so until it lands the store holds its defaults — the sample and `onboarded: false`, i.e. the first-launch chooser over a document that exists, with buttons that replace it. `writesArmed` gates every flush until a load reaches a definite answer; `Welcome` is gated on hydration, `Recovery` shows when the load failed, and `navigator.storage.persist()` is asked for at startup so the browser stops treating projects as evictable. |
+| Onboarding | The chooser knows when it's wrong | ✅ | If it comes up over a document with work in it, "Keep working on this" leads and resolves the state without touching anything. The two replacing options go through a confirm that names the project and **carries a "Download a copy"** — the welcome screen is a full-screen overlay, so pointing at the File menu underneath it would be advice you cannot follow. Skipped entirely on a genuine first launch, where `doc` is still the untouched `sampleStory` object. |
+| Onboarding | The sample opens as a map | ✅ | Its authored coordinates run left to right across ~2100px, so `useSample` auto-arranges on load with `bestColumns` sized to the current window (2026-08-11). The "Alt ending" fork takes the same positions — it exists to compare two endings, and the map shouldn't move underneath that. |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
