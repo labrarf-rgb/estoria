@@ -4680,3 +4680,62 @@ reasons (`storage`, `prose`, `locked`). That section is a dated record of a
 2026-07-01 review with its findings marked fixed, not a description of current
 state — rewriting its history to match today's code would make it useless as
 history. The current behaviour is described in §2.
+
+---
+
+## 2026-08-15 — The caret lands where the writing stopped
+
+Ray asked for the manuscript to open at the end of the prose instead of the
+start. One effect, and the reason it was worth doing is the whole session.
+
+### The change
+
+`ManuscriptModal` already focused the textarea on open — the surface exists to
+be written in, and making a writer click before they can type is a tax on the
+one thing the modal is for. But focus alone leaves the caret at index 0. So
+opening a chapter you had already written put you in front of your own first
+sentence, with the last thing you wrote scrolled off the bottom: the app
+focused the right element and then pointed it at the wrong end of the work.
+
+The effect now sets the selection to the end and scrolls there explicitly. Two
+details that are load-bearing:
+
+- It reads the **textarea's live value**, not the `text` binding. The effect
+  runs on the same tick the textarea mounts with the chapter's prose, and the
+  end is wherever that value ends.
+- The **scroll is set separately**. Moving the selection does not reliably
+  scroll the caret into view — the caret would be at the end and the viewport
+  still at the top, which is the same complaint with an invisible cursor.
+
+Deps are unchanged (`[ch.id, view]`), so it keeps re-running per chapter, which
+is what makes the prev/next arrows land the same way, and per view, so coming
+back from View is not a dead end.
+
+### Verified
+
+In the running app, against the sample's chapter 01 with a 20-line manuscript:
+
+- Open chapter → manuscript: `selectionStart` 297 of 297, `scrollTop` 95 with a
+  max scroll of 95, textarea focused.
+- View → Edit: same, caret at the end and scrolled to it.
+- Next-chapter arrow into an unwritten chapter: caret 0, focused, empty sheet.
+  No special case needed; the end of nothing is the start of it.
+
+No console errors. `npm run typecheck` clean.
+
+### Not done
+
+- **View mode still opens at the top**, deliberately. Reading a chapter starts
+  at its beginning; only the writing surface has a reason to jump to the end.
+- No preference for this. The caret goes to the end, always. A toggle would be
+  a setting for a thing nobody wants the other way.
+
+### Drift check against SPECS
+
+The manuscript modal's row (§4, "Manuscript: its own modal") described the two
+faces, the mode memory and the word-count recompute, but said nothing about
+where the caret lands — so the old behaviour was never written down either.
+Added the landing rule to that row along with why it is the end and not the
+start, the live-value and explicit-scroll details, and the empty-chapter case.
+Nothing else in SPECS described the focus behaviour, so nothing else needed
+correcting.
