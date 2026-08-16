@@ -83,13 +83,25 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
   useEffect(() => flushNow, [ch.id]);
 
   /**
-   * Land in the text. The surface exists to be written in, and the alternative
-   * is a writer who has to click before they can type. Re-runs per chapter so
-   * the prev/next arrows keep the caret where it is wanted, and per view so
+   * Land in the text, at the end of it. The surface exists to be written in,
+   * and the alternative is a writer who has to click before they can type.
+   * The caret goes to the end rather than the start because opening a chapter
+   * you have already written means carrying on from where it stops, not
+   * typing into the front of your first sentence. Re-runs per chapter so the
+   * prev/next arrows keep the caret where it is wanted, and per view so
    * switching back from View is not a dead end.
    */
   useEffect(() => {
-    if (view === "edit") taRef.current?.focus();
+    if (view !== "edit") return;
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.focus();
+    // Read the live value, not `text`: this runs on the same tick the
+    // textarea mounts with the chapter's prose, and the end is wherever that
+    // ends. Setting the selection alone does not always scroll the caret into
+    // view, so the scroll is explicit.
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.scrollTop = ta.scrollHeight;
   }, [ch.id, view]);
 
   /**
