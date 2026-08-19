@@ -979,6 +979,65 @@ Regenerate with `scripts/make-icons.sh` (`npm run icons`) after changing
 `icon-source.png`, and commit what it writes. It needs ImageMagick, and never
 runs during a build or a deploy.
 
+### How big can a project get? (measured 2026-08-18)
+
+Asked directly — *50 chapters × 10,000 words × 5 versions, i.e. 2.5 million
+words, does that hit a limit?* — and answered by measuring rather than
+estimating, in Chrome on the dev machine. Recorded here because the intuition
+is badly wrong in both directions: there is far more room than anyone expects,
+and the thing that actually breaks first is not storage at all.
+
+| | Measured |
+| --- | --- |
+| IndexedDB quota, one origin | **4.63 GB** |
+| 2.5M words of prose on disk, repetitive text | 5.25 MB — **0.11%** of quota |
+| 2.5M words on disk, high-entropy upper bound | 17.2 MB — **0.36%** of quota |
+| Writing all 250 manuscripts | 47 ms |
+| localStorage map, 250 chapters × 6 scenes | **282 KB** — ~11% of the ~5MB budget |
+| `JSON.stringify` of that map (per-save cost while typing) | 4.3 ms |
+
+Real prose falls between those two disk rows — Chrome compresses IndexedDB
+values, so the first run (a 40-word vocabulary) compressed unrealistically well
+and the second (random letters) is a hard upper bound. Call it 6–12 MB for a
+2.5M-word project. **There is no storage problem at this scale, or at ten times
+it.**
+
+Three things do become real long before the quota does:
+
+1. **The file, not the store.** The document is whole in every file, so that
+   project's `.estoria.json` is ~15–18MB. Sync rewrites it in full on every
+   sync and keeps five rotating backups, so the Estoria folder carries ~100MB
+   of near-identical copies, and `downloadProjectFile` runs
+   `JSON.stringify(doc, null, 2)` on the main thread for all of it. This is the
+   actual ceiling.
+2. **Memory.** All five versions' prose is one in-memory object, ~30–36MB of
+   UTF-16 strings. Comfortable on a laptop, less so on the phone opening the
+   same file.
+3. **Eviction, not capacity.** That 4.63 GB was reported with
+   `navigator.storage.persisted() === false`. A best-effort origin can be
+   cleared wholesale under disk pressure no matter how little of it is in use —
+   which is why the Sync folder and exports matter more than any byte count.
+
+Two things blunt (1) before it needs solving. Versions only multiply the prose
+if the prose is actually forked: `addDraft` takes `copyProse: false` precisely
+so a re-arrangement experiment does not double the manuscript on disk. And
+`splitProse`/`splitImages` already write only what changed, so the *store* cost
+of a fifth version is near zero either way.
+
+**The idea to reach for when (1) does bite**, floated 2026-08-18: per-version
+or per-book granularity **in the file layer** — Sync writing only the version
+that changed instead of rewriting five copies of a manuscript on every save.
+Note what this is *not*: the same idea aimed at localStorage buys nothing,
+because **the localStorage quota is per origin, not per key** (the note in
+`store/prose.ts` says so, and it is why prose went to IndexedDB rather than to
+a second key). It also has to reckon with the series bible — `characters`,
+`world` and `assets` are project-level and shared across every book — so books
+are not independent units, and any split has to keep a bible write and the
+books referencing it consistent. In IndexedDB a transaction spans records and
+gives that for free; across localStorage keys or separate files it does not.
+See also §9 item 1, which already wants per-project granularity for the Drive
+adapter — that is the moment to do this work, not before.
+
 ---
 
 ## 9. Known issues & fix backlog (code review, 2026-07-01)
