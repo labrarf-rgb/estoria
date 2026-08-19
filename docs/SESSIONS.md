@@ -4823,13 +4823,41 @@ In the dev app, on the sample project:
 - Forcing `payloadStoreAvailable` to false put a document written externally on
   the Recovery screen with auto-save paused, rather than blanking it.
 
+### And then the cap, same day
+
+Ray asked for the follow-up straight after, so it landed in the same session.
+`lib/files.ts` gained `readImageForStorage`, and both upload sites use it — one
+place, because two copies of a policy is how the two drift apart.
+
+The rules, and what each is protecting:
+
+- **Longest edge 2048.** Measured against the biggest surface a picture ever
+  gets: the lightbox, which fills 92vw and then zooms 1.6× on click. Less would
+  be visibly soft there on a large display; more buys nothing a reader can see.
+- **JPEG at 0.85, unless the source can carry alpha and does.** A transparent
+  PNG re-encoded as JPEG comes back on a black background, which is a silent
+  and permanent way to ruin someone's image. PNG and WebP get a pixel scan for
+  any non-opaque byte and keep their format if they find one.
+- **GIF and SVG never touch a canvas.** An animated GIF would come out as one
+  frame and an SVG would be frozen into a bitmap — both lossy conversions of
+  something the writer chose deliberately, and both small by nature anyway.
+- **Already small, already within the edge → stored byte-for-byte.** Re-encoding
+  a 6KB screenshot trades quality for nothing.
+- **Never rejects.** A format the browser will not decode, a canvas that will
+  not paint, a re-encode that comes out bigger — every one falls back to the
+  original data URL. This is an optimisation, not a gate, and losing the picture
+  the writer just picked would be much worse than storing it whole.
+
+Verified against a synthetic 4032×3024 / 5.76MB JPEG — the exact "one phone
+photo" case: stored at 2048×1536, 1.2MB of base64, ~1s of work. (That source
+was pure noise, worst case for JPEG; a real photograph compresses much
+further.) A 3000×2000 transparent PNG stayed PNG and came back 2048×1365, 119KB
+→ 77KB, so transparency survived. A 400×300 6KB PNG was stored byte-identical
+to its source. localStorage stayed at 13KB throughout with zero `data:image`
+occurrences.
+
 ### Not done
 
-- **No cap on what a picture may be.** The ceiling moved; the input is still
-  unbounded. A 40MB image now saves fine and bloats every export and Sync write
-  instead, which the Android app also pays for. Downscale-on-import is the
-  follow-up; Ray deliberately kept it out of this session so the diff stayed in
-  the persistence layer.
 - **Still no headroom measurement.** `navigator.storage.estimate()` is called
   nowhere. The first signal of trouble is still the failure itself — much
   further away now, but no earlier when it comes.
@@ -4845,6 +4873,7 @@ In the dev app, on the sample project:
 
 - §2 "Persistence architecture" now states the invariant the split depends on:
   the document is whole above the at-rest layer.
-- §3 project layout lists `store/idb.ts` and `store/images.ts`.
+- §3 project layout lists `store/idb.ts` and `store/images.ts`, and `files.ts`
+  now describes the downscale policy rather than "file → data URL reading".
 - §9 item 2 closed — its "consider IndexedDB as the local adapter's backing
-  store" is now true of both payloads.
+  store" is now true of both payloads, and the import cap it implied is in.

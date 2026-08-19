@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore, type ConfirmRequest } from "@/store/useStore";
-import { readFileAsDataURL } from "@/lib/files";
+import { readImageForStorage } from "@/lib/files";
 import { isAssetEmpty } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { ARCHIVED_DIM } from "@/components/ui/ArchiveShelf";
@@ -255,7 +255,7 @@ export function RefList({
 
   const upload = async (id: string, file: File | undefined) => {
     if (!file) return;
-    const src = await readFileAsDataURL(file);
+    const src = await readImageForStorage(file);
     update(id, { src, label: file.name.replace(/\.[^.]+$/, "") });
   };
 

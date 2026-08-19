@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
-import { readFileAsDataURL } from "@/lib/files";
+import { readImageForStorage } from "@/lib/files";
 import { BOOK_W, BOOK_H, BOOK_GAP_X, timelineBookPositions, fitBooksToContent } from "@/lib/layout";
 import type { BookMeta, BookStatus } from "@/types";
 
@@ -117,7 +117,7 @@ export function SeriesMap() {
 
   const uploadCover = async (id: string, file: File | undefined) => {
     if (!file) return;
-    updateBook(id, { coverSrc: await readFileAsDataURL(file) });
+    updateBook(id, { coverSrc: await readImageForStorage(file) });
   };
 
   useEffect(() => {

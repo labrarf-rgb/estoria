@@ -242,7 +242,9 @@ estoria/
    │  │                       #   and the `?sw=off` escape hatch
    │  ├─ storageDurability.ts # asks `navigator.storage.persist()` at startup so the
    │  │                       #   browser stops treating projects as evictable
-   │  └─ files.ts             # file → data URL reading
+   │  └─ files.ts             # reading a picked image in: downscale to IMAGE_MAX_EDGE
+   │                          #   (2048), JPEG unless the source carries alpha,
+   │                          #   GIF/SVG untouched
    └─ components/
       ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls
       ├─ Board.tsx            # story map: pan/zoom/drag, cards, connectors
@@ -1015,7 +1017,9 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
    earlier, and images now follow it (`store/images.ts`), so base64 pictures no
    longer sit in the quota-bound blob at all. The footer additionally tells a
    failed picture apart from failed prose, because the writer's next move
-   differs.
+   differs. Pictures are also **downscaled on import** (`lib/files.ts`, longest
+   edge 2048), which is what keeps the export, the Sync write and the Android
+   app's copy small now that the quota no longer does it for us.
 3. ✅ **Fixed 2026-07-01 (Session 20)** — saves are debounced 500ms trailing,
    with a synchronous flush on `beforeunload` and `visibilitychange → hidden`.
    *Original finding:*
