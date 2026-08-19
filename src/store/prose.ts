@@ -1,4 +1,5 @@
 import type { Chapter, StoryDoc } from "@/types";
+import { loadAllFrom, STORE_PROSE, writeTo } from "@/store/idb";
 
 /**
  * Where chapter prose lives at rest.
@@ -26,10 +27,6 @@ import type { Chapter, StoryDoc } from "@/types";
  * A second *localStorage key* would fix neither: the quota is per origin.
  */
 
-const DB_NAME = "estoria";
-const DB_VERSION = 1;
-const STORE = "manuscripts";
-
 /**
  * Prose is keyed by all four coordinates that identify a chapter's text.
  * Versions are standalone forks, so the same chapter id holds different prose in
@@ -52,116 +49,20 @@ export interface ProseKey {
 export const proseKey = (k: ProseKey): string =>
   JSON.stringify([k.projectId, k.bookId, k.draftId, k.chapterId]);
 
-function projectOf(key: string): string {
-  try {
-    return (JSON.parse(key) as string[])[0] ?? "";
-  } catch {
-    return "";
-  }
-}
-
 // ---- The IndexedDB store ----------------------------------------------------
 
-let dbPromise: Promise<IDBDatabase> | null = null;
-
 /**
- * How long to wait for `indexedDB.open` before giving up on it.
- *
- * It is not enough to handle `onerror` and `onblocked`: an open can simply
- * never settle — a database left locked by an unclean shutdown, or a second
- * window (an installed app and a browser tab are two) holding it. Without a
- * bound, the load that awaits this never returns, hydration never finishes, and
- * the app sits forever on a first-launch screen over an intact document. That
- * is the failure this timeout exists to convert into an honest error.
+ * Opening, availability and the raw read/write live in `store/idb.ts`, shared
+ * with the image payload — see the note there on why there is one database and
+ * one availability answer rather than two.
  */
-const OPEN_TIMEOUT_MS = 5000;
-
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error("IndexedDB timed out"));
-    }, OPEN_TIMEOUT_MS);
-    const finish = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      fn();
-    };
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
-    };
-    req.onsuccess = () => finish(() => resolve(req.result));
-    req.onerror = () => finish(() => reject(req.error));
-    req.onblocked = () => finish(() => reject(new Error("IndexedDB blocked")));
-  });
-  return dbPromise;
-}
-
-/**
- * Is IndexedDB usable here? Some private-browsing modes expose the API and then
- * fail to open, so this is a real open rather than a feature check.
- *
- * **When it is not, prose simply stays in the localStorage blob**, exactly as it
- * did before this split existed. Slower and quota-bound, but never lost — a
- * writer on a browser we cannot use IndexedDB in still keeps their words.
- *
- * That is the whole answer only for a document whose prose was *never* moved
- * out. For one whose prose is already in IndexedDB, "unavailable" does not mean
- * "no prose" — it means we cannot see it, and handing the store a doc of blank
- * chapters would be one auto-save away from making that permanent. The stored
- * blob records which case it is (`proseExternal`), and `persistence.getItem`
- * refuses to load rather than guess. See store/persistence.ts.
- */
-export async function proseStoreAvailable(): Promise<boolean> {
-  if (typeof indexedDB === "undefined") return false;
-  try {
-    await openDb();
-    return true;
-  } catch {
-    dbPromise = null;
-    return false;
-  }
-}
 
 /** Every manuscript on this origin, keyed by `proseKey`. */
-export async function loadAllProse(): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readonly");
-    const req = tx.objectStore(STORE).openCursor();
-    req.onsuccess = () => {
-      const cur = req.result;
-      if (!cur) return resolve();
-      if (typeof cur.value === "string") out.set(String(cur.key), cur.value);
-      cur.continue();
-    };
-    req.onerror = () => reject(req.error);
-  });
-  return out;
-}
+export const loadAllProse = (): Promise<Map<string, string>> => loadAllFrom(STORE_PROSE);
 
 /** Apply one batch of writes and deletes in a single transaction. */
-export async function writeProse(
-  puts: Map<string, string>,
-  deletes: Iterable<string>
-): Promise<void> {
-  const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    const store = tx.objectStore(STORE);
-    for (const [k, v] of puts) store.put(v, k);
-    for (const k of deletes) store.delete(k);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
-}
+export const writeProse = (puts: Map<string, string>, deletes: Iterable<string>): Promise<void> =>
+  writeTo(STORE_PROSE, puts, deletes);
 
 // ---- The crash pad ----------------------------------------------------------
 
@@ -304,19 +205,4 @@ export function mergeProse(doc: StoryDoc, prose: Map<string, string>): StoryDoc 
     const text = prose.get(proseKey({ projectId: doc.id, bookId, draftId, chapterId: c.id }));
     return text === undefined || text === c.manuscript ? c : { ...c, manuscript: text };
   });
-}
-
-/**
- * Keys to delete: prose we hold for a project that is still here, but for a
- * chapter that no longer is. Prose belonging to a project **absent from this
- * snapshot is deliberately left alone** — an incomplete snapshot is a bug we
- * would rather leak a few kilobytes over than answer by deleting someone's
- * writing.
- */
-export function staleKeys(live: Map<string, string>, known: Set<string>, projectIds: Set<string>): string[] {
-  const out: string[] = [];
-  for (const k of known) {
-    if (!live.has(k) && projectIds.has(projectOf(k))) out.push(k);
-  }
-  return out;
 }
