@@ -146,6 +146,6 @@ function explain(f: LoadFailure): string {
         ? "There is a project saved here, but it wouldn't parse — most often a save that was cut off partway. It has been copied aside untouched, and you can download it below."
         : "There is a project saved here, but it wouldn't parse, and there wasn't room to copy it aside. Don't start over until you've exported or synced from another device.";
     case "prose-unreachable":
-      return `Your project map loaded, but the database holding the chapter manuscripts couldn't be opened, so every chapter would look empty. Estoria stopped rather than show you a blank book and save it that way. This often clears on a reload, or after closing other Estoria windows. (${f.detail})`;
+      return `Your project map loaded, but the database holding the chapter manuscripts and images couldn't be opened, so every chapter would look empty and every picture would be missing. Estoria stopped rather than show you a blank book and save it that way. This often clears on a reload, or after closing other Estoria windows. (${f.detail})`;
   }
 }

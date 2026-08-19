@@ -220,7 +220,9 @@ export function Footer() {
       ? "Auto-save is paused: Estoria couldn't read what's already saved here, and won't write over it. Reload, or export this to a file."
       : status.reason === "prose"
         ? "Couldn't save this chapter's writing. It's safe until the next save, but export your project to keep a copy."
-        : "Couldn't save: browser storage is full. Export your project to keep a copy."
+        : status.reason === "images"
+          ? "Couldn't save an image. Everything else saved — try adding it again, or export your project to keep a copy."
+          : "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
       ? "Saving..."
       : (status.savedAt

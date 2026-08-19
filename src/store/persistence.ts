@@ -17,15 +17,15 @@ import {
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
 import { syncChapterWords } from "@/lib/manuscript";
+import { payloadStoreAvailable, staleKeys } from "@/store/idb";
+import { loadAllImages, mergeImages, splitImages, writeImages } from "@/store/images";
 import {
   clearPad,
   loadAllProse,
   mapChapters,
   mergeProse,
-  proseStoreAvailable,
   readPad,
   splitProse,
-  staleKeys,
   writePad,
   writeProse,
 } from "@/store/prose";
@@ -184,12 +184,15 @@ export interface SaveStatus {
   savedAt: number;
   /**
    * Which write failed. The map goes to localStorage, where a failure is nearly
-   * always the quota; prose goes to IndexedDB, where it is not — and telling a
-   * writer their storage is full when it isn't sends them to delete things they
-   * did not need to. `locked` is neither: nothing was attempted, because the
-   * load never established what is already stored (see `writesArmed`).
+   * always the quota; prose and pictures go to IndexedDB, where it is not — and
+   * telling a writer their storage is full when it isn't sends them to delete
+   * things they did not need to. Prose and pictures are told apart because the
+   * writer's next move differs: words that did not land are gone if they walk
+   * away, a picture that did not land is a file they can pick again. `locked`
+   * is none of these: nothing was attempted, because the load never established
+   * what is already stored (see `writesArmed`).
    */
-  reason?: "storage" | "prose" | "locked";
+  reason?: "storage" | "prose" | "images" | "locked";
 }
 
 let saveStatus: SaveStatus = { state: "idle", savedAt: 0 };
@@ -212,7 +215,7 @@ function setSaveStatus(next: SaveStatus): void {
 
 // ---- Debounced write-through shim for zustand persist ------------------------
 
-/** What `partialize` hands us. Only the two fields carrying prose are named. */
+/** What `partialize` hands us. Only the two fields carrying payloads are named. */
 export interface PersistedShape {
   doc: StoryDoc;
   projectStash?: Record<string, StoryDoc>;
@@ -220,14 +223,25 @@ export interface PersistedShape {
   [key: string]: unknown;
 }
 /**
- * `proseExternal` is ours, not zustand's — it sits beside the state rather than
- * in it, and records whether the manuscripts were lifted into IndexedDB when
- * this blob was written. Without it, a doc with no inline prose is ambiguous
- * between "has no prose" and "its prose is somewhere we can't currently read",
- * and only the second must refuse to load. Absent on blobs written before this
- * existed, which read as `false` — those still carry their prose inline.
+ * `payloadsExternal` is ours, not zustand's — it sits beside the state rather
+ * than in it, and records whether the manuscripts *and pictures* were lifted
+ * into IndexedDB when this blob was written. Without it, a doc with no inline
+ * prose is ambiguous between "has no prose" and "its prose is somewhere we
+ * can't currently read", and only the second must refuse to load. The same now
+ * goes for a book with no cover.
+ *
+ * `proseExternal` is the name this flag was born under, when prose was the only
+ * payload. It is still **written** so that a build from before images moved
+ * still refuses to load a document whose prose it cannot reach, and still
+ * **read** as the fallback for blobs written before the rename. Absent on blobs
+ * older than either, which read as `false` — those carry everything inline.
  */
-type Stored = { state: PersistedShape; version?: number; proseExternal?: boolean };
+type Stored = {
+  state: PersistedShape;
+  version?: number;
+  payloadsExternal?: boolean;
+  proseExternal?: boolean;
+};
 
 /**
  * Auto-save, in two streams.
@@ -239,64 +253,82 @@ type Stored = { state: PersistedShape; version?: number; proseExternal?: boolean
  * debounce discarded all but the last result. Now `setItem` costs one
  * assignment and the work happens on the timer.
  *
- * The map goes to localStorage on a 500ms trailing timer; **prose goes to
+ * The map goes to localStorage on a 500ms trailing timer; **the payloads go to
  * IndexedDB on a much shorter one**, because prose is the thing being typed and
  * the window between a keystroke and it reaching disk is the window in which it
- * can be lost. See `store/prose.ts` for the split and the crash pad.
+ * can be lost. See `store/prose.ts` for the manuscript split and the crash pad,
+ * and `store/images.ts` for the pictures — which ride the same timer and, for
+ * the reason `flushImages` gives, deliberately have no pad.
  */
 const SAVE_DEBOUNCE_MS = 500;
-const PROSE_DEBOUNCE_MS = 200;
+const PAYLOAD_DEBOUNCE_MS = 200;
 
 let pending: Stored | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let proseTimer: ReturnType<typeof setTimeout> | null = null;
+let payloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Whether prose is being kept in IndexedDB. Decided once, on load. When it is
- * false — no IndexedDB, or a private mode that refuses to open one — every
- * manuscript simply stays in the localStorage blob exactly as before, quota
- * limits and all. Slower and smaller, but never lost.
+ * Whether the payloads are being kept in IndexedDB. Decided once, on load. When
+ * it is false — no IndexedDB, or a private mode that refuses to open one —
+ * every manuscript and every picture simply stays in the localStorage blob
+ * exactly as before, quota limits and all. Slower and smaller, but never lost.
  */
-let proseEnabled = false;
-/** What IndexedDB is believed to hold, so only changed chapters are written. */
+let payloadsEnabled = false;
+/** What IndexedDB is believed to hold, so only what changed is written. */
 let lastProse = new Map<string, string>();
+let lastImages = new Map<string, string>();
 /**
- * Set when a prose write fails, cleared when one succeeds.
+ * Set when a payload write fails, cleared when one succeeds.
  *
- * Without this the footer lies: the map write and the prose write are separate,
- * the map is much more likely to succeed, and its "saved" would paint straight
- * over the prose failure a second later. Silent save failure is the exact bug
- * SPECS §9 item 2 exists to have fixed, and splitting the write in two is a
- * fresh chance to reintroduce it.
+ * Without these the footer lies: the map write and the payload writes are
+ * separate, the map is much more likely to succeed, and its "saved" would paint
+ * straight over a payload failure a second later. Silent save failure is the
+ * exact bug SPECS §9 item 2 exists to have fixed, and splitting the write up is
+ * a fresh chance to reintroduce it.
+ *
+ * They are two flags rather than one because they say different things to the
+ * writer: prose that did not land is words they just typed, pictures that did
+ * not land is a file they can pick again.
  */
 let proseFailed = false;
+let imagesFailed = false;
 
 interface Split {
   src: Stored;
   stripped: Stored;
   prose: Map<string, string>;
+  images: Map<string, string>;
   projectIds: Set<string>;
 }
 let splitCache: Split | null = null;
 
-/** Lift the prose out of the active project and every stashed one. */
+/** Lift the prose and the pictures out of the active project and every stashed one. */
 function currentSplit(): Split | null {
   if (!pending) return null;
   if (splitCache && splitCache.src === pending) return splitCache;
 
   const value = pending;
-  if (!proseEnabled) {
-    splitCache = { src: value, stripped: value, prose: new Map(), projectIds: new Set() };
+  if (!payloadsEnabled) {
+    splitCache = {
+      src: value,
+      stripped: value,
+      prose: new Map(),
+      images: new Map(),
+      projectIds: new Set(),
+    };
     return splitCache;
   }
 
   const prose = new Map<string, string>();
+  const images = new Map<string, string>();
   const projectIds = new Set<string>();
   const take = (d: StoryDoc): StoryDoc => {
-    const out = splitProse(d);
+    const withoutProse = splitProse(d);
+    const withoutImages = splitImages(withoutProse.doc);
     projectIds.add(d.id);
-    for (const [k, v] of out.prose) prose.set(k, v);
-    return out.doc;
+    for (const [k, v] of withoutProse.prose) prose.set(k, v);
+    for (const [k, v] of withoutImages.images) images.set(k, v);
+    return withoutImages.doc;
   };
 
   const state = value.state;
@@ -313,7 +345,7 @@ function currentSplit(): Split | null {
       ? value
       : { ...value, state: { ...state, doc, ...(state.projectStash ? { projectStash: stash } : {}) } };
 
-  splitCache = { src: value, stripped, prose, projectIds };
+  splitCache = { src: value, stripped, prose, images, projectIds };
   return splitCache;
 }
 
@@ -324,15 +356,7 @@ function currentSplit(): Split | null {
  * then the asynchronous IndexedDB write, then the pad is cleared only for the
  * keys that actually landed. A tab closed anywhere in the middle loses nothing.
  */
-function flushProse(): void {
-  if (proseTimer != null) {
-    clearTimeout(proseTimer);
-    proseTimer = null;
-  }
-  if (!writesArmed) return;
-  const split = currentSplit();
-  if (!split || !proseEnabled) return;
-
+function flushProse(split: Split): void {
   const dirty = new Map<string, string>();
   for (const [k, v] of split.prose) if (lastProse.get(k) !== v) dirty.set(k, v);
   const stale = staleKeys(split.prose, new Set(lastProse.keys()), split.projectIds);
@@ -355,6 +379,50 @@ function flushProse(): void {
     });
 }
 
+/**
+ * Write the changed pictures.
+ *
+ * **No crash pad here, deliberately.** The pad exists because IndexedDB is
+ * async and `beforeunload` is not, and it is affordable for prose because prose
+ * is small. A picture in the pad would be several megabytes of base64 in
+ * localStorage — recreating, on the recovery path, the exact quota failure this
+ * split exists to remove. The exposure is a different shape anyway: prose is a
+ * continuous stream of keystrokes, a picture is one deliberate act, and the
+ * unprotected window is the ~200ms between picking the file and the write
+ * landing. A picture lost there is a file the writer still has and can pick
+ * again; there is no equivalent for words.
+ */
+function flushImages(split: Split): void {
+  const dirty = new Map<string, string>();
+  for (const [k, v] of split.images) if (lastImages.get(k) !== v) dirty.set(k, v);
+  const stale = staleKeys(split.images, new Set(lastImages.keys()), split.projectIds);
+  if (dirty.size === 0 && stale.length === 0) return;
+
+  void writeImages(dirty, stale)
+    .then(() => {
+      for (const [k, v] of dirty) lastImages.set(k, v);
+      for (const k of stale) lastImages.delete(k);
+      imagesFailed = false;
+    })
+    .catch(() => {
+      imagesFailed = true;
+      setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "images" });
+    });
+}
+
+/** Both payloads, on the shared short timer. */
+function flushPayloads(): void {
+  if (payloadTimer != null) {
+    clearTimeout(payloadTimer);
+    payloadTimer = null;
+  }
+  if (!writesArmed) return;
+  const split = currentSplit();
+  if (!split || !payloadsEnabled) return;
+  flushProse(split);
+  flushImages(split);
+}
+
 function flushMap(): void {
   if (saveTimer != null) {
     clearTimeout(saveTimer);
@@ -366,23 +434,29 @@ function flushMap(): void {
   pending = null;
   splitCache = null;
   // The marker travels with the blob it describes, so the next load knows
-  // whether these chapters are prose-free because there is none or because it
-  // lives in IndexedDB.
-  const value = JSON.stringify({ ...split.stripped, proseExternal: proseEnabled });
+  // whether these chapters are prose-free (and these books cover-free) because
+  // there is none or because it lives in IndexedDB. `proseExternal` is written
+  // alongside it only so that an older build still refuses this blob rather
+  // than loading it blank — see the note on `Stored`.
+  const value = JSON.stringify({
+    ...split.stripped,
+    payloadsExternal: payloadsEnabled,
+    proseExternal: payloadsEnabled,
+  });
   void activeAdapter
     .save(value)
     .then(() => {
-      // Only the map landed. Saying "saved" while the prose write is failing
+      // Only the map landed. Saying "saved" while a payload write is failing
       // would be the more comforting lie and the more expensive one.
-      if (proseFailed) return;
+      if (proseFailed || imagesFailed) return;
       setSaveStatus({ state: "saved", savedAt: Date.now() });
     })
     .catch(() => setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "storage" }));
 }
 
-/** Everything, now. Prose before the map, so the pad is written either way. */
+/** Everything, now. Payloads before the map, so the pad is written either way. */
 function flushSave(): void {
-  flushProse();
+  flushPayloads();
   flushMap();
 }
 
@@ -432,10 +506,10 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
     };
 
     // Settled once, up front, so every path below — including the failures,
-    // which the reader may still choose to write over — agrees on where prose
-    // goes. A browser opening Estoria for the first time would otherwise keep
-    // prose inline until its next reload.
-    proseEnabled = await proseStoreAvailable();
+    // which the reader may still choose to write over — agrees on where the
+    // payloads go. A browser opening Estoria for the first time would otherwise
+    // keep prose and pictures inline until its next reload.
+    payloadsEnabled = await payloadStoreAvailable();
 
     let raw: string | null;
     try {
@@ -464,27 +538,29 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
       return fail({ code: "unreadable", savedAs: kept });
     }
 
-    // Written with its manuscripts in IndexedDB? Then IndexedDB is not optional
-    // for this document, whatever it is for the browser.
-    const external = parsed?.proseExternal === true;
+    // Written with its payloads in IndexedDB? Then IndexedDB is not optional
+    // for this document, whatever it is for the browser. `proseExternal` is the
+    // pre-rename spelling and means the same thing for the prose it described.
+    const external = parsed?.payloadsExternal === true || parsed?.proseExternal === true;
 
     if (!parsed?.state?.doc) return ready(parsed ?? null);
 
-    if (!proseEnabled) {
+    if (!payloadsEnabled) {
       if (external) {
         return fail({
           code: "prose-unreachable",
-          detail: "This browser's database for manuscripts could not be opened.",
+          detail: "This browser's database for manuscripts and pictures could not be opened.",
         });
       }
-      return ready(parsed); // prose is inline here; nothing is missing
+      return ready(parsed); // everything is inline here; nothing is missing
     }
 
     let stored: Map<string, string>;
+    let storedImages: Map<string, string>;
     try {
-      stored = await loadAllProse();
+      [stored, storedImages] = await Promise.all([loadAllProse(), loadAllImages()]);
     } catch (e) {
-      proseEnabled = false;
+      payloadsEnabled = false;
       if (external) {
         return fail({
           code: "prose-unreachable",
@@ -496,20 +572,22 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
     // What IndexedDB holds, recorded before the pad goes over the top — so a
     // pad entry that never reached IndexedDB reads as dirty and is written.
     lastProse = new Map(stored);
+    lastImages = new Map(storedImages);
     const merged = new Map(stored);
     for (const [k, v] of Object.entries(readPad())) merged.set(k, v);
 
-    // Documents written before this split still carry their prose inline; it
-    // survives here untouched and moves to IndexedDB on the next save. That is
-    // the whole migration.
+    // Documents written before either split still carry their prose and their
+    // pictures inline; both survive here untouched and move to IndexedDB on the
+    // next save. That is the whole migration.
     const state = parsed.state;
+    const rejoin = (d: StoryDoc): StoryDoc => mergeImages(mergeProse(d, merged), storedImages);
     const stash: Record<string, StoryDoc> = {};
-    for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = mergeProse(d, merged);
+    for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = rejoin(d);
     return ready({
       ...parsed,
       state: {
         ...state,
-        doc: mergeProse(state.doc, merged),
+        doc: rejoin(state.doc),
         ...(state.projectStash ? { projectStash: stash } : {}),
       },
     });
@@ -529,8 +607,8 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
       return;
     }
     if (saveStatus.state !== "saving") setSaveStatus({ ...saveStatus, state: "saving" });
-    if (proseTimer != null) clearTimeout(proseTimer);
-    proseTimer = setTimeout(flushProse, PROSE_DEBOUNCE_MS);
+    if (payloadTimer != null) clearTimeout(payloadTimer);
+    payloadTimer = setTimeout(flushPayloads, PAYLOAD_DEBOUNCE_MS);
     if (saveTimer != null) clearTimeout(saveTimer);
     saveTimer = setTimeout(flushMap, SAVE_DEBOUNCE_MS);
   },

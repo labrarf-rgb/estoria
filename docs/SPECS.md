@@ -88,6 +88,13 @@ Everything hinges on two seams so we can grow from local → cloud incrementally
 1. **One serializable document** — [`StoryDoc`](../src/types.ts) is plain JSON with
    a `schemaVersion`. It's exactly what we auto-save, what the user exports as a
    `.estoria.json` file, and what a server would persist.
+   **The document is always whole above the at-rest layer.** Manuscripts
+   ([`store/prose.ts`](../src/store/prose.ts)) and pictures
+   ([`store/images.ts`](../src/store/images.ts)) are lifted into IndexedDB on
+   the way *into* localStorage and put back on the way out, so the store, every
+   export, Sync and the Android contract still see one document with its prose
+   and its images inline. The blob that hits the ~5MB quota carries the map and
+   nothing else.
 2. **`StorageAdapter`** — [`src/store/persistence.ts`](../src/store/persistence.ts)
    defines `load()` / `save()`. v1 ships `LocalStorageAdapter`. Cloud later =
    write a new adapter against the same interface + swap `activeAdapter`.
@@ -194,12 +201,16 @@ estoria/
    ├─ store/
    │  ├─ useStore.ts          # Zustand store: doc + UI state + all actions
    │  ├─ persistence.ts       # StorageAdapter, the two-stream save (map -> localStorage,
-   │  │                       #   prose -> IndexedDB), the load lock + LoadFailure,
+   │  │                       #   payloads -> IndexedDB), the load lock + LoadFailure,
    │  │                       #   normalizeDoc, save-status, file I/O
    │  ├─ hydration.ts         # has persist finished reading the store back, and did it
    │  │                       #   succeed — what Welcome/Recovery gate on (§2 "load lock")
-   │  └─ prose.ts             # manuscripts at rest: the IndexedDB store, the doc
-   │                          #   split/merge, and the synchronous crash pad
+   │  ├─ idb.ts               # the one IndexedDB database both payloads share: open with
+   │  │                       #   timeout, availability, stale-key rule, raw read/write
+   │  ├─ prose.ts             # manuscripts at rest: the doc split/merge and the
+   │  │                       #   synchronous crash pad
+   │  └─ images.ts            # pictures at rest: the same split/merge for asset `src`
+   │                          #   and book `coverSrc` (no pad — see flushImages)
    ├─ lib/
    │  ├─ layout.ts            # board layout, auto-arrange, fit-to-content, scene grids
    │  ├─ sceneFit.ts          # SCENE_TEXT_MAX + measured card capacity: how wide a
@@ -1000,6 +1011,11 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
    *when*, not an *if*, and the user would lose work believing it saved. Fix:
    propagate save failure into store state, show it in the footer; consider
    IndexedDB (far larger quota) as the local adapter's backing store.
+   **Closed 2026-08-18:** the second half landed — prose moved to IndexedDB
+   earlier, and images now follow it (`store/images.ts`), so base64 pictures no
+   longer sit in the quota-bound blob at all. The footer additionally tells a
+   failed picture apart from failed prose, because the writer's next move
+   differs.
 3. ✅ **Fixed 2026-07-01 (Session 20)** — saves are debounced 500ms trailing,
    with a synchronous flush on `beforeunload` and `visibilitychange → hidden`.
    *Original finding:*

@@ -4739,3 +4739,112 @@ Added the landing rule to that row along with why it is the end and not the
 start, the live-value and explicit-scroll details, and the empty-chapter case.
 Nothing else in SPECS described the focus behaviour, so nothing else needed
 correcting.
+
+## 2026-08-18 — Pictures leave the five-megabyte room
+
+Ray asked what stops the app crashing or the save file corrupting when
+localStorage fills up. The honest answer was: the failure is handled well and
+nothing prevents it. Handling was thorough — `setItem` is atomic so a full quota
+leaves the stored document byte-for-byte intact, every write is wrapped, the
+footer goes red and says so, and the load lock means a bad read can never
+overwrite a good document. Prevention was missing entirely: nothing measured
+headroom, and nothing capped the one input that can exhaust the quota in a
+single action.
+
+### The actual size of the problem
+
+Not "storage is nearly full". Prose has lived in IndexedDB since the manuscript
+split, where the budget is disk-proportional. The only thing squeezed into the
+~5MB localStorage blob is the map — and, inlined into it as base64 data URLs,
+every picture the writer has ever added. Base64 costs a third more than the file
+did, so one phone photo is ~5.5MB of string: **the whole quota, in one drop**,
+after which every later save fails, including the ones that have nothing to do
+with the picture. SPECS §9 item 2 named this in July and suggested the fix in
+the same breath.
+
+Strip the pictures out and a large multi-book map is a few hundred kilobytes.
+There is no ceiling problem left to solve.
+
+### The change
+
+`store/images.ts`, deliberately the same shape as `store/prose.ts`:
+`splitImages` lifts `asset.src` and `book.coverSrc` out before `JSON.stringify`
+sees them, `mergeImages` puts them back on load. Both hang off the top level of
+a document rather than being buried in the book/version/chapter tree the way
+prose is, so this is two array walks, not a recursive one.
+
+Three decisions worth recording, because each had a tempting wrong answer:
+
+- **Data URLs stay data URLs.** The obvious design is to store Blobs and keep
+  an id in the document, resolving object URLs at render. It is also the design
+  that changes what the document *is*: `contentKey` in `migrateRefsToAssets`
+  hashes `src` to decide whether two assets are the same asset, `lib/sync.ts`
+  diffs `coverSrc` by value, and every `<img>` would acquire a lifetime to
+  manage. Keeping the document whole leaves every one of those untouched. The
+  cost is a third of a picture's size, in memory only.
+- **One database, one availability answer.** The DB open, the timeout, the
+  stale-key rule and the raw read/write moved to `store/idb.ts`, shared by both
+  payloads, and `DB_VERSION` went 1 → 2 to add the `images` store. Two separate
+  databases would have let the load half-answer the only question that matters
+  — reaching the prose, missing the images, and saving a document that had
+  quietly lost its covers.
+- **No crash pad for pictures.** The pad exists because IndexedDB is async and
+  `beforeunload` is not, and it is affordable for prose because prose is small.
+  A picture in the pad would be megabytes of base64 in localStorage, recreating
+  on the recovery path the exact failure this removes. The exposure is a
+  different shape anyway: prose is a continuous stream of keystrokes, a picture
+  is one deliberate act, and a picture lost in the ~200ms window is a file the
+  writer still has. There is no equivalent for words.
+
+`proseExternal` became `payloadsExternal` and now guards both, so the
+`prose-unreachable` refusal covers a document whose pictures cannot be reached.
+The old key is still written beside it, purely so a build from before this
+change still refuses a blob whose prose it cannot see rather than loading it
+blank. The footer tells a failed picture apart from failed prose: words that
+did not land are gone if the writer walks away, a picture that did not land is
+a file they can pick again.
+
+### Verified
+
+In the dev app, on the sample project:
+
+- A 400KB image added through the normal "+ Image" flow: the localStorage blob
+  stayed at 14KB with zero `data:image` occurrences, and the picture sat in
+  IndexedDB. Before this change that blob would have been ~414KB.
+- Reload: the picture came back as a real data URL on a plain `<img src>`,
+  decoded, 400,118 characters — the round trip through `mergeImages`.
+- **Export still carries it inline.** The captured `.estoria.json` was 413KB
+  with the data URL present and `schemaVersion` unchanged at 9. This is the
+  Android contract: the file is exactly what it would have been before.
+- Deleting the asset removed its image from IndexedDB — the stale-key path,
+  no orphan left behind.
+- Prose still writes to `manuscripts` after the version bump, and stays out of
+  the blob.
+- Forcing `payloadStoreAvailable` to false put a document written externally on
+  the Recovery screen with auto-save paused, rather than blanking it.
+
+### Not done
+
+- **No cap on what a picture may be.** The ceiling moved; the input is still
+  unbounded. A 40MB image now saves fine and bloats every export and Sync write
+  instead, which the Android app also pays for. Downscale-on-import is the
+  follow-up; Ray deliberately kept it out of this session so the diff stayed in
+  the persistence layer.
+- **Still no headroom measurement.** `navigator.storage.estimate()` is called
+  nowhere. The first signal of trouble is still the failure itself — much
+  further away now, but no earlier when it comes.
+- **A failed save is still not retried.** `flushMap` clears `pending` before
+  the write, so a rejection drops that snapshot; the next change re-populates
+  it, but a failure on the last edit of a session is never retried.
+- **Downgrade caveat.** A build from before this change, reading a blob written
+  after it, will merge the prose and miss the pictures. `proseExternal` is
+  still written so the refusal path holds where it can, but a revert past this
+  commit is not free for images.
+
+### Drift check against SPECS
+
+- §2 "Persistence architecture" now states the invariant the split depends on:
+  the document is whole above the at-rest layer.
+- §3 project layout lists `store/idb.ts` and `store/images.ts`.
+- §9 item 2 closed — its "consider IndexedDB as the local adapter's backing
+  store" is now true of both payloads.
