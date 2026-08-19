@@ -4869,6 +4869,23 @@ occurrences.
   still written so the refusal path holds where it can, but a revert past this
   commit is not free for images.
 
+### Deployed
+
+`npm run deploy` → **build 168 / `f9e0694`**, live at
+https://www.labrarf.com/estoria. Verified beyond the script's own version.json
+poll: prod's `index.html` references `index-D62lWVaN.js` / `index-ByV1r8kW.css`,
+matching the local `dist/`. Loaded prod in a browser — app mounts, `sw.js?v=168`
+is the active worker with nothing waiting, exactly one cache
+(`estoria-shell-168`), no console errors, and **the IndexedDB database opens
+with both object stores present (`images`, `manuscripts`)**, which is the one
+thing about this release that could only be confirmed on a real origin: the
+v1 → v2 upgrade running against a database that already existed.
+
+Ray's installed copy stays on the old worker until he takes the update toast,
+which is by design. Worth knowing for this release specifically: the first load
+on the new build is when the DB upgrade runs, and until it does, that window is
+still writing pictures inline.
+
 ### Drift check against SPECS
 
 - §2 "Persistence architecture" now states the invariant the split depends on:
@@ -4877,3 +4894,10 @@ occurrences.
   now describes the downscale policy rather than "file → data URL reading".
 - §9 item 2 closed — its "consider IndexedDB as the local adapter's backing
   store" is now true of both payloads, and the import cap it implied is in.
+- **Drift found and fixed at ship time.** §4's `Persist | Local auto-save` row
+  still read "Via zustand persist → LocalStorageAdapter (debounced; failures
+  surfaced in footer)" and nothing more — it was never updated when *prose*
+  moved to IndexedDB in an earlier session, so it was already a session stale
+  before today made it two. It now describes the split, the shared database,
+  the `payloadsExternal` refusal and why prose has a crash pad and pictures do
+  not. A new §4 row covers the import downscale.
