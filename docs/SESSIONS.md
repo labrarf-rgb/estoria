@@ -4901,3 +4901,29 @@ still writing pictures inline.
   before today made it two. It now describes the split, the shared database,
   the `payloadsExternal` refusal and why prose has a crash pad and pictures do
   not. A new §4 row covers the import downscale.
+
+### 2026-08-20 — Selection word count in the manuscript (Session 57)
+
+Small feature, on `feature/selection-word-count`.
+
+- **The manuscript's status bar now counts your selection.** A chip left of the
+  existing `54 words of 3,200` reads `10 words selected` while anything is
+  highlighted, and disappears when nothing is. Asked for by the one question the
+  bar could not answer: *how long is this passage?*
+- **One `selectionchange` listener, two selection models.** In Edit the count
+  comes off the textarea's own `selectionStart`/`selectionEnd` — the document
+  selection does not reach inside a textarea — and in View off
+  `window.getSelection()`, but only when its anchor sits inside the prose
+  container (`readRef`), so highlighting the chapter title or a beat in the rail
+  is not highlighting manuscript. Counted with `countWords`, the same function
+  every other number in the app uses, so a selection full of markdown does not
+  read longer than it is.
+- The count is **cleared on chapter change and on the Edit/View toggle**: a
+  selection belongs to the text it was made in, and a count left standing over
+  unhighlighted prose is exactly the lying number §4's *Word count is derived*
+  row exists to prevent.
+- Verified in the browser against the sample book: a 10-word sentence selected
+  in Edit read `10 words selected`, a 25-word span across two lines in View read
+  `25`, select-all read `54` beside a chapter total of `54`, and switching view
+  cleared it. No console errors; `npm run build` passes.
+- SPECS §4 gained a `Detail | Selection word count` row.

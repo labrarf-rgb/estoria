@@ -78,6 +78,43 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
   // again for each character typed into it.
   const proseWords = useMemo(() => (text ? countWords(text) : 0), [text]);
 
+  /**
+   * Words in whatever is highlighted right now, for the chip beside the total.
+   *
+   * One `selectionchange` listener covers both halves of the sheet, because the
+   * two halves report a selection differently: a textarea's is its own
+   * `selectionStart`/`selectionEnd` (the document selection does not reach
+   * inside one), and reading mode's is the window selection — but only when it
+   * lives inside the prose, or highlighting the chapter title or a beat in the
+   * rail would count as manuscript.
+   *
+   * Counted with `countWords` like every other number in the app, so half a
+   * paragraph of `**bold**` does not read longer than it is.
+   */
+  const readRef = useRef<HTMLDivElement>(null);
+  const [selWords, setSelWords] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      const ta = taRef.current;
+      if (ta && document.activeElement === ta) {
+        const { selectionStart: a, selectionEnd: b } = ta;
+        const picked = a === b ? "" : ta.value.slice(a, b);
+        setSelWords(picked ? countWords(picked) : 0);
+        return;
+      }
+      const sel = window.getSelection();
+      const inProse =
+        !!sel && !sel.isCollapsed && !!sel.anchorNode && !!readRef.current?.contains(sel.anchorNode);
+      const picked = inProse ? sel.toString() : "";
+      setSelWords(picked ? countWords(picked) : 0);
+    };
+    document.addEventListener("selectionchange", read);
+    return () => document.removeEventListener("selectionchange", read);
+  }, []);
+  // A selection belongs to the text it was made in. Changing chapter or side of
+  // the toggle would otherwise leave a count standing with nothing lit under it.
+  useEffect(() => setSelWords(0), [ch.id, view]);
+
   // Leaving a chapter forces the prose out, and so does leaving for the story
   // map: the chapter you just left is the one nobody is going to notice losing.
   useEffect(() => flushNow, [ch.id]);
@@ -222,6 +259,7 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {view === "read" ? (
               <div
+                ref={readRef}
                 data-print-root
                 className="min-h-0 flex-1 overflow-y-auto px-[clamp(20px,4%,56px)] py-[26px]"
               >
@@ -244,10 +282,19 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
             )}
             {/* Counted off the prose in front of you, so it moves as you type.
                 The chip in the header is the saved cache, which follows on the
-                save rhythm; a writer watching a target wants the live one. */}
-            <div className="shrink-0 border-t border-rule px-[clamp(20px,4%,56px)] py-[7px] text-right font-mono text-[10.5px] font-medium text-faint">
-              {proseWords.toLocaleString()} {proseWords === 1 ? "word" : "words"}
-              {ch.target ? ` of ${ch.target.toLocaleString()}` : ""}
+                save rhythm; a writer watching a target wants the live one. The
+                selection count sits to its left and appears only while
+                something is highlighted — this bar is thin enough already. */}
+            <div className="flex shrink-0 items-center justify-end gap-[9px] border-t border-rule px-[clamp(20px,4%,56px)] py-[7px] font-mono text-[10.5px] font-medium text-faint">
+              {selWords > 0 && (
+                <span className="rounded-full border border-rule px-[7px] py-[1px]">
+                  {selWords.toLocaleString()} {selWords === 1 ? "word" : "words"} selected
+                </span>
+              )}
+              <span>
+                {proseWords.toLocaleString()} {proseWords === 1 ? "word" : "words"}
+                {ch.target ? ` of ${ch.target.toLocaleString()}` : ""}
+              </span>
             </div>
           </div>
         </div>
