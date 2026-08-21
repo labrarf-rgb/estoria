@@ -4927,3 +4927,8 @@ Small feature, on `feature/selection-word-count`.
   `25`, select-all read `54` beside a chapter total of `54`, and switching view
   cleared it. No console errors; `npm run build` passes.
 - SPECS §4 gained a `Detail | Selection word count` row.
+- **Shipped.** Committed as `45c7432`, pushed to `origin/main`, deployed with
+  `npm run deploy`; prod confirmed serving `45c7432` at
+  https://www.labrarf.com/estoria on 2026-08-21. This entry and the SPECS row
+  land in the follow-up commit, so prod trails `main` by one docs-only commit
+  until the next deploy — the same pattern as Session 56.
