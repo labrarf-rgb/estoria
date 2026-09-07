@@ -43,6 +43,18 @@ export function ProseChapter({
   const text = ch.manuscript ?? "";
   const blocks = useMemo(() => parseBlocks(text), [text]);
 
+  /**
+   * A press that doesn't move is a click; a press that moves is a text
+   * selection. The same rule the board uses for cards, and the reason the prose
+   * can be both a way in and something you can still select and copy out of.
+   */
+  const press = useRef<{ x: number; y: number } | null>(null);
+
+  // Every hook above this line, because the line itself is conditional: an
+  // empty chapter returns early, and a hook below the return would be skipped
+  // on that render. Stepping from a written chapter to an unwritten one keeps
+  // the same component mounted, so React saw the hook count drop and tore the
+  // whole app down to a blank page.
   if (blocks.length === 0) {
     return (
       <div
@@ -64,13 +76,6 @@ export function ProseChapter({
       </div>
     );
   }
-
-  /**
-   * A press that doesn't move is a click; a press that moves is a text
-   * selection. The same rule the board uses for cards, and the reason the prose
-   * can be both a way in and something you can still select and copy out of.
-   */
-  const press = useRef<{ x: number; y: number } | null>(null);
 
   return (
     <div

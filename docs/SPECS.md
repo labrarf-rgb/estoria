@@ -261,12 +261,20 @@ estoria/
       │                       #   "Opening your work…" panel for a slow load
       ├─ Recovery.tsx         # shown instead when the load failed: what happened, the
       │                       #   rescued copy, and a way on (§2 "load lock")
+      ├─ ErrorBoundary.tsx    # the app's only class component: catches render errors
+      │                       #   so React can't blank the page (§4 "A crash you can
+      │                       #   get out of"). `resetKey` re-arms it on navigation
+      ├─ CrashScreen.tsx      # what it draws instead — AppCrash (whole app, replaces
+      │                       #   everything) and ChapterCrash (the modal only, board
+      │                       #   still live). Both offer "Download a copy"
       ├─ Lightbox.tsx · ConfirmDialog.tsx
       ├─ UpdateToast.tsx      # "a new version is ready"
       │                       #   Stacking order, top down: ConfirmDialog (100) —
       │                       #   it guards the irreversible actions and is raised
       │                       #   *from* the screens below it; Recovery (95);
-      │                       #   UpdateToast (90); Welcome (70); modals (60-80)
+      │                       #   UpdateToast (90); Welcome (70); modals (60-80);
+      │                       #   ChapterCrash sits at 50 with the chapter modal it
+      │                       #   replaces, so all of the above still rise over it
       ├─ ui/                  # Overlay (Scrim/Drawer/SizeButton/CloseButton/stop),
       │                       #   Popover, RefList, ViewToggle, ExpandableTextarea,
       │                       #   AssetLinkPicker, AppIcon
@@ -375,6 +383,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
+| App | A crash you can get out of | ✅ | **2026-09-07.** React's answer to a component that throws mid-render is to unmount the whole tree, which is a white page — and in the installed app there is no address bar to reload from, so the only move left was quit and restart. Two `ErrorBoundary`s now stand between that and the writer. **Around the chapter modal**, keyed on `openCh` + `chapterMode`: a chapter that will not draw costs you the chapter, not the session, so the board, the toolbar and everything unsaved stay live behind a card offering *Close the chapter* / *Try again* / *Download a copy*, and the key re-arms the boundary as you navigate — without it one bad chapter would poison every chapter opened after it. **At the root**, in `main.tsx`: everything else lands on a full page saying the writing is saved, with *Reload Estoria* as the way out. Both write the error and its component stack to the console, and both put a whole-project `.estoria.json` one click away (`downloadProjectFile` straight off `useStore.getState()`), the same instinct as `Recovery`'s rescued copy — say nothing is lost, put a copy within reach, then offer the way on. Honest limits: **render errors only** (handlers, timers and promises never pass through render, so React never routes them here), and the theme comes from the `data-theme` the app already wrote on the document element, falling back to the OS preference for the one case that has neither — a crash on the very first render, where no effect has run and the store has not finished rehydrating. |
 | App | Version / build stamp | ✅ | About shows `v… · build N · sha · time` from `window.__ESTORIA_BUILD__`; `npm run deploy` verifies the commit is live (Sessions 41–42). |
 
 ---
@@ -1150,6 +1159,22 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     headings *starting* with "act" parse as acts. *Original finding:*
     **Import parser: any `##` heading containing "act" becomes an Act** (the
     fallback `/act/.test(h)` misparsed sections like `## Factions`).
+
+20. ✅ **Fixed 2026-09-07 (Session 58) — a conditional hook, and the white
+    screen it caused.** `ProseChapter` in
+    [`ProsePane.tsx`](../src/components/ProsePane.tsx) called `useRef` *after*
+    the early return that draws the "Nothing written yet" box, so a chapter with
+    prose rendered four hooks and an empty one three. The modal's arrows swap
+    the chapter on the same mounted component, so **stepping from a written
+    chapter to an unwritten one in View mode dropped the hook count mid-life**,
+    React threw `Rendered fewer hooks than expected` and tore the whole app down
+    to a blank page. Only View mode, because Edit renders a textarea and never
+    mounts the component; the timeline was exposed to the same fault by emptying
+    a chapter while it was on screen. The ref moved above the return. A sweep of
+    every component found no second instance — there is no ESLint in this
+    project, so `react-hooks/rules-of-hooks` was not there to catch it. The
+    unescapable *white page* was a separate failure, and got its own answer: see
+    §4 "A crash you can get out of".
 
 ### P3 — quality / round-trip / UX
 

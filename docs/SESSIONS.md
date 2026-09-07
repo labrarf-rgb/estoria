@@ -4932,3 +4932,104 @@ Small feature, on `feature/selection-word-count`.
   https://www.labrarf.com/estoria on 2026-08-21. This entry and the SPECS row
   land in the follow-up commit, so prod trails `main` by one docs-only commit
   until the next deploy — the same pattern as Session 56.
+
+
+### 2026-09-07 — The blank white screen, and a way out of the next one (Session 58)
+
+Reported as a bug with an exact recipe: in the chapter modal's manuscript view,
+go from Edit to View, then step to a chapter with nothing written in it, and the
+app goes to a blank white screen you cannot escape without quitting and
+restarting.
+
+#### The bug
+
+A conditional hook, in `ProseChapter` ([`ProsePane.tsx`](../src/components/ProsePane.tsx)).
+The component called `useRef` **after** the early return that draws the "Nothing
+written yet" box, so a chapter with prose rendered four hooks and an empty one
+three. The modal's arrows swap the chapter on the same mounted component, so
+that step dropped the hook count mid-life and React did what it does:
+
+```
+Uncaught Error: Rendered fewer hooks than expected.
+This may be caused by an accidental early return statement.
+```
+
+Which unmounts the entire tree. The white page *is* React's error handling.
+
+Only View mode reaches it, because Edit renders a textarea and never mounts this
+component — which is why the recipe needs the Edit → View step to be interesting
+at all. The timeline renders `ProseChapter` too, and was exposed to the same
+fault by emptying a chapter's prose while it was on screen.
+
+The fix is the ref moving above the return, with a comment saying why the order
+matters so it does not get tidied back down. **Confirmed both directions**: the
+repro reproduced the console error and the blank page on the pre-fix file, and
+the fixed file steps between written and unwritten chapters cleanly. A scan of
+every component turned up no second instance of the pattern — worth noting that
+this project has no ESLint, so `react-hooks/rules-of-hooks` was not there to
+catch it, and a hand-written scan is currently what stands in for it.
+
+#### The part the bug report was really about
+
+"I can't escape from it, I need to quit the app and restart." That is not the
+hook bug — that is the app having no error boundary at all, so *any* render
+error is unrecoverable, and in the installed PWA there is no address bar to
+reload from. Fixed on request, and deliberately as a second thing:
+
+- **`ErrorBoundary.tsx`** — the app's only class component, because
+  `getDerivedStateFromError` / `componentDidCatch` have no hook equivalent. It
+  takes a `fallback` and a `resetKey`; changing the key clears a tripped
+  boundary, so **moving away from the thing that broke is the retry**. Without
+  that, one bad chapter would show the error page for every chapter opened
+  afterwards.
+- **Around the chapter modal**, keyed on `openCh` + `chapterMode`. A chapter
+  that will not draw now costs you the chapter, not the session: the board, the
+  toolbar and everything unsaved stay live behind a card offering *Close the
+  chapter*, *Try again* and *Download a copy*. It sits at z 50 — the chapter
+  modal's own layer, so a confirm, the recovery screen and the update toast all
+  still come up over it.
+- **At the root**, in `main.tsx`. Everything else lands on a full page saying
+  the writing is saved, with *Reload Estoria* as the way out — the button the
+  installed app could not otherwise offer.
+
+Both fallbacks follow the order `Recovery` set for a failed *load*, because a
+failed *render* frightens a writer the same way: say plainly nothing is lost,
+put a copy of the work one click away (`downloadProjectFile` straight off
+`useStore.getState()`), then offer the way forward. Both still write the error
+and its component stack to the console — the fallback is for the writer, but
+that stack is the only copy anyone debugging gets.
+
+Two limits stated in the code rather than glossed. It catches **render errors
+only**: handlers, timers and promises never pass through render, so React never
+routes them here. And the theme is inherited from the `data-theme` the app
+already wrote onto the document element, which covers every crash after startup;
+a crash on the very first render has neither that attribute nor a rehydrated
+store, so it falls back to the OS preference rather than flashing a bright page
+at someone who chose the dark one.
+
+#### Verified
+
+By crashing it on purpose, twice.
+
+- **Chapter boundary** — reintroduced the hook bug and ran the reported recipe.
+  The card appears over a working board; *Close the chapter* returns to it with
+  the session intact; opening a different chapter afterwards behaves normally,
+  so the `resetKey` re-arm works.
+- **Root boundary** — threw from `Footer` to trip it. The page renders correctly
+  in **both light and dark**, *Download a copy* wrote the project file, and the
+  console received the error plus the full component stack.
+- `npm run typecheck` and `npm run build` clean. The first dark-mode attempt
+  rendered light, which is what turned up the real constraint: the store
+  rehydrates asynchronously, so a first-render crash cannot read the saved theme
+  by any route. Hence the OS-preference fallback.
+
+#### Drift check against SPECS
+
+- §3's component tree gained `ErrorBoundary.tsx` and `CrashScreen.tsx`, and the
+  stacking-order note now places `ChapterCrash` at 50 with the modal it replaces.
+- §4 gained an `App | A crash you can get out of` row.
+- §9 P2 gained item 20, the conditional hook, closed.
+- No drift found in the rest. `ProsePane`'s existing §4 description (the
+  `Timeline | Read the book as prose` row) still describes it accurately — the
+  fix changed hook order, not behaviour, and the empty-chapter box it returns is
+  unchanged.

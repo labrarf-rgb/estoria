@@ -7,6 +7,8 @@ import "@/lib/install";
 import { resetIfRequested } from "@/lib/sw";
 import { requestDurableStorage } from "@/lib/storageDurability";
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppCrash } from "@/components/CrashScreen";
 
 // "?sw=off" tears out the service worker and its caches, then reloads. It runs
 // before anything else because the shell it rescues someone from could be the
@@ -17,7 +19,13 @@ if (!resetIfRequested()) {
   void requestDurableStorage();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <App />
+      {/* Outermost, and therefore the one that catches what nothing else did.
+          Without it React's answer to a render error is to unmount the whole
+          tree, which in the installed app is a white screen with no address bar
+          to reload from. See components/ErrorBoundary.tsx. */}
+      <ErrorBoundary fallback={(error) => <AppCrash error={error} />}>
+        <App />
+      </ErrorBoundary>
     </StrictMode>
   );
 }

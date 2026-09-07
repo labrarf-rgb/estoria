@@ -6,6 +6,8 @@ import { Timeline } from "@/components/Timeline";
 import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
 import { ChapterModal } from "@/components/ChapterModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ChapterCrash } from "@/components/CrashScreen";
 import { Lightbox } from "@/components/Lightbox";
 import { Welcome } from "@/components/Welcome";
 import { Recovery } from "@/components/Recovery";
@@ -29,6 +31,7 @@ export function App() {
   const seriesMode = useStore((s) => s.doc.seriesMode);
   const level = useStore((s) => s.level);
   const view = useStore((s) => s.view);
+  const chapterMode = useStore((s) => s.chapterMode);
   const onSeriesMap = seriesMode && level === "series";
   // The book-level timeline is its own surface (a scrolling rail + scene pane),
   // not a mode of the board's canvas. The series map still renders its own
@@ -49,7 +52,18 @@ export function App() {
       {onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
       <Footer />
 
-      {openCh && !onSeriesMap && <ChapterModal />}
+      {/* The chapter modal catches its own errors, because the board behind it
+          is still perfectly good: a chapter that won't draw should cost you the
+          chapter, not the session. Keyed on which chapter and which face of it,
+          so closing it or stepping to the next one re-arms the boundary. */}
+      {openCh && !onSeriesMap && (
+        <ErrorBoundary
+          resetKey={`${openCh}:${chapterMode}`}
+          fallback={(error, retry) => <ChapterCrash error={error} retry={retry} />}
+        >
+          <ChapterModal />
+        </ErrorBoundary>
+      )}
       {/* Side panels are modal overlays: the app behind them is dimmed and
           inert, one panel at a time (see `Drawer`). */}
       <CharactersPanel />
