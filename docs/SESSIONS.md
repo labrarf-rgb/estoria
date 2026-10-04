@@ -5421,4 +5421,24 @@ In the dev server (`estoria-dev`), on the sample book:
 - §9 P2 gained item 21, closed.
 - Comments updated in step: the `target` doc in `types.ts` and the parser's
   "never drafted" note in `markdown.ts`.
-- Not pushed or deployed.
+
+#### Merging with Session 60
+
+Built on `f6ac3a2`. `main` had since gained single pieces (Session 60), whose
+entry lists this bug under *Found, not fixed*. This is that fix. The merge
+conflicted only in the docs: both sessions were numbered 59, so this one became
+61, and the two §4 rows were re-applied over `main`'s table. Main didn't touch
+either row.
+
+Session 60 added two new callers of `reconcileWords`: `expandIntoBook` and
+`turnIntoPiece`. Expanding doesn't touch prose, so it only recounts.
+Collapsing now does what §4 says, **targets summed**. Before, the hidden
+promotion added a goal when no chapter had one: a book of three written,
+unplanned chapters became a piece reading `9,000 words of 9,000`. One narrow
+case reads worse now. If a book mixes written chapters with no target and
+unwritten chapters with only a hand-typed count, the unwritten chapters' plans
+used to come along by accident inside that promoted total. Now they are dropped,
+the same as any other non-target count. Left as is: it is a rule for collapsing,
+not for counting, and §4 already states it. Re-checked on the merged tree:
+the recipe still gives `4` with no target, and collapsing a book with chapters
+at `9 / 3200` and `4 / none` gives a piece at `13 / 3200`.
