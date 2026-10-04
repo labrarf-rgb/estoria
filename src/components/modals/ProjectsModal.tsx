@@ -2,6 +2,16 @@ import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { readProjectFile } from "@/store/persistence";
+import { shortCount } from "@/lib/manuscript";
+import { SAVED_REASON, countParts, shortDate } from "@/lib/piece";
+import type { ProjectMeta } from "@/store/useStore";
+
+/** "Short story · 7 scenes · 4.3k words", "Series · 3 books · 8 chapters". */
+function metaLine(p: ProjectMeta): string {
+  if (p.isPiece) return `${p.label} · ${countParts(p, p.parts)} · ${shortCount(p.words)} words`;
+  const chapters = `${p.chapters} ${p.chapters === 1 ? "chapter" : "chapters"}`;
+  return `${p.isSeries ? `Series · ${p.books} books` : p.label ? `${p.label}` : "Standalone"} · ${chapters}`;
+}
 
 /** "Open project" - switch between independent projects, or merge one into a series. */
 export function ProjectsModal() {
@@ -16,6 +26,7 @@ export function ProjectsModal() {
   const deleteProject = useStore((s) => s.deleteProject);
   const mergeProjectIntoSeries = useStore((s) => s.mergeProjectIntoSeries);
   const openDoc = useStore((s) => s.openDoc);
+  const openSavedCopy = useStore((s) => s.openSavedCopy);
   const askConfirm = useStore((s) => s.askConfirm);
   const setPanel = useStore((s) => s.setPanel);
 
@@ -39,7 +50,13 @@ export function ProjectsModal() {
     setMergeId(null);
     setPanel("showProjects", false);
   };
-  const projects = listProjects();
+  const all = listProjects();
+  // Saved copies are projects too, but they are the way back from a change of
+  // form rather than something being worked on, so they are listed apart.
+  const projects = all.filter((p) => !p.savedCopy);
+  const savedCopies = all
+    .filter((p) => p.savedCopy)
+    .sort((a, b) => (b.savedCopy!.savedAt > a.savedCopy!.savedAt ? 1 : -1));
   const seriesTargets = projects.filter((p) => p.isSeries && p.id !== mergeId);
 
   return (
@@ -55,7 +72,7 @@ export function ProjectsModal() {
             </div>
             <div className="mt-[3px] text-[12.5px] font-medium text-soft">
               {mergeId
-                ? "Its books, characters and world will be added to the series you choose."
+                ? "Its books, characters and world will be added to the series you choose. A copy of both is saved first, under Saved copies."
                 : "Each project is independent, with its own books, characters and world."}
             </div>
           </div>
@@ -87,9 +104,7 @@ export function ProjectsModal() {
               >
                 <div className="flex-1">
                   <div className="font-serif text-[15px] font-semibold text-ink">{t.title}</div>
-                  <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">
-                    {t.books} books · {t.chapters} chapters
-                  </div>
+                  <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">{metaLine(t)}</div>
                 </div>
                 <span className="rounded-lg bg-ink px-[14px] py-[7px] text-[12px] font-semibold text-bg">
                   Merge here
@@ -101,7 +116,8 @@ export function ProjectsModal() {
           <div className="flex flex-col gap-[10px] overflow-auto px-[22px] py-[18px]">
             {projects.map((p) => {
               const isActive = p.id === activeId;
-              const canMerge = projects.some((q) => q.isSeries && q.id !== p.id);
+              // A piece has no books to move into a series; expand it first.
+              const canMerge = !p.isPiece && projects.some((q) => q.isSeries && q.id !== p.id);
               return (
                 <div
                   key={p.id}
@@ -114,15 +130,14 @@ export function ProjectsModal() {
                       <span className="truncate font-serif text-[16px] font-semibold text-ink">
                         {p.title}
                       </span>
+                      {p.label && <KindTag label={p.label} />}
                       {isActive && (
                         <span className="rounded-full bg-ink px-[8px] py-[2px] text-[9px] font-semibold uppercase tracking-wide text-bg">
                           Open
                         </span>
                       )}
                     </div>
-                    <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">
-                      {p.isSeries ? `Series · ${p.books} books` : "Standalone"} · {p.chapters} chapters
-                    </div>
+                    <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">{metaLine(p)}</div>
                   </div>
                   {!isActive && (
                     <button
@@ -160,6 +175,49 @@ export function ProjectsModal() {
                 </div>
               );
             })}
+
+            {savedCopies.length > 0 && (
+              <>
+                <div className="mt-[14px] flex items-baseline gap-[10px]">
+                  <span className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">Saved copies</span>
+                  <span className="text-[11.5px] text-faint">Taken automatically before a project changed form</span>
+                </div>
+                {savedCopies.map((p) => (
+                  <div key={p.id} className="flex items-center gap-[10px] rounded-[13px] border border-rule p-[12px_14px]">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-[8px]">
+                        <span className="truncate font-serif text-[14.5px] font-semibold text-ink">{p.title}</span>
+                        {p.label && <KindTag label={p.label} />}
+                      </div>
+                      <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">
+                        {SAVED_REASON[p.savedCopy!.reason]} · {shortDate(p.savedCopy!.savedAt)} · {metaLine(p)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openSavedCopy(p.id)}
+                      className="rounded-lg border border-rule bg-card px-[12px] py-[7px] text-[12px] font-medium text-ink hover:border-faint"
+                      title="Bring this copy back as an ordinary project, and open it"
+                    >
+                      Open as a project
+                    </button>
+                    <button
+                      onClick={() =>
+                        askConfirm({
+                          message: `Delete this saved copy of "${p.title}"?`,
+                          detail: "The project it was saved from is not affected. The copy is permanently removed.",
+                          danger: true,
+                          onConfirm: () => deleteProject(p.id),
+                        })
+                      }
+                      className="h-[30px] w-[30px] rounded-lg border border-rule text-[13px] text-faint hover:border-faint hover:text-but"
+                      title="Delete saved copy"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
@@ -190,5 +248,13 @@ export function ProjectsModal() {
         )}
       </div>
     </Scrim>
+  );
+}
+
+function KindTag({ label }: { label: string }) {
+  return (
+    <span className="shrink-0 rounded-full bg-chip px-[7px] py-[2px] text-[9px] font-bold uppercase tracking-wide text-soft">
+      {label}
+    </span>
   );
 }

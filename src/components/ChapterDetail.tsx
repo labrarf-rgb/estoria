@@ -12,6 +12,8 @@ import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { type ChapterTab } from "@/store/useStore";
 import { type ConnType, type Vec2 } from "@/types";
+import { KINDS, partNouns } from "@/lib/piece";
+import type { ReactNode } from "react";
 
 const CONN: Record<ConnType, { label: string; color: string }> = {
   therefore: { label: "Therefore", color: "var(--therefore)" },
@@ -30,9 +32,22 @@ const TABS: { key: ChapterTab; label: string; hint: string }[] = [
   { key: "refs", label: "Pinned references", hint: "Notes, to-dos and images pinned here" },
 ];
 
-export function ChapterDetail() {
+/**
+ * `page` is a **single piece**: the same surface, filling the window under the
+ * toolbar instead of floating over a board. A piece is one chapter underneath
+ * (see `lib/piece.ts`), so everything here works on it unchanged; page mode
+ * only drops what a piece has no use for (the chapter number, act, the
+ * previous/next arrows, Delete chapter) and draws its connectors as plain
+ * lines, because a piece's seams make no causal claim.
+ */
+export function ChapterDetail({ page = false }: { page?: boolean }) {
   const openCh = useStore((s) => s.openCh);
   const doc = useStore((s) => s.doc);
+  const setProjectTitle = useStore((s) => s.setProjectTitle);
+  const setPieceKind = useStore((s) => s.setPieceKind);
+  const nouns = partNouns(doc);
+  // What "this chapter" is called in the copy around the canvas.
+  const unit = page ? "piece" : "chapter";
   const closeChapter = useStore((s) => s.closeChapter);
   const openChapter = useStore((s) => s.openChapter);
   const bumpAct = useStore((s) => s.bumpChapterAct);
@@ -611,30 +626,46 @@ export function ChapterDetail() {
 
   return (
     <>
-    <Scrim onClose={closeFromScrim} z={50} center>
+    <Shell page={page} onClose={closeFromScrim}>
       <div
         ref={modalRef}
         onMouseDown={stop}
-        className={`max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-          expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
-        }`}
+        className={
+          page
+            ? "min-h-full bg-panel"
+            : `max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+                expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+              }`
+        }
       >
         {/* Header */}
-        <div className="sticky top-0 z-[2] flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
-          <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
-            {String(ch.num).padStart(2, "0")}
-          </span>
+        <div
+          className={`flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px] ${
+            page ? "" : "sticky top-0 z-[2]"
+          }`}
+        >
+          {!page && (
+            <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
+              {String(ch.num).padStart(2, "0")}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
+            {/* A piece's title is the project's: one name, not a project name
+                and a chapter name that could drift apart. */}
             <input
-              value={ch.title}
-              onChange={(e) => editChapterText(ch.id, { title: e.target.value })}
-              placeholder="Chapter title"
-              className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
+              value={page ? doc.projectTitle : ch.title}
+              onChange={(e) =>
+                page ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
+              }
+              placeholder={page ? "Title" : "Chapter title"}
+              className={`w-full bg-transparent font-serif font-semibold leading-tight text-ink outline-none placeholder:text-faint ${
+                page ? "text-[28px]" : "text-[24px]"
+              }`}
             />
             <textarea
               value={ch.summary ?? ""}
               onChange={(e) => editChapterText(ch.id, { summary: e.target.value })}
-              placeholder="One-line chapter summary..."
+              placeholder={page ? "One-line summary..." : "One-line chapter summary..."}
               rows={1}
               className="mt-[5px] w-full resize-none bg-transparent text-[14px] leading-[1.5] text-soft outline-none placeholder:text-faint"
             />
@@ -649,7 +680,9 @@ export function ChapterDetail() {
                 stepper is a planning control and goes only here. */}
             <ChapterMetaRow
               ch={ch}
+              lead={page ? <KindPicker value={doc.kind ?? "story"} onChange={setPieceKind} /> : undefined}
               act={
+                page ? undefined : 
                 <div className="flex items-center gap-[8px]">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
                     Act
@@ -679,6 +712,7 @@ export function ChapterDetail() {
               }
             />
           </div>
+          {!page && (
           <div className="flex items-center gap-[6px]">
             <button
               onClick={() => prevCh && openChapter(prevCh.id)}
@@ -698,6 +732,7 @@ export function ChapterDetail() {
             </button>
             <CloseButton onClick={closeChapter} />
           </div>
+          )}
         </div>
 
         {/* Reference material, tabbed.
@@ -710,17 +745,18 @@ export function ChapterDetail() {
           <div className="flex flex-wrap items-center gap-[6px] px-[26px] pb-[12px] pt-[14px]">
             {TABS.map((t) => {
               const n = tabCount[t.key];
+              const label = page && t.key === "notes" ? "Notes" : t.label;
               const on = tab === t.key;
               return (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  title={on ? `Hide ${t.label.toLowerCase()}` : t.hint}
+                  title={on ? `Hide ${label.toLowerCase()}` : t.hint.replace("chapter", unit)}
                   className={`flex items-center gap-[7px] rounded-lg px-[11px] py-[6px] text-[12px] font-medium ${
                     on ? "bg-ink text-bg" : "bg-chip text-soft hover:text-ink"
                   }`}
                 >
-                  {t.label}
+                  {label}
                   {n !== undefined && (
                     <span
                       className={`font-mono text-[10.5px] font-semibold ${on ? "opacity-70" : "text-faint"}`}
@@ -766,7 +802,7 @@ export function ChapterDetail() {
                   </span>
                 ))}
                 {members.length === 0 && (
-                  <span className="text-[12px] text-faint">No characters in this chapter yet.</span>
+                  <span className="text-[12px] text-faint">No characters in this {unit} yet.</span>
                 )}
                 <button
                   onClick={() => setCharAdd((v) => !v)}
@@ -793,7 +829,7 @@ export function ChapterDetail() {
                     </button>
                   ))}
                   {available.length === 0 && (
-                    <span className="text-[12px] text-faint">Everyone is already in this chapter.</span>
+                    <span className="text-[12px] text-faint">Everyone is already in this {unit}.</span>
                   )}
                   <button
                     onClick={() => startCharDraft()}
@@ -832,7 +868,7 @@ export function ChapterDetail() {
                   </span>
                 ))}
                 {members.length === 0 && (
-                  <span className="text-[12px] text-faint">No world details in this chapter yet.</span>
+                  <span className="text-[12px] text-faint">No world details in this {unit} yet.</span>
                 )}
                 <button
                   onClick={() => setWorldAdd((v) => !v)}
@@ -874,7 +910,7 @@ export function ChapterDetail() {
               <ExpandableTextarea
                 value={ch.notes ?? ""}
                 onChange={(v) => patchChapter(ch.id, { notes: v })}
-                placeholder="Reminders, revision ideas, continuity flags for this chapter..."
+                placeholder={`Reminders, revision ideas, continuity flags for this ${unit}...`}
                 collapsedRows={3}
                 expandedHeight="52vh"
                 expanded={notesExpanded}
@@ -898,7 +934,7 @@ export function ChapterDetail() {
                 // the same note can sit first here and anywhere there.
                 onReorder={(refId, toIdx) => reorderChapterRef(ch.id, refId, toIdx)}
                 deletePrompt={() => ({
-                  message: "Remove from this chapter?",
+                  message: `Remove from this ${unit}?`,
                   detail: "It stays in the shared library.",
                   // Not a delete — the button must not say one.
                   confirmLabel: "Remove",
@@ -936,14 +972,14 @@ export function ChapterDetail() {
           </button>
           <ChapterModeTabs />
           <span className="font-mono text-[11px] font-medium text-faint">
-            {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"}
+            {ch.scenes.length} {ch.scenes.length === 1 ? nouns.one : nouns.many}
           </span>
           {scenesCollapsed ? null : selectMode ? (
             <div className="ml-auto flex items-center gap-[9px]">
               <span className="text-[12px] font-medium text-soft">
                 {selected.size === 0
-                  ? "Click the scenes to pick them"
-                  : `${selected.size} ${selected.size === 1 ? "scene" : "scenes"} selected`}
+                  ? `Click the ${nouns.many} to pick them`
+                  : `${selected.size} ${selected.size === 1 ? nouns.one : nouns.many} selected`}
               </span>
               {selected.size > 0 && (
                 <>
@@ -958,7 +994,7 @@ export function ChapterDetail() {
                   <button
                     onClick={() => setDestPickerOpen((v) => !v)}
                     className="flex items-center gap-[6px] rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
-                    title="Choose a chapter to move the selected scenes to"
+                    title={`Choose where to move the selected ${nouns.many}`}
                   >
                     Move
                     <span className="text-[9px]">▾</span>
@@ -969,7 +1005,7 @@ export function ChapterDetail() {
                   <button
                     onClick={askDeleteSelected}
                     className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-soft hover:border-but hover:text-but"
-                    title="Delete the selected scenes"
+                    title={`Delete the selected ${nouns.many}`}
                   >
                     Delete
                   </button>
@@ -987,7 +1023,7 @@ export function ChapterDetail() {
               <button
                 onClick={() => setSceneFlowExpanded(!expanded)}
                 className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                title={expanded ? "Shrink the scene area" : "Expand the scene area"}
+                title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
               >
                 {expanded ? "Collapse" : "Expand"}
               </button>
@@ -1004,9 +1040,13 @@ export function ChapterDetail() {
                 <button
                   onClick={() => setSelectMode(true)}
                   className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                  title="Pick several scenes to reorder together, send to another chapter, or delete"
+                  title={
+                    page
+                      ? `Pick several ${nouns.many} to reorder together, or delete`
+                      : `Pick several ${nouns.many} to reorder together, send to another chapter, or delete`
+                  }
                 >
-                  Select scenes
+                  Select {nouns.many}
                 </button>
               )}
               <button
@@ -1015,7 +1055,7 @@ export function ChapterDetail() {
                 title="Click to append · press and hold to drag it into place"
                 className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
               >
-                + Add scene
+                + Add {nouns.one}
               </button>
             </div>
           )}
@@ -1025,7 +1065,7 @@ export function ChapterDetail() {
         {selectMode && destPickerOpen && selected.size > 0 && (
           <div className="mx-[26px] mb-[4px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
             <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-faint">
-              Move to which chapter?
+              {page ? "Move them where?" : "Move to which chapter?"}
             </span>
             {/* This chapter first, and only when there is somewhere to move to
                 within it — with every scene selected there is nothing left to
@@ -1035,10 +1075,12 @@ export function ChapterDetail() {
                 onClick={() => pickDest({ id: ch.id, num: ch.num, title: ch.title })}
                 className="flex items-center gap-[7px] rounded-full border border-ink bg-panel px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
               >
-                <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[10px] font-semibold text-bg">
-                  {String(ch.num).padStart(2, "0")}
-                </span>
-                This chapter
+                {!page && (
+                  <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[10px] font-semibold text-bg">
+                    {String(ch.num).padStart(2, "0")}
+                  </span>
+                )}
+                This {unit}
                 <span className="font-mono text-[10px] text-faint">reorder</span>
               </button>
             )}
@@ -1071,7 +1113,7 @@ export function ChapterDetail() {
         <div
           ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
-            expanded ? "max-h-[58vh]" : "max-h-[40vh]"
+            page ? "max-h-[70vh] min-h-[320px]" : expanded ? "max-h-[58vh]" : "max-h-[40vh]"
           }`}
           style={{
             backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
@@ -1096,6 +1138,7 @@ export function ChapterDetail() {
             )}
 
             {!drag &&
+              !page &&
               ch.scenes.slice(0, -1).map((_, i) => {
                 const a = sceneCenter(i);
                 const b = sceneCenter(i + 1);
@@ -1179,7 +1222,7 @@ export function ChapterDetail() {
                       <button
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={() => insertScene(ch.id, i, insertCols)}
-                        title="Add a scene before this one"
+                        title={`Add a ${nouns.one} before this one`}
                         className="absolute left-[-11px] top-[38px] z-30 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-card text-[14px] font-semibold leading-none text-soft opacity-0 shadow-[var(--shadow)] transition-opacity hover:border-faint hover:text-ink group-hover:opacity-100"
                       >
                         +
@@ -1187,7 +1230,7 @@ export function ChapterDetail() {
                       <button
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={() => insertScene(ch.id, i + 1, insertCols)}
-                        title="Add a scene after this one"
+                        title={`Add a ${nouns.one} after this one`}
                         className="absolute right-[-11px] top-[38px] z-30 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-card text-[14px] font-semibold leading-none text-soft opacity-0 shadow-[var(--shadow)] transition-opacity hover:border-faint hover:text-ink group-hover:opacity-100"
                       >
                         +
@@ -1230,7 +1273,7 @@ export function ChapterDetail() {
                         </span>
                       )}
                       <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
-                        SCENE {slot.num}
+                        {nouns.one.toUpperCase()} {slot.num}
                       </span>
                       <div className="flex-1" />
                       {/* Silent until it matters: at the cap it explains why
@@ -1252,13 +1295,13 @@ export function ChapterDetail() {
                         <button
                           onClick={() =>
                             askConfirm({
-                              message: `Delete scene ${slot.num}?`,
+                              message: `Delete ${nouns.one} ${slot.num}?`,
                               danger: true,
                               onConfirm: () => deleteScene(ch.id, i),
                             })
                           }
                           className="text-[12px] leading-none text-faint opacity-0 transition-opacity hover:text-but group-hover:opacity-100"
-                          title="Delete scene"
+                          title={`Delete ${nouns.one}`}
                         >
                           ✕
                         </button>
@@ -1274,7 +1317,7 @@ export function ChapterDetail() {
                       onMouseDown={(e) => !selectMode && e.stopPropagation()}
                       readOnly={selectMode}
                       rows={3}
-                      placeholder="New scene"
+                      placeholder={`New ${nouns.one}`}
                       className={`w-full flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-ink outline-none placeholder:text-faint ${
                         selectMode ? "pointer-events-none" : ""
                       }`}
@@ -1291,7 +1334,7 @@ export function ChapterDetail() {
               >
                 <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-faint bg-card p-[12px_13px] shadow-[0_18px_38px_rgba(0,0,0,0.35)]">
                   <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
-                    SCENE {ghostNum}
+                    {nouns.one.toUpperCase()} {ghostNum}
                   </span>
                   <div className="line-clamp-4 flex-1 text-[13px] leading-[1.5] text-ink">{ghostText}</div>
                 </div>
@@ -1303,8 +1346,10 @@ export function ChapterDetail() {
           {selectMode
             ? // Names the two buttons rather than paraphrasing them, so the
               // hint and the controls it explains use the same words.
-              "Click scenes to select them · drag any selected scene to reorder them all together · then Move them to a chapter, or Delete them"
-            : "Drag scenes to reorder · press and hold Add scene to drop it in place · click a connector to cycle Therefore / But / And, or past it to leave the seam unlabeled"}
+              `Click ${nouns.many} to select them · drag any selected ${nouns.one} to reorder them all together · then Move them${page ? "" : " to a chapter"}, or Delete them`
+            : page
+              ? `Drag ${nouns.many} to reorder · press and hold Add ${nouns.one} to drop it in place · connectors show order only`
+              : `Drag ${nouns.many} to reorder · press and hold Add ${nouns.one} to drop it in place · click a connector to cycle Therefore / But / And, or past it to leave the seam unlabeled`}
         </div>
         </>
         )}
@@ -1312,7 +1357,10 @@ export function ChapterDetail() {
         {/* The manuscript is not here. It has its own modal, reached by the
             button on the meta line above — see `ManuscriptModal`. */}
 
-        {/* Danger zone */}
+        {/* Danger zone. A piece has no chapter to delete. */}
+        {page ? (
+          <div className="h-[24px]" />
+        ) : (
         <div className="flex items-center justify-end border-t border-rule px-[26px] py-[14px]">
           <button
             onClick={() =>
@@ -1328,8 +1376,9 @@ export function ChapterDetail() {
             Delete chapter
           </button>
         </div>
+        )}
       </div>
-    </Scrim>
+    </Shell>
 
     {/* Move confirmation — choose where in the destination chapter to drop the
         selected scenes, then confirm. */}
@@ -1340,14 +1389,16 @@ export function ChapterDetail() {
           className="w-[min(440px,92vw)] rounded-2xl border border-rule bg-panel p-[22px] shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
         >
           <div className="font-serif text-[19px] font-semibold text-ink">
-            Move {selected.size} {selected.size === 1 ? "scene" : "scenes"}
+            Move {selected.size} {selected.size === 1 ? nouns.one : nouns.many}
           </div>
           <div className="mt-[4px] flex items-center gap-[7px] text-[13px] text-soft">
             {movingWithin ? "within" : "to"}
-            <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[11px] font-semibold text-bg">
-              {String(moveDest.num).padStart(2, "0")}
-            </span>
-            {moveDest.title || "Untitled chapter"}
+            {!page && (
+              <span className="rounded bg-ink px-[6px] py-[1px] font-mono text-[11px] font-semibold text-bg">
+                {String(moveDest.num).padStart(2, "0")}
+              </span>
+            )}
+            {page ? `this ${unit}` : moveDest.title || "Untitled chapter"}
           </div>
 
           <div className="mt-[18px] text-[11px] font-semibold uppercase tracking-widest text-soft">
@@ -1391,7 +1442,7 @@ export function ChapterDetail() {
               onClick={confirmMove}
               className="rounded-lg bg-ink px-[14px] py-[7px] text-[12px] font-semibold text-bg"
             >
-              Move {selected.size === 1 ? "scene" : "scenes"}
+              Move {selected.size === 1 ? nouns.one : nouns.many}
             </button>
           </div>
         </div>
@@ -1401,3 +1452,38 @@ export function ChapterDetail() {
   );
 }
 
+
+/** A modal over the board, or, for a single piece, the page itself. */
+function Shell({ page, onClose, children }: { page: boolean; onClose: () => void; children: ReactNode }) {
+  if (page) return <div className="min-h-0 flex-1 overflow-auto bg-panel">{children}</div>;
+  return (
+    <Scrim onClose={onClose} z={50} center>
+      {children}
+    </Scrim>
+  );
+}
+
+type Kind = (typeof KINDS)[number]["kind"];
+
+/** What a single piece is. A label, so changing it is always safe. */
+export function KindPicker({ value, onChange }: { value: Kind; onChange: (k: Kind) => void }) {
+  return (
+    <label
+      className="flex items-center gap-[4px] rounded-full bg-chip py-[3px] pl-[10px] pr-[7px]"
+      title="What this piece is. Only the wording changes, so you can switch any time."
+    >
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as Kind)}
+        className="cursor-pointer appearance-none bg-transparent text-[10.5px] font-bold uppercase tracking-wide text-soft outline-none"
+      >
+        {KINDS.map((k) => (
+          <option key={k.kind} value={k.kind}>
+            {k.label}
+          </option>
+        ))}
+      </select>
+      <span className="text-[9px] text-faint">▾</span>
+    </label>
+  );
+}

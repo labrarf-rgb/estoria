@@ -2,7 +2,12 @@
 
 Map and write your story. Arrange chapters on an infinite
 canvas, map scenes with the **but / therefore** method, track characters and
-worldbuilding, and export to Obsidian-ready markdown.
+worldbuilding, and write the manuscript in the same place.
+
+End to end in one tool: no third-party integration, and none planned
+([SPECS §7](docs/SPECS.md)). The reach beyond the browser is the Android
+companion app, reading the same project file from your Google Drive folder
+([SPECS §8](docs/SPECS.md)).
 
 ## Quick start
 

@@ -8,11 +8,26 @@ import {
   type Chapter,
   type Character,
   type ConnType,
+  type GrownInto,
+  type PieceKind,
   type RefKind,
+  type SavedCopyInfo,
+  type SavedCopyReason,
   type StoryDoc,
   type Vec2,
   type WorldEntry,
 } from "@/types";
+import {
+  collapseToPiece,
+  expandToBook,
+  formLabel,
+  isPiece,
+  makeSavedCopy,
+  newPiece,
+  shortDate,
+  type ChapterJoin,
+} from "@/lib/piece";
+import { writeSavedCopyFile } from "@/lib/backup";
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
@@ -194,7 +209,17 @@ interface UiState {
    * full screen, covering the canvas.
    */
   panelExpanded: boolean;
+  /**
+   * The notice after a change of form: "Saved a copy of … before …". Transient
+   * and not persisted; it names where the copy went and goes away.
+   */
+  savedNotice: { title: string; reason: SavedCopyReason } | null;
+  /** Which change-of-form dialog is open, if any. Transient. */
+  formDialog: FormDialog | null;
 }
+
+/** The three change-of-form dialogs. See `components/modals/FormChangeModal.tsx`. */
+export type FormDialog = "expand" | "collapse" | "series";
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
 export interface ConfirmRequest {
@@ -219,8 +244,20 @@ export interface ProjectMeta {
   id: string;
   title: string;
   isSeries: boolean;
+  /** A single piece rather than a book. */
+  isPiece: boolean;
+  /** "Short story", "Poetry collection" — see `formLabel`. `null` for a plain book. */
+  label: string | null;
   books: number;
   chapters: number;
+  /** Parts in a single piece (its scenes, sections or stanzas). */
+  parts: number;
+  /** What a piece's parts are called follows its kind. */
+  kind?: PieceKind;
+  /** The active version's word total, from the stored counts. */
+  words: number;
+  /** Present on a saved copy, which the projects list shows apart. */
+  savedCopy?: SavedCopyInfo;
 }
 
 interface StoreState extends UiState {
@@ -239,7 +276,19 @@ interface StoreState extends UiState {
   setAuthor: (author: string) => void;
   listProjects: () => ProjectMeta[];
   switchProject: (id: string) => void;
-  newProject: (opts: { series: boolean; keepCurrent: boolean }) => void;
+  /** `piece` starts a single piece of that kind instead of a book. */
+  newProject: (opts: { series: boolean; keepCurrent: boolean; piece?: PieceKind }) => void;
+  /** Change what a single piece is (a label: wording and a few defaults). */
+  setPieceKind: (kind: PieceKind) => void;
+  setKeepLineBreaks: (keep: boolean) => void;
+  /** Piece → book. Saves a copy first. */
+  expandIntoBook: (grownInto: GrownInto) => void;
+  /** Standalone book → piece. Saves a copy first. */
+  turnIntoPiece: (kind: PieceKind, join: ChapterJoin) => void;
+  /** Bring a saved copy back as an ordinary project, and open it. */
+  openSavedCopy: (id: string) => void;
+  dismissSavedNotice: () => void;
+  setFormDialog: (d: FormDialog | null) => void;
   openDoc: (doc: StoryDoc) => void;
   deleteProject: (id: string) => void;
   mergeProjectIntoSeries: (sourceId: string, targetId: string) => void;
@@ -698,6 +747,8 @@ const initialUi: UiState = {
   manuscriptExpanded: true,
   manuscriptUndo: null,
   panelExpanded: false,
+  savedNotice: null,
+  formDialog: null,
 };
 
 /**
@@ -753,7 +804,24 @@ export const useStore = create<StoreState>()(
       zoomOut: () => set((s) => ({ zoom: clampZoom(s.zoom / 1.15) })),
 
       // ---- project ----
-      setProjectTitle: (title) => set((s) => ({ doc: { ...s.doc, projectTitle: title } })),
+      // A piece's title lives on the project; its one chapter carries the same
+      // title so the phone, which shows a piece as a one-chapter book, reads it.
+      setProjectTitle: (title) =>
+        set((s) => {
+          if (!isPiece(s.doc)) return { doc: { ...s.doc, projectTitle: title } };
+          const retitle = (chs: Chapter[]) => chs.map((c, i) => (i === 0 ? { ...c, title } : c));
+          return {
+            doc: {
+              ...s.doc,
+              projectTitle: title,
+              books: s.doc.books.map((b) => (b.id === s.doc.activeBookId ? { ...b, title } : b)),
+              chapters: retitle(s.doc.chapters),
+              draftData: Object.fromEntries(
+                Object.entries(s.doc.draftData).map(([id, v]) => [id, { ...v, chapters: retitle(v.chapters) }])
+              ),
+            },
+          };
+        }),
 
       setAuthor: (author) =>
         set((s) => ({ doc: { ...s.doc, author: author.trim() ? author : undefined } })),
@@ -764,10 +832,16 @@ export const useStore = create<StoreState>()(
           id: d.id,
           title: d.projectTitle || "Untitled",
           isSeries: d.seriesMode,
+          isPiece: isPiece(d),
+          label: formLabel(d),
           books: d.books.length,
           chapters:
             d.chapters.length +
             Object.values(d.bookData || {}).reduce((a, b) => a + (b.chapters?.length ?? 0), 0),
+          parts: d.chapters[0]?.scenes.length ?? 0,
+          kind: d.kind,
+          words: d.chapters.reduce((a, c) => a + c.words, 0),
+          savedCopy: d.savedCopy,
         });
         return [metaOf(s.doc), ...Object.values(s.projectStash).map(metaOf)];
       },
@@ -790,10 +864,10 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      newProject: ({ series, keepCurrent }) =>
+      newProject: ({ series, keepCurrent, piece }) =>
         set((s) => {
-          const fresh = emptyStory();
-          if (series) {
+          const fresh = piece ? newPiece(piece) : emptyStory();
+          if (series && !piece) {
             fresh.seriesMode = true;
           }
           const stash = { ...s.projectStash };
@@ -807,10 +881,81 @@ export const useStore = create<StoreState>()(
             openCh: null,
             showNewBook: false,
             showProjects: false,
-            // Offer a way to begin the first book.
-            showTemplates: !series,
+            // Offer a way to begin the first book. A piece starts on its map
+            // with one blank part instead: templates are chapter structures.
+            showTemplates: !series && !piece,
+            chapterMode: piece ? "map" : s.chapterMode,
           };
         }),
+
+      setPieceKind: (kind) =>
+        set((s) => {
+          if (!isPiece(s.doc)) return s;
+          // Poems keep their line breaks by default; moving to a poem turns that
+          // on, and moving away leaves whatever the writer had.
+          const keepLineBreaks = kind === "poem" ? true : s.doc.keepLineBreaks;
+          return { doc: { ...s.doc, kind, keepLineBreaks } };
+        }),
+
+      setKeepLineBreaks: (keep) =>
+        set((s) => ({ doc: { ...s.doc, keepLineBreaks: keep ? true : undefined } })),
+
+      expandIntoBook: (grownInto) => {
+        const before = get().doc;
+        if (!isPiece(before)) return;
+        const copy = makeSavedCopy(before, "expand");
+        set((s) => ({
+          doc: reconcileWords(expandToBook(s.doc, grownInto)),
+          projectStash: { ...s.projectStash, [copy.id]: copy },
+          savedNotice: { title: before.projectTitle, reason: "expand" },
+          level: "book",
+          view: "board",
+          openCh: null,
+          arrangeN: 0,
+          newMenu: false,
+        }));
+        void writeSavedCopyFile(copy);
+      },
+
+      turnIntoPiece: (kind, join) => {
+        const before = get().doc;
+        if (isPiece(before) || before.seriesMode) return;
+        const copy = makeSavedCopy(before, "collapse");
+        set((s) => ({
+          doc: reconcileWords(collapseToPiece(s.doc, kind, join)),
+          projectStash: { ...s.projectStash, [copy.id]: copy },
+          savedNotice: { title: before.projectTitle, reason: "collapse" },
+          level: "book",
+          view: "board",
+          openCh: null,
+          chapterMode: "map",
+          newMenu: false,
+        }));
+        void writeSavedCopyFile(copy);
+      },
+
+      openSavedCopy: (id) => {
+        const s = get();
+        const target = s.projectStash[id];
+        if (!target?.savedCopy) return;
+        // Coming back next to the project it was copied from, it would share a
+        // title — and a title is what names the sync file. Say which one it is.
+        const taken = new Set(
+          [s.doc, ...Object.values(s.projectStash)]
+            .filter((d) => d.id !== id && !d.savedCopy)
+            .map((d) => d.projectTitle)
+        );
+        const date = shortDate(target.savedCopy.savedAt);
+        const title = taken.has(target.projectTitle)
+          ? `${target.projectTitle} (${date || "saved copy"})`
+          : target.projectTitle;
+        const { savedCopy: _copy, ...rest } = target;
+        set((st) => ({ projectStash: { ...st.projectStash, [id]: { ...rest, projectTitle: title } } }));
+        get().switchProject(id);
+      },
+
+      dismissSavedNotice: () => set({ savedNotice: null }),
+      setFormDialog: (d) => set({ formDialog: d, newMenu: false }),
 
       openDoc: (incoming) =>
         set((s) => {
@@ -912,10 +1057,18 @@ export const useStore = create<StoreState>()(
           delete stash[targetId];
           // Keep any other currently-active project in the library.
           if (s.doc.id !== sourceId && s.doc.id !== targetId) stash[s.doc.id] = s.doc;
+          // A merge changes two projects — the book that moves in disappears,
+          // and the series gains a book — so both are saved as they were.
+          for (const d of [source, target]) {
+            const copy = makeSavedCopy(d, "merge");
+            stash[copy.id] = copy;
+            void writeSavedCopyFile(copy);
+          }
 
           return {
             doc: mergedTarget,
             projectStash: stash,
+            savedNotice: { title: source.projectTitle, reason: "merge" as SavedCopyReason },
             level: "series" as Level,
             view: "board" as View,
             openCh: null,
@@ -1169,7 +1322,9 @@ export const useStore = create<StoreState>()(
               const scenes = c.scenes.concat("");
               const sceneLinks =
                 c.scenes.length > 0
-                  ? c.sceneLinks.concat(inheritedLink(c.sceneLinks, c.sceneLinks.length))
+                  ? c.sceneLinks.concat(
+                      isPiece(s.doc) ? "none" : inheritedLink(c.sceneLinks, c.sceneLinks.length)
+                    )
                   : c.sceneLinks;
               return {
                 ...c,
@@ -1196,7 +1351,7 @@ export const useStore = create<StoreState>()(
                 // on the left half; the right half is the new seam, and takes
                 // its type from the seam it split.
                 const at = Math.min(idx, sceneLinks.length);
-                sceneLinks.splice(at, 0, inheritedLink(sceneLinks, at));
+                sceneLinks.splice(at, 0, isPiece(s.doc) ? "none" : inheritedLink(sceneLinks, at));
               }
               return {
                 ...c,
@@ -1456,6 +1611,8 @@ export const useStore = create<StoreState>()(
       // should do.
       cycleSceneLink: (chId, idx) =>
         set((s) => {
+          // A piece's connectors are plain lines and say nothing.
+          if (isPiece(s.doc)) return s;
           const order: ConnType[] = ["therefore", "but", "and", "none"];
           return {
             doc: {
@@ -1724,11 +1881,17 @@ export const useStore = create<StoreState>()(
       // Series" for them to rename.
       makeSeries: () =>
         set((s) => {
-          if (s.doc.seriesMode) return s;
+          if (s.doc.seriesMode || isPiece(s.doc)) return s;
+          const copy = makeSavedCopy(s.doc, "series");
+          void writeSavedCopyFile(copy);
           const books = s.doc.books.map((b) =>
             b.id === s.doc.activeBookId ? { ...b, title: s.doc.projectTitle || b.title } : b
           );
-          return { doc: { ...s.doc, seriesMode: true, projectTitle: "Untitled Series", books } };
+          return {
+            doc: { ...s.doc, seriesMode: true, projectTitle: "Untitled Series", books },
+            projectStash: { ...s.projectStash, [copy.id]: copy },
+            savedNotice: { title: s.doc.projectTitle, reason: "series" as SavedCopyReason },
+          };
         }),
 
       switchBook: (id) =>
@@ -2416,9 +2579,10 @@ export const useStore = create<StoreState>()(
             level: "book",
             view: "board",
             openCh: null,
-            showNewBook: false,
-            // Offer creation options right away.
-            showTemplates: true,
+            // A single piece or a book: the New project chooser asks, and a
+            // book goes on to the templates from there.
+            showNewBook: true,
+            showTemplates: false,
           })
         ),
     }),

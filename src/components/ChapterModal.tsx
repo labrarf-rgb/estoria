@@ -22,7 +22,7 @@ import { ManuscriptModal } from "@/components/ManuscriptModal";
  * as an effect *cleanup*, so unmounting it — which is what a mode switch does —
  * writes the words through on the way out.
  */
-export function ChapterModal() {
+export function ChapterModal({ page = false }: { page?: boolean }) {
   const openCh = useStore((s) => s.openCh);
   const mode = useStore((s) => s.chapterMode);
   const doc = useStore((s) => s.doc);
@@ -67,5 +67,5 @@ export function ChapterModal() {
   );
 
   if (!ch) return null;
-  return mode === "manuscript" ? <ManuscriptModal ch={ch} /> : <ChapterDetail />;
+  return mode === "manuscript" ? <ManuscriptModal ch={ch} page={page} /> : <ChapterDetail page={page} />;
 }

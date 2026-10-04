@@ -112,8 +112,8 @@ export function Welcome() {
           >
             <span className="font-serif text-[17px] font-semibold text-ink">Start fresh</span>
             <span className="text-[12.5px] leading-[1.5] text-soft">
-              Begin a new, empty project. You'll pick how to start your first book: a proven
-              structure template, a blank chapter, or import an existing draft.
+              Begin a new, empty project: a single piece (a short story, essay or poem), or a book
+              in chapters, from a structure template, a blank chapter, or an existing draft.
             </span>
             <span className="mt-[4px] text-[11px] font-semibold uppercase tracking-wide text-faint">
               A blank canvas

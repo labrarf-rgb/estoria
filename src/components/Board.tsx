@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { wordsMeta } from "@/lib/manuscript";
+import { countParts } from "@/lib/piece";
 import { CARD_W, CARD_H, GRID_GAP_X, fitToContent, type Camera } from "@/lib/layout";
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
@@ -583,7 +584,7 @@ export function Board() {
                 <div className="flex-1" />
                 <div className="flex items-center justify-end gap-[7px] font-mono text-[11px] font-medium text-soft">
                   <span>
-                    {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
+                    {countParts(doc, c.scenes.length)}
                   </span>
                   <span className="text-faint">·</span>
                   <span>{wordsMeta(c.words, c.target)}</span>

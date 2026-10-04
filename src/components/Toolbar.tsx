@@ -4,6 +4,7 @@ import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
 import { isStandalone } from "@/lib/install";
+import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -30,7 +31,6 @@ export function Toolbar() {
   const addBook = useStore((s) => s.addBook);
   const autoArrangeBoard = useStore((s) => s.autoArrangeBoard);
   const autoArrangeSeries = useStore((s) => s.autoArrangeSeries);
-  const makeSeries = useStore((s) => s.makeSeries);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const updateBook = useStore((s) => s.updateBook);
   const setActiveDraft = useStore((s) => s.setActiveDraft);
@@ -39,6 +39,10 @@ export function Toolbar() {
   const deleteDraft = useStore((s) => s.deleteDraft);
   const setMainDraft = useStore((s) => s.setMainDraft);
   const askConfirm = useStore((s) => s.askConfirm);
+  const setFormDialog = useStore((s) => s.setFormDialog);
+  // A single piece has no board, chapters or timeline, so none of their
+  // controls; it switches Scene flow / Manuscript where a chapter does.
+  const piece = isPiece(doc);
 
   const [versionMenu, setVersionMenu] = useState(false);
   // "+ Add version" expands into the prose question rather than acting at once.
@@ -120,8 +124,11 @@ export function Toolbar() {
   const onSeriesMap = doc.seriesMode && level === "series";
   // The book timeline is a scrolling surface with no camera, so a zoom readout
   // there would report a number that controls nothing.
-  const showZoom = !onSeriesMap && view !== "timeline";
-  const bookStat = `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words · ${doc.chapters.length} chapters`;
+  const showZoom = !piece && !onSeriesMap && view !== "timeline";
+  const wordStat = words >= 1000 ? `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words` : `${words} words`;
+  const bookStat = piece
+    ? `${formLabel(doc)} · ${wordStat} · ${countParts(doc, doc.chapters[0]?.scenes.length ?? 0)}`
+    : `${formLabel(doc) ? `${formLabel(doc)} · ` : ""}${wordStat} · ${doc.chapters.length} chapters`;
 
   const seg = "px-3 py-[6px] rounded-[7px] text-[12px] font-medium cursor-pointer whitespace-nowrap";
   const segOn = `${seg} bg-card text-ink`;
@@ -167,7 +174,7 @@ export function Toolbar() {
               <EditableName
                 value={doc.projectTitle}
                 onChange={setProjectTitle}
-                placeholder="Story name"
+                placeholder={piece ? "Title" : "Story name"}
               />
             )}
           </div>
@@ -320,7 +327,7 @@ export function Toolbar() {
           with no positions to arrange; a new chapter would be appended somewhere
           off screen. Both dropped drag-to-reorder when the timeline became a
           reading surface (§4), and this is the same rule applied to the toolbar. */}
-      {!onSeriesMap && view === "board" && (
+      {!piece && !onSeriesMap && view === "board" && (
         <>
           <button onClick={addChapter} className={action}>
             <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
@@ -346,6 +353,7 @@ export function Toolbar() {
       )}
 
       {/* View toggle: Board/Map vs Timeline */}
+      {!piece && (
       <div className="flex shrink-0 items-center gap-[6px]">
         <div className="flex rounded-[9px] bg-chip p-[3px]">
           <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
@@ -405,6 +413,7 @@ export function Toolbar() {
           </div>
         )}
       </div>
+      )}
 
       {/* Side panels */}
       <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
@@ -457,12 +466,13 @@ export function Toolbar() {
           )}
           <div className="mx-[6px] my-1 h-px bg-rule" />
           <MenuItem
-            title="New book"
-            sub="Standalone, new series, or add to a series"
+            title="New project"
+            sub="A single piece, a book, or a series"
             onClick={() => setPanel("showNewBook", true)}
           />
-          {/* Chapter-level actions don't apply to the series map. */}
-          {!onSeriesMap && (
+          {/* Chapter-level actions don't apply to the series map, or to a
+              piece, which has no chapters. */}
+          {!piece && !onSeriesMap && (
             <MenuItem
               title="New chapter"
               sub="A single empty chapter"
@@ -472,18 +482,30 @@ export function Toolbar() {
               }}
             />
           )}
-          {!doc.seriesMode && (
+          {/* Changes of form. Each opens a dialog that says what happens, and
+              each saves a copy first. */}
+          {piece && (
             <MenuItem
-              title="Make this a series"
-              sub="Turn this book into a multi-book series"
-              onClick={() => {
-                makeSeries();
-                goToSeries();
-                closeNewMenu();
-              }}
+              title="Expand into a book"
+              sub="This becomes Chapter 1. A copy is saved first."
+              onClick={() => setFormDialog("expand")}
             />
           )}
-          {!onSeriesMap && (
+          {canCollapse(doc) && (
+            <MenuItem
+              title="Turn into single piece"
+              sub="Join the chapters into one piece. A copy is saved first."
+              onClick={() => setFormDialog("collapse")}
+            />
+          )}
+          {!piece && !doc.seriesMode && (
+            <MenuItem
+              title="Make this a series"
+              sub="This becomes Book One. A copy is saved first."
+              onClick={() => setFormDialog("series")}
+            />
+          )}
+          {!piece && !onSeriesMap && (
             <MenuItem
               title="Use a template"
               sub="Three-act, Hero's Journey, Save the Cat..."

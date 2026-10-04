@@ -210,3 +210,26 @@ export async function writeRotatingBackup(
   }
   return { fileName, kept: Math.min(mine.length, MAX_BACKUPS) };
 }
+
+/**
+ * Write a saved copy (see `lib/piece.ts`) into the Estoria folder as its own
+ * file, `<slug>-saved-<reason>-<stamp>.estoria.json`, beside the project's live
+ * file and backups. Best effort and silent: only when a folder is already
+ * connected with permission, because a change of form is not a moment to show
+ * a folder picker. Without one, the copy still lives in this browser's
+ * projects. Never pruned — unlike backups, a saved copy is the way back from a
+ * specific change, and only the writer knows when that is no longer wanted.
+ */
+export async function writeSavedCopyFile(doc: StoryDoc): Promise<void> {
+  try {
+    const dir = await getBackupDir({ requestPermission: false });
+    if (!dir || !doc.savedCopy) return;
+    const name = `${slugify(doc.projectTitle || "story")}-saved-${doc.savedCopy.reason}-${fileStamp()}.estoria.json`;
+    const fh = await dir.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(stampModified(doc), null, 2));
+    await w.close();
+  } catch {
+    // The browser copy is the copy; the file is a bonus.
+  }
+}
