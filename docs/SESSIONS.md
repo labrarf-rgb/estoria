@@ -5330,10 +5330,10 @@ branch's doing; flagged as its own task.
 
 Committed on `feature/short-stories` as `bd618d2` (Session 59's docs, which had
 been sitting uncommitted, split out into their own commit) and `5af0b74` (this
-feature), merged to `main` as `90d9a3a`, and both branches pushed. **The deploy
-was not run from this session** — the production deploy step was refused by the
-session's permission policy — so `npm run deploy` is still to be run by hand,
-then checked with `curl https://www.labrarf.com/estoria/version.json`.
+feature), merged to `main` as `90d9a3a`, and both branches pushed. The deploy
+step was refused by the session's permission policy, so the user ran
+`npm run deploy` by hand: portfolio commit `7a26c68`, and prod reported
+**`bcc07d0` live** at www.labrarf.com/estoria on the fifth poll.
 
 Spec drift review after shipping: §3's file tree did not list `lib/piece.ts`,
 `PieceView.tsx` or the `FormChange` modal, and §1 still described a tool for
