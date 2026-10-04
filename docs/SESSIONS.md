@@ -5459,3 +5459,29 @@ It also implied the structure-only fork and the pull's undo go through
 `syncChapterWords`, when both set the count directly. Fixed. Session 60's
 open drift (the *Manuscript: its own modal* row) is still there and still
 outside this change.
+
+### 2026-10-04 (b) — Production went blank between two deploys (Session 60 cont.)
+
+**What happened.** Minutes after the single-piece deploy (`bcc07d0`, live at
+11:47), the word-target fix from a background session merged to `main` and
+deployed `42b6d85` at 11:49. `deploy.sh` synced with `rsync --delete`, so the
+second deploy deleted `index-BbrNd_AD.js`, the first build's only script, while
+GitHub Pages' CDN (`max-age=600`) was still serving the first build's
+`index.html` to some visitors. They got a 404 for the script and a blank page.
+`version.json` looked fine throughout, so neither deploy's "✓ live" caught it.
+It cleared by itself once the CDN picked up the new `index.html`; verified in
+the browser and across several CDN nodes that `42b6d85` loads. No user data was
+at risk: projects live in the browser, and no app code ran while it was blank.
+
+**Fixed in `scripts/deploy.sh`** (see SPECS §8 "Deploy runbook"):
+- `assets/` keeps the hashed files of the last 3 deploys instead of being
+  mirrored with `--delete`, so a cached `index.html` always finds its script.
+  Dry-run on a throwaway clone of the portfolio repo: kept the current, previous
+  and one-before builds' files, dropped an older stray.
+- One deploy at a time (a lock in the portfolio repo's `.git`), and none within
+  10 minutes of the last `Deploy Estoria` commit on the portfolio remote unless
+  `FORCE=1`. Checked read-only against the real repo: it would have refused.
+- The final check now also requires every asset `index.html` names to return
+  200, not just a matching `version.json`.
+
+Not run end to end: a real deploy is the only full test, and none was due.

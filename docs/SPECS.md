@@ -929,7 +929,7 @@ extensions that go beyond the original to-do.** The web behavior is now:
   origin(s) — settle hosting before the Drive adapter so OAuth is set up once.
   With the same-origin copy, that origin is `https://www.labrarf.com`.
 
-#### Deploy runbook — `npm run deploy` (updated Session 42)
+#### Deploy runbook — `npm run deploy` (updated Session 42, and 2026-10-04)
 
 Publishing is still **two repos**, but `scripts/deploy.sh` now drives the whole
 loop and verifies the result, so the manual steps below are only what it does
@@ -937,20 +937,40 @@ under the hood (and what to fall back on when Pages misbehaves):
 
 1. Refuse a dirty tree — commit and push the source repo first, so the SHA
    stamped into the build is a real commit.
-2. `npm run build` — stamps `window.__ESTORIA_BUILD__` + writes
+2. **Refuse to overlap another deploy** (2026-10-04): a lock directory in the
+   portfolio repo's `.git` allows one run at a time on this machine, and the
+   script refuses to run within **10 minutes** (`SETTLE_MIN`, the CDN's
+   `max-age=600`) of the last `Deploy Estoria` commit on the portfolio remote,
+   wherever it came from. `FORCE=1 npm run deploy` skips the wait. It also
+   fast-forwards the portfolio checkout first, so the push can't be rejected.
+3. `npm run build` — stamps `window.__ESTORIA_BUILD__` + writes
    `dist/version.json`.
-3. `rsync -a --delete dist/ → Portfolio-Website/estoria/`, then commit + push
+4. `rsync` into `Portfolio-Website/estoria/`: everything except `assets/`
+   mirrors `dist/` exactly (`--delete`), while **`assets/` keeps the hashed
+   files of the last 3 deploys** (`KEEP_DEPLOYS`, read from the previous
+   `estoria/index.html` revisions) and prunes anything older. Then commit + push
    the **portfolio** repo. That push triggers its `pages-build-deployment`
    Action, which is what actually publishes `www.labrarf.com/estoria/`.
-4. Poll `…/estoria/version.json` (cache-busted) for up to ~5 min until prod
-   reports HEAD's commit → `✓ <sha> is live`. A timeout means Pages is still
-   building; re-run to re-check.
+5. Poll `…/estoria/version.json` (cache-busted) for up to ~5 min until prod
+   reports HEAD's commit **and every asset the new `index.html` names returns
+   200** → `✓ <sha> is live, and its assets load`. A timeout means Pages is
+   still building; check `version.json` again by hand (re-running would hit
+   step 2).
+
+**Why steps 2 and 4 exist — the 2026-10-04 blank page.** Two deploys from two
+sessions landed two minutes apart. The second one's `rsync --delete` removed the
+first one's only script while the CDN was still handing out the first one's
+`index.html` (cached up to 600s), so every visitor in that window got a 404 for
+the script and a blank page — while `version.json`, the only thing step 5 then
+checked, looked healthy. Keeping recent assets makes a stale `index.html`
+harmless; the settle window keeps deploys from stacking; checking the assets
+makes the "✓" mean the app actually loads.
 
 Step 4 is the point of the script — it replaces the old "compare asset hashes
 by hand" check below, which stays here as the manual fallback:
 
-- **The rsync uses `--delete`**, so it removes the old
-  content-hashed `assets/index-*.{js,css}` and writes new ones. If the Pages
+- **The rsync used to `--delete` the old content-hashed
+  `assets/index-*.{js,css}`** (it now keeps three deploys' worth, see above). If the Pages
   deploy then fails or stalls, Pages keeps serving the **last successful**
   (old) build — so the site looks unchanged even though the repo is correct.
   This is the trap: a green push does **not** mean a green deploy.
