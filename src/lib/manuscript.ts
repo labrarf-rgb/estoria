@@ -140,29 +140,44 @@ export const hasProse = (text: string | undefined): boolean => !!text && countWo
  * the board, the rail, the toolbar, the version menu and the series map cannot
  * disagree with each other or with what is written.
  *
- * Two rules survive from when the recompute lived in the store:
+ * **A chapter with no manuscript is never touched.** Every book written before
+ * prose existed carries a hand-typed count and no text, and counting what isn't
+ * there would report an 80,000-word project as 0.
  *
- *  - **A chapter with no manuscript is never touched.** Every book written
- *    before prose existed carries a hand-typed count and no text, and counting
- *    what isn't there would report an 80,000-word project as 0.
- *  - **Promote, don't overwrite.** The first time real prose appears the number
- *    already there was a *plan*, so it moves to `target` rather than being
- *    replaced — `words` used to mean *planned* (the AI import prompt says
- *    "estimate from scene length"), and the gap between the two is the reading
- *    the board exists to show.
+ * It does **not** promote the old count into `target` — that is `withManuscript`,
+ * at the moment a manuscript first appears. This function cannot tell a first
+ * count from the hundredth: by the second debounced recount, `words` is the
+ * previous count, and promoting it made the chapter's goal whatever had been
+ * written a second ago (`4 words of 3`).
  *
- * What changed: an empty manuscript now counts as **0** rather than freezing the
- * last number. `manuscript` stays `undefined` until someone types, so a defined
- * one that counts zero means the words were deleted — and the old plan is safe
- * in `target` by the rule above. A count that quietly refuses to fall is the
- * kind of lying number this whole pass is about.
+ * An empty manuscript counts as **0** rather than freezing the last number.
+ * `manuscript` stays `undefined` until someone types, so a defined one that
+ * counts zero means the words were deleted — and the old plan is safe in
+ * `target`. A count that quietly refuses to fall is the kind of lying number
+ * this whole pass is about.
  */
 export function syncChapterWords(c: Chapter): Chapter {
   if (c.manuscript === undefined) return c;
   const n = countWords(c.manuscript);
-  const promote = c.target === undefined && c.words > 0;
-  if (n === c.words && !promote) return c;
-  return { ...c, ...(promote ? { target: c.words } : {}), words: n };
+  return n === c.words ? c : { ...c, words: n };
+}
+
+/**
+ * Give a chapter its prose. **Promote, don't overwrite**: when this is the first
+ * manuscript the chapter has ever had, the number already in `words` was a
+ * *plan* — `words` used to mean *planned*, and the AI import prompt says
+ * "estimate from scene length" — so it moves to `target` before the count takes
+ * the field over. The gap between the two is the reading the board exists to
+ * show.
+ *
+ * Only on that transition, from no manuscript to one. Every later write leaves
+ * `target` alone, because by then `words` is a count of the prose, not a plan.
+ * The count itself is left to `syncChapterWords`, so typing can keep recounting
+ * on its debounce.
+ */
+export function withManuscript(c: Chapter, text: string): Chapter {
+  const promote = c.manuscript === undefined && c.target === undefined && c.words > 0;
+  return { ...c, manuscript: text, ...(promote ? { target: c.words } : {}) };
 }
 
 /** The same, over a board. Returns the array it was given when nothing moved. */

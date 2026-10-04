@@ -5033,3 +5033,84 @@ By crashing it on purpose, twice.
   `Timeline | Read the book as prose` row) still describes it accurately — the
   fix changed hook order, not behaviour, and the empty-chapter box it returns is
   unchanged.
+
+
+### 2026-10-04 — A chapter's goal stopped following its own count (Session 59)
+
+Reported with a recipe: in a chapter with no plan, write `one two three`, pause
+for the 700 ms recount, type ` four`, pause again, and the footer reads
+`4 words of 3`. The chapter's target had become whatever was written a second
+earlier.
+
+#### The bug
+
+`syncChapterWords` in [`lib/manuscript.ts`](../src/lib/manuscript.ts) carried the
+*promote, don't overwrite* rule: if a chapter has a manuscript, no `target` and
+`words > 0`, move `words` into `target` before recounting. That is right exactly
+once, when the first prose replaces a hand-typed plan. But the function only
+sees the chapter as it is now, and after the first recount `words` is a count,
+not a plan. A chapter that started at 0 never got a target on the first pass, so
+the second pass promoted the first pass's count. Every other caller had the same
+blind spot: `reconcileWords` on `openDoc` / `replaceDoc` gave any written,
+unplanned chapter its current count as a goal, and pulling prose from another
+version into a chapter that already had some did the same.
+
+#### The fix
+
+- **New `withManuscript(c, text)`** in `lib/manuscript.ts` sets the prose and
+  promotes only when `c.manuscript` was `undefined`, so the rule is attached to
+  the one event it describes rather than inferred from state.
+- **`syncChapterWords` only counts now.** Its "no manuscript, no touch" rule and
+  "empty reads 0" rule are unchanged.
+- **Callers:** `setManuscript` (the keystroke path) and `pullManuscriptFrom` go
+  through `withManuscript`; the pull still recounts with `syncChapterWords`, and
+  its undo still restores the saved `target`. `withoutProse` keeps its own
+  deliberate promotion for structure-only forks. `openDoc` / `replaceDoc` only
+  recount.
+- **The import parser had been relying on the bug's mechanism.** A
+  Map + manuscript import arrives with the AI's estimate in `words` and the
+  prose already in `manuscript`, and it was `reconcileWords` on `openDoc` that
+  promoted the estimate. With that gone, `parseImportMarkdown` now builds each
+  written chapter through `withManuscript`, so the estimate still lands in
+  `target` before the real count takes over.
+
+One thing the fix can't undo: a chapter that already got a wrong `target` this
+way keeps it, because a promoted count and a goal the writer typed look the
+same in the data. Clearing the TARGET field in the chapter header fixes one.
+There's also a small change for sync: a chapter that already has prose and no
+target, whose `words` was retyped elsewhere (Android has a hand-typed field), is
+now just recounted on arrival, where before the retyped number became its goal.
+That case looks the same in the data as the bug, so it gets the same answer.
+
+#### Verified
+
+In the dev server (`estoria-dev`), on the sample book:
+
+- **Before the fix**, ran the recipe through the real editor on chapter 1 with
+  its count zeroed: `target: 3`, `words: 4`, footer `4 words of 3`. Reproduced.
+- **After**, the same recipe: `words: 4`, no target, footer `4 words`.
+- **First prose on a planned chapter** (ch 2, 2,800 planned): the first write
+  gives `1 / 2800`, and a later write `3 / 2800`. The plan holds.
+- **Pull + undo**: pulling into ch 3, which had no prose, promoted its 3,100 plan
+  and counted 6. Undo restored no manuscript, 3,100 words and no target. Pulling
+  into ch 1, which already had prose and no target, left the target empty, and
+  undo restored it exactly.
+- **Structure-only fork**: ch 1 (4 words, no plan) became `0 / 4` and ch 2
+  `0 / 2800`. Unwritten chapters were untouched.
+- **`replaceDoc` / `openDoc`** with a stale `words: 999` on a written, unplanned
+  chapter recounted it to 4 with no target. An unwritten chapter's hand-typed
+  1,234 was left alone.
+- **Import** (Map + manuscript, `· 3200 words` plus one sentence of prose):
+  the parser gives `target 3200`, and after `openDoc` the chapter reads
+  `9 / 3200` as a draft. The chapter without prose stays an idea at 2,800.
+- `npm run typecheck` and `npm run build` clean. No console errors.
+
+#### Drift check against SPECS
+
+- §4 *Word count is derived* now says where promotion lives and lists the
+  transitions that trigger it. §4 *Manuscript comes with it* names the parser as
+  the place the estimate is promoted.
+- §9 P2 gained item 21, closed.
+- Comments updated in step: the `target` doc in `types.ts` and the parser's
+  "never drafted" note in `markdown.ts`.
+- Not pushed or deployed.

@@ -18,7 +18,7 @@ import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
-import { syncChapterWords, withoutProse } from "@/lib/manuscript";
+import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import {
@@ -1493,11 +1493,13 @@ export const useStore = create<StoreState>()(
       // the chapter, written through the same persist path as everything else.
       // Versions get it for free — `cloneVersionData` is a `structuredClone`, so
       // a fork deep-copies the prose exactly as it deep-copies the scenes.
+      // `withManuscript` because the first keystroke is the one moment a planned
+      // count can be told apart from a written one.
       setManuscript: (chId, text) =>
         set((s) => ({
           doc: {
             ...s.doc,
-            chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, manuscript: text } : c)),
+            chapters: s.doc.chapters.map((c) => (c.id === chId ? withManuscript(c, text) : c)),
           },
         })),
 
@@ -1523,7 +1525,8 @@ export const useStore = create<StoreState>()(
           // Chapter ids survive a fork, so the same chapter is findable in every
           // version without any matching heuristic.
           const src = s.doc.draftData[fromDraftId]?.chapters.find((c) => c.id === chId);
-          if (!src || src.manuscript === undefined) return {};
+          const text = src?.manuscript;
+          if (text === undefined) return {};
           const name = s.doc.drafts.find((d) => d.id === fromDraftId)?.name ?? "another version";
           const before = s.doc.chapters.find((c) => c.id === chId);
           return {
@@ -1537,9 +1540,10 @@ export const useStore = create<StoreState>()(
             doc: {
               ...s.doc,
               // A whole manuscript arriving is exactly the event the count has to
-              // follow, and nothing else recomputes it on this path.
+              // follow, and nothing else recomputes it on this path. Into a chapter
+              // that had none, it is also the first prose, so the plan is promoted.
               chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? syncChapterWords({ ...c, manuscript: src.manuscript }) : c
+                c.id === chId ? syncChapterWords(withManuscript(c, text)) : c
               ),
             },
           };

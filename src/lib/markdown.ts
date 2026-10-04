@@ -10,7 +10,7 @@ import {
   type WorldEntry,
 } from "@/types";
 import { displaySummary } from "@/lib/drafts";
-import { countWords } from "@/lib/manuscript";
+import { countWords, withManuscript } from "@/lib/manuscript";
 import { CARD_W, CARD_H } from "@/lib/layout";
 
 const CONN_LABEL: Record<ConnType, string> = {
@@ -540,7 +540,7 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       sceneLinks: sceneTags.slice(0, Math.max(0, (scenes.length || 1) - 1)),
       charNames,
       // Left `undefined` when nothing was written, because that is the value the
-      // word-count rules read as "never drafted" (see `syncChapterWords`). A block
+      // word-count rules read as "never drafted" (see `withManuscript`). A block
       // holding only `***` or stray punctuation counts as nothing.
       ...(countWords(manuscript) > 0 ? { manuscript } : {}),
     });
@@ -623,7 +623,7 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
   const chapters: Chapter[] = parsedChapters.map((pc, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    return {
+    const chapter: Chapter = {
       id: importId("c"),
       num: i + 1,
       act: pc.act,
@@ -637,9 +637,13 @@ export function parseImportMarkdown(text: string, fileName = "import.md"): Parse
       scenes: pc.scenes,
       sceneLinks: pc.sceneLinks,
       refs: [],
-      // A chapter that arrived with its text in it is written, not an idea.
-      ...(pc.manuscript ? { manuscript: pc.manuscript, status: "draft" as const } : {}),
     };
+    // A chapter that arrived with its text in it is written, not an idea. Its
+    // `words` is still the AI's estimate here, so `withManuscript` promotes it
+    // to `target`; `openDoc`'s `reconcileWords` then counts the real prose.
+    return pc.manuscript
+      ? { ...withManuscript(chapter, pc.manuscript), status: "draft" as const }
+      : chapter;
   });
 
   const links: ChapterLink[] = chapters

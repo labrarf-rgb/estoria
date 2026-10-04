@@ -219,7 +219,8 @@ export interface Chapter {
    * from scene length" — and auto-updating it would silently redefine it as
    * *actual*. The gap between the two is the most motivating number a planning
    * tool can show, so it is worth the extra field. Absent until set; the first
-   * time real prose appears, an existing hand-typed `words` is promoted here.
+   * time a manuscript appears, an existing hand-typed `words` is promoted here
+   * (`withManuscript`) — on that transition only, never on a later recount.
    */
   target?: number;
   /** Board position. */
