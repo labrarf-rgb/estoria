@@ -5236,3 +5236,92 @@ get?" points at §10 and calls out Phase 0 as the cheap one; §9 item 1's open h
 Still no code and still no UI copy pass — the three user-visible Obsidian strings
 noted in the previous entry remain. §10 is analysis only; nothing in it is
 scheduled.
+
+### 2026-10-04 — Single pieces, and every change of form saves a copy (Session 60, branch `feature/short-stories`)
+
+Started as "short stories without chapters" and widened, at the user's
+suggestion, to **any single piece**: a short story, an essay, a poem, or other.
+Mockups first (`docs/mockups/single-piece.html`, nine screens), reviewed over
+several rounds before any code; the decisions below are the user's.
+
+#### What a single piece is
+
+- **One chapter that is never shown as a chapter.** `StoryDoc.form = "piece"`;
+  scenes, prose, cast, world, pins and versions all live on `chapters[0]`
+  exactly as a chapter's do, so every chapter feature is a piece feature for
+  free and changing form moves nothing. All new fields (`form`, `kind`,
+  `grownInto`, `keepLineBreaks`, `savedCopy`) are optional: **no schema bump**,
+  and the Android app's top-level `ExtrasSerializer` passthrough keeps them
+  (checked in `Estoria-aa`'s `StoryDoc.kt`). The phone shows a piece as a book
+  with one chapter.
+- **No board.** `PieceView` renders the chapter modal in **page mode** under the
+  toolbar: no chapter number, act, prev/next or Delete chapter. **Map / Write**
+  is switched by the same tabs a chapter uses for Scene flow / Manuscript, in
+  the same place; only the labels differ, at the user's request. A toolbar **Map /
+  Write** toggle was built first and dropped on review: the user found a control
+  that moved to the top only for pieces confusing next to book mode. Board /
+  Timeline, New chapter, Auto-arrange, zoom and templates are hidden.
+- **Kind is a label** (`lib/piece.ts` `KINDS`): it names the parts (scenes,
+  sections, stanzas, parts) everywhere they are counted, and a poem defaults to
+  kept line breaks. Changed from a picker in the piece's header.
+- **Connectors are always plain lines** in a piece — the user's call. New seams
+  are `"none"`, `cycleSceneLink` is a no-op, and the canvas draws no pills or
+  click targets.
+- **Keep line breaks** (any project, on by default for a poem): View renders
+  with `whitespace-pre-line`, `.md` export uses markdown hard breaks, `.txt`
+  keeps the newlines, `.docx` puts `<w:br/>` inside the paragraph. The footer
+  counts lines when it is on.
+
+#### Changes of form, and saved copies
+
+Three changes, each behind a dialog that says what is kept and what is dropped:
+**Expand into a book** (asks "one longer work or a collection", stored as
+`grownInto` for the label), **Turn into single piece** (standalone books only;
+asks the kind and what separates chapters: a `***` break, a heading, or
+nothing), and **Make this a series** (now behind a dialog; it used to act at
+once). **Merge into a series** keeps its existing flow. **Every one saves a copy
+first** (`makeSavedCopy`), a merge saves both projects. A saved copy is an
+ordinary project with a `savedCopy` marker, listed apart under **Projects ›
+Saved copies**; **Open as a project** clears the marker (adding the date to the
+title if it would collide), and that is how a change is walked back. Nothing is
+linked to its copy, so nothing is ever blocked. When an Estoria folder is
+connected, the copy is also written there as
+`<slug>-saved-<reason>-<stamp>.estoria.json`, never pruned.
+
+Collapsing joins prose in board order, runs the scenes into one flow with plain
+seams (dropping empty placeholder scenes), unions cast, world and pins (pins
+deduped by asset), gathers summaries and chapter notes into the piece's notes
+under each chapter title, sums targets, takes the least-finished status, and
+drops acts, layout and chapter links. Every version is collapsed the same way.
+
+#### Also
+
+- `normalizeDoc` whitelists top-level fields, so the five new ones are validated
+  and kept there; without that a file round trip would have turned every piece
+  back into a book.
+- The board, timeline and project list count parts by kind; "New book" in the
+  File menu is now "New project", and Welcome's Start fresh opens that chooser.
+- If the phone adds a chapter to a piece, the page says so and offers Expand.
+
+#### Verified
+
+`npm run build` passes. In the dev server: created a story, mapped three scenes
+(plain connectors), switched the kind to Poem (stanza wording, line breaks on,
+line count), wrote and viewed a poem (breaks kept), expanded it as a collection
+(board, "Poetry collection" label, saved-copy notice), added a chapter, turned
+the book back into a piece with headings (prose joined, kind defaulted to poem),
+opened a saved copy as a project (dated title), made a book a series, and merged
+an expanded poem into it (two copies saved). State survived a reload.
+
+#### Found, not fixed (pre-existing)
+
+`syncChapterWords` promotes `words` into `target` whenever a chapter has prose
+and no target, not only the first time prose appears — so typing in two bursts
+sets a target equal to the first count (seen as `31 / 31` and `of 3`). Not this
+branch's doing; flagged as its own task.
+
+#### Not done
+
+- **Android:** plan written into `Estoria-aa/docs/SPECS.md` §7; nothing built there.
+- **Saved copies without a folder** live only in this browser — §6 future item.
+- Mixed kinds inside one series (a merged poem book uses the series' wording).

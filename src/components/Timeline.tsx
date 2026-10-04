@@ -7,6 +7,7 @@ import { displaySummary } from "@/lib/drafts";
 import { roman } from "@/lib/markdown";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
 import { wordsMeta } from "@/lib/manuscript";
+import { countParts } from "@/lib/piece";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType, Vec2 } from "@/types";
@@ -522,7 +523,7 @@ export function Timeline() {
                   </div>
                   <div className="flex items-center justify-end gap-[6px] font-mono text-[10.5px] font-medium text-soft">
                     <span>
-                      {c.scenes.length} {c.scenes.length === 1 ? "scene" : "scenes"}
+                      {countParts(doc, c.scenes.length)}
                     </span>
                     <span className="text-faint">·</span>
                     <span>{wordsMeta(c.words, c.target)}</span>
@@ -582,7 +583,7 @@ export function Timeline() {
                         were prose. */}
                     {prose
                       ? `${(c.manuscript ? c.words : 0).toLocaleString()} words`
-                      : `${c.scenes.length} ${c.scenes.length === 1 ? "scene" : "scenes"}`}
+                      : countParts(doc, c.scenes.length)}
                   </span>
                 </div>
 

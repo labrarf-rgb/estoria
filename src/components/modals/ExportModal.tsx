@@ -10,6 +10,7 @@ import {
   writtenChapters,
 } from "@/lib/manuscriptExport";
 import { downloadProjectFile, slugify } from "@/store/persistence";
+import { countParts, isPiece } from "@/lib/piece";
 
 /**
  * Two exports, kept apart on purpose.
@@ -96,7 +97,9 @@ export function ExportModal() {
 
         {tab === "manuscript" && written.length === 0 ? (
           <div className="flex-1 px-[24px] py-[40px] text-center text-[13px] font-medium text-faint">
-            Nothing written yet. Open a chapter's manuscript and it shows up here.
+            {isPiece(doc)
+              ? "Nothing written yet. Switch to Write and it shows up here."
+              : "Nothing written yet. Open a chapter's manuscript and it shows up here."}
           </div>
         ) : (
           <pre className="m-0 flex-1 overflow-auto whitespace-pre-wrap bg-card px-[24px] py-5 font-mono text-[12.5px] leading-[1.7] text-ink">
@@ -142,7 +145,7 @@ export function ExportModal() {
               <div className="flex-1" />
               <span className="text-[11.5px] font-medium text-faint">
                 {doc.chapters.reduce((a, c) => a + c.words, 0).toLocaleString()} words ·{" "}
-                {doc.chapters.length} chapters
+                {isPiece(doc) ? countParts(doc, doc.chapters[0]?.scenes.length ?? 0) : `${doc.chapters.length} chapters`}
               </span>
             </>
           ) : (
@@ -179,8 +182,10 @@ export function ExportModal() {
               </button>
               <div className="flex-1" />
               <span className="text-[11.5px] font-medium text-faint">
-                {proseWords.toLocaleString()} words · {written.length} of {doc.chapters.length}{" "}
-                {doc.chapters.length === 1 ? "chapter" : "chapters"} written
+                {proseWords.toLocaleString()} words
+                {isPiece(doc)
+                  ? ""
+                  : ` · ${written.length} of ${doc.chapters.length} ${doc.chapters.length === 1 ? "chapter" : "chapters"} written`}
               </span>
             </>
           )}

@@ -1058,6 +1058,18 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     // survive normalization or every open would look like a fresh write.
     ...(typeof d.modifiedAt === "string" && d.modifiedAt ? { modifiedAt: d.modifiedAt } : {}),
     seriesMode: !!d.seriesMode,
+    // Single pieces (see `lib/piece.ts`). All optional, so a file without them
+    // is a book exactly as before; each is checked rather than copied, because a
+    // stray value here would change what the whole project looks like.
+    ...(d.form === "piece" && !d.seriesMode ? { form: "piece" as const } : {}),
+    ...(d.kind === "story" || d.kind === "essay" || d.kind === "poem" || d.kind === "other"
+      ? { kind: d.kind }
+      : {}),
+    ...(d.grownInto === "work" || d.grownInto === "collection" ? { grownInto: d.grownInto } : {}),
+    ...(d.keepLineBreaks === true ? { keepLineBreaks: true } : {}),
+    ...(d.savedCopy && typeof d.savedCopy === "object" && typeof d.savedCopy.savedAt === "string"
+      ? { savedCopy: d.savedCopy }
+      : {}),
     drafts,
     activeDraftId,
     // Absent in files written before the marker was movable; there the seed

@@ -6,6 +6,8 @@ import { Timeline } from "@/components/Timeline";
 import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
 import { ChapterModal } from "@/components/ChapterModal";
+import { PieceView } from "@/components/PieceView";
+import { FormChangeModal, SavedNotice } from "@/components/modals/FormChangeModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ChapterCrash } from "@/components/CrashScreen";
 import { Lightbox } from "@/components/Lightbox";
@@ -32,6 +34,8 @@ export function App() {
   const level = useStore((s) => s.level);
   const view = useStore((s) => s.view);
   const chapterMode = useStore((s) => s.chapterMode);
+  // A single piece has no board: it is its own page. See `PieceView`.
+  const piece = useStore((s) => s.doc.form === "piece");
   const onSeriesMap = seriesMode && level === "series";
   // The book-level timeline is its own surface (a scrolling rail + scene pane),
   // not a mode of the board's canvas. The series map still renders its own
@@ -49,14 +53,14 @@ export function App() {
       className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
     >
       <Toolbar />
-      {onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
+      {piece ? <PieceView /> : onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
       <Footer />
 
       {/* The chapter modal catches its own errors, because the board behind it
           is still perfectly good: a chapter that won't draw should cost you the
           chapter, not the session. Keyed on which chapter and which face of it,
           so closing it or stepping to the next one re-arms the boundary. */}
-      {openCh && !onSeriesMap && (
+      {openCh && !onSeriesMap && !piece && (
         <ErrorBoundary
           resetKey={`${openCh}:${chapterMode}`}
           fallback={(error, retry) => <ChapterCrash error={error} retry={retry} />}
@@ -74,6 +78,8 @@ export function App() {
       <ImportModal />
       <NewBookModal />
       <ProjectsModal />
+      <FormChangeModal />
+      <SavedNotice />
       <BackupsModal />
       <AboutModal />
       <InstallModal />

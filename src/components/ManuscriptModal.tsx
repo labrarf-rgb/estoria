@@ -6,6 +6,8 @@ import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter, ConnType } from "@/types";
+import { partNouns } from "@/lib/piece";
+import type { ReactNode } from "react";
 
 /**
  * Manuscript mode — the writing pane, with the chapter's beats in a rail beside
@@ -54,8 +56,16 @@ const CONN: Record<ConnType, { label: string; color: string }> = {
 /** The rail's width. Enough for a beat at the 200-character cap in a few lines. */
 const RAIL_W = 284;
 
-export function ManuscriptModal({ ch }: { ch: Chapter }) {
+/**
+ * `page` is a single piece: the writing surface fills the window under the
+ * toolbar rather than floating over a board, and the chrome that only means
+ * something for a chapter among chapters (number, arrows, close) is not drawn.
+ */
+export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: boolean }) {
   const doc = useStore((s) => s.doc);
+  const setProjectTitle = useStore((s) => s.setProjectTitle);
+  const setKeepLineBreaks = useStore((s) => s.setKeepLineBreaks);
+  const keepLines = !!doc.keepLineBreaks;
   const closeChapter = useStore((s) => s.closeChapter);
   const openChapter = useStore((s) => s.openChapter);
   const editChapterText = useStore((s) => s.editChapterText);
@@ -77,6 +87,11 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
   // is a full regex sweep of the chapter: 3.3ms on a 10k-word chapter, spent
   // again for each character typed into it.
   const proseWords = useMemo(() => (text ? countWords(text) : 0), [text]);
+  // Lines, for writing that keeps its line breaks: a poem is measured in them.
+  const proseLines = useMemo(
+    () => (keepLines && text ? text.split("\n").filter((l) => l.trim()).length : 0),
+    [keepLines, text]
+  );
 
   /**
    * Words in whatever is highlighted right now, for the chip beside the total.
@@ -182,26 +197,35 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
 
   return (
-    <Scrim onClose={closeFromScrim} z={50} center>
+    <Shell page={page} onClose={closeFromScrim}>
       <div
         onMouseDown={stop}
         // A fixed height, not a maximum. See the note at the top of the file:
-        // sizing to the content is what made an empty chapter scroll.
-        className={`flex h-[92vh] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-          expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
-        }`}
+        // sizing to the content is what made an empty chapter scroll. A piece
+        // takes the height the page gives it, for the same reason.
+        className={
+          page
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-panel"
+            : `flex h-[92vh] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+                expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+              }`
+        }
       >
         {/* Header. Not sticky, because nothing scrolls past it: the modal itself
             does not scroll, only the two columns below do. */}
         <div className="flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
-          <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
-            {String(ch.num).padStart(2, "0")}
-          </span>
+          {!page && (
+            <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
+              {String(ch.num).padStart(2, "0")}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <input
-              value={ch.title}
-              onChange={(e) => editChapterText(ch.id, { title: e.target.value })}
-              placeholder="Chapter title"
+              value={page ? doc.projectTitle : ch.title}
+              onChange={(e) =>
+                page ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
+              }
+              placeholder={page ? "Title" : "Chapter title"}
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
             />
             {draftId !== doc.mainDraftId && (
@@ -225,6 +249,8 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
               </span>
             )}
             <SheetViewToggle view={view} onChange={setView} />
+            {!page && (
+            <>
             <button
               onClick={() => setExpanded(!expanded)}
               className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
@@ -249,13 +275,15 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
               ›
             </button>
             <CloseButton onClick={closeChapter} />
+            </>
+            )}
           </div>
         </div>
 
         {/* Rail beside prose, each scrolling on its own. `min-h-0` on both is
             what lets a flex child scroll rather than grow the row. */}
         <div className="flex min-h-0 flex-1">
-          <BeatRail ch={ch} />
+          <BeatRail ch={ch} page={page} />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {view === "read" ? (
               <div
@@ -263,7 +291,7 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
                 data-print-root
                 className="min-h-0 flex-1 overflow-y-auto px-[clamp(20px,4%,56px)] py-[26px]"
               >
-                <ProseChapter ch={ch} maxWidth="none" />
+                <ProseChapter ch={ch} maxWidth={page ? 720 : "none"} />
               </div>
             ) : (
               <textarea
@@ -276,7 +304,11 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
                 // that true.
                 onBlur={flushNow}
                 spellCheck
-                placeholder="Write the chapter here. Markdown works: **bold**, *italic*, # heading."
+                placeholder={
+                  page
+                    ? "Write it here. Markdown works: **bold**, *italic*, # heading."
+                    : "Write the chapter here. Markdown works: **bold**, *italic*, # heading."
+                }
                 className="min-h-0 w-full flex-1 resize-none bg-transparent px-[clamp(20px,4%,56px)] py-[26px] font-serif text-[15.5px] leading-[1.8] text-ink outline-none placeholder:text-faint"
               />
             )}
@@ -286,6 +318,29 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
                 selection count sits to its left and appears only while
                 something is highlighted — this bar is thin enough already. */}
             <div className="flex shrink-0 items-center justify-end gap-[9px] border-t border-rule px-[clamp(20px,4%,56px)] py-[7px] font-mono text-[10.5px] font-medium text-faint">
+              {/* Markdown joins single line breaks into the paragraph, which is
+                  right for prose and wrong for a poem. On by default for a poem;
+                  any piece or book can turn it on. */}
+              <button
+                onClick={() => setKeepLineBreaks(!keepLines)}
+                title={
+                  keepLines
+                    ? "Line breaks are kept as typed, in View and in exports"
+                    : "Single line breaks join into the paragraph, as markdown does"
+                }
+                className="mr-auto flex items-center gap-[6px] font-sans text-[11px] font-medium text-soft hover:text-ink"
+              >
+                <span
+                  className="relative h-[14px] w-[24px] rounded-full transition-colors"
+                  style={{ background: keepLines ? "var(--therefore)" : "var(--line)" }}
+                >
+                  <span
+                    className="absolute top-[2px] h-[10px] w-[10px] rounded-full bg-card transition-[left]"
+                    style={{ left: keepLines ? 12 : 2 }}
+                  />
+                </span>
+                Keep line breaks
+              </button>
               {selWords > 0 && (
                 <span className="rounded-full border border-rule px-[7px] py-[1px]">
                   {selWords.toLocaleString()} {selWords === 1 ? "word" : "words"} selected
@@ -294,11 +349,22 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
               <span>
                 {proseWords.toLocaleString()} {proseWords === 1 ? "word" : "words"}
                 {ch.target ? ` of ${ch.target.toLocaleString()}` : ""}
+                {keepLines ? ` · ${proseLines.toLocaleString()} ${proseLines === 1 ? "line" : "lines"}` : ""}
               </span>
             </div>
           </div>
         </div>
       </div>
+    </Shell>
+  );
+}
+
+/** A modal over the board, or, for a single piece, the page itself. */
+function Shell({ page, onClose, children }: { page: boolean; onClose: () => void; children: ReactNode }) {
+  if (page) return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+  return (
+    <Scrim onClose={onClose} z={50} center>
+      {children}
     </Scrim>
   );
 }
@@ -317,8 +383,10 @@ export function ManuscriptModal({ ch }: { ch: Chapter }) {
  * Left, not right, because the timeline's vertical rail is on the left and the
  * beats should not change sides depending on where you are in the app.
  */
-function BeatRail({ ch }: { ch: Chapter }) {
+function BeatRail({ ch, page }: { ch: Chapter; page: boolean }) {
   const openAtScene = useStore((s) => s.openChapterAtScene);
+  const kind = useStore((s) => s.doc.kind);
+  const nouns = partNouns({ kind });
 
   return (
     <aside className="flex shrink-0 flex-col border-r border-rule bg-bg" style={{ width: RAIL_W }}>
@@ -329,24 +397,29 @@ function BeatRail({ ch }: { ch: Chapter }) {
       <div className="shrink-0 px-[16px] pb-[8px] pt-[14px]">
         <ChapterModeTabs full />
         <div className="mt-[8px] font-mono text-[10.5px] font-medium text-faint">
-          {ch.scenes.length} {ch.scenes.length === 1 ? "beat" : "beats"}
+          {ch.scenes.length} {ch.scenes.length === 1 ? nouns.one : nouns.many}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-[16px] pb-[16px]">
         {ch.scenes.length === 0 ? (
           <div className="rounded-[11px] border border-dashed border-line px-[12px] py-[18px] text-center text-[11.5px] font-medium text-faint">
-            No beats yet. Plan some on the story map.
+            Nothing mapped yet. Plan some {nouns.many} on the map.
           </div>
         ) : (
           ch.scenes.map((s, i) => (
             <div key={i}>
               {i > 0 && (
                 <div className="flex justify-center py-[6px]">
-                  <Pill type={ch.sceneLinks[i - 1] ?? "none"} />
+                  {page ? (
+                    // A piece's seams are plain lines: order, and nothing more.
+                    <span className="block h-[10px] w-px bg-line" />
+                  ) : (
+                    <Pill type={ch.sceneLinks[i - 1] ?? "none"} />
+                  )}
                 </div>
               )}
-              <BeatCard num={i + 1} text={s} onOpen={() => openAtScene(ch.id, i)} />
+              <BeatCard num={i + 1} text={s} noun={nouns.one} onOpen={() => openAtScene(ch.id, i)} />
             </div>
           ))
         )}
@@ -367,18 +440,18 @@ function BeatRail({ ch }: { ch: Chapter }) {
  * undo, and `openChapterAtScene` already lands on a scene, focuses it and
  * flashes it — so the card only has to name which one.
  */
-function BeatCard({ num, text, onOpen }: { num: number; text: string; onOpen: () => void }) {
+function BeatCard({ num, text, noun, onOpen }: { num: number; text: string; noun: string; onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      title="Open this scene on the story map"
+      title={`Open this ${noun} on the map`}
       className="block w-full rounded-[11px] border border-rule bg-card p-[8px_12px] text-left shadow-[var(--shadow)] hover:border-faint"
     >
       <span className="font-mono text-[9.5px] font-semibold tracking-wide text-faint">
-        SCENE {num}
+        {noun.toUpperCase()} {num}
       </span>
       <div className="mt-[3px] text-[12px] leading-[1.45] text-ink">
-        {text || <span className="text-faint">New scene</span>}
+        {text || <span className="text-faint">New {noun}</span>}
       </div>
     </button>
   );

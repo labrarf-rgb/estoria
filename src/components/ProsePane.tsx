@@ -42,6 +42,7 @@ export function ProseChapter({
 
   const text = ch.manuscript ?? "";
   const blocks = useMemo(() => parseBlocks(text), [text]);
+  const keepLines = useStore((s) => !!s.doc.keepLineBreaks);
 
   /**
    * A press that doesn't move is a click; a press that moves is a text
@@ -97,13 +98,18 @@ export function ProseChapter({
       }
     >
       {blocks.map((b, i) => (
-        <BlockView key={i} block={b} />
+        <BlockView key={i} block={b} keepLines={keepLines} />
       ))}
     </div>
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+/**
+ * `keepLines`: single line breaks inside a paragraph are kept as typed (a poem)
+ * rather than joined, which is all `whitespace-pre-line` does — the parser
+ * already keeps them in the text.
+ */
+function BlockView({ block, keepLines }: { block: Block; keepLines: boolean }) {
   switch (block.kind) {
     case "hr":
       return <hr className="my-[26px] border-0 border-t" style={{ borderColor: "var(--rule)" }} />;
@@ -123,7 +129,9 @@ function BlockView({ block }: { block: Block }) {
     case "quote":
       return (
         <blockquote
-          className="mb-[14px] border-l-2 pl-[14px] font-serif text-[15.5px] italic leading-[1.85] text-soft"
+          className={`mb-[14px] border-l-2 pl-[14px] font-serif text-[15.5px] italic leading-[1.85] text-soft ${
+            keepLines ? "whitespace-pre-line" : ""
+          }`}
           style={{ borderColor: "var(--line)" }}
         >
           <Inline text={block.text} />
@@ -176,7 +184,11 @@ function BlockView({ block }: { block: Block }) {
       );
     default:
       return (
-        <p className="mb-[14px] font-serif text-[15.5px] leading-[1.85] text-ink">
+        <p
+          className={`font-serif text-[15.5px] leading-[1.85] text-ink ${
+            keepLines ? "mb-[22px] whitespace-pre-line" : "mb-[14px]"
+          }`}
+        >
           <Inline text={block.text} />
         </p>
       );

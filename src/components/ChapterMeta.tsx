@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useStore } from "@/store/useStore";
 import { hasProse } from "@/lib/manuscript";
 import type { Chapter, ChapterStatus } from "@/types";
+import { partNouns } from "@/lib/piece";
 
 const STATUSES: { value: ChapterStatus; label: string }[] = [
   { value: "idea", label: "Idea" },
@@ -20,14 +21,18 @@ const STATUSES: { value: ChapterStatus; label: string }[] = [
  * The switch between the two lives on the working area's section header, not
  * here — see `ChapterModeTabs`.
  */
-export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
+export function ChapterMetaRow({ ch, act, lead }: { ch: Chapter; act?: ReactNode; lead?: ReactNode }) {
   const patchChapter = useStore((s) => s.patchChapter);
+  const kind = useStore((s) => s.doc.kind);
+  const nouns = partNouns({ kind });
 
   // Does this chapter's count come from its prose rather than from the keyboard?
   const counted = hasProse(ch.manuscript);
 
   return (
     <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">
+      {/* A single piece leads with what it is. */}
+      {lead}
       {/* Counted, not typed, once the chapter has prose — so the field stops
           being editable rather than silently ignoring edits. A chapter with
           nothing written keeps the hand-typed estimate it has always had. */}
@@ -51,7 +56,7 @@ export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
               patchChapter(ch.id, { words: Math.max(0, parseInt(e.target.value, 10) || 0) })
             }
             className="w-[56px] bg-transparent text-right font-mono text-[12px] font-medium text-ink outline-none [appearance:textfield]"
-            title="Words in this chapter. Once you write in it, this is counted for you."
+            title="Words so far. Once you write, this is counted for you."
           />
           <span className="font-mono text-[11px] font-medium text-soft">words</span>
         </label>
@@ -59,7 +64,7 @@ export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
 
       <label
         className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]"
-        title="How long you mean this chapter to be. The gap is the progress."
+        title="How long you mean this to be. The gap is the progress."
       >
         <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-faint">
           Target
@@ -80,7 +85,7 @@ export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
       </label>
 
       <span className="font-mono text-[11.5px] font-medium text-faint">
-        · {ch.scenes.length} {ch.scenes.length === 1 ? "scene" : "scenes"}
+        · {ch.scenes.length} {ch.scenes.length === 1 ? nouns.one : nouns.many}
       </span>
 
       <div className="flex rounded-lg bg-chip p-[3px]">
@@ -122,6 +127,9 @@ export function ChapterMetaRow({ ch, act }: { ch: Chapter; act?: ReactNode }) {
 export function ChapterModeTabs({ full = false }: { full?: boolean }) {
   const mode = useStore((s) => s.chapterMode);
   const setMode = useStore((s) => s.setChapterMode);
+  // Same control, same place; a single piece names its two faces in plainer
+  // words than a book's chapter does.
+  const piece = useStore((s) => s.doc.form === "piece");
 
   const seg = (m: "map" | "manuscript", label: string, hint: string) => (
     <button
@@ -137,8 +145,17 @@ export function ChapterModeTabs({ full = false }: { full?: boolean }) {
 
   return (
     <div className={`flex rounded-lg bg-chip p-[3px] ${full ? "w-full" : ""}`}>
-      {seg("map", "Scene flow", "Plan this chapter's beats")}
-      {seg("manuscript", "Manuscript", "Write this chapter, with its beats beside you")}
+      {piece ? (
+        <>
+          {seg("map", "Map", "Map the parts")}
+          {seg("manuscript", "Write", "Write it, with the parts beside you")}
+        </>
+      ) : (
+        <>
+          {seg("map", "Scene flow", "Plan this chapter's beats")}
+          {seg("manuscript", "Manuscript", "Write this chapter, with its beats beside you")}
+        </>
+      )}
     </div>
   );
 }

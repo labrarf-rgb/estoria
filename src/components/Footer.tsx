@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { partNouns } from "@/lib/piece";
 import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistence";
 import { chooseBackupFolder, getBackupDirName, isBackupPickerSupported } from "@/lib/backup";
 import {
@@ -229,8 +230,10 @@ export function Footer() {
           ? `Saved in this browser · ${new Date(status.savedAt).toLocaleTimeString()}`
           : "Saved in this browser") + mirrorSuffix;
 
-  const hint =
-    view === "timeline"
+  const pieceKind = useStore((s) => (s.doc.form === "piece" ? s.doc.kind ?? "story" : null));
+  const hint = pieceKind
+    ? `Map the ${partNouns({ kind: pieceKind }).many} · switch to Write to draft beside them`
+    : view === "timeline"
       ? "Read the story straight through · click a chapter to jump, a scene to edit it · use the arrows to flip orientation"
       : "Click a chapter to map its scenes · drag to rearrange · scroll to zoom";
 

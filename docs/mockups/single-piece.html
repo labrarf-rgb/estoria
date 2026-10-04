@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Single Piece Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+    --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+    --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+    --therefore: oklch(0.54 0.1 152); --but: oklch(0.55 0.15 33); --and: oklch(0.55 0.04 70);
+    --new: oklch(0.6 0.12 250);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #d9cfba; color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; padding: 24px 16px 60px; }
+  .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+
+  .intro { max-width: 1180px; margin: 0 auto 18px; }
+  .intro h1 { font-family: Spectral, serif; font-size: 26px; font-weight: 600; }
+  .intro p { color: var(--soft); font-size: 13.5px; margin-top: 4px; line-height: 1.5; max-width: 780px; }
+  .controls { max-width: 1180px; margin: 0 auto 14px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button, .kinds button { font: inherit; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 13px; border-radius: 9px; cursor: pointer; }
+  .tabs button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .kinds { display: flex; gap: 4px; align-items: center; }
+  .kinds .lbl { font-size: 11.5px; color: var(--soft); margin-right: 4px; }
+  .kinds button { padding: 5px 10px; font-size: 12px; font-weight: 500; }
+  .kinds button.on { border-color: var(--new); color: var(--new); font-weight: 600; }
+  .kinds.hide { visibility: hidden; }
+  .screen { display: none; max-width: 1180px; margin: 0 auto; }
+  .screen.on { display: block; }
+  .caption { margin-top: 12px; font-size: 13px; color: var(--soft); line-height: 1.55; max-width: 880px; }
+  .caption b { color: var(--ink); }
+  .new-flag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); border: 1px solid var(--new); border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+
+  .frame { border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(40,28,10,.25); border: 1px solid var(--line); background: var(--bg); }
+  .appbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--rule); background: var(--panel); flex-wrap: wrap; }
+  .logo { font-family: Spectral, serif; font-style: italic; font-size: 20px; font-weight: 600; margin-right: 4px; }
+  .ptitle { line-height: 1.15; }
+  .ptitle b { font-size: 13px; font-weight: 700; display: block; }
+  .ptitle span { font-size: 10.5px; color: var(--soft); }
+  .btn { font: inherit; font-size: 12px; font-weight: 500; border: 1px solid var(--rule); background: var(--card); color: var(--ink); padding: 6px 11px; border-radius: 8px; white-space: nowrap; }
+  .btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg span { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 7px; color: var(--soft); }
+  .seg span.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); font-weight: 600; }
+  .spacer { flex: 1; }
+  .dotred { width: 7px; height: 7px; border-radius: 50%; background: var(--but); display: inline-block; margin-right: 6px; }
+  .statusbar { display: flex; justify-content: space-between; padding: 7px 16px; border-top: 1px solid var(--rule); font-size: 10.5px; color: var(--faint); background: var(--panel); }
+
+  /* New project modal */
+  .scrim { background: rgba(20,14,6,.55); padding: 50px 20px; display: flex; justify-content: center; }
+  .modal { width: min(820px,100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
+  .modal-h { padding: 20px 26px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; }
+  .modal-h .t { font-family: Spectral, serif; font-size: 19px; font-weight: 600; }
+  .modal-h .s { font-size: 12.5px; color: var(--soft); margin-top: 3px; font-weight: 500; }
+  .grid { display: grid; gap: 14px; padding: 12px 24px 24px; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); }
+  .groupl { padding: 18px 24px 0; }
+  .card { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--rule); border-radius: 15px; padding: 16px; min-height: 150px; }
+  .card.hl { border-color: var(--new); box-shadow: 0 0 0 3px color-mix(in oklch, var(--new) 18%, transparent); }
+  .card .t { font-family: Spectral, serif; font-size: 16px; font-weight: 600; }
+  .card .b { flex: 1; font-size: 12px; line-height: 1.5; color: var(--soft); }
+  .card.dis { opacity: .5; }
+  .kindpick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
+  .kindpick div { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; background: var(--panel); }
+  .kindpick div.on { border-color: var(--ink); background: var(--card); box-shadow: var(--shadow); }
+  .kindpick b { display: block; font-size: 12.5px; font-weight: 600; }
+  .kindpick small { font-size: 11px; color: var(--soft); }
+  .startrow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+
+  /* Map */
+  .ws-head { padding: 18px 26px 14px; background: var(--panel); border-bottom: 1px solid var(--rule); }
+  .ws-title { font-family: Spectral, serif; font-size: 27px; font-weight: 600; }
+  .ws-sum { font-size: 13.5px; color: var(--soft); margin-top: 3px; }
+  .meta { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .pill { font-family: "JetBrains Mono", monospace; font-size: 11px; background: var(--chip); border-radius: 7px; padding: 5px 9px; color: var(--soft); }
+  .pill b { color: var(--ink); font-weight: 600; margin-right: 6px; }
+  .kindtag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 4px 9px; border-radius: 99px; background: var(--chip); color: var(--soft); }
+  .bar { height: 5px; width: 140px; background: var(--chip); border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--therefore); }
+  .ws-tabs { display: flex; gap: 6px; padding: 12px 26px; border-bottom: 1px solid var(--rule); background: var(--panel); align-items: center; flex-wrap: wrap; }
+  .chipbtn { font-size: 11.5px; font-weight: 500; padding: 6px 11px; background: var(--chip); border-radius: 8px; color: var(--ink); }
+  .chipbtn em { font-style: normal; color: var(--faint); margin-left: 4px; }
+  .canvas { background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px; padding: 18px 26px 26px; min-height: 360px; }
+  .canvas-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 38px 54px; }
+  .node { background: var(--card); border-radius: 10px; padding: 12px 14px 14px; box-shadow: var(--shadow); font-size: 12.5px; line-height: 1.45; position: relative; min-height: 86px; }
+  .node .n { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: .08em; color: var(--faint); margin-bottom: 6px; text-transform: uppercase; }
+  .conn { position: absolute; top: 50%; right: -54px; width: 54px; display: flex; align-items: center; justify-content: center; transform: translateY(-50%); }
+  .conn::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px solid var(--line); }
+  .wrapconn { position: absolute; left: 50%; bottom: -38px; height: 38px; display: flex; align-items: center; transform: translateX(-50%); }
+  .wrapconn::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1.5px solid var(--line); }
+  .tag { position: relative; font-size: 8.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; background: var(--card); border: 1px solid; }
+  .tag.therefore { color: var(--therefore); border-color: var(--therefore); }
+  .tag.but { color: var(--but); border-color: var(--but); }
+  .tag.and { color: var(--and); border-color: var(--and); }
+  .tag.none { display: none; }
+  .vline { display: block; width: 0; height: 12px; border-left: 1.5px solid var(--line); }
+  .hint { margin-top: 18px; font-size: 10.5px; color: var(--faint); }
+
+  /* Write */
+  .write { display: grid; grid-template-columns: 260px 1fr; min-height: 600px; }
+  .rail { background: var(--chip); border-right: 1px solid var(--rule); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .rail .node { min-height: 0; padding: 10px 12px; font-size: 11.5px; }
+  .rail .mid { display: flex; justify-content: center; min-height: 4px; }
+  .prose { background: var(--card); padding: 34px 0; flex: 1; }
+  .prose .col { max-width: 640px; margin: 0 auto; padding: 0 28px; font-family: Spectral, serif; font-size: 16.5px; line-height: 1.75; }
+  .prose h3 { font-family: Spectral, serif; font-size: 22px; font-weight: 600; margin-bottom: 18px; }
+  .prose h4 { font-family: Spectral, serif; font-size: 17px; font-weight: 600; margin: 22px 0 8px; }
+  .prose p { margin-bottom: 14px; }
+  .prose.story p + p { text-indent: 1.5em; }
+  .prose .brk { text-align: center; color: var(--faint); letter-spacing: .6em; margin: 18px 0; }
+  .prose .stanza { white-space: pre-line; margin-bottom: 22px; line-height: 1.65; }
+  .wfoot { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--faint); border-top: 1px solid var(--rule); background: var(--card); }
+  .lbk { font-family: "Hanken Grotesk", sans-serif; font-size: 11px; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+  .tog { width: 26px; height: 15px; border-radius: 99px; background: var(--therefore); position: relative; }
+  .tog::after { content: ""; position: absolute; right: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--card); }
+
+  /* Projects */
+  .row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--rule); border-radius: 13px; padding: 14px; }
+  .row .t { font-family: Spectral, serif; font-size: 16px; font-weight: 600; }
+  .row .m { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); margin-top: 2px; }
+  .kind { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: 99px; background: var(--chip); color: var(--soft); margin-left: 8px; vertical-align: middle; }
+  .menu { width: 270px; background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; font-size: 12.5px; }
+  .menu div { padding: 8px 10px; border-radius: 7px; }
+  .menu div.sep { padding: 0; height: 1px; background: var(--rule); margin: 5px 4px; }
+  .menu div.hl { background: var(--chip); }
+  .menu small { display: block; color: var(--soft); font-size: 11px; margin-top: 2px; }
+
+
+  /* Expand + after */
+  .dlg { width: min(560px,100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
+  .dlg-b { padding: 20px 26px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; line-height: 1.55; color: var(--soft); }
+  .dlg-b ul { margin: 0; padding-left: 18px; }
+  .dlg-b li { margin-bottom: 4px; }
+  .dlg-b b { color: var(--ink); }
+  .note { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; font-size: 12px; display: flex; gap: 10px; align-items: flex-start; }
+  .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 26px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
+  .btn.danger { color: var(--but); border-color: color-mix(in oklch, var(--but) 40%, var(--rule)); }
+  .board { position: relative; min-height: 470px; background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px; padding: 60px 70px; }
+  .chcard { width: 250px; background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px 12px; transform: rotate(-1.2deg); }
+  .chnum { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 600; background: var(--ink); color: var(--bg); border-radius: 5px; padding: 2px 6px; }
+  .chcard .t { font-family: Spectral, serif; font-size: 17px; font-weight: 600; margin: 8px 0 4px; }
+  .chcard .s { font-size: 11.5px; color: var(--soft); line-height: 1.45; }
+  .chcard .f { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--soft); text-align: right; margin-top: 12px; }
+  .ghost { width: 250px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 26px 14px; text-align: center; font-size: 12px; color: var(--faint); }
+  .float { position: absolute; right: 26px; top: 14px; }
+
+  @media (max-width: 980px) { .float { position: static; margin-top: 24px; } .board { padding: 30px 20px 80px; } }
+  @media (max-width: 760px) {
+    .flow { grid-template-columns: 1fr 1fr; }
+    .conn, .wrapconn { display: none; }
+    .write { grid-template-columns: 1fr; }
+    .rail { display: none; }
+    .kindpick { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Single pieces in Estoria: mockups</h1>
+  <p>A <b>single piece</b> is one work with no chapters: a short story, an essay, a poem, or anything else. It skips the chapter board and opens straight into what is now the chapter modal, laid out as a full page. Its kind is just a label: it changes what the parts are called, never which features you get. Items marked <span class="new-flag">new</span> are the changes.</p>
+</div>
+
+<div class="controls">
+  <div class="tabs" id="tabs">
+    <button class="on" data-s="1">1 · New project</button>
+    <button data-s="2">2 · Map</button>
+    <button data-s="3">3 · Write</button>
+    <button data-s="4">4 · Projects &amp; File menu</button>
+    <button data-s="5">5 · Expand</button>
+    <button data-s="6">6 · After expanding</button>
+    <button data-s="7">7 · Into single piece</button>
+    <button data-s="8">8 · Into series</button>
+    <button data-s="9">9 · Saved copies</button>
+  </div>
+  <div class="kinds hide" id="kinds">
+    <span class="lbl">Example:</span>
+    <button class="on" data-k="story">Short story</button>
+    <button data-k="essay">Essay</button>
+    <button data-k="poem">Poem</button>
+  </div>
+</div>
+
+<!-- ============ 1. NEW PROJECT ============ -->
+<section class="screen on" id="s1">
+  <div class="frame">
+    <div class="scrim">
+      <div class="modal">
+        <div class="modal-h">
+          <div style="flex:1">
+            <div class="t">New project</div>
+            <div class="s">One piece of writing, or a book in chapters.</div>
+          </div>
+          <span class="btn">✕</span>
+        </div>
+
+        <div class="groupl eyebrow">Single piece <span class="new-flag">new</span></div>
+        <div class="grid" style="grid-template-columns:1fr; padding-bottom:6px">
+          <div class="card hl" style="min-height:0">
+            <div class="b" style="flex:none">One work, no chapters. Map it in parts, write it beside the map, and keep its characters, world and notes alongside. Pick what it is; you can change this later.</div>
+            <div class="kindpick">
+              <div class="on"><b>Short story</b><small>Parts are scenes</small></div>
+              <div><b>Essay</b><small>Parts are sections</small></div>
+              <div><b>Poem</b><small>Parts are stanzas</small></div>
+              <div><b>Other</b><small>Parts are parts</small></div>
+            </div>
+            <div class="startrow">
+              <span class="spacer"></span>
+              <span class="btn dark">Start short story</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="groupl eyebrow" style="padding-top:14px">Book</div>
+        <div class="grid">
+          <div class="card">
+            <div class="t">Standalone book</div>
+            <div class="b">A new, separate project with its own characters and world.</div>
+            <span class="eyebrow">Not a series</span>
+          </div>
+          <div class="card">
+            <div class="t">Start a series</div>
+            <div class="b">A new project in series mode, with this as Book One.</div>
+            <span class="eyebrow">New series</span>
+          </div>
+          <div class="card dis">
+            <div class="t">Add to a series</div>
+            <div class="b">You don't have any series yet.</div>
+            <span class="eyebrow">0 available</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>"New book" becomes "New project"</b>, split into two groups: <b>Single piece</b> and <b>Book</b>. Within Single piece you pick a kind, and the start button follows it ("Start short story", "Start essay", "Start poem"). It skips the structure-template picker that books open with and lands on an empty map with one blank part. The first-launch <b>Start fresh</b> card leads here too.</p>
+</section>
+
+<!-- ============ 2. MAP ============ -->
+<section class="screen" id="s2">
+  <div class="frame">
+    <div class="appbar">
+      <span class="logo">Estoria</span>
+      <div class="ptitle"><b data-f="title"></b><span data-f="sub"></span></div>
+      <span class="btn"><span class="dotred"></span>Main draft ▾</span>
+      <span class="spacer"></span>
+      <span class="seg"><span class="on">Map</span><span>Write</span></span><span class="new-flag" style="margin-left:-4px">new</span>
+      <span class="spacer"></span>
+      <span class="seg"><span>Characters</span><span>World</span><span>Notes</span></span>
+      <span class="btn dark">File ▾</span>
+    </div>
+    <div class="ws-head">
+      <div class="ws-title" data-f="title"></div>
+      <div class="ws-sum" data-f="summary"></div>
+      <div class="meta">
+        <span class="kindtag" data-f="kind"></span>
+        <span class="pill"><b data-f="words"></b>words</span>
+        <span class="pill"><b data-f="target"></b>target</span>
+        <span class="bar"><i data-f="pct"></i></span>
+        <span class="pill" style="background:none" data-f="count"></span>
+        <span class="seg"><span>Idea</span><span class="on">Draft</span><span>Done</span></span>
+      </div>
+    </div>
+    <div class="ws-tabs" data-f="tabs"></div>
+    <div class="canvas">
+      <div class="canvas-bar">
+        <span class="eyebrow" style="color:var(--soft)" data-f="flowname"></span>
+        <span class="spacer"></span>
+        <span class="btn">Collapse</span><span class="btn">Auto-arrange</span><span class="btn" data-f="select"></span><span class="btn dark" data-f="add"></span>
+      </div>
+      <div class="flow" id="flow"></div>
+      <div class="hint" data-f="hint"></div>
+    </div>
+    <div class="statusbar"><span>● Saved</span><span data-f="status"></span></div>
+  </div>
+  <p class="caption"><b>The board is replaced by the piece itself.</b> What sits inside a chapter modal today becomes the whole page: title, summary, kind, words and target, Idea / Draft / Done, the tabs, and the map filling the rest. <b>Removed:</b> New chapter, chapter numbers, Act, previous/next chapter arrows, Delete chapter, and Timeline. <b>Board / Timeline becomes Map / Write.</b> Versions stay. <b>Connectors are always plain lines</b> <span class="new-flag">new</span> in a single piece: no Therefore / But / And, and clicking one does nothing. They show order only. Switch the example above to see how the wording follows the kind.</p>
+</section>
+
+<!-- ============ 3. WRITE ============ -->
+<section class="screen" id="s3">
+  <div class="frame">
+    <div class="appbar">
+      <span class="logo">Estoria</span>
+      <div class="ptitle"><b data-f="title"></b><span data-f="sub"></span></div>
+      <span class="btn"><span class="dotred"></span>Main draft ▾</span>
+      <span class="spacer"></span>
+      <span class="seg"><span>Map</span><span class="on">Write</span></span>
+      <span class="spacer"></span>
+      <span class="seg"><span>Edit</span><span class="on">View</span></span>
+      <span class="seg"><span>Characters</span><span>World</span><span>Notes</span></span>
+      <span class="btn dark">File ▾</span>
+    </div>
+    <div class="write">
+      <div class="rail" id="rail"></div>
+      <div style="display:flex; flex-direction:column">
+        <div class="prose" id="prose"><div class="col" id="col"></div></div>
+        <div class="wfoot"><span id="lbk"></span><span data-f="foot"></span></div>
+      </div>
+    </div>
+  </div>
+  <p class="caption" id="cap3"></p>
+</section>
+
+<!-- ============ 4. PROJECTS + FILE MENU ============ -->
+<section class="screen" id="s4">
+  <div class="frame" style="padding:28px; background:var(--panel)">
+    <div style="display:grid; grid-template-columns: minmax(0,1fr) 270px; gap:28px; align-items:start">
+      <div>
+        <div class="eyebrow" style="margin-bottom:10px">Projects</div>
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div class="row">
+            <div style="flex:1; min-width:0">
+              <div class="t">Salt and Static <span class="kind">Short story</span></div>
+              <div class="m">Short story · 7 scenes · 4.3k words</div>
+            </div>
+            <span class="btn dark">Open</span><span class="btn">✕</span>
+          </div>
+          <div class="row">
+            <div style="flex:1; min-width:0">
+              <div class="t">The Case for Bad First Drafts <span class="kind">Essay</span></div>
+              <div class="m">Essay · 6 sections · 2.1k words</div>
+            </div>
+            <span class="btn dark">Open</span><span class="btn">✕</span>
+          </div>
+          <div class="row">
+            <div style="flex:1; min-width:0">
+              <div class="t">Inventory of a Lighthouse <span class="kind">Poem</span></div>
+              <div class="m">Poem · 4 stanzas · 132 words</div>
+            </div>
+            <span class="btn dark">Open</span><span class="btn">✕</span>
+          </div>
+          <div class="row">
+            <div style="flex:1; min-width:0">
+              <div class="t">The Drowned Map</div>
+              <div class="m">Series · 3 books · 8 chapters</div>
+            </div>
+            <span class="btn dark">Open</span><span class="btn">Merge</span><span class="btn">✕</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:10px">File menu, in a single piece</div>
+        <div class="menu">
+          <div>Projects…</div>
+          <div>New project…</div>
+          <div class="sep"></div>
+          <div>Export…<small>Manuscript, markdown, or project file</small></div>
+          <div>Import…</div>
+          <div class="sep"></div>
+          <div>Change kind… <span class="new-flag">new</span><small>Short story, essay, poem or other. Only the wording changes.</small></div>
+          <div class="hl">Expand into a book… <span class="new-flag">new</span><small>The piece becomes Chapter 1 of a book. A copy is saved first.</small></div>
+          <div class="sep"></div>
+          <div>Backups…</div>
+          <div>About</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>Projects list:</b> each single piece shows its kind as a label, and counts its parts by their own name ("7 scenes", "6 sections", "4 stanzas") instead of chapters. Single pieces can't be merged into a series. <b>Change kind</b> is safe at any time because the kind is only a label. Changing form (piece to book, book to piece, book to series) is on screens 5 to 9.</p>
+</section>
+
+<!-- ============ 5. EXPAND ============ -->
+<section class="screen" id="s5">
+  <div class="frame">
+    <div class="scrim">
+      <div class="dlg">
+        <div class="modal-h">
+          <div style="flex:1">
+            <div class="t">Expand into a book?</div>
+            <div class="s">"Salt and Static" becomes a book, with your short story as Chapter 1.</div>
+          </div>
+        </div>
+        <div class="dlg-b">
+          <div>
+            <div class="eyebrow" style="margin-bottom:8px">Growing it into</div>
+            <div class="kindpick" style="grid-template-columns:1fr 1fr">
+              <div class="on"><b>One longer work</b><small>A novella or novel</small></div>
+              <div><b>A collection</b><small>A story collection</small></div>
+            </div>
+          </div>
+          <div>Everything comes along: the manuscript, all 7 scenes and their layout, characters, world, notes, pins, and every version. Parts are still called scenes. You can add chapters, acts and the Timeline, and label connectors with Therefore / But / And.</div>
+          <div class="note">
+            <span style="font-size:15px">↺</span>
+            <div><b>A copy is saved first.</b> "Salt and Static" as it is now is saved as its own file, under <b>Projects › Saved copies</b>.</div>
+          </div>
+        </div>
+        <div class="dlg-f">
+          <span class="btn">Cancel</span>
+          <span class="btn dark">Expand into a book</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>File › Expand into a book.</b> The "growing it into" choice follows the kind: a poem offers "One long poem" or "A poetry collection", an essay offers "One long essay" or "An essay collection". It sets the book's label only. The kind still sets the wording and a poem's line breaks.</p>
+</section>
+
+<!-- ============ 6. AFTER EXPANDING ============ -->
+<section class="screen" id="s6">
+  <div class="frame">
+    <div class="appbar">
+      <span class="logo">Estoria</span>
+      <div class="ptitle"><b>Salt and Static</b><span>Novella · 4.3k words · 1 chapter</span></div>
+      <span class="btn"><span class="dotred"></span>Main draft ▾</span>
+      <span class="spacer"></span>
+      <span class="btn">+ New chapter</span><span class="btn">Auto-arrange</span>
+      <span class="seg"><span class="on">Board</span><span>Timeline</span></span>
+      <span class="spacer"></span>
+      <span class="seg"><span>Characters</span><span>World</span><span>Notes</span></span>
+      <span class="btn dark">File ▾</span>
+    </div>
+    <div class="board">
+      <div style="display:flex; gap:60px; align-items:center; flex-wrap:wrap">
+        <div class="chcard">
+          <div style="display:flex; justify-content:space-between; align-items:center"><span class="chnum">01</span><span class="kind" style="margin:0">Draft</span></div>
+          <div class="t">Salt and Static</div>
+          <div class="s">A lighthouse keeper's radio starts picking up her drowned brother's voice.</div>
+          <div class="f">7 scenes · 4.3k words</div>
+        </div>
+        <div class="ghost">+ New chapter<br/><span style="font-size:11px">Your story is Chapter 1. Build the book around it.</span></div>
+      </div>
+      <div class="float menu">
+        <div>Projects…</div>
+        <div>New project…</div>
+        <div class="sep"></div>
+        <div>Export…</div>
+        <div>Import…</div>
+        <div class="sep"></div>
+        <div class="hl">Turn into single piece… <span class="new-flag">new</span><small>Collapse the chapters into one piece. A copy is saved first.</small></div>
+        <div>Make it a series…<small>This becomes Book One. A copy is saved first.</small></div>
+        <div class="sep"></div>
+        <div>Backups…</div>
+        <div>About</div>
+      </div>
+      <div style="position:absolute; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:var(--bg); font-size:12px; padding:9px 14px; border-radius:10px; box-shadow:var(--shadow)">
+        Saved a copy of "Salt and Static" before expanding. <u>View saved copies</u>
+      </div>
+    </div>
+    <div class="statusbar"><span>● Saved</span><span>Click a chapter to map its scenes · drag to rearrange</span></div>
+  </div>
+  <p class="caption"><b>You land on an ordinary book board</b> with one card, and a short notice says where the saved copy went. Nothing about this book is special from now on: no "return" link, no locks. Every standalone book's File menu has <b>Turn into single piece</b> and <b>Make it a series</b>, whether it started as a piece or not.</p>
+</section>
+
+<!-- ============ 7. TURN INTO SINGLE PIECE ============ -->
+<section class="screen" id="s7">
+  <div class="frame">
+    <div class="scrim">
+      <div class="dlg" style="width:min(620px,100%)">
+        <div class="modal-h">
+          <div style="flex:1">
+            <div class="t">Turn into a single piece?</div>
+            <div class="s">"Salt and Static" has 3 chapters. They collapse into one piece, in board order.</div>
+          </div>
+          <span class="btn">✕</span>
+        </div>
+        <div class="dlg-b">
+          <div>
+            <div class="eyebrow" style="margin-bottom:8px">It becomes a</div>
+            <div class="kindpick">
+              <div class="on"><b>Short story</b><small>Scenes</small></div>
+              <div><b>Essay</b><small>Sections</small></div>
+              <div><b>Poem</b><small>Stanzas</small></div>
+              <div><b>Other</b><small>Parts</small></div>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:8px">Where one chapter ends and the next begins</div>
+            <div class="kindpick" style="grid-template-columns:repeat(3,1fr)">
+              <div class="on"><b>A break</b><small>* * * between them</small></div>
+              <div><b>A heading</b><small>The chapter title</small></div>
+              <div><b>Nothing</b><small>Run straight on</small></div>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:6px">What happens</div>
+            <ul>
+              <li><b>Prose:</b> all chapters joined into one manuscript</li>
+              <li><b>Scenes:</b> 19 scenes in one flow, laid out fresh</li>
+              <li><b>Connectors:</b> become plain lines; Therefore / But / And labels are dropped</li>
+              <li><b>Cast, world, pins:</b> everything any chapter used</li>
+              <li><b>Summaries and chapter notes:</b> gathered into the piece's notes, under each chapter title</li>
+              <li><b>Target:</b> the chapter targets added up</li>
+              <li><b>Dropped:</b> acts, chapter statuses, the board layout, chapter links</li>
+              <li><b>Versions:</b> every version is collapsed the same way</li>
+            </ul>
+          </div>
+          <div class="note">
+            <span style="font-size:15px">↺</span>
+            <div><b>A copy is saved first.</b> The book as it is now, chapters and all, is saved under <b>Projects › Saved copies</b>.</div>
+          </div>
+        </div>
+        <div class="dlg-f">
+          <span class="btn">Cancel</span>
+          <span class="btn dark">Turn into single piece</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>File › Turn into single piece</b>, for any standalone book. Nothing is merged silently: the dialog says what joins, what's dropped, and that the whole book is saved first. Only what can't exist in a single piece is dropped (acts, board layout, connector labels), and the saved copy still has it. The kind defaults to the book's own kind if it has one.</p>
+</section>
+
+<!-- ============ 8. MAKE IT A SERIES ============ -->
+<section class="screen" id="s8">
+  <div class="frame">
+    <div class="scrim" style="gap:24px; flex-wrap:wrap; align-items:flex-start">
+      <div class="dlg" style="width:min(470px,100%)">
+        <div class="modal-h">
+          <div style="flex:1">
+            <div class="t">Make it a series?</div>
+            <div class="s">"Salt and Static" becomes Book One of a new series.</div>
+          </div>
+        </div>
+        <div class="dlg-b">
+          <div>The book keeps its title and everything in it. The series starts as "Untitled Series" for you to rename, with a series map and timeline above the book.</div>
+          <div class="note"><span style="font-size:15px">↺</span><div><b>A copy is saved first</b>, under <b>Projects › Saved copies</b>.</div></div>
+        </div>
+        <div class="dlg-f"><span class="btn">Cancel</span><span class="btn dark">Make it a series</span></div>
+      </div>
+      <div class="dlg" style="width:min(470px,100%)">
+        <div class="modal-h">
+          <div style="flex:1">
+            <div class="t">Move into "The Drowned Map"?</div>
+            <div class="s">"Salt and Static" joins the series as Book 4.</div>
+          </div>
+        </div>
+        <div class="dlg-b">
+          <div>Its characters, world and assets join the series bible. "Salt and Static" stops being a separate project.</div>
+          <div class="note"><span style="font-size:15px">↺</span><div><b>A copy is saved first</b>, under <b>Projects › Saved copies</b>.</div></div>
+        </div>
+        <div class="dlg-f"><span class="btn">Cancel</span><span class="btn dark">Merge into series</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>The two ways a book becomes part of a series both save a copy first.</b> Left: <b>File › Make it a series</b> (today's "make series" in the toolbar). Right: <b>Projects › Merge</b>, which today moves the book in with no confirm at all. Neither is blocked.</p>
+</section>
+
+<!-- ============ 9. SAVED COPIES ============ -->
+<section class="screen" id="s9">
+  <div class="frame" style="padding:28px; background:var(--panel)">
+    <div class="eyebrow" style="margin-bottom:10px">Projects</div>
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div class="row">
+        <div style="flex:1; min-width:0"><div class="t">Salt and Static <span class="kind">Novella</span></div><div class="m">Book · 3 chapters · 9.8k words</div></div>
+        <span class="btn dark">Open</span><span class="btn">✕</span>
+      </div>
+      <div class="row">
+        <div style="flex:1; min-width:0"><div class="t">The Drowned Map</div><div class="m">Series · 3 books · 8 chapters</div></div>
+        <span class="btn dark">Open</span><span class="btn">Merge</span><span class="btn">✕</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:24px 0 10px">
+      <span class="eyebrow">Saved copies <span class="new-flag">new</span></span>
+      <span style="font-size:11.5px; color:var(--faint)">Taken automatically before a project changed form</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px">
+      <div class="row" style="background:transparent; padding:11px 14px">
+        <div style="flex:1; min-width:0"><div class="t" style="font-size:14.5px">Salt and Static <span class="kind">Short story</span></div><div class="m">Before expanding into a book · 4 Oct · 7 scenes · 4.3k words</div></div>
+        <span class="btn">Open as a project</span><span class="btn">✕</span>
+      </div>
+      <div class="row" style="background:transparent; padding:11px 14px">
+        <div style="flex:1; min-width:0"><div class="t" style="font-size:14.5px">Low Tide <span class="kind">Book</span></div><div class="m">Before turning into a single piece · 28 Sep · 3 chapters · 6.2k words</div></div>
+        <span class="btn">Open as a project</span><span class="btn">✕</span>
+      </div>
+    </div>
+  </div>
+  <p class="caption"><b>Saved copies live in their own section of Projects</b>, apart from your working projects, each saying what change it was taken before and when. <b>Open as a project</b> moves it up into your projects as an ordinary project, which is how you go back. ✕ deletes it. On disk each copy is its own file.</p>
+</section>
+
+<script>
+const K = {
+  story: {
+    kind: "Short story", one: "scene", many: "scenes", title: "Salt and Static",
+    summary: "A lighthouse keeper's radio starts picking up her drowned brother's voice.",
+    words: "4,310", target: "8,000", pct: 54, tabs: [["Characters",3],["World details",2],["Notes"],["Pinned references",1]],
+    parts: [
+      ["Mara logs a storm warning and hears a voice under the static.","but"],
+      ["The voice knows the name of the boat that sank with Tomas.","therefore"],
+      ["She skips the supply run to stay on the frequency all night.","therefore"],
+      ["The harbormaster comes up the stairs to check on her.","but"],
+      ["He hears it too, and says it is his own voice, from 1987.","therefore"],
+      ["Mara climbs to the lamp room and switches off the light.","and"],
+      ["The radio goes quiet. A boat she does not recognize comes in.",null],
+    ],
+    cur: 2, foot: "4,310 / 8,000 words", lbk: false,
+    prose: `<h3>Salt and Static</h3>
+      <p>The warning came in at six, the way they always did, flat and clipped and read by someone in a warm room two hundred miles inland. Mara wrote it in the log in pencil.</p>
+      <p>It was under the warning that she heard him. Not words at first. A cadence. The particular way Tomas used to pause before the last word of a sentence, as if checking it was still there.</p>
+      <div class="brk">* * *</div>
+      <p>She did not go down to the boat on Thursday. She left a note on the door for Ewan, who would be annoyed, and sat with the headphones on until the window went from black to grey to a white that hurt.</p>`,
+    cap: `<b>Write is today's manuscript view, given the whole page.</b> The beats sit on the left as a guide, and the prose runs on the right in one piece, exactly as a chapter's manuscript works now. Export produces one manuscript with the story title in place of chapter headings.`,
+  },
+  essay: {
+    kind: "Essay", one: "section", many: "sections", title: "The Case for Bad First Drafts",
+    summary: "Polishing as you go feels like progress, and it is the reason most drafts never finish.",
+    words: "2,140", target: "3,000", pct: 71, tabs: [["People",1],["Sources",4],["Notes"],["Pinned references",3]],
+    parts: [
+      ["Open: the novel I rewrote the first page of forty times.","but"],
+      ["The standard advice says quality comes from care at every line.","but"],
+      ["Care at the line level hides problems at the structure level.","therefore"],
+      ["A bad full draft shows you the shape you are actually writing.","and"],
+      ["Evidence: how three working writers describe their zero drafts.","therefore"],
+      ["Close: write it badly, then you have something to make good.",null],
+    ],
+    cur: 2, foot: "2,140 / 3,000 words", lbk: false,
+    prose: `<h3>The Case for Bad First Drafts</h3>
+      <p>I rewrote the first page of my first novel forty times. I know because I kept them, in a folder named, without irony, "progress".</p>
+      <h4>What the advice gets wrong</h4>
+      <p>Nearly every guide to writing will tell you that good work comes from care, and that care means attention to every sentence. This is true, and it is also exactly backwards for a first draft.</p>
+      <p>Care at the level of the line is a way of not looking at the level of the whole. A perfect paragraph in the wrong place is still in the wrong place.</p>`,
+    cap: `<b>The same Write view, for an essay.</b> Sections sit beside the draft; headings in the prose are ordinary markdown headings, not tied to the sections. "Characters" can be relabeled for an essay (shown here as "People" and "Sources"); that is an open question rather than a decision.`,
+  },
+  poem: {
+    kind: "Poem", one: "stanza", many: "stanzas", title: "Inventory of a Lighthouse",
+    summary: "A list poem that turns, in the last stanza, into a letter.",
+    words: "132", target: "none", pct: 0, tabs: [["Characters"],["World details",1],["Notes"],["Pinned references",2]],
+    parts: [
+      ["The objects: lamp, log, kettle, one chair.","and"],
+      ["The sounds: wind, radio, the gull on the rail.","and"],
+      ["The absences: a second cup, a coat on the hook.","but"],
+      ["Turn: addressed to him. What the list was for.",null],
+    ],
+    cur: 2, foot: "132 words · 11 lines", lbk: true,
+    prose: `<h3>Inventory of a Lighthouse</h3>
+      <div class="stanza">One lamp, cleaned on Sundays.
+One log, in pencil, in my hand.
+One kettle. One chair
+turned to face the water.</div>
+      <div class="stanza">The wind, which has opinions.
+The radio, which has none.
+A gull on the rail who comes
+for nothing, every day, on time.</div>
+      <div class="stanza">No second cup.
+No coat on the second hook.
+I count them anyway.</div>`,
+    cap: `<b>Poems keep their line breaks.</b> Today a single line break in the manuscript is merged into the paragraph, which would turn a poem into a block of prose. For a poem, line breaks are kept exactly as typed in View mode and in every export, and the footer counts lines as well as words. The switch in the footer lets any piece turn it on or off.`,
+  },
+};
+
+let kind = "story";
+const esc = (s) => s;
+function render() {
+  const k = K[kind];
+  const set = (f, v) => document.querySelectorAll(`[data-f="${f}"]`).forEach((el) => (el.innerHTML = v));
+  set("title", k.title);
+  set("sub", `${k.kind} · ${k.words} words · ${k.parts.length} ${k.many}`);
+  set("summary", k.summary);
+  set("kind", k.kind);
+  set("words", k.words);
+  set("target", k.target);
+  set("count", `${k.parts.length} ${k.many}`);
+  set("flowname", `${k.one} flow`);
+  set("select", `Select ${k.many}`);
+  set("add", `+ Add ${k.one}`);
+  set("hint", `Drag ${k.many} to reorder · connectors are plain lines that show order only`);
+  set("status", `Map the ${k.many} · switch to Write to draft beside them`);
+  set("foot", k.foot);
+  set("tabs", k.tabs.map(([n, c]) => `<span class="chipbtn">${n}${c ? `<em>${c}</em>` : ""}</span>`).join(""));
+  document.querySelectorAll('[data-f="pct"]').forEach((el) => (el.style.width = k.pct + "%"));
+
+  // Map: 4 per row, a connector to the right, or down at the end of a row.
+  document.getElementById("flow").innerHTML = k.parts.map(([txt, c], i) => {
+    const rowEnd = (i + 1) % 4 === 0;
+    // Single pieces never label a seam: every connector is a plain line.
+    const conn = i < k.parts.length - 1 ? (rowEnd ? `<div class="wrapconn"></div>` : `<div class="conn"></div>`) : "";
+    return `<div class="node"><div class="n">${k.one} ${i + 1}</div>${txt}${conn}</div>`;
+  }).join("");
+
+  // Write rail
+  document.getElementById("rail").innerHTML =
+    `<div class="eyebrow" style="margin-bottom:2px">${k.parts.length} ${k.many}</div>` +
+    k.parts.map(([txt, c], i) =>
+      `<div class="node" style="${i === k.cur ? "outline:1.5px solid var(--ink)" : ""}"><div class="n">${k.one} ${i + 1}</div>${txt}</div>` +
+      (i < k.parts.length - 1 ? `<div class="mid"><span class="vline"></span></div>` : "")
+    ).join("");
+  document.getElementById("prose").className = "prose " + kind;
+  document.getElementById("col").innerHTML = k.prose;
+  document.getElementById("lbk").innerHTML =
+    `<span class="lbk">${k.lbk ? '<span class="tog"></span>' : '<span class="tog" style="background:var(--line)"></span>'} Keep line breaks${k.lbk ? ' <span class="new-flag">new</span>' : ""}</span>`;
+  document.getElementById("cap3").innerHTML = k.cap;
+}
+
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === "s" + b.dataset.s));
+  document.getElementById("kinds").classList.toggle("hide", !["2", "3"].includes(b.dataset.s));
+});
+document.getElementById("kinds").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  kind = b.dataset.k;
+  document.querySelectorAll("#kinds button").forEach((x) => x.classList.toggle("on", x === b));
+  render();
+});
+render();
+</script>
+</body>
+</html>
