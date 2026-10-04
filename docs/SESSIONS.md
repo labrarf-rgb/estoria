@@ -5442,3 +5442,20 @@ the same as any other non-target count. Left as is: it is a rule for collapsing,
 not for counting, and §4 already states it. Re-checked on the merged tree:
 the recipe still gives `4` with no target, and collapsing a book with chapters
 at `9 / 3200` and `4 / none` gives a piece at `13 / 3200`.
+
+#### Shipped (same session)
+
+Merged into `main` as a fast-forward to `42b6d85`, which also carried another
+session's unpushed `8053cde` (Session 60's deploy record). Pushed `main` and
+`claude/festive-almeida-e70ef9`. Deployed with `npm run deploy` from the main
+checkout: portfolio commit `2fdc760`, and the script reported **`42b6d85` live**.
+Checked independently: `version.json` reports commit `42b6d85` (build 182), and
+the live bundle `index-DQidOa-3.js` contains the new first-prose check. Prod
+trails `main` by this docs-only commit until the next deploy.
+
+Spec drift review after shipping: the §4 *Word count is derived* row listed the
+paths that recount, but missed Session 60's `expandIntoBook` / `turnIntoPiece`.
+It also implied the structure-only fork and the pull's undo go through
+`syncChapterWords`, when both set the count directly. Fixed. Session 60's
+open drift (the *Manuscript: its own modal* row) is still there and still
+outside this change.
