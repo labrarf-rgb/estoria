@@ -5325,3 +5325,19 @@ branch's doing; flagged as its own task.
 - **Android:** plan written into `Estoria-aa/docs/SPECS.md` §7; nothing built there.
 - **Saved copies without a folder** live only in this browser — §6 future item.
 - Mixed kinds inside one series (a merged poem book uses the series' wording).
+
+#### Shipped (same session)
+
+Committed on `feature/short-stories` as `bd618d2` (Session 59's docs, which had
+been sitting uncommitted, split out into their own commit) and `5af0b74` (this
+feature), merged to `main` as `90d9a3a`, and both branches pushed. **The deploy
+was not run from this session** — the production deploy step was refused by the
+session's permission policy — so `npm run deploy` is still to be run by hand,
+then checked with `curl https://www.labrarf.com/estoria/version.json`.
+
+Spec drift review after shipping: §3's file tree did not list `lib/piece.ts`,
+`PieceView.tsx` or the `FormChange` modal, and §1 still described a tool for
+novelists only — both fixed. One pre-existing drift seen and left alone: the
+"Manuscript: its own modal" row in §4 still describes a meta-line button naming
+*Manuscript* / *Story map*, where the switch is now the Scene flow / Manuscript
+tabs on the working area's header.
