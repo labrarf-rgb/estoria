@@ -2,6 +2,7 @@ import type { Chapter, StoryDoc } from "@/types";
 import { countWords, parseBlocks, taskItem, type Block } from "@/lib/manuscript";
 import { inlineTokens } from "@/lib/inline";
 import { zipStore } from "@/lib/zip";
+import { isPiece } from "@/lib/piece";
 
 /**
  * Manuscript export — **a second export with a different purpose** from the one
@@ -27,14 +28,25 @@ const chapterHeading = (c: Chapter): string =>
   c.title.trim() ? `Chapter ${c.num}. ${c.title.trim()}` : `Chapter ${c.num}`;
 
 /**
+ * Markdown joins a single line break into the paragraph; a trailing double
+ * space is how markdown says "keep this one". Only between two lines that both
+ * have text, so blank-line paragraph breaks are left as they are.
+ */
+const hardBreaks = (text: string): string => text.replace(/([^\n])[ \t]*\n(?=[^\n])/g, "$1  \n");
+
+/**
  * `.md` — concatenation, and nothing to strip. The prose is already markdown and
  * the `***` between scenes is already a thematic break, which is why that
  * marker was chosen over anything the writer would have had to work around.
  */
 export function buildManuscriptMarkdown(doc: StoryDoc): string {
   const parts = [`# ${doc.projectTitle}`, ""];
+  // A single piece is one text under its title: no chapter heading to add.
+  const piece = isPiece(doc);
   for (const c of writtenChapters(doc)) {
-    parts.push(`## ${chapterHeading(c)}`, "", (c.manuscript ?? "").trim(), "");
+    const body = (c.manuscript ?? "").trim();
+    if (!piece) parts.push(`## ${chapterHeading(c)}`, "");
+    parts.push(doc.keepLineBreaks ? hardBreaks(body) : body, "");
   }
   return `${parts.join("\n").replace(/\n{4,}/g, "\n\n\n").trim()}\n`;
 }
@@ -42,13 +54,15 @@ export function buildManuscriptMarkdown(doc: StoryDoc): string {
 /** `.txt` — the same prose with the markup taken out and `#` between scenes. */
 export function buildManuscriptText(doc: StoryDoc): string {
   const parts = [doc.projectTitle.toUpperCase(), ""];
+  const piece = isPiece(doc);
+  const join = (t: string) => (doc.keepLineBreaks ? t : t.replace(/\n/g, " "));
   for (const c of writtenChapters(doc)) {
-    parts.push("", chapterHeading(c).toUpperCase(), "");
+    if (!piece) parts.push("", chapterHeading(c).toUpperCase(), "");
     for (const b of parseBlocks(c.manuscript ?? "")) {
       if (b.kind === "hr") parts.push("#", "");
       else if (b.kind === "ul" || b.kind === "ol") parts.push(...b.items.map(plain), "");
       else if (b.kind === "h" || b.kind === "p" || b.kind === "quote")
-        parts.push(plain(b.text.replace(/\n/g, " ")), "");
+        parts.push(join(b.text).split("\n").map(plain).join("\n"), "");
     }
   }
   return `${parts.join("\n").replace(/\n{4,}/g, "\n\n\n").trim()}\n`;
@@ -95,11 +109,11 @@ const runsFor = (line: string): string =>
  * manuscript format uses for a scene break, and the paragraph after it loses its
  * indent — the two together are what make a scene change legible on paper.
  */
-function chapterParagraphs(text: string): string[] {
+function chapterParagraphs(text: string, keepLines = false): string[] {
   const out: string[] = [];
   let bodyStarted = false;
   for (const b of parseBlocks(text)) {
-    out.push(...docxBlock(b, bodyStarted));
+    out.push(...docxBlock(b, bodyStarted, keepLines));
     if (b.kind === "p") bodyStarted = true;
     // A rule or a heading ends a passage, so the paragraph after it opens one —
     // no indent, the way the first paragraph of a chapter has none.
@@ -115,7 +129,7 @@ function chapterParagraphs(text: string): string[] {
  * rule is a rule in both. Anything less and the file an agent opens quietly
  * disagrees with the screen the author approved it on.
  */
-function docxBlock(b: Block, indent: boolean): string[] {
+function docxBlock(b: Block, indent: boolean, keepLines = false): string[] {
   switch (b.kind) {
     case "hr":
       // The centred `#` standard manuscript format uses for a passage break.
@@ -133,7 +147,11 @@ function docxBlock(b: Block, indent: boolean): string[] {
     case "ol":
       return b.items.map((it, i) => para(runsFor(String(i + 1) + ". " + it), { indent: true }));
     default:
-      return [para(runsFor(b.text.replace(/\n/g, " ")), { indent })];
+      // Kept line breaks are a `<w:br/>` inside the one paragraph, so a stanza
+      // stays one block with its lines where the poet put them.
+      return keepLines
+        ? [para(b.text.split("\n").map(runsFor).join("<w:r><w:br/></w:r>"), { indent: false })]
+        : [para(runsFor(b.text.replace(/\n/g, " ")), { indent })];
   }
 }
 
@@ -211,10 +229,12 @@ export function buildDocx(doc: StoryDoc, author: string): Uint8Array {
   body.push(para(runsFor(title), { align: "center" }));
   if (author.trim()) body.push(para(runsFor(`by ${author.trim()}`), { align: "center" }));
 
+  const piece = isPiece(doc);
   for (const c of writtenChapters(doc)) {
-    body.push(para(runsFor(chapterHeading(c)), { align: "center", pageBreakBefore: true }));
+    // A piece starts its text under its own title rather than a chapter heading.
+    body.push(para(runsFor(piece ? title : chapterHeading(c)), { align: "center", pageBreakBefore: true }));
     body.push(para(""));
-    body.push(...chapterParagraphs(c.manuscript ?? ""));
+    body.push(...chapterParagraphs(c.manuscript ?? "", !!doc.keepLineBreaks));
   }
 
   const sectPr =

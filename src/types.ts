@@ -146,6 +146,22 @@ export interface WorldEntry {
 
 export type BookStatus = "drafting" | "planned" | "idea";
 
+/** A project that is not a book. See `StoryDoc.form`. */
+export type ProjectForm = "piece";
+/** What a single piece is. See `StoryDoc.kind`. */
+export type PieceKind = "story" | "essay" | "poem" | "other";
+/** What an expanded piece became. See `StoryDoc.grownInto`. */
+export type GrownInto = "work" | "collection";
+/** The change of form a saved copy was taken before. */
+export type SavedCopyReason = "expand" | "collapse" | "series" | "merge";
+export interface SavedCopyInfo {
+  reason: SavedCopyReason;
+  /** ISO 8601. */
+  savedAt: string;
+  /** The project it was copied from, for "saved from …" wording. */
+  fromId: string;
+}
+
 /** Series-level metadata for a book. The board itself lives in BookData. */
 export interface BookMeta {
   id: string;
@@ -293,6 +309,46 @@ export interface StoryDoc {
    */
   author?: string;
   seriesMode: boolean;
+
+  /**
+   * The project's form, when it is not a book. `"piece"` is a **single piece**:
+   * one work with no chapters (a short story, an essay, a poem). Absent means a
+   * book, or a series when `seriesMode` is on — which is every document written
+   * before single pieces existed, so the field is optional and needs no
+   * `SCHEMA_VERSION` bump. The Android app keeps it through its top-level
+   * unknown-key passthrough, and shows a piece as a book with one chapter.
+   *
+   * **A piece is still one chapter underneath.** Its scenes, prose, cast, pins
+   * and versions live on `chapters[0]` exactly as a chapter's do, so every
+   * feature a chapter has, a piece has, and turning one into the other moves
+   * nothing. See `lib/piece.ts`.
+   */
+  form?: ProjectForm;
+  /**
+   * What kind of writing this is. A label: it changes what the parts are
+   * called (scenes, sections, stanzas) and a few defaults, never which
+   * features exist. Kept when a piece is expanded into a book, so a poem that
+   * grows keeps calling its parts stanzas. Absent means a story.
+   */
+  kind?: PieceKind;
+  /**
+   * What an expanded piece grew into, asked when it expands: one longer work
+   * (a novel, a long poem) or a collection. A label only, read by `formLabel`.
+   */
+  grownInto?: GrownInto;
+  /**
+   * Keep single line breaks in the prose as typed, instead of joining them into
+   * the paragraph the way markdown does. On by default for a poem. Applies to
+   * the reading view and every manuscript export.
+   */
+  keepLineBreaks?: boolean;
+  /**
+   * Set only on a **saved copy**: the project as it was just before it changed
+   * form, kept so the change can be walked back by opening the copy. A saved
+   * copy lives in the projects library like any project, but is listed apart
+   * and is never the one being worked on. Opening it clears this field.
+   */
+  savedCopy?: SavedCopyInfo;
 
   /**
    * ISO 8601 stamp of the last *file* write (export/backup/sync), shared with

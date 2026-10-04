@@ -7,6 +7,10 @@
 > feature status, §9 for the fix backlog. The dated record of what happened when
 > lives in [`SESSIONS.md`](SESSIONS.md) — appending there is not a substitute for
 > updating the section above that the change made stale.
+>
+> **§§1-9 describe what Estoria is and what was decided. §10 is a *proposal* and
+> describes nothing that exists** — it is parked analysis to revisit, and must not
+> be read as current state or as a commitment.
 
 ---
 
@@ -14,8 +18,13 @@
 
 **Where a novelist maps a story and writes it.** Authors arrange chapters on an
 infinite canvas, map the scenes inside each chapter using the **but / therefore**
-causality method, track characters and worldbuilding, and export everything as
-Obsidian-vault-ready markdown.
+causality method, track characters and worldbuilding, and write the manuscript
+itself, with the map and the phone reading the same file.
+
+It is the **whole workflow**, not a planning front-end for some other editor:
+there is no third-party integration and none is planned (§7). The reach beyond
+this browser is the **Android companion app** over one shared project file in the
+user's Google Drive folder (§8).
 
 It feels like a calm, papery desk tool (warm palette, serif display type), not a
 flashy SaaS app. The aesthetic and full feature set come from the original design
@@ -64,9 +73,24 @@ running app.
   version you're on drops you. Nothing else follows it — export, Sync, and the
   toolbar word count all track the version you're *viewing*, and `+ Add version`
   forks the board you're reading rather than the starred one.
-- **Project** — an independent `StoryDoc` (a standalone book or a whole series).
-  Multiple projects live side by side in a library; you switch, create, delete,
-  and merge them.
+- **Project** — an independent `StoryDoc` (a single piece, a standalone book, or
+  a whole series). Multiple projects live side by side in a library; you switch,
+  create, delete, and merge them.
+- **Single piece** (`form: "piece"`, 2026-10-04) — one work with no chapters: a
+  short story, an essay, a poem, or other. Underneath it is **one chapter that is
+  never shown as a chapter**, so it has every chapter feature (scene flow,
+  manuscript, cast, world, notes, pins, versions) and changing form moves
+  nothing. It has no board: it opens as a page, switched between **Map** and
+  **Write** with the same tabs, in the same place, as a chapter's Scene flow /
+  Manuscript. Its **kind** is a label that names the parts (scenes, sections,
+  stanzas, parts) and sets defaults (a poem keeps line breaks), never which
+  features exist. **Its connectors are always plain lines.** See `lib/piece.ts`.
+- **Change of form** — piece → book (Expand), standalone book → piece (Turn into
+  single piece), book → series (Make this a series, or Merge). **Each saves a
+  copy first**: a **saved copy** is an ordinary project marked `savedCopy`,
+  listed apart under Projects › Saved copies. Opening one as a project is how a
+  change is walked back; nothing stays linked to its copy, so no change is ever
+  blocked.
 
 ---
 
@@ -215,7 +239,7 @@ estoria/
    │  ├─ layout.ts            # board layout, auto-arrange, fit-to-content, scene grids
    │  ├─ sceneFit.ts          # SCENE_TEXT_MAX + measured card capacity: how wide a
    │  │                       #   timeline scene card must be to show its text whole
-   │  ├─ markdown.ts          # *map* export builder (Obsidian), import prompt + parser
+   │  ├─ markdown.ts          # *map* export builder (markdown), import prompt + parser
    │  ├─ manuscript.ts        # prose: markdown block parsing, word count
    │  ├─ manuscriptExport.ts  # *prose* export: .md / .txt / standard-format .docx
    │  ├─ inline.ts            # inline-markdown tokenizer, shared by the reading
@@ -305,7 +329,7 @@ estoria/
   (`- **Name** — role | archetype`). The importer parses them
   (`parseCharacters`, `parseWorld`), the AI import prompt documents them literally,
   and the Android app reads the same files, so "cleaning" them would desync
-  every vault already on disk. Leave them.
+  every exported file already on disk. Leave them.
 
 ---
 
@@ -333,9 +357,12 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Detail | The beats are a guide, not a structure | ✅ | **The prose is not bound to the scenes**, and this is a reversal worth knowing about. An earlier design separated scenes with `***` thematic breaks and kept the two in step: the carousel followed your caret, each beat knew whether it had been written, unnamed beats borrowed their opening line, and a drift bar reconciled the two whenever a scene was deleted or reordered. It was **dropped** — the app *seeded* those breaks, so opening a fresh nine-scene chapter greeted you with eight rows of `***` and nothing between them. The argument for the marker was that it is what a novelist types anyway; pre-filling it is the app typing it for you, which is the opposite thing. Adding, deleting or reordering a beat now changes the map and leaves every word where it is. That cost per-scene written state, borrowed labels, and roughly 300 lines of sections, drift and reconciliation — and the premise survives intact, because seeing your beats while you draft never required the beats to own the paragraphs. |
 | Detail | Markdown in, markdown out | ✅ | You write markdown and `View` renders it: bold, italic, bold-italic, inline code, headings, blockquotes, bulleted and numbered lists, and thematic breaks as a plain rule. `parseBlocks` (block structure) and `inlineTokens` (inline) live in `lib/` and are used by **the reading view and the `.docx` exporter alike**, so a heading is a heading and a word emphasised on screen is emphasised in the file an agent opens. |
 | Timeline | Read the book as prose | ✅ | A `Scenes / Manuscript` **pane toggle** beside the ↓ / → control, not a fourth view: same rail, same cards, same active ring, same two-way scroll sync — only the pane's contents change. Renders through `ProsePane`, the same component the editor's View mode uses. The toggle says **Manuscript**, not Prose: one word for one thing, matching the chapter modal and the export. Vertical fills the pane (the rail already takes the left of the window); horizontal keeps a fixed column, because there the pane scrolls sideways and every chapter needs the same width. **Windowed** since 2026-08-02 (g): only the chapter you are reading and its two neighbours either side render their prose, because rendering all of them put 14,602 nodes in the DOM and froze the main thread for 1,242ms on one 300k-word book. Every chapter's *header* still renders — the rail's two-way sync and `jumpTo` read each group's offset — with a spacer beneath it holding the chapter's height, measured once it has been on screen and estimated from `words × px-per-word` before that (cold error 0.2%). **`Cmd+P` still prints the whole book**: `beforeprint` renders every chapter and `flushSync` is what lands it before the dialog snapshots the page, since the print stylesheet *is* the PDF route and a windowed page would print a book with holes in it. `jumpTo` `flushSync`es the mode change before measuring, or it would aim at spacer heights one render away from changing. |
+| Projects | Single pieces | ✅ | **2026-10-04, branch `feature/short-stories`.** New project offers **Single piece** (kind: Short story / Essay / Poem / Other) beside **Book**. `PieceView` shows the chapter modal in **page mode**: no number, act, prev/next or Delete chapter, title bound to the project title (mirrored onto the chapter so the phone reads it), kind picker in the meta row. Map / Write is switched by the same tabs a chapter uses for Scene flow / Manuscript, in the same place (`ChapterModeTabs` relabels for a piece) — a toolbar toggle was tried and dropped as confusing next to book mode. Toolbar: no Board / Timeline, New chapter, Auto-arrange, zoom or templates. **Connectors are plain lines** — new seams are `"none"`, `cycleSceneLink` refuses, nothing is drawn to click. Parts are named by kind on the canvas, rail, meta row, board, timeline, toolbar, footer and project list (`partNouns` / `countParts`). Optional fields only, **no schema bump**; `normalizeDoc` validates and keeps them. A piece that comes back from the phone with extra chapters says so and offers Expand. |
+| Projects | Changes of form save a copy | ✅ | **2026-10-04.** Expand into a book (asks one longer work / a collection → `grownInto`, the book's label), Turn into single piece (standalone books only; asks the kind and the chapter separator: `***`, a heading, or nothing), Make this a series (now behind a dialog), Merge into a series. Every one calls `makeSavedCopy` first — a merge copies **both** projects — and shows a notice linking to **Projects › Saved copies**. A saved copy is a project with `savedCopy: { reason, savedAt, fromId }`; **Open as a project** clears it (dating the title on a clash). With a connected Estoria folder the copy is also written as `<slug>-saved-<reason>-<stamp>.estoria.json` (never pruned). Collapse rules: prose joined in board order; scenes run on with plain seams (empty placeholders dropped); cast/world/pins unioned (pins deduped by asset); summaries and chapter notes gathered into the notes under each chapter title; targets summed; least-finished status; acts, layout and chapter links dropped; every version collapsed the same way. |
+| Detail | Keep line breaks | ✅ | **2026-10-04.** `keepLineBreaks` on the project, on by default for a poem, switched from the manuscript footer. View renders paragraphs `whitespace-pre-line` (the parser already kept the newlines); `.md` export writes markdown hard breaks, `.txt` keeps the newlines, `.docx` puts `<w:br/>` inside the paragraph. The footer counts lines when it is on. Leading indentation is still trimmed by `parseBlocks`. |
 | App | Word count is derived | ✅ | `words` is a **cache of the manuscript**, recomputed on the save rhythm and written back — still a stored field, because eight places read it and deriving at those call sites would put a manuscript scan inside every render. Counting strips markdown (`**tension**` is one word) and ignores `***`. **One definition, `syncChapterWords` in `lib/manuscript.ts`**, called by every path that can change prose — the debounced typing recompute, a manuscript pulled from another version and its undo, a structure-only fork, and every document arriving through `openDoc` / `replaceDoc` (`reconcileWords`, at the door rather than at hydration, where `mergeProse` has just restored counts this app already wrote). Before 2026-08-06 only the first of those existed, so the board, the toolbar, the version menu and the series map all read one cache that five other paths could leave behind. **Promote, don't overwrite** survives: the first real prose moves the old number into `target`, because `words` used to mean *planned* (the AI import prompt says "estimate from scene length"), so cards read `1.2k / 3k words`. A chapter with **no manuscript is never touched** — a pre-prose book's hand-typed count is not a number to recount. **Emptying one now reads 0**, where it used to freeze at its last count: `manuscript` stays `undefined` until someone types, so a defined-and-empty one means the words were deleted, and the plan is already safe in `target`. |
 | Detail | Selection word count | ✅ | **How long is this passage?** The manuscript's status bar carries the live chapter count (`1,204 words of 3,200`), and since 2026-08-20 a chip to its **left** counts whatever is highlighted — `54 words selected`. It appears only while a selection exists, so the bar is otherwise exactly what it was. **One `selectionchange` listener covers both sides of the Edit/View toggle**, because the two report a selection differently: a textarea's lives in its own `selectionStart`/`selectionEnd` (the document selection does not reach inside one), while reading mode's is the window selection — taken only when its anchor is inside the prose container, or highlighting the chapter title would count as manuscript. It goes through **`countWords`** like every other number in the app, so a selection full of `**bold**` does not read longer than it is, and the count is cleared when the chapter or the view changes: a selection belongs to the text it was made in, and a number standing with nothing lit under it is the kind of lying count the *Word count is derived* row above exists to prevent. |
-| Export | Manuscript (prose) | ✅ | **A second export with a different purpose**, tabbed apart from the map export and never merged: that one is Obsidian-shaped structure, this one is prose for a person. `.docx` in **standard manuscript format** (12pt Times, double spaced, 1" margins, half-inch indents except the first paragraph of a scene, title page, `#` scene breaks, running `Surname / Title / page` header) — the one export agents and beta readers expect and Obsidian cannot produce. Plus `.md` / `.txt`. `StoryDoc` gained an optional `author` for the title block; **no name is invented when none is given**. A ZIP writer (`lib/zip.ts`, stored not deflated) rather than a dependency. A markdown thematic break in your prose exports as the centred `#` standard format uses for a passage break, because that is what the reading view shows — but nothing inserts one for you. |
+| Export | Manuscript (prose) | ✅ | **A second export with a different purpose**, tabbed apart from the map export and never merged: that one is the map's structure, this one is prose for a person. `.docx` in **standard manuscript format** (12pt Times, double spaced, 1" margins, half-inch indents except the first paragraph of a scene, title page, `#` scene breaks, running `Surname / Title / page` header) — the one export agents and beta readers expect, and the reason §7 closed the Google Docs plan: this covers handing the manuscript to a person, offline and with no OAuth. Plus `.md` / `.txt`. `StoryDoc` gained an optional `author` for the title block; **no name is invented when none is given**. A ZIP writer (`lib/zip.ts`, stored not deflated) rather than a dependency. A markdown thematic break in your prose exports as the centred `#` standard format uses for a passage break, because that is what the reading view shows — but nothing inserts one for you. |
 | Export | PDF, via print | ✅ | **Deliberately not an exporter.** `Cmd+P` from the timeline's Prose mode or the editor's View mode prints a typeset reading copy, through an `@media print` block in `index.css`. A PDF writer would be a second implementation of the reading view that could drift from it; this *is* the reading view, on paper. Screen-only furniture (chrome, hover affordances, the scroll spacer, unwritten scenes) is marked `data-print-skip`. |
 | App | Versions carry their prose | ✅ | Prose forks with the version, exactly as scenes do — "version" keeps meaning a version of the book. So: forking **asks whether to take the writing**, but only when there is prose to copy (with none, both answers are identical and the prompt is just a click); the version menu shows **word counts**, so a fork's cost is visible before you pay it; and a chapter can **pull its text from another version** (`Also written in …`), behind a confirm naming the version and the count, with one undo. Deliberately **not a merge engine** — merging prose is a hard problem and a bad one to half-solve. |
 | Detail | Scene flow canvas | ✅ | Drag-to-reorder scene nodes (live grid preview + edge auto-scroll), long-press Add scene to drop it in place, SVG connectors, click pill to cycle therefore/but/and/unlabeled, add/edit/delete scene, auto-arrange, **move selected scenes to another chapter** (Beginning/Middle/End). |
@@ -367,7 +394,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Templates | Insert / replace skeletons | ✅ | 33 structures + blank starter (34 template cards), every structure carrying per-chapter writing prompts; incl. 9 life-story arcs and 14 genre beat sheets (4 of them magical realism, Session 50); facet filter bar. The card's tag pill is **pinned to the right edge**, not trailed after the name (Session 54) — the name is what varies in length, so trailing it put the tag in a different place on every card, and on a two-line name it squeezed the pill until its own text wrapped. `items-start` keeps the tag on the name's first line; `shrink-0` is what stops the pill breaking. |
 | Import | AI prompt + markdown parse | ✅ | Prompt copy, drop-to-parse, summary card, opens as a new project. Parser tolerates AI drift (Session 43). Validation still only errors on 0 chapters. **A numbered marker alone on its line (`2.`, `2)`) is an empty beat**, not a stray number — a blank scene exports as `2. ` and arrives trimmed, so without this rule it vanished and every later link shifted up a seam. Only the **numbered** form may stand alone; bullets still require their space, because relaxing the shared rule to `\s*` would read a lone `*`, an emphasised line (`*She lies here*`), `---`, `+1 …` and `3.5 hours later` (as "5 hours later") all as beats — the exact drift tolerance Session 43 exists to protect. **The export format did not change.** |
 | Import | Manuscript comes with it | ✅ | A **Map only / Map + manuscript** toggle in step 1 swaps the copied prompt (2026-08-06). With prose on, each chapter carries its text under `#### Manuscript`, last in the chapter, ending at the next `###`/`##`; the parser lifts that block off the chunk **before** the scene matcher runs, or a paragraph beginning `- ` or `1. ` would be read as a beat. Prose lands in `chapter.manuscript` and the chapter opens as `draft` rather than `idea`. `manuscript` is left **undefined** when the block is missing or wordless, because that is the value `syncChapterWords` reads as "never drafted". No new counting code: `openDoc` already runs `reconcileWords`, so the AI's estimate is promoted to `target` and the real count takes over — cards read `27 / 3.2k words`. Off by default: the map costs a page, the prose is the whole book. The prompt asks for parts split at chapter boundaries rather than a compressed book, and forbids summaries or `[chapter continues]` in place of text. |
-| Export | Markdown (Obsidian) | ✅ | Copy + download. An **unlabeled** scene seam (`"none"`, v9) writes **no tag** rather than a `_(none)_` marker — the vault should not carry a word for "no word here" — and `parseImportMarkdown` reads an untagged scene back as `"none"`, which is what makes the round trip lossless. The cost is deliberate and one-way: markdown exported **before** v9, or an AI file that skipped tags, imports those seams unlabeled where it used to import them as `"therefore"`. The import prompt was updated to match, telling the model that leaving a tag off is a real answer. |
+| Export | Markdown (story map) | ✅ | Copy + download. A readable snapshot of the map, and the shape `parseImportMarkdown` reads back — its `[[wikilinks]]` and `—` field separators are **this format's own syntax**, not a promise about another tool (§7). An **unlabeled** scene seam (`"none"`, v9) writes **no tag** rather than a `_(none)_` marker — the file should not carry a word for "no word here" — and `parseImportMarkdown` reads an untagged scene back as `"none"`, which is what makes the round trip lossless. The cost is deliberate and one-way: markdown exported **before** v9, or an AI file that skipped tags, imports those seams unlabeled where it used to import them as `"therefore"`. The import prompt was updated to match, telling the model that leaving a tag off is a real answer. |
 | Export | Project file (.json) | ✅ | Save + "Open file…" in the Projects modal (Session 9). |
 | Series | Planner view + mode toggle | ✅ | Book cards editable in place (title, premise, status, cover, link labels). |
 | Series | Add book / reorder / auto-arrange | ✅ | Toolbar "+ New book" and "Auto-arrange" (series map only). Reorder via grip handle: map drop → confirm → resequence + re-arrange; timeline drag → live reflow. A map drop lands the book **before** the card it hit, with an **End of series** slot past the last book for the tail — same rule as the chapter board. The map drop also **re-tests at release** now (2026-08-05), instead of trusting a ref only written inside the coalescing rAF; it had the same frame-staleness the board fixed when multi-chapter reorder landed (see the "Drop target is hit-tested at release" row), and the new end slot would otherwise miss a quick flick. |
@@ -426,8 +453,16 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 7. **Cloud backend = Google Drive + Google sign-in** — decided 2026-07-01, see
    §8 for the full plan. Prerequisites first: fix the persistence seam and
    quota/perf issues in §9 (items 1–3), then move hosting to Vercel (§8),
-   then build `GoogleDriveStorageAdapter`. See also §7 Integrations
-   (Obsidian/Google Docs).
+   then build `GoogleDriveStorageAdapter`. This is the **only** external
+   surface Estoria is getting: third-party integrations are closed (§7).
+
+8. **Saved copies when no folder is connected** — *future, noted 2026-10-04.* A
+   change of form saves its copy as a project in this browser, and also as a file
+   in the Estoria folder when one is connected. Without a folder (Firefox,
+   Safari, or never set up) the copy exists only in this browser's storage, so
+   clearing site data loses it. Options when this is picked up: offer a download
+   of the copy alongside the change, or keep it in the Drive file once §8's
+   Drive adapter exists.
 
 > **Cross-project note — an Android companion app is planned (not built here).**
 > A **separate** native Kotlin/Compose app is planned (decided 2026-07-02); its
@@ -546,68 +581,126 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 
 ---
 
-## 7. Integrations / external sync (future, not started)
+## 7. Integrations — CLOSED, not planned (decided 2026-09-19)
 
-A separate area from the cloud backend. **Cloud (roadmap item 7, plan in §8)**
-syncs Estoria's *own* data (`.estoria.json`) across the user's devices.
-**Integrations** project Estoria *into other tools* (Obsidian, Google Docs) for
-writing prose or sharing.
+**Estoria is the end-to-end workflow. It does not project itself into another
+writing tool, and no third-party integration is planned.** The loop is: map and
+write on the web app, reach the same work from the Android app, and let the
+shared file live in the user's Google Drive folder. That is the whole story —
+see §8, which is where the real sync design lives.
 
-### The core tension
+This section used to plan an **Obsidian** folder sync as integration #1, with
+**Google Docs** export behind it. Both are dropped. The section is kept rather
+than deleted so the reasoning survives and nobody re-opens it by accident.
 
-Estoria's model is a **structured graph** (board positions, scene node positions,
-typed connectors, characters, world, per-book versions, multi-book). The targets
-are **linear text**. Export is easy; reading edits *back* without losing structure
-is the hard part. Stance: **Estoria owns structure; the external tool owns prose.**
-Embed stable IDs + structural metadata as YAML front-matter / hidden blocks so a
-round-trip survives; regenerate (don't store) anything the target can't represent
-(e.g. board positions in a Google Doc).
+### Why a synced folder of files was dropped
 
-Three levels of ambition: (1) one-way export — already have markdown; (2) one-way
-push sync — keep the external copy updated; (3) two-way sync — reconcile both
-sides (genuinely hard; do last, behind a manual "pull").
+- **It contradicts the shape of the product.** Obsidian sync meant a second tool
+  owning the prose, which re-opens the round-trip problem Estoria exists to
+  avoid: Estoria's model is a structured graph (board positions, typed
+  connectors, scene layouts, per-book versions), the target is linear text, and
+  reading edits *back* without losing structure is the expensive half. Paying
+  that cost to hand the manuscript to an editor Estoria already has, in its own
+  chapter modal, is a bad trade.
+- **Conflict resolution would leave the app.** This is the real cost, and it is
+  worth stating precisely because the *obvious* objection is wrong — see the
+  correction below. Today Estoria reads the file itself, fingerprints it, runs
+  the three-way compare, and when both sides changed runs `diffDocs` +
+  [`merge.ts`](../src/lib/merge.ts) with reference closure. **Estoria owns
+  correctness.** In a synced-folder topology it does not: it sees a local folder
+  mutating underneath it, and a background sync app resolves by mtime or by
+  "keep both, rename one". With **one file** that is survivable — a clobber is
+  wholesale, and the fingerprint catches it on the next open ("file changed
+  elsewhere, press Sync"). With **many files** it is not: a dumb syncer can merge
+  *partially*, taking chapter 12 from the phone and the series bible from the
+  laptop, and hand back a chapter casting a character id that does not exist.
+  That is the §9 item 5 bug class arriving from **outside** the app, where
+  nothing can detect it. Note the shape of this argument: it is about **many
+  files**, not about folders.
+- **SAF folder enumeration is slow.** `DocumentFile.listFiles()` is a known
+  Android cost; Obsidian mobile draws complaints about it on large vaults.
+  Opening one file is cheap, walking a few hundred chapter files on every open
+  is not.
+- **It puts a third-party sync app in the critical path** of the product's own
+  sync story. Acceptable for a user who already runs one; a real setup cost to
+  put in front of everyone else.
 
-### Obsidian — preferred first integration (local, no backend)
+> **⚠️ Correction (2026-09-19) — an earlier draft of this section was wrong, and
+> the wrong version is easy to re-derive from §8, so read this before citing it.**
+> That draft claimed "the Android app cannot see a folder", citing §8's
+> `ACTION_OPEN_DOCUMENT_TREE` note. **§8's claim is narrower than that and does
+> not generalize.** It is about reaching *into Google Drive through Drive's own
+> `DocumentsProvider`* — see the scope note on that bullet in §8. It says nothing
+> about folders on the phone's **local** storage, where SAF grants persistable
+> tree URIs normally. That is exactly how Obsidian mobile works: it reads a
+> **local** vault folder, and a separate sync app (Autosync, FolderSync,
+> Syncthing) mirrors that folder to Drive. Obsidian never talks to Drive at all.
+> **Estoria Android could do the same.** The platform is not the blocker here;
+> the bullets above are, and they are a choice about who owns correctness, not a
+> limitation to hide behind.
 
-- A vault is just markdown files in a folder; no API/OAuth. The browser writes to
-  it via the **File System Access API** (user grants a folder handle once). Fits
-  Estoria's local-first ethos and slots behind the existing `StorageAdapter` seam.
-- Mapping (we're ~90% there): one note per chapter (folder per book),
-  characters/world as notes, `[[wikilinks]]` (already emitted), a project index
-  note. **Front-matter** carries `estoria-id`, act, status, version, scene order/
-  positions, connector types → enables pull-back.
-- Two-way is tractable: re-read on focus, **match by `estoria-id`, not title**
-  (titles change), update chapter summary / scene prose from the body, keep
-  structure from front-matter.
+The web side is **unchanged by that correction and is a separate constraint**: a
+browser is not a filesystem. Estoria reaches disk through the File System Access
+API — Chromium only, permission-gated, async, gesture-granted — and Firefox and
+Safari get no folder access at all (§8, "No footer button where folder access
+doesn't exist"). This limits *folder* features in the browser regardless of what
+the phone can do, and it is why the desktop side leans on a Drive-for-desktop
+folder rather than on Drive's API.
 
-### Google Docs — later, one-way share (rides the cloud milestone)
+### Why Google Docs export was dropped
 
-- Real cloud API + **OAuth**; realistically needs a small **backend** (PKCE in a
-  pure SPA hits CORS/quota friction). So it's coupled to the cloud milestone
-  (roadmap item 7 / §8), not before it. Note: the §8 Google sign-in work gives
-  us the OAuth client anyway — Docs export would add the `documents` scope.
-- Rich text, not markdown: writing a clean formatted manuscript (chapters = H1,
-  scenes = paragraphs) is fine; **parsing a Doc back is fragile**. Treat as a
-  one-way "export to a shareable Doc" for editors who live in Google. **Skip
-  two-way Docs** — not worth the cost.
+It rode the cloud milestone for OAuth, needed the `documents` scope and
+realistically a small backend, and existed to hand a formatted manuscript to an
+editor or beta reader. The **standard-manuscript-format `.docx` export**
+(§4, "Manuscript (prose)") already does that job, offline, with no OAuth and no
+backend, and in the format agents actually ask for. Nothing is left for a Docs
+integration to add.
 
-### Key sequencing insight
+### What this does NOT retire
 
-The **markdown import parser** (§6 item 6) and the **Obsidian pull side** are the
-same code (markdown → `StoryDoc`). Build the parser first: it makes Import actually
-work *and* becomes the read-back engine for Obsidian sync. → Do parser, then
-Obsidian folder sync, then (with cloud) one-way Google Docs export.
+- **The markdown export stays** (§4, "Markdown (story map)"). It is a plain
+  markdown rendering of the map, useful as a readable snapshot and as the thing
+  the import parser reads back. It emits `[[wikilinks]]` and `— ` field
+  separators; those are now just **the export format's own syntax**, load-bearing
+  for `parseImportMarkdown` and for the Android app, not a promise about any
+  other tool. See the em-dash exception in §3 Conventions.
+- **`parseImportMarkdown` stays** (§6 item 5). It was built to make Import work
+  and to be the AI-import read-back engine. That is its whole job now; it is no
+  longer half of a pull-side for a vault.
+- **The `.docx` / `.md` / `.txt` manuscript exports stay.** Getting prose *out*
+  for a reader is a one-way export and always was. What is dropped is
+  *syncing with* another tool, not exporting to a file.
 
-### Decisions to settle before building
+### If it is ever re-opened
 
-- **Granularity:** sync per **book** (a book = a manuscript = a vault folder / one
-  Doc), not whole-project.
-- **Which version syncs:** just the **active** version (multiple versions → multiple
-  files gets confusing).
-- **Conflicts:** start with Estoria-owns-structure / external-owns-prose + a manual
-  **pull** button before anything live or automatic.
-- **Google Docs intent:** sharing with editors vs. writing there — likely sharing,
-  which means one-way is enough.
+The one idea from the vault design worth keeping is **prose as separate files**,
+and it is worth keeping for **durability, not interop**: chapter manuscripts are
+the bulk of the bytes, are already markdown (`Chapter.manuscript`), are already
+keyed four ways at rest (`ProseKey` in [`store/prose.ts`](../src/store/prose.ts),
+which is a folder path in all but name), and a corrupt `.estoria.json` currently
+costs the novel rather than costing the card positions. That is the same idea
+§8's "How big can a project get?" reaches for under per-version/per-book file
+granularity, and it belongs to the **§9 item 1** storage-granularity work, not to
+an integration.
+
+**The shape that survives all three objections above is a hybrid**, and it is
+what to build if this is picked up: **prose as `.md` files beside a canonical
+`.estoria.json`, with the JSON still authoritative.** The manuscripts are the
+bulk of the bytes, are independent of each other, and are the thing worth being
+readable by any text editor on any device; the JSON keeps the graph, keeps the
+fingerprint, and keeps `merge.ts` able to reconcile — so **Estoria still owns
+correctness** and a background sync app never gets to partially merge a project.
+A user who mirrors their Estoria folder to the phone (the Obsidian-on-Android
+pattern: local folder + a sync app) then gets their chapters readable there for
+free, which is most of what the vault idea was ever worth.
+
+The cost to be honest about: the prose then exists twice on disk, and the `.md`
+copies can drift if they are hand-edited. Read-back stays behind an **explicit
+pull**, never automatic — the stance §7 already took before it was closed.
+
+**That idea is worked out in full in §10**, together with the lazy-loading half of
+the same question, what can and cannot be markdown, and a phased order. Start
+there rather than from this paragraph.
 
 ---
 
@@ -686,6 +779,14 @@ web half shipped later the same day (Session 24). **The contract:**
   Drive (no `ACTION_OPEN_DOCUMENT_TREE` support in Drive's provider), so the
   phone can only watch a single file — and `drive.file`-scoped API access
   wouldn't see desktop-synced backups anyway.
+  **⚠️ Scope of that rationale (clarified 2026-09-19).** It holds *for the phone
+  reaching into Drive itself*, which is the topology this contract assumes. It
+  is **not** a general claim that the Android app cannot use folders: a folder on
+  the phone's **local** storage grants a persistable SAF tree URI normally, and a
+  third-party sync app can mirror that folder to Drive (this is how Obsidian
+  mobile works — it never talks to Drive). So the one-file contract is held in
+  place by **who resolves conflicts**, not by what Android can open. See §7,
+  "Why a synced folder of files was dropped", including the correction box there.
 - **Change detection = per-device content fingerprint + `modifiedAt`.**
   Each device remembers a hash of the state it last agreed on with the file
   (web: localStorage/IDB alongside the dir handle). Compare:
@@ -1046,7 +1147,10 @@ are not independent units, and any split has to keep a bible write and the
 books referencing it consistent. In IndexedDB a transaction spans records and
 gives that for free; across localStorage keys or separate files it does not.
 See also §9 item 1, which already wants per-project granularity for the Drive
-adapter — that is the moment to do this work, not before.
+adapter — that is the moment to do this work, not before. **§10 is the worked-out
+proposal** for exactly this, and its Phase 0 is cheaper than any of it: the
+startup load currently pulls every manuscript of *every project* into memory, so
+scoping that load is a change to one function and costs no format work at all.
 
 ---
 
@@ -1062,7 +1166,9 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
    `activeAdapter.load()` (async rehydrate), the duplicate write is gone, and
    the legacy `estoria:doc:v1` copy is removed on first load to reclaim quota.
    Still open from this item: widening `StorageAdapter` to per-project
-   granularity (deferred to the §8 Drive work).
+   granularity (deferred to the §8 Drive work). **This is Phase 0 of §10** and is
+   worth doing on its own merits — `partialize` puts the active doc *and every
+   stashed project* into one string today.
    *Original finding:* **`zustandStorage` bypasses the adapter on read and double-writes on save**
    ([persistence.ts](../src/store/persistence.ts)). `setItem` writes the full
    serialized store twice — once via `activeAdapter.save()` (which stores under
@@ -1182,7 +1288,7 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     and full character fields (Desc/Bio/Traits/Goals/Motivations/Wants|Needs)
     in the import-prompt schema, and the parser learned the `Desc:` line, so
     the round-trip keeps them. Still open: export covers only the **active
-    book** — add a per-book choice (or label it) when the Obsidian work starts.
+    book** — add a per-book choice (or label it) if per-book export is wanted.
     *Original finding:* **Markdown export is lossy vs the import schema.**
 12. **Wheel zoom is origin-anchored, not cursor-anchored** (Board + SeriesMap):
     zooming drifts the content instead of zooming at the pointer. Standard fix:
@@ -1370,3 +1476,223 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
     (2026-08-06 made that cache trustworthy everywhere else). The claim that
     `Timeline.tsx` counts per chapter in its rail render was already stale — item
     17's pass moved it to `c.words`.
+
+---
+
+## 10. Proposal: folder-per-project storage + lazy loading (2026-09-19, NOT STARTED)
+
+> **Status: a proposal to revisit, not a decision.** Nothing here is built and
+> nothing here is committed to. It is written down because the analysis is the
+> expensive part and it should not have to be redone. Read §7 first (why a
+> *synced folder of files* was closed as an integration) — this section is the
+> same shape of idea aimed at **storage and scale**, which is a different
+> question with a different answer.
+
+**The proposal, as put:** one folder per project, with the story map, manuscript,
+versions, books, details, characters, notes and the future plotgrids / plotlines
+/ stats each as separate markdown files, JSON for whatever cannot be markdown.
+And, for scale as the manuscript grows, stop loading everything into the browser
+at once: load what is needed, free what is not.
+
+### 10.1 The first finding: these are two independent changes
+
+**Lazy loading does not require the file split, and the file split does not give
+you lazy loading.** Keeping them apart is the single most useful conclusion here,
+because one of them is cheap and available today.
+
+What happens today, in [`persistence.ts`](../src/store/persistence.ts)'s
+`getItem`:
+
+```ts
+const [stored, storedImages] = await Promise.all([loadAllProse(), loadAllImages()]);
+...
+for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = rejoin(d);
+```
+
+`loadAllProse()` is, by its own docstring, *"Every manuscript on this origin"*.
+So on startup Estoria loads **every manuscript, of every version, of every book,
+of every project** — including the projects in `projectStash` that nobody is
+looking at — and merges them all into memory.
+
+That is the scalability problem, it exists now, and **the on-disk format has
+nothing to do with it.** Prose is already keyed four ways in IndexedDB
+(`ProseKey` in [`store/prose.ts`](../src/store/prose.ts)), which is a *better*
+lazy-load source than a folder: indexed, transactional, no permission prompt, no
+`await` on a directory handle. Scoping that load is a change to one function, not
+to the document model.
+
+### 10.2 What can be markdown, and what cannot
+
+| Thing | Verdict |
+| --- | --- |
+| **Manuscript** | **Yes.** Already markdown (`Chapter.manuscript`), one string per chapter, independent of every other chapter. The whole case rests on this one. |
+| **Notes** (`storyNotes`, `Chapter.notes`, `NOTE` assets) | **Yes.** Free text. |
+| **Characters / World** | **Defensible, do last.** Frontmatter for `id`, `color` (an `oklch()` string), `archived`, `refs[]`; body for desc / bio / motivations / want / need. Lowest value of the "yes" group — it is where frontmatter starts outweighing body. |
+| **Book meta** | **Partly.** `premise` / `arc` / `notes` are prose; `status` / `x` / `y` / `id` are frontmatter; `coverSrc` should stop being a base64 data URL and become a real image file (**this is §9 item 13**, and the folder model makes it natural). |
+| **Story map** | **No.** See below. |
+| **Plotgrids / plotlines** (future) | **No.** Grids are tabular; markdown tables are lossy and miserable to parse back. |
+| **Stats** (future) | **No — and mostly should not be *stored*.** See §10.6. |
+
+#### Why the map specifically cannot be markdown
+
+`sceneLinks[i]` is the **gap** between scenes `i` and `i+1`, under a hard
+invariant: `sceneLinks.length === scenes.length - 1`. `scenePos` and
+`scenePosCompact` are arrays *parallel to* `scenes`. Add `x`, `y`, `rot`, `act`,
+`num`, `chars[]`, `worldRefs[]`, `refs[]`.
+
+That can be crammed into frontmatter, but then it is JSON wearing a markdown hat
+— and, worse, it is JSON that a text editor can now break. **The value of
+markdown is that anything can edit it, and that is exactly what destroys a
+positional array.** Add a scene bullet to the body by hand and three parallel
+arrays desync; `normalizeSceneLinks` then dutifully "repairs" it by truncating or
+padding, which is silent loss of the writer's connector types.
+
+Prose carries no such hazard: it is one string, and there is no way to corrupt it
+by editing it. So the rule the split should follow is not an aesthetic one:
+
+> **Markdown for what a human cannot break. JSON for what they can.**
+
+Which is, not coincidentally, the same line Obsidian draws — its notes are
+markdown and its Canvas is a `.canvas` JSON file.
+
+#### And do not split the map per chapter
+
+Measured in §8 ("How big can a project get?"): the whole map at **250 chapters ×
+6 scenes is 282KB**, past any realistic book. Splitting it per chapter buys
+nothing and costs a great deal, because renumbering, reordering and auto-arrange
+all touch **every** chapter — N file writes where one `map.json` is one write.
+**One `map.json` per version.**
+
+### 10.3 Critical analysis — stability
+
+- **Transactions are lost.** An IndexedDB transaction spans records; N file
+  writes have no such thing (§8 already names this). Interrupt a reorder and
+  chapters 1–7 are renumbered while 8–20 are not. Per-file atomic rename does not
+  rescue this, because it is the **set** that has to be consistent, not each file.
+- **The load lock's binary answer stops working.** §2's invariant is "nothing is
+  written until a load has said what is already there", and it needs a definite
+  yes/no. N files introduce a third state: *40 of 50 chapters read*. Treat that as
+  ready and the next auto-save deletes the missing 10; treat it as failed and a
+  single unreadable file locks the project. This is the same ambiguity
+  `proseExternal` was added to kill, arriving once per file — and it is the
+  strongest argument for §10.5's manifest.
+- **The folder can never be the only store.** `beforeunload` is synchronous,
+  IndexedDB is not, which is the entire reason `writePad` exists. The File System
+  Access API is **also** async and has **no** synchronous escape hatch at all. A
+  sync-capable local store therefore stays underneath the folder permanently.
+  This one is a hard constraint, not a preference.
+
+### 10.4 Critical analysis — performance
+
+- **The win is real and already measured.** A 2.5M-word project is a 15–18MB
+  `.estoria.json` rewritten *whole* on every sync, times five rotating backups,
+  with `JSON.stringify(doc, null, 2)` on the main thread (§8). Splitting fixes
+  exactly this, and it is the strongest argument for the proposal.
+- **Lazy loading puts latency at the worst moment.** Opening a chapter becomes an
+  async read before any text appears: ~1ms from IndexedDB, slower from the File
+  System Access API and capable of prompting. An editor that opens blank and then
+  fills is bad in a writing app. Prefetch neighbours; keep an LRU.
+- **"Free memory when possible" has a floor, and it names the right unit.**
+  [`Timeline.tsx`](../src/components/Timeline.tsx) loops every chapter reading
+  `manuscript` — reading the book straight through needs the whole active version
+  by design. That is not a problem; it is the answer to "what is the working
+  set": **one version of one book.** Everything outside it can be evicted.
+
+### 10.5 Critical analysis — cross-device, and the manifest
+
+This is the part to worry about, and the proposal makes §7's objection **worse,
+not better**: with everything split, a project is hundreds to thousands of files.
+In a Drive-mirrored folder (local folder + a background sync app — see §7's
+correction box) conflicts are resolved by mtime across all of them, and **at that
+file count a partial sync stops being an edge case and becomes the normal
+outcome of any interruption.** Estoria's fingerprint and `merge.ts` reference
+closure never see it.
+
+**The answer is a manifest, and it should be treated as mandatory, not optional:**
+
+- one small `manifest.json` per project, holding **per-file hashes, expected
+  counts, and the schema version**, and **written last**;
+- it gives torn-set detection (manifest disagrees with the files ⇒ refuse and
+  repair rather than arming writes over a partial project — the §10.3 problem);
+- cheap change detection without reading every file;
+- and a home for the fingerprint Sync already depends on.
+
+Without it, multi-file sync is uncontrolled. **Schema coordination with Android
+also gets harder:** today it is one file and one `schemaVersion` (and v9 is
+already open — web on 9, phone on 8, see §6). A folder means versioning the
+directory *structure* too, and two apps disagreeing about where a file lives is a
+worse failure than disagreeing about a field.
+
+### 10.6 Stats, when they come (the Pace precedent)
+
+The sibling project **Pace** (`~/WebAppProjects/Pace Calculator`) already solved
+this shape, and its answer should be copied rather than re-derived: the stored
+data is an append-only log of `(date, amount)`, and **every projection is derived
+at read time, never stored.** Its README states the rule that makes it work —
+*progress* is a total, *pace* is measured only over logged days, and the atomic
+unit is the day, not the sitting.
+
+For Estoria that means: a day log is numeric, append-heavy, tabular data ⇒ JSON,
+or better, per-day IndexedDB records. It is the clearest "must not be markdown"
+case in the whole proposal, and the stats themselves should not be persisted at
+all.
+
+### 10.7 Suggested order, if this is picked up
+
+**Phase 0 — costs nothing, fixes today, no format change.** Scope
+`loadAllProse` / `loadAllImages` to the active project, then to the active
+version. Do **§9 item 1**'s per-project granularity so `partialize` stops putting
+every stashed project into one string. No new failure modes, and it is a
+prerequisite for everything below.
+
+**Phase 1 — lazy loading, still no format change.** Keep §2's invariant ("the
+document is always whole above the at-rest layer") and **narrow its scope** to
+the active book + version rather than breaking it. Deliberately avoid letting
+`manuscript?: string` come to mean "absent, or merely not loaded yet" — that
+ambiguity is precisely the `proseExternal` bug class, and it is one auto-save away
+from making "not loaded" permanently true. Hydrate fully at the export / Sync /
+backup boundary, where `loadAllProse()` already does the right thing.
+
+**Phase 2 — file granularity in the sync layer only, not in the store.**
+
+```
+Estoria/
+  the-drowned-map/
+    manifest.json              # per-file hashes + counts + schema. WRITTEN LAST
+    project.json               # the bible: characters, world, assets, books, bookLinks
+    assets/<id>.md | <id>.jpg  # notes and to-dos as md, images as real files (§9 item 13)
+    book-one/
+      book.json                # BookMeta, drafts[], activeDraftId, mainDraftId
+      cover.jpg
+      main/                    # one folder per version
+        map.json               # chapters (minus prose), links, storyNotes
+        prose/01-the-wreck.md  # frontmatter: estoria-id, num, title
+  the-drowned-map.estoria.json # KEEP WRITING until Android is ready (§8 contract)
+```
+
+Frontmatter on each prose file carries enough to rebuild if `map.json` is ever
+lost. That is the durability argument in one line: **the map is reconstructible,
+the novel is not.**
+
+**Phase 3 — characters / world as markdown.** Only if there is a real wish to
+edit them elsewhere.
+
+**Phase 4 — plotgrids / plotlines / stats.** JSON from the start, per §10.6.
+
+### 10.8 What this proposal should drop
+
+- The **story map**, **plotgrids** and **stats** as markdown (§10.2, §10.6).
+- **Per-chapter map files** — one `map.json` per version (§10.2).
+- Any notion that the folder becomes the **primary store** for the web app
+  (§10.3, and Firefox/Safari have no folder access at all — §7).
+
+Everything else stands, and folder-per-project as an organising idea is
+straightforwardly good.
+
+### 10.9 The one-line summary
+
+**The file split solves a measured problem (write amplification). Lazy loading
+solves a speculative one (memory) and does not need the split. The part that
+would hurt is putting the graph in markdown.** Do them in that order,
+independently, and treat the manifest as the price of admission for multi-file
+sync.
