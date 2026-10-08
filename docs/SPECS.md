@@ -500,7 +500,14 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    then build `GoogleDriveStorageAdapter`. This is the **only** external
    surface Estoria is getting: third-party integrations are closed (§7).
 
-   > **▶ NEXT UP (handoff, 2026-10-07).** This is the next phase, and its goal
+   > **▶ NEXT UP (handoff, 2026-10-07).** **The plan is written and approved:
+   > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Decided with the
+   > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in
+   > stays on `www.labrarf.com`, and Drive becomes a second kind of "Estoria
+   > folder" *under the existing Sync* (a `SyncFolder` interface) rather than a
+   > `StorageAdapter`. The notes below are the background it was planned from.
+   >
+   > This is the next phase, and its goal
    > is **Estoria on iPad, Safari and Firefox**: today cross-device Sync needs
    > the File System Access API (desktop Chromium only), so those browsers have
    > local storage only. Drive over HTTPS works everywhere.
