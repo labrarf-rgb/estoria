@@ -223,7 +223,9 @@ export function Footer() {
         ? "Couldn't save this chapter's writing. It's safe until the next save, but export your project to keep a copy."
         : status.reason === "images"
           ? "Couldn't save an image. Everything else saved — try adding it again, or export your project to keep a copy."
-          : "Couldn't save: browser storage is full. Export your project to keep a copy."
+          : status.reason === "map"
+            ? "Couldn't save this project's story map. Your latest changes are held for the next save, but export your project to keep a copy."
+            : "Couldn't save: browser storage is full. Export your project to keep a copy."
     : status.state === "saving"
       ? "Saving..."
       : (status.savedAt

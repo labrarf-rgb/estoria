@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
-import { readProjectFile } from "@/store/persistence";
+import {
+  discardQuarantined,
+  downloadQuarantined,
+  getQuarantined,
+  onQuarantined,
+  readProjectFile,
+  type Quarantined,
+} from "@/store/persistence";
 import { shortCount } from "@/lib/manuscript";
 import { SAVED_REASON, countParts, shortDate } from "@/lib/piece";
 import type { ProjectMeta } from "@/store/useStore";
@@ -30,6 +37,7 @@ export function ProjectsModal() {
   const askConfirm = useStore((s) => s.askConfirm);
   const setPanel = useStore((s) => s.setPanel);
 
+  const quarantined = useSyncExternalStore(onQuarantined, getQuarantined);
   const [mergeId, setMergeId] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
 
@@ -218,6 +226,10 @@ export function ProjectsModal() {
                 ))}
               </>
             )}
+
+            {quarantined.length > 0 && (
+              <SetAside entries={quarantined} askConfirm={askConfirm} />
+            )}
           </div>
         )}
 
@@ -256,5 +268,72 @@ function KindTag({ label }: { label: string }) {
     <span className="shrink-0 rounded-full bg-chip px-[7px] py-[2px] text-[9px] font-bold uppercase tracking-wide text-soft">
       {label}
     </span>
+  );
+}
+
+/**
+ * Projects the last load could not read. Each is left exactly as it was found
+ * (see `Quarantined` in store/persistence.ts) — never saved over, never
+ * deleted — until the writer takes its data or lets it go.
+ */
+function SetAside({
+  entries,
+  askConfirm,
+}: {
+  entries: Quarantined[];
+  askConfirm: ReturnType<typeof useStore.getState>["askConfirm"];
+}) {
+  const [note, setNote] = useState<string | null>(null);
+  return (
+    <>
+      <div className="mt-[14px] flex items-baseline gap-[10px]">
+        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+          Couldn't be read
+        </span>
+        <span className="text-[11.5px] text-faint">Left untouched. Your other projects are fine.</span>
+      </div>
+      {entries.map((q) => (
+        <div key={q.id} className="flex items-center gap-[10px] rounded-[13px] border border-rule p-[12px_14px]">
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium text-ink">
+              {q.reason === "missing"
+                ? "A project listed here couldn't be found"
+                : "A project saved here wouldn't load"}
+            </div>
+            <div className="mt-[2px] font-mono text-[11px] font-medium text-soft">
+              Since {shortDate(q.since) || "this session"}
+              {note && ` · ${note}`}
+            </div>
+          </div>
+          {q.key && (
+            <button
+              onClick={() =>
+                void downloadQuarantined(q).then((ok) => !ok && setNote("its data is no longer there"))
+              }
+              className="rounded-lg border border-rule bg-card px-[12px] py-[7px] text-[12px] font-medium text-ink hover:border-faint"
+              title="Download its raw data, so the writing can be recovered by hand"
+            >
+              Download data
+            </button>
+          )}
+          <button
+            onClick={() =>
+              askConfirm({
+                message: "Remove this unreadable project?",
+                detail: q.key
+                  ? "Download its data first if you might want it. It will be permanently removed from this browser."
+                  : "There is nothing left to recover. This only clears the notice.",
+                danger: true,
+                onConfirm: () => void discardQuarantined(q).catch(() => setNote("couldn't remove it, try again")),
+              })
+            }
+            className="h-[30px] w-[30px] rounded-lg border border-rule text-[13px] text-faint hover:border-faint hover:text-but"
+            title="Remove"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </>
   );
 }

@@ -14,14 +14,16 @@
 
 const DB_NAME = "estoria";
 /**
- * v1 held `manuscripts` alone. v2 adds `images`. The upgrade is additive and
- * guarded, so a browser carrying a v1 database gains the store and keeps every
- * manuscript in it.
+ * v1 held `manuscripts` alone. v2 adds `images`. v3 adds `projects`, one story
+ * map per project (`store/projects.ts`). Every upgrade is additive and guarded,
+ * so a browser carrying an older database gains the new stores and keeps every
+ * manuscript and picture already in it.
  */
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export const STORE_PROSE = "manuscripts";
 export const STORE_IMAGES = "images";
+export const STORE_PROJECTS = "projects";
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -57,8 +59,20 @@ export function openDb(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_PROSE)) db.createObjectStore(STORE_PROSE);
       if (!db.objectStoreNames.contains(STORE_IMAGES)) db.createObjectStore(STORE_IMAGES);
+      if (!db.objectStoreNames.contains(STORE_PROJECTS)) db.createObjectStore(STORE_PROJECTS);
     };
-    req.onsuccess = () => finish(() => resolve(req.result));
+    req.onsuccess = () =>
+      finish(() => {
+        const db = req.result;
+        // Step aside for a newer build's upgrade instead of blocking it. Builds
+        // from before v3 never did this, which is why the first upgrade can still
+        // be blocked by an old window — the load treats that as "unavailable".
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      });
     req.onerror = () => finish(() => reject(req.error));
     req.onblocked = () => finish(() => reject(new Error("IndexedDB blocked")));
   });
@@ -93,7 +107,7 @@ export async function payloadStoreAvailable(): Promise<boolean> {
 }
 
 /** Both payloads key by a JSON array whose first element is the project id. */
-function projectOf(key: string): string {
+export function projectOf(key: string): string {
   try {
     return (JSON.parse(key) as string[])[0] ?? "";
   } catch {
@@ -135,19 +149,41 @@ export async function loadAllFrom(store: string): Promise<Map<string, string>> {
 }
 
 /** Apply one batch of writes and deletes to one store, in a single transaction. */
-export async function writeTo(
-  store: string,
-  puts: Map<string, string>,
-  deletes: Iterable<string>
+export const writeTo = (store: string, puts: Map<string, string>, deletes: Iterable<string>): Promise<void> =>
+  writeAcross({ [store]: { puts, deletes } });
+
+/**
+ * Writes and deletes across **several stores in one transaction** — all of it
+ * lands or none of it does. Two callers need that rather than wanting it: the
+ * one-time move of every project out of the old localStorage blob, which must
+ * not leave a map without its prose, and deleting a project, which must not
+ * leave prose without its map.
+ */
+export async function writeAcross(
+  batches: Record<string, { puts?: Map<string, string>; deletes?: Iterable<string> }>
 ): Promise<void> {
+  const stores = Object.keys(batches);
+  if (stores.length === 0) return;
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(store, "readwrite");
-    const os = tx.objectStore(store);
-    for (const [k, v] of puts) os.put(v, k);
-    for (const k of deletes) os.delete(k);
+    const tx = db.transaction(stores, "readwrite");
+    for (const [name, b] of Object.entries(batches)) {
+      const os = tx.objectStore(name);
+      for (const [k, v] of b.puts ?? []) os.put(v, k);
+      for (const k of b.deletes ?? []) os.delete(k);
+    }
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
+  });
+}
+
+/** One raw value, or `undefined` when the key is absent. */
+export async function readFrom(store: string, key: string): Promise<string | undefined> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, "readonly").objectStore(store).get(key);
+    req.onsuccess = () => resolve(typeof req.result === "string" ? req.result : undefined);
+    req.onerror = () => reject(req.error);
   });
 }

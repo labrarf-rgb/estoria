@@ -119,8 +119,12 @@ Everything hinges on two seams so we can grow from local → cloud incrementally
    ([`store/images.ts`](../src/store/images.ts)) are lifted into IndexedDB on
    the way *into* localStorage and put back on the way out, so the store, every
    export, Sync and the Android contract still see one document with its prose
-   and its images inline. The blob that hits the ~5MB quota carries the map and
-   nothing else.
+   and its images inline.
+   **Each project's map is its own IndexedDB record** (added 2026-10-07,
+   [`store/projects.ts`](../src/store/projects.ts)). localStorage keeps only a
+   small shell — prefs, which project is open, the project list — so no project
+   shares a quota with another, and one that will not load is set aside rather
+   than taking the library with it. See the layout table below.
 2. **`StorageAdapter`** — [`src/store/persistence.ts`](../src/store/persistence.ts)
    defines `load()` / `save()`. v1 ships `LocalStorageAdapter`. Cloud later =
    write a new adapter against the same interface + swap `activeAdapter`.
@@ -132,8 +136,39 @@ What cloud adds later (and only then do we pay for it): **auth** and
 (`GoogleDriveStorageAdapter`), with **Sign in with Google** for auth — see §8.
 The seam is ready for it: since Session 20 both reads and writes go through
 `activeAdapter` (async rehydrate, single debounced write path, save failures
-surfaced in the footer). Still to do before a Drive adapter: widen
-`StorageAdapter` to per-project granularity (§9 item 1).
+surfaced in the footer). Since 2026-10-07 the adapter is **per project**
+(`loadShell` / `saveShell`, `loadProjects` / `saveProjects`), which is the shape
+a Drive adapter implements — one file per project.
+
+**At rest (2026-10-07):**
+
+| Where | Key | Holds |
+| --- | --- | --- |
+| localStorage | `estoria:shell:v2` | prefs, `activeProjectId`, `projectIds[]`, zustand `version`, `quarantined[]` |
+| localStorage | `estoria:map-pad:v1` | crash pad: maps with a write in flight (`beforeunload` is sync, IndexedDB is not) |
+| localStorage | `estoria:prose-pad:v1` | the same, for prose |
+| localStorage | `estoria:store:v1` | after migration, a non-JSON tombstone; before it (or with no IndexedDB), the old single blob |
+| IndexedDB `estoria` v3 | `projects` | one map per project (prose and pictures lifted out), plus `__legacy-backup:<ms>` from the migration and `__unreadable:<id>:<ms>` copies |
+| IndexedDB `estoria` | `manuscripts`, `images` | unchanged |
+
+- **Writes:** only projects whose map changed are stringified and written —
+  usually just the open one. Pad first, shell, then IndexedDB; the pad entry is
+  cleared once its write lands.
+- **Deletes:** a project leaves storage only when the last shell listed it and
+  the snapshot holds it nowhere (`deleteProject`); its map, prose and pictures
+  go in one transaction.
+- **Migration:** on the first load after the update — every record, prose and
+  picture plus a backup of the old blob in one transaction, then the shell,
+  then the tombstone. Any failure leaves the old blob as what the next load
+  reads, and that session saves the old way.
+- **A project that will not load** is copied aside and listed under "Couldn't be
+  read" in the Projects modal (download its data / remove); the others load.
+  Only if every one fails does Recovery show (`projects-unreadable`).
+- **The tombstone is not JSON on purpose:** a stale build (cached service
+  worker, un-updated installed app) would otherwise take a doc-less blob for a
+  first launch and save the sample story. Unparseable, it shows that build's
+  Recovery screen and writes nothing.
+- **No IndexedDB** (some private windows): the old single-blob path, unchanged.
 
 ### The load lock (added 2026-08-11)
 
@@ -761,7 +796,9 @@ shape of roadmap item 7 (cloud backend).
   should note the crash pad: IndexedDB is async and `beforeunload` is not, so
   every prose flush writes a synchronous localStorage pad first and clears it
   only once the IndexedDB write resolves.
-- **Granularity**: the persisted blob today is doc + `projectStash` + prefs in
+- ✅ **Done 2026-10-07** (see §2's at-rest table) — the adapter is per
+  project and UI prefs live in a local-only shell. *Original note:*
+  **Granularity**: the persisted blob today is doc + `projectStash` + prefs in
   one string. For Drive, prefer **one file per project**
   (`<title>.estoria.json` in an app folder) plus keeping UI prefs local-only —
   needs a small widening of `StorageAdapter` (`list()` / per-id load/save)
@@ -1192,7 +1229,8 @@ with an entry in [`SESSIONS.md`](SESSIONS.md).
 1. ✅ **Fixed 2026-07-01 (Session 20)** — reads now go through
    `activeAdapter.load()` (async rehydrate), the duplicate write is gone, and
    the legacy `estoria:doc:v1` copy is removed on first load to reclaim quota.
-   Still open from this item: widening `StorageAdapter` to per-project
+   **Closed 2026-10-07:** the adapter is per project and each map is its own
+   IndexedDB record (§2). *Was* still open from this item: widening `StorageAdapter` to per-project
    granularity (deferred to the §8 Drive work). **This is Phase 0 of §10** and is
    worth doing on its own merits — `partialize` puts the active doc *and every
    stashed project* into one string today.
@@ -1679,7 +1717,11 @@ all.
 
 ### 10.7 Suggested order, if this is picked up
 
-**Phase 0 — costs nothing, fixes today, no format change.** Scope
+**Phase 0 — costs nothing, fixes today, no format change.** *(Per-project
+storage done 2026-10-07, §2. Still open: scoping the startup load to the open
+project — stashed projects are still loaded whole, because `switchProject`,
+`listProjects`, `openSavedCopy`, `mergeProjectIntoSeries` and `openDoc` read
+them synchronously.)* Scope
 `loadAllProse` / `loadAllImages` to the active project, then to the active
 version. Do **§9 item 1**'s per-project granularity so `partialize` stops putting
 every stashed project into one string. No new failure modes, and it is a

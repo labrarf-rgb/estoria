@@ -17,7 +17,15 @@ import {
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
 import { syncChapterWords } from "@/lib/manuscript";
-import { payloadStoreAvailable, staleKeys } from "@/store/idb";
+import {
+  payloadStoreAvailable,
+  projectOf,
+  staleKeys,
+  STORE_IMAGES,
+  STORE_PROJECTS,
+  STORE_PROSE,
+  writeAcross,
+} from "@/store/idb";
 import { loadAllImages, mergeImages, splitImages, writeImages } from "@/store/images";
 import {
   clearPad,
@@ -29,54 +37,103 @@ import {
   writePad,
   writeProse,
 } from "@/store/prose";
+import {
+  clearMapPad,
+  dropFromMapPad,
+  LEGACY_BACKUP_PREFIX,
+  loadAllProjects,
+  readMapPad,
+  readProjectRaw,
+  writeMapPad,
+  writeProjects,
+} from "@/store/projects";
 import type { PersistStorage } from "zustand/middleware";
 
 /**
  * StorageAdapter — the single seam between Estoria and where stories live.
  *
- * v1 ships a LocalStorageAdapter (auto-save to the browser). Growing into a
- * cloud backend later means writing another adapter (e.g. GoogleDriveStorage-
- * Adapter, see docs/SPECS.md §8) against this same interface and swapping
- * `activeAdapter` — no UI or store changes required. Both reads and writes go
- * through the adapter; nothing else touches the persisted copy.
+ * It speaks **per project**: a small shell (prefs, which project is open, the
+ * list of projects) plus one record per project's map. That is the granularity
+ * a cloud backend wants — a GoogleDriveStorageAdapter (docs/SPECS.md §8) is one
+ * file per project behind these same calls — and swapping `activeAdapter` is
+ * still the whole change. Both reads and writes go through the adapter; nothing
+ * else touches the persisted copy.
+ *
+ * `loadBlob` / `saveBlob` are the layout every project used to share, one
+ * string in localStorage. They stay for two reasons: it is what a first load
+ * after the update migrates *from*, and it is where a browser with no usable
+ * IndexedDB (some private windows) keeps saving, exactly as it always did.
  */
 export interface StorageAdapter {
-  load(): Promise<string | null>;
-  save(serialized: string): Promise<void>;
-  /** For multi-document support later. */
-  list?(): Promise<string[]>;
+  loadShell(): Promise<string | null>;
+  /** Must complete synchronously up to its first await: it runs in `beforeunload`. */
+  saveShell(serialized: string): Promise<void>;
+  loadProjects(): Promise<Map<string, string>>;
+  saveProjects(puts: Map<string, string>, deletes: Iterable<string>): Promise<void>;
+  loadBlob(): Promise<string | null>;
+  /** Must complete synchronously up to its first await, like `saveShell`. */
+  saveBlob(serialized: string): Promise<void>;
 }
 
-/** Where the persisted store lives. Must match the persist `name` in useStore. */
-const STORAGE_KEY = "estoria:store:v1";
+/**
+ * The single-blob layout. Must match the persist `name` in useStore. After the
+ * move to per-project records it holds `BLOB_TOMBSTONE` instead.
+ */
+const BLOB_KEY = "estoria:store:v1";
+/** The per-project layout's shell: prefs, the open project, the project list. */
+const SHELL_KEY = "estoria:shell:v2";
 /** Legacy duplicate copy once written by the old double-write shim. */
 const LEGACY_KEY = "estoria:doc:v1";
 /** Where a blob we could not parse is set aside instead of being overwritten. */
 const UNREADABLE_KEY = "estoria:unreadable";
+/**
+ * What the old key holds once its projects have moved. Deliberately **not
+ * JSON**: a build from before the move (a cached service worker, an installed
+ * app that has not updated yet) that opens after it would find a doc-less blob,
+ * take it for a first launch and save the sample story. Unparseable, it instead
+ * shows that build's recovery screen, which writes nothing unless the writer
+ * insists — and even then only to this key, which the new layout never reads.
+ */
+const BLOB_TOMBSTONE = "estoria: moved to per-project storage (estoria:shell:v2)";
 
-export class LocalStorageAdapter implements StorageAdapter {
-  constructor(private key: string = STORAGE_KEY) {}
-
-  /**
+export class BrowserStorageAdapter implements StorageAdapter {
+  /*
    * Failures propagate, deliberately. Returning `null` for them made "there is
    * nothing stored" and "we could not read what is stored" the same answer, and
    * the app's response to the first is to show the first-launch screen, whose
    * buttons overwrite the second. `null` now means only ever *absent*.
+   *
+   * Quota / private-mode failures on save propagate too, so the UI can surface
+   * them — silently swallowing them left the footer claiming "saved" while
+   * nothing was being written.
    */
-  async load(): Promise<string | null> {
-    return localStorage.getItem(this.key);
+  async loadShell(): Promise<string | null> {
+    return localStorage.getItem(SHELL_KEY);
   }
 
-  async save(serialized: string): Promise<void> {
-    // Quota / private-mode failures propagate so the UI can surface them —
-    // silently swallowing them here left the footer claiming "saved" while
-    // nothing was being written.
-    localStorage.setItem(this.key, serialized);
+  async saveShell(serialized: string): Promise<void> {
+    localStorage.setItem(SHELL_KEY, serialized);
+  }
+
+  loadProjects(): Promise<Map<string, string>> {
+    return loadAllProjects();
+  }
+
+  saveProjects(puts: Map<string, string>, deletes: Iterable<string>): Promise<void> {
+    return writeProjects(puts, deletes);
+  }
+
+  async loadBlob(): Promise<string | null> {
+    return localStorage.getItem(BLOB_KEY);
+  }
+
+  async saveBlob(serialized: string): Promise<void> {
+    localStorage.setItem(BLOB_KEY, serialized);
   }
 }
 
 /** The adapter the store auto-saves through. Swap this to change backends. */
-export const activeAdapter: StorageAdapter = new LocalStorageAdapter();
+export const activeAdapter: StorageAdapter = new BrowserStorageAdapter();
 
 // ---- Load outcome, and the write lock it controls ---------------------------
 
@@ -91,11 +148,18 @@ export const activeAdapter: StorageAdapter = new LocalStorageAdapter();
  *  - `prose-unreachable` — the map read fine, but it was written with its
  *    manuscripts in IndexedDB and IndexedDB cannot be reached. Loading anyway
  *    would show every chapter as blank and save it that way.
+ *  - `projects-unreachable` — the shell says the projects live in IndexedDB,
+ *    and IndexedDB cannot be reached. There is a library; we cannot see it.
+ *  - `projects-unreadable` — IndexedDB opened, but not one listed project would
+ *    load. Each has been left untouched (see `Quarantined`). One bad project
+ *    alone never lands here: the rest load and that one is set aside.
  */
 export type LoadFailure =
   | { code: "unavailable"; detail: string }
   | { code: "unreadable"; savedAs: string | null }
-  | { code: "prose-unreachable"; detail: string };
+  | { code: "prose-unreachable"; detail: string }
+  | { code: "projects-unreachable"; detail: string }
+  | { code: "projects-unreadable"; count: number };
 
 export type LoadState =
   | { kind: "loading" }
@@ -183,16 +247,17 @@ export interface SaveStatus {
   /** Epoch ms of the last successful save (0 = none this session). */
   savedAt: number;
   /**
-   * Which write failed. The map goes to localStorage, where a failure is nearly
-   * always the quota; prose and pictures go to IndexedDB, where it is not — and
-   * telling a writer their storage is full when it isn't sends them to delete
-   * things they did not need to. Prose and pictures are told apart because the
-   * writer's next move differs: words that did not land are gone if they walk
-   * away, a picture that did not land is a file they can pick again. `locked`
+   * Which write failed. `storage` is localStorage (the shell, or the old
+   * single blob), where a failure is nearly always the quota; the project maps
+   * (`map`), prose and pictures go to IndexedDB, where it is not — and telling a
+   * writer their storage is full when it isn't sends them to delete things they
+   * did not need to. Prose and pictures are told apart because the writer's
+   * next move differs: words that did not land are gone if they walk away, a
+   * picture that did not land is a file they can pick again. `locked`
    * is none of these: nothing was attempted, because the load never established
    * what is already stored (see `writesArmed`).
    */
-  reason?: "storage" | "prose" | "images" | "locked";
+  reason?: "storage" | "map" | "prose" | "images" | "locked";
 }
 
 let saveStatus: SaveStatus = { state: "idle", savedAt: 0 };
@@ -223,6 +288,8 @@ export interface PersistedShape {
   [key: string]: unknown;
 }
 /**
+ * The single-blob layout, as zustand hands it to us and as `BLOB_KEY` holds it.
+ *
  * `payloadsExternal` is ours, not zustand's — it sits beside the state rather
  * than in it, and records whether the manuscripts *and pictures* were lifted
  * into IndexedDB when this blob was written. Without it, a doc with no inline
@@ -244,6 +311,55 @@ type Stored = {
 };
 
 /**
+ * The per-project layout's shell, at `SHELL_KEY`: everything that is not a
+ * project. Small, and written synchronously, so it is always current — the
+ * project records it lists are what can lag, and the map pad covers that.
+ *
+ * Its existence is the payloads-are-external marker: a shell is only ever
+ * written with IndexedDB in use, so a shell with no reachable IndexedDB is
+ * always a refusal (`projects-unreachable`), never "nothing stored".
+ */
+type Shell = {
+  layout: 2;
+  /** zustand's persist version — the schema the project records were written at. */
+  version?: number;
+  /** The prefs `partialize` persists: everything but `doc` and `projectStash`. */
+  state: Record<string, unknown>;
+  activeProjectId: string;
+  /** Every project this browser holds, the open one first. */
+  projectIds: string[];
+  quarantined?: Quarantined[];
+};
+
+/**
+ * A project the load could not read, set aside instead of failing the whole
+ * library. It stays listed here — so it is never deleted and never written over
+ * — until the writer downloads it or removes it (Projects modal).
+ *
+ * `key` is where its raw data now sits: a copy under `__unreadable:<id>:<ms>`,
+ * so the project's own id is free again; its own id, if even that copy could
+ * not be made (and then that record is never written to); or `null` when there
+ * was nothing to find — listed, but no record and no pad entry.
+ */
+export interface Quarantined {
+  id: string;
+  reason: "unreadable" | "missing";
+  key: string | null;
+  since: string;
+}
+
+/**
+ * Which layout this session saves in. Decided once, on load.
+ *
+ *  - `split` — the shell in localStorage, one record per project in IndexedDB.
+ *  - `blob` — every project in one localStorage string, **exactly as before the
+ *    split**: the code path is the old one, untouched. Used only when
+ *    IndexedDB cannot be used here, or the one-time move could not complete
+ *    (it is retried on the next launch).
+ */
+let layout: "split" | "blob" = "blob";
+
+/**
  * Auto-save, in two streams.
  *
  * zustand persist calls `setItem` on *every* state change, so this holds the
@@ -253,12 +369,13 @@ type Stored = {
  * debounce discarded all but the last result. Now `setItem` costs one
  * assignment and the work happens on the timer.
  *
- * The map goes to localStorage on a 500ms trailing timer; **the payloads go to
- * IndexedDB on a much shorter one**, because prose is the thing being typed and
- * the window between a keystroke and it reaching disk is the window in which it
- * can be lost. See `store/prose.ts` for the manuscript split and the crash pad,
- * and `store/images.ts` for the pictures — which ride the same timer and, for
- * the reason `flushImages` gives, deliberately have no pad.
+ * The maps go out on a 500ms trailing timer; **the payloads go to IndexedDB on
+ * a much shorter one**, because prose is the thing being typed and the window
+ * between a keystroke and it reaching disk is the window in which it can be
+ * lost. See `store/prose.ts` for the manuscript split and the crash pad,
+ * `store/images.ts` for the pictures — which ride the same timer and, for the
+ * reason `flushImages` gives, deliberately have no pad — and
+ * `store/projects.ts` for the per-project maps and theirs.
  */
 const SAVE_DEBOUNCE_MS = 500;
 const PAYLOAD_DEBOUNCE_MS = 200;
@@ -277,21 +394,36 @@ let payloadsEnabled = false;
 /** What IndexedDB is believed to hold, so only what changed is written. */
 let lastProse = new Map<string, string>();
 let lastImages = new Map<string, string>();
+/** Each project's map as IndexedDB holds it, by project id. */
+const lastProjectJson = new Map<string, string>();
 /**
- * Set when a payload write fails, cleared when one succeeds.
+ * The projects the last shell listed. A project leaves this set only by being
+ * absent from a later snapshot, which is what `deleteProject` does — and that
+ * is the one signal on which a project's data is removed (see `flushProjects`).
+ */
+let lastIndex = new Set<string>();
+/** The last shell written or read, so a quarantine change can rewrite it. */
+let lastShell: Shell | null = null;
+let quarantined: Quarantined[] = [];
+const quarantineListeners = new Set<() => void>();
+/**
+ * Set when a write fails, cleared when one succeeds.
  *
- * Without these the footer lies: the map write and the payload writes are
- * separate, the map is much more likely to succeed, and its "saved" would paint
- * straight over a payload failure a second later. Silent save failure is the
- * exact bug SPECS §9 item 2 exists to have fixed, and splitting the write up is
- * a fresh chance to reintroduce it.
+ * Without these the footer lies: the writes are separate, some are much more
+ * likely to succeed than others, and one's "saved" would paint straight over
+ * another's failure a second later. Silent save failure is the exact bug SPECS
+ * §9 item 2 exists to have fixed, and splitting the write up is a fresh chance
+ * to reintroduce it.
  *
- * They are two flags rather than one because they say different things to the
- * writer: prose that did not land is words they just typed, pictures that did
- * not land is a file they can pick again.
+ * They are separate flags because they say different things to the writer:
+ * prose that did not land is words they just typed, pictures that did not land
+ * is a file they can pick again, and a map that did not land is still in the
+ * pad until the next save.
  */
 let proseFailed = false;
 let imagesFailed = false;
+let mapFailed = false;
+let shellFailed = false;
 
 interface Split {
   src: Stored;
@@ -299,8 +431,43 @@ interface Split {
   prose: Map<string, string>;
   images: Map<string, string>;
   projectIds: Set<string>;
+  /** Each project's payload-free map, by id. */
+  docs: Map<string, StoryDoc>;
 }
 let splitCache: Split | null = null;
+
+/**
+ * One project, lifted apart — computed **once per document object**. zustand
+ * replaces only what changed, so a project nobody touched arrives as the very
+ * same object every save and costs a lookup, not a walk.
+ */
+interface DocSplit {
+  doc: StoryDoc;
+  prose: Map<string, string>;
+  images: Map<string, string>;
+}
+const docSplits = new WeakMap<StoryDoc, DocSplit>();
+const docJson = new WeakMap<StoryDoc, string>();
+
+function splitDoc(d: StoryDoc): DocSplit {
+  const hit = docSplits.get(d);
+  if (hit) return hit;
+  const withoutProse = splitProse(d);
+  const withoutImages = splitImages(withoutProse.doc);
+  const out = { doc: withoutImages.doc, prose: withoutProse.prose, images: withoutImages.images };
+  docSplits.set(d, out);
+  return out;
+}
+
+/** A payload-free map's JSON, stringified once per document object. */
+function jsonOf(d: StoryDoc): string {
+  let json = docJson.get(d);
+  if (json === undefined) {
+    json = JSON.stringify(d);
+    docJson.set(d, json);
+  }
+  return json;
+}
 
 /** Lift the prose and the pictures out of the active project and every stashed one. */
 function currentSplit(): Split | null {
@@ -315,6 +482,7 @@ function currentSplit(): Split | null {
       prose: new Map(),
       images: new Map(),
       projectIds: new Set(),
+      docs: new Map(),
     };
     return splitCache;
   }
@@ -322,13 +490,14 @@ function currentSplit(): Split | null {
   const prose = new Map<string, string>();
   const images = new Map<string, string>();
   const projectIds = new Set<string>();
+  const docs = new Map<string, StoryDoc>();
   const take = (d: StoryDoc): StoryDoc => {
-    const withoutProse = splitProse(d);
-    const withoutImages = splitImages(withoutProse.doc);
+    const s = splitDoc(d);
     projectIds.add(d.id);
-    for (const [k, v] of withoutProse.prose) prose.set(k, v);
-    for (const [k, v] of withoutImages.images) images.set(k, v);
-    return withoutImages.doc;
+    docs.set(d.id, s.doc);
+    for (const [k, v] of s.prose) prose.set(k, v);
+    for (const [k, v] of s.images) images.set(k, v);
+    return s.doc;
   };
 
   const state = value.state;
@@ -345,7 +514,7 @@ function currentSplit(): Split | null {
       ? value
       : { ...value, state: { ...state, doc, ...(state.projectStash ? { projectStash: stash } : {}) } };
 
-  splitCache = { src: value, stripped, prose, images, projectIds };
+  splitCache = { src: value, stripped, prose, images, projectIds, docs };
   return splitCache;
 }
 
@@ -423,6 +592,96 @@ function flushPayloads(): void {
   flushImages(split);
 }
 
+function markSavedIfClean(): void {
+  // Only part of it landed? Saying "saved" while another write is failing
+  // would be the more comforting lie and the more expensive one.
+  if (proseFailed || imagesFailed || mapFailed || shellFailed) return;
+  setSaveStatus({ state: "saved", savedAt: Date.now() });
+}
+
+/**
+ * Write the maps that changed, and the shell.
+ *
+ * Order, as for prose: the changed maps go to the synchronous pad first, then
+ * the shell (synchronous too), then the IndexedDB write, and each pad entry is
+ * cleared only once its write has landed. A tab closed anywhere in the middle
+ * reloads from the pad. Only projects whose map actually changed are written —
+ * usually just the open one.
+ *
+ * **Deleting is the one destructive path, and it is narrow on purpose.** A
+ * project is removed only when the previous shell listed it and this snapshot
+ * holds it nowhere — what `deleteProject` does — and then its map, manuscripts
+ * and pictures go in one transaction. A quarantined project is never in that
+ * set. The prose and image flushes keep their own rule (a project absent from
+ * the snapshot is left alone), so nothing else can delete across projects.
+ */
+function flushProjects(split: Split): void {
+  const { doc, projectStash, ...prefs } = split.stripped.state;
+  const projectIds = [doc.id, ...Object.keys(projectStash ?? {}).filter((id) => id !== doc.id)];
+  const live = new Set(projectIds);
+  const pinned = new Set(quarantined.filter((q) => q.key === q.id).map((q) => q.id));
+  const setAside = new Set(quarantined.map((q) => q.id));
+
+  const dirty = new Map<string, string>();
+  // A live project on a pinned id — one whose damaged record could not be
+  // copied aside — cannot be written without destroying that record. It is
+  // not written, and the footer says so rather than claiming it saved.
+  let blocked = false;
+  for (const [id, d] of split.docs) {
+    const json = jsonOf(d);
+    if (lastProjectJson.get(id) === json) continue;
+    if (pinned.has(id)) blocked = true;
+    else dirty.set(id, json);
+  }
+  const deleted = [...lastIndex].filter((id) => !live.has(id) && !setAside.has(id));
+
+  const shell: Shell = {
+    layout: 2,
+    version: split.stripped.version,
+    state: prefs,
+    activeProjectId: doc.id,
+    projectIds,
+    ...(quarantined.length ? { quarantined } : {}),
+  };
+
+  writeMapPad(dirty);
+  if (deleted.length) dropFromMapPad(deleted);
+  const shellWrite = activeAdapter.saveShell(JSON.stringify(shell));
+  lastShell = shell;
+  lastIndex = live;
+
+  const mapWrite = dirty.size ? activeAdapter.saveProjects(dirty, []) : Promise.resolve();
+  const doomed = new Set(deleted);
+  const proseGone = [...lastProse.keys()].filter((k) => doomed.has(projectOf(k)));
+  const imagesGone = [...lastImages.keys()].filter((k) => doomed.has(projectOf(k)));
+  const deleteWrite = deleted.length
+    ? writeAcross({
+        [STORE_PROJECTS]: { deletes: deleted },
+        [STORE_PROSE]: { deletes: proseGone },
+        [STORE_IMAGES]: { deletes: imagesGone },
+      })
+    : Promise.resolve();
+
+  void Promise.allSettled([shellWrite, mapWrite, deleteWrite]).then(([s, m, d]) => {
+    shellFailed = s.status === "rejected";
+    if (m.status === "fulfilled") {
+      for (const [id, json] of dirty) lastProjectJson.set(id, json);
+      clearMapPad(dirty);
+    }
+    if (d.status === "fulfilled") {
+      for (const id of deleted) lastProjectJson.delete(id);
+      for (const k of proseGone) lastProse.delete(k);
+      for (const k of imagesGone) lastImages.delete(k);
+    }
+    // A failed delete leaves data no shell lists: it can never load again, it
+    // only takes up room. Not worth alarming a writer over.
+    mapFailed = m.status === "rejected" || blocked;
+    if (shellFailed) setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "storage" });
+    else if (mapFailed) setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "map" });
+    else markSavedIfClean();
+  });
+}
+
 function flushMap(): void {
   if (saveTimer != null) {
     clearTimeout(saveTimer);
@@ -433,6 +692,7 @@ function flushMap(): void {
   if (!split) return;
   pending = null;
   splitCache = null;
+  if (layout === "split") return flushProjects(split);
   // The marker travels with the blob it describes, so the next load knows
   // whether these chapters are prose-free (and these books cover-free) because
   // there is none or because it lives in IndexedDB. `proseExternal` is written
@@ -444,14 +704,15 @@ function flushMap(): void {
     proseExternal: payloadsEnabled,
   });
   void activeAdapter
-    .save(value)
+    .saveBlob(value)
     .then(() => {
-      // Only the map landed. Saying "saved" while a payload write is failing
-      // would be the more comforting lie and the more expensive one.
-      if (proseFailed || imagesFailed) return;
-      setSaveStatus({ state: "saved", savedAt: Date.now() });
+      shellFailed = false;
+      markSavedIfClean();
     })
-    .catch(() => setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "storage" }));
+    .catch(() => {
+      shellFailed = true;
+      setSaveStatus({ state: "error", savedAt: saveStatus.savedAt, reason: "storage" });
+    });
 }
 
 /** Everything, now. Payloads before the map, so the pad is written either way. */
@@ -461,9 +722,10 @@ function flushSave(): void {
 }
 
 if (typeof window !== "undefined") {
-  // `LocalStorageAdapter.save` and the prose pad both run synchronously up to
+  // The shell, the blob and both pads are all written synchronously, up to
   // their (absent) first await, so a flush here still lands before the page
-  // goes away. The IndexedDB write will not finish — the pad is what covers it.
+  // goes away. The IndexedDB writes will not finish — the pads are what cover
+  // them.
   window.addEventListener("beforeunload", flushSave);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushSave();
@@ -475,6 +737,342 @@ export function flushNow(): void {
   flushSave();
 }
 
+// ---- Projects set aside on load ----------------------------------------------
+
+/** Projects that could not be read and were set aside (Projects modal). */
+export function getQuarantined(): Quarantined[] {
+  return quarantined;
+}
+
+export function onQuarantined(fn: () => void): () => void {
+  quarantineListeners.add(fn);
+  return () => quarantineListeners.delete(fn);
+}
+
+function setQuarantined(next: Quarantined[]): void {
+  quarantined = next;
+  quarantineListeners.forEach((fn) => fn());
+}
+
+/** The raw data of a set-aside project, for download. `undefined` if there is none. */
+export async function readQuarantinedRaw(q: Quarantined): Promise<string | undefined> {
+  if (!q.key) return undefined;
+  return readProjectRaw(q.key);
+}
+
+/**
+ * Hand a set-aside project's raw data to the writer as a file. `false` when
+ * there is none to give (it was listed but never found).
+ */
+export async function downloadQuarantined(q: Quarantined): Promise<boolean> {
+  const raw = await readQuarantinedRaw(q);
+  if (raw === undefined) return false;
+  const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `estoria-recovered-${slugify(q.id)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+/**
+ * Remove a set-aside project for good — the writer's explicit choice, behind a
+ * confirm. Its raw copy goes; if no live project has since taken its id, so do
+ * the record at that id and every manuscript and picture keyed to it.
+ */
+export async function discardQuarantined(q: Quarantined): Promise<void> {
+  const takenBack = lastIndex.has(q.id);
+  const projectDeletes = new Set<string>();
+  if (q.key && q.key !== q.id) projectDeletes.add(q.key);
+  if (!takenBack) projectDeletes.add(q.id);
+  const proseGone = takenBack ? [] : [...lastProse.keys()].filter((k) => projectOf(k) === q.id);
+  const imagesGone = takenBack ? [] : [...lastImages.keys()].filter((k) => projectOf(k) === q.id);
+  await writeAcross({
+    [STORE_PROJECTS]: { deletes: projectDeletes },
+    [STORE_PROSE]: { deletes: proseGone },
+    [STORE_IMAGES]: { deletes: imagesGone },
+  });
+  for (const k of proseGone) lastProse.delete(k);
+  for (const k of imagesGone) lastImages.delete(k);
+  setQuarantined(quarantined.filter((x) => x !== q));
+  if (lastShell && writesArmed) {
+    const { quarantined: _old, ...rest } = lastShell;
+    lastShell = { ...rest, ...(quarantined.length ? { quarantined } : {}) };
+    await activeAdapter.saveShell(JSON.stringify(lastShell));
+  }
+}
+
+// ---- Loading -----------------------------------------------------------------
+
+type LoadResult = { value: Stored | null } | { failure: LoadFailure };
+
+/** Keep a copy of something unparseable before anything else touches its key. */
+function setAside(raw: string): string | null {
+  const savedAs = `${UNREADABLE_KEY}:${Date.now()}`;
+  try {
+    localStorage.setItem(savedAs, raw);
+    return savedAs;
+  } catch {
+    return null; // no room to keep it, and no way to read it
+  }
+}
+
+/**
+ * Every manuscript and picture, with the prose pad over the top. Records what
+ * IndexedDB holds **before** the pad is applied, so a pad entry that never
+ * reached IndexedDB reads as dirty and is written on the next save.
+ */
+async function loadPayloads(): Promise<{ prose: Map<string, string>; images: Map<string, string> }> {
+  const [stored, storedImages] = await Promise.all([loadAllProse(), loadAllImages()]);
+  lastProse = new Map(stored);
+  lastImages = new Map(storedImages);
+  const prose = new Map(stored);
+  for (const [k, v] of Object.entries(readPad())) prose.set(k, v);
+  return { prose, images: storedImages };
+}
+
+/** The old single-blob layout — this is the load as it was before the split. */
+async function loadBlobLayout(raw: string): Promise<LoadResult> {
+  let parsed: Stored;
+  try {
+    parsed = JSON.parse(raw) as Stored;
+  } catch {
+    // Unreadable. Keep a copy before anything else touches this key — it is
+    // the only chance anyone has of getting the text back out by hand, and it
+    // costs one write on a path that should never run.
+    return { failure: { code: "unreadable", savedAs: setAside(raw) } };
+  }
+
+  // Written with its payloads in IndexedDB? Then IndexedDB is not optional
+  // for this document, whatever it is for the browser. `proseExternal` is the
+  // pre-rename spelling and means the same thing for the prose it described.
+  const external = parsed?.payloadsExternal === true || parsed?.proseExternal === true;
+
+  if (!parsed?.state?.doc) return { value: parsed ?? null };
+
+  if (!payloadsEnabled) {
+    if (external) {
+      return {
+        failure: {
+          code: "prose-unreachable",
+          detail: "This browser's database for manuscripts and pictures could not be opened.",
+        },
+      };
+    }
+    return { value: parsed }; // everything is inline here; nothing is missing
+  }
+
+  let payloads: Awaited<ReturnType<typeof loadPayloads>>;
+  try {
+    payloads = await loadPayloads();
+  } catch (e) {
+    payloadsEnabled = false;
+    if (external) {
+      return {
+        failure: { code: "prose-unreachable", detail: e instanceof Error ? e.message : String(e) },
+      };
+    }
+    return { value: parsed };
+  }
+
+  // Documents written before either split still carry their prose and their
+  // pictures inline; both survive here untouched and move to IndexedDB on the
+  // next save. That is the whole migration.
+  const state = parsed.state;
+  const rejoin = (d: StoryDoc): StoryDoc => mergeImages(mergeProse(d, payloads.prose), payloads.images);
+  const stash: Record<string, StoryDoc> = {};
+  for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = rejoin(d);
+  return {
+    value: {
+      ...parsed,
+      state: {
+        ...state,
+        doc: rejoin(state.doc),
+        ...(state.projectStash ? { projectStash: stash } : {}),
+      },
+    },
+  };
+}
+
+/**
+ * The one-time move from the single blob to one record per project.
+ *
+ * Runs on the first load after the update, before the store sees anything, and
+ * is ordered so that **a failure at any step leaves the old blob as the thing
+ * the next load reads**:
+ *
+ *  1. Every project's map, every manuscript and picture not yet in IndexedDB,
+ *     and an untouched copy of the old blob go in **one transaction**.
+ *  2. The shell is written. From here the next load takes the new path.
+ *  3. The old key is replaced with `BLOB_TOMBSTONE` — the space comes back,
+ *     and a stale build cannot mistake it for a first launch.
+ *
+ * `false` means it did not complete: this session keeps saving the old way and
+ * the next launch tries again. Writing before the lock is armed is deliberate
+ * and safe here — every write is additive, and the load has already read the
+ * definite answer it is copying.
+ */
+async function migrateToSplit(value: Stored, raw: string): Promise<boolean> {
+  try {
+    const { doc, projectStash, ...prefs } = value.state;
+    const docs = [doc, ...Object.values(projectStash ?? {}).filter((d) => d.id !== doc.id)];
+    const records = new Map<string, string>();
+    const prose = new Map<string, string>();
+    const images = new Map<string, string>();
+    for (const d of docs) {
+      const s = splitDoc(d);
+      records.set(d.id, jsonOf(s.doc));
+      for (const [k, v] of s.prose) if (lastProse.get(k) !== v) prose.set(k, v);
+      for (const [k, v] of s.images) if (lastImages.get(k) !== v) images.set(k, v);
+    }
+
+    await writeAcross({
+      [STORE_PROJECTS]: { puts: new Map([...records, [`${LEGACY_BACKUP_PREFIX}${Date.now()}`, raw]]) },
+      [STORE_PROSE]: { puts: prose },
+      [STORE_IMAGES]: { puts: images },
+    });
+    for (const [id, json] of records) lastProjectJson.set(id, json);
+    for (const [k, v] of prose) lastProse.set(k, v);
+    for (const [k, v] of images) lastImages.set(k, v);
+    clearPad(prose.keys());
+
+    const shell: Shell = {
+      layout: 2,
+      version: value.version,
+      state: prefs,
+      activeProjectId: doc.id,
+      projectIds: docs.map((d) => d.id),
+    };
+    await activeAdapter.saveShell(JSON.stringify(shell));
+    lastShell = shell;
+    lastIndex = new Set(shell.projectIds);
+
+    try {
+      await activeAdapter.saveBlob(BLOB_TOMBSTONE);
+    } catch {
+      // The shell already wins on every later load; this only frees the room.
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The per-project layout. `shellRaw === null` means the shell is gone but the
+ * tombstone says the projects moved: the list is rebuilt from the records
+ * rather than calling it a first launch over a library.
+ */
+async function loadSplitLayout(shellRaw: string | null): Promise<LoadResult> {
+  let shell: Shell | null = null;
+  if (shellRaw !== null) {
+    try {
+      shell = JSON.parse(shellRaw) as Shell;
+      if (!Array.isArray(shell?.projectIds)) throw new Error("no project list");
+    } catch {
+      return { failure: { code: "unreadable", savedAs: setAside(shellRaw) } };
+    }
+  }
+
+  if (!payloadsEnabled) {
+    return {
+      failure: {
+        code: "projects-unreachable",
+        detail: "This browser's database for your projects could not be opened.",
+      },
+    };
+  }
+
+  let records: Map<string, string>;
+  let payloads: Awaited<ReturnType<typeof loadPayloads>>;
+  try {
+    [records, payloads] = await Promise.all([activeAdapter.loadProjects(), loadPayloads()]);
+  } catch (e) {
+    payloadsEnabled = false;
+    return {
+      failure: { code: "projects-unreachable", detail: e instanceof Error ? e.message : String(e) },
+    };
+  }
+
+  if (!shell) {
+    const ids = [...records.keys()].filter((k) => !k.startsWith("__"));
+    // Version 0 sends every record through `normalizeDoc` on the way in — the
+    // schema they were written at is one more thing the lost shell knew.
+    shell = { layout: 2, version: 0, state: { onboarded: true }, activeProjectId: ids[0] ?? "", projectIds: ids };
+  }
+
+  const pad = readMapPad();
+  const rejoin = (d: StoryDoc): StoryDoc => mergeImages(mergeProse(d, payloads.prose), payloads.images);
+  const next: Quarantined[] = [...(shell.quarantined ?? [])];
+  const setAsideIds = new Set(next.map((q) => q.id));
+  const docs = new Map<string, StoryDoc>();
+  const now = new Date().toISOString();
+
+  for (const id of shell.projectIds) {
+    if (setAsideIds.has(id) || docs.has(id)) continue;
+    const stored = records.get(id);
+    // The pad is newer than the record when both exist: it is what was in
+    // flight when the tab went away.
+    const candidates = [pad[id], stored].filter((v): v is string => typeof v === "string");
+    let loaded: StoryDoc | null = null;
+    for (const raw of candidates) {
+      try {
+        const d = JSON.parse(raw) as StoryDoc;
+        if (d && typeof d === "object" && typeof d.id === "string") {
+          loaded = d;
+          break;
+        }
+      } catch {
+        // try the other copy
+      }
+    }
+    if (loaded) {
+      if (stored !== undefined) lastProjectJson.set(id, stored);
+      // A pad entry identical to its record is one whose write landed but whose
+      // clear did not: nothing is in flight, so it can go.
+      if (stored !== undefined && pad[id] === stored) clearMapPad(new Map([[id, stored]]));
+      docs.set(id, rejoin(loaded));
+      continue;
+    }
+    if (candidates.length === 0) {
+      next.push({ id, reason: "missing", key: null, since: now });
+      continue;
+    }
+    // Unreadable. Copy it aside so its id is free to be written again; if even
+    // that fails, leave it where it is and never write to that id.
+    const key = `__unreadable:${id}:${Date.now()}`;
+    let kept: string | null = stored !== undefined ? id : null;
+    try {
+      await writeProjects(new Map([[key, candidates[candidates.length - 1]]]), []);
+      kept = key;
+    } catch {
+      // `kept` stays as above
+    }
+    next.push({ id, reason: "unreadable", key: kept, since: now });
+  }
+  setQuarantined(next);
+
+  if (docs.size === 0) {
+    if (next.length) return { failure: { code: "projects-unreadable", count: next.length } };
+    return { value: null }; // a shell listing nothing: nothing is lost by starting fresh
+  }
+
+  const activeId = docs.has(shell.activeProjectId) ? shell.activeProjectId : [...docs.keys()][0];
+  const stash: Record<string, StoryDoc> = {};
+  for (const [id, d] of docs) if (id !== activeId) stash[id] = d;
+  lastIndex = new Set(docs.keys());
+  lastShell = shell;
+  return {
+    value: {
+      state: { ...shell.state, doc: docs.get(activeId)!, projectStash: stash },
+      version: shell.version,
+    },
+  };
+}
+
 /**
  * Storage for zustand's persist middleware, in object form rather than through
  * `createJSONStorage`: owning the serialization is what lets the prose be
@@ -482,15 +1080,21 @@ export function flushNow(): void {
  */
 export const zustandStorage: PersistStorage<PersistedShape> = {
   getItem: async (name: string) => {
-    void name; // the adapter owns its key; see STORAGE_KEY
+    void name; // the adapter owns its keys; see BLOB_KEY and SHELL_KEY
     try {
       // One-time cleanup: reclaim the quota eaten by the old duplicate copy.
       localStorage.removeItem(LEGACY_KEY);
+      // A stale build that opened after the move set the tombstone aside as
+      // "unreadable" — that is what it is for — but it is not anyone's writing,
+      // and a recovery screen offering it for download would only confuse.
+      for (const { key, raw } of readUnreadableBackups()) {
+        if (raw === BLOB_TOMBSTONE) localStorage.removeItem(key);
+      }
     } catch {
       // ignore
     }
 
-    // Every `return null` below hands the store its defaults — the sample story
+    // Every `null` value below hands the store its defaults — the sample story
     // and `onboarded: false`, i.e. the first-launch screen. That is the right
     // answer for exactly one of these paths (nothing stored) and a catastrophe
     // on the rest, so each failure arms nothing and says why instead.
@@ -504,6 +1108,7 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
       setLoadState({ kind: "ready" });
       return value;
     };
+    const settle = (r: LoadResult) => ("failure" in r ? fail(r.failure) : ready(r.value));
 
     // Settled once, up front, so every path below — including the failures,
     // which the reader may still choose to write over — agrees on where the
@@ -511,86 +1116,38 @@ export const zustandStorage: PersistStorage<PersistedShape> = {
     // keep prose and pictures inline until its next reload.
     payloadsEnabled = await payloadStoreAvailable();
 
+    let shellRaw: string | null;
     let raw: string | null;
     try {
-      raw = await activeAdapter.load();
+      shellRaw = await activeAdapter.loadShell();
+      raw = shellRaw ? null : await activeAdapter.loadBlob();
     } catch (e) {
       return fail({ code: "unavailable", detail: e instanceof Error ? e.message : String(e) });
     }
 
+    if (shellRaw || raw === BLOB_TOMBSTONE) {
+      layout = "split";
+      const result = await loadSplitLayout(shellRaw);
+      // No IndexedDB: if the reader chooses to start over from the recovery
+      // screen, that goes to the old blob key, which the shell outranks on every
+      // later load — the library behind it is never written over.
+      if (!payloadsEnabled) layout = "blob";
+      return settle(result);
+    }
+
     // Genuinely nothing stored: a first launch, and the one case that may write.
-    if (!raw) return ready(null);
-
-    let parsed: Stored;
-    try {
-      parsed = JSON.parse(raw) as Stored;
-    } catch {
-      // Unreadable. Keep a copy before anything else touches this key — it is
-      // the only chance anyone has of getting the text back out by hand, and it
-      // costs one write on a path that should never run.
-      const savedAs = `${UNREADABLE_KEY}:${Date.now()}`;
-      let kept: string | null = savedAs;
-      try {
-        localStorage.setItem(savedAs, raw);
-      } catch {
-        kept = null; // no room to keep it, and no way to read it
-      }
-      return fail({ code: "unreadable", savedAs: kept });
+    if (!raw) {
+      layout = payloadsEnabled ? "split" : "blob";
+      return ready(null);
     }
 
-    // Written with its payloads in IndexedDB? Then IndexedDB is not optional
-    // for this document, whatever it is for the browser. `proseExternal` is the
-    // pre-rename spelling and means the same thing for the prose it described.
-    const external = parsed?.payloadsExternal === true || parsed?.proseExternal === true;
-
-    if (!parsed?.state?.doc) return ready(parsed ?? null);
-
-    if (!payloadsEnabled) {
-      if (external) {
-        return fail({
-          code: "prose-unreachable",
-          detail: "This browser's database for manuscripts and pictures could not be opened.",
-        });
-      }
-      return ready(parsed); // everything is inline here; nothing is missing
+    layout = "blob";
+    const result = await loadBlobLayout(raw);
+    if ("failure" in result) return fail(result.failure);
+    if (result.value?.state?.doc && payloadsEnabled && (await migrateToSplit(result.value, raw))) {
+      layout = "split";
     }
-
-    let stored: Map<string, string>;
-    let storedImages: Map<string, string>;
-    try {
-      [stored, storedImages] = await Promise.all([loadAllProse(), loadAllImages()]);
-    } catch (e) {
-      payloadsEnabled = false;
-      if (external) {
-        return fail({
-          code: "prose-unreachable",
-          detail: e instanceof Error ? e.message : String(e),
-        });
-      }
-      return ready(parsed);
-    }
-    // What IndexedDB holds, recorded before the pad goes over the top — so a
-    // pad entry that never reached IndexedDB reads as dirty and is written.
-    lastProse = new Map(stored);
-    lastImages = new Map(storedImages);
-    const merged = new Map(stored);
-    for (const [k, v] of Object.entries(readPad())) merged.set(k, v);
-
-    // Documents written before either split still carry their prose and their
-    // pictures inline; both survive here untouched and move to IndexedDB on the
-    // next save. That is the whole migration.
-    const state = parsed.state;
-    const rejoin = (d: StoryDoc): StoryDoc => mergeImages(mergeProse(d, merged), storedImages);
-    const stash: Record<string, StoryDoc> = {};
-    for (const [id, d] of Object.entries(state.projectStash ?? {})) stash[id] = rejoin(d);
-    return ready({
-      ...parsed,
-      state: {
-        ...state,
-        doc: rejoin(state.doc),
-        ...(state.projectStash ? { projectStash: stash } : {}),
-      },
-    });
+    return ready(result.value);
   },
 
   setItem: (name: string, value: Stored) => {

@@ -5531,3 +5531,55 @@ clickable cards. Make both groups the same kind of card, pieces on top.
 cards over 3 book cards on desktop, 2×2 then stacked at 375px, no console
 errors. Did not click a card through (it would replace the local project).
 SPECS §4 "Single pieces" row updated.
+
+### 2026-10-07 — Each project gets its own storage record (Session 64)
+
+**Asked:** every project shared one localStorage string, so all of them shared
+one ~5MB quota and one bad save could take the whole library. Give each
+project its own storage. Planned first and reviewed (plan approved in session),
+as the groundwork for the Drive adapter that would bring Estoria to iPad and
+Safari (§8).
+
+**Changed** (at-rest layer only — the store, every action, files, Sync and the
+Android contract are untouched):
+- `store/idb.ts`: database v3 adds a `projects` store; `writeAcross` (one
+  transaction over several stores), `readFrom`; open connections now close on
+  `versionchange` so future upgrades are not blocked by another window.
+- `store/projects.ts` (new): one record per project map, plus the map crash
+  pad (`estoria:map-pad:v1`), the same pattern as the prose pad.
+- `store/persistence.ts`: `StorageAdapter` is per-project (`loadShell` /
+  `saveShell`, `loadProjects` / `saveProjects`, plus `loadBlob` / `saveBlob`
+  for the old layout). localStorage keeps only the shell (`estoria:shell:v2`:
+  prefs, open project, project list). Only projects whose map changed are
+  stringified and written (split cached per document object). Deleting a
+  project removes its map, prose and pictures in one transaction. One-time
+  migration on first load: records + prose + pictures + a backup of the old
+  blob in one transaction, then the shell, then a non-JSON tombstone in
+  `estoria:store:v1` so a stale cached build shows Recovery instead of saving
+  the sample story. No IndexedDB → the old single-blob code path, unchanged.
+  A project that will not load is copied aside and listed under "Couldn't be
+  read" in the Projects modal (download / remove); the rest load.
+- New load failures `projects-unreachable` / `projects-unreadable` (Recovery
+  copy, downloads for set-aside projects) and save reason `map` (Footer copy).
+
+**Verified** on `vite preview` (port 5200) with the previous build seeding real
+old-format data (3 projects, prose and a cover in the v2 database): migration
+produced 3 records + backup + tombstone and every project opened with its prose;
+switching projects rewrote only the 465-byte shell; deleting the project with
+prose and a cover removed all three kinds of data; a 26MB map loaded and saved;
+a pad newer than its record won on reload and cleared; one corrupt record was
+set aside while the others loaded, and Remove cleared it; all records corrupt →
+Recovery with downloads, writes locked; a simulated map write failure showed the
+`map` footer and the pad restored the edit on reload; the previous build opened
+on migrated storage showed its Recovery screen and wrote nothing but a copy of
+the tombstone (now cleaned up by the new build); a newer database version gave
+`projects-unreachable`; a fresh origin started on the new layout. **Not shown:**
+the 5MB wall itself — this embedded browser accepted 26M characters in
+localStorage, so the ceiling the change removes could not be reproduced here;
+and the no-IndexedDB fallback, which is the old code path, checked by reading.
+The **Download data** button was not clicked (it saves a file). Not deployed:
+waiting on the user's own local testing.
+
+**Still open:** loading only the open project (§10 Phase 0's other half) —
+stashed projects are still held whole in memory because `switchProject` and
+friends read them synchronously.

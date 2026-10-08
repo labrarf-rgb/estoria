@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useLoadState } from "@/store/hydration";
-import { armWrites, readUnreadableBackups, type LoadFailure } from "@/store/persistence";
+import {
+  armWrites,
+  getQuarantined,
+  readQuarantinedRaw,
+  readUnreadableBackups,
+  type LoadFailure,
+} from "@/store/persistence";
 import { AppIcon } from "@/components/ui/AppIcon";
 
 /**
@@ -24,7 +30,25 @@ export function Recovery() {
   const askConfirm = useStore((s) => s.askConfirm);
   const startFresh = useStore((s) => s.startFresh);
   const [dismissed, setDismissed] = useState(false);
-  const [rescued] = useState(readUnreadableBackups);
+  const [rescued, setRescued] = useState(readUnreadableBackups);
+
+  // Projects that would not load were left in IndexedDB rather than copied into
+  // localStorage (a map can outgrow its quota), so their raw data is fetched
+  // here and offered beside anything set aside the old way.
+  const failedProjects = load.kind === "failed" && load.failure.code === "projects-unreadable";
+  useEffect(() => {
+    if (!failedProjects) return;
+    let live = true;
+    void Promise.all(
+      getQuarantined().map(async (q) => ({ key: `project:${q.id}`, raw: await readQuarantinedRaw(q).catch(() => undefined) }))
+    ).then((found) => {
+      const extra = found.filter((f): f is { key: string; raw: string } => typeof f.raw === "string");
+      if (live && extra.length) setRescued((r) => [...r, ...extra]);
+    });
+    return () => {
+      live = false;
+    };
+  }, [failedProjects]);
 
   if (load.kind !== "failed" || dismissed) return null;
   const { failure } = load;
@@ -145,6 +169,12 @@ function explain(f: LoadFailure): string {
       return f.savedAs
         ? "There is a project saved here, but it wouldn't parse — most often a save that was cut off partway. It has been copied aside untouched, and you can download it below."
         : "There is a project saved here, but it wouldn't parse, and there wasn't room to copy it aside. Don't start over until you've exported or synced from another device.";
+    case "projects-unreachable":
+      return `Your projects are saved in this browser's database, and it couldn't be opened, so Estoria can't see them. They haven't been touched. This often clears on a reload, or after closing other Estoria windows. (${f.detail})`;
+    case "projects-unreadable":
+      return f.count === 1
+        ? "There is a project saved here, but it wouldn't load. It has been left exactly as it was, and you can download its data below."
+        : `There are ${f.count} projects saved here, and none of them would load. They have been left exactly as they were, and you can download their data below.`;
     case "prose-unreachable":
       return `Your project map loaded, but the database holding the chapter manuscripts and images couldn't be opened, so every chapter would look empty and every picture would be missing. Estoria stopped rather than show you a blank book and save it that way. This often clears on a reload, or after closing other Estoria windows. (${f.detail})`;
   }
