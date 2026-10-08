@@ -500,6 +500,40 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    then build `GoogleDriveStorageAdapter`. This is the **only** external
    surface Estoria is getting: third-party integrations are closed (§7).
 
+   > **▶ NEXT UP (handoff, 2026-10-07).** This is the next phase, and its goal
+   > is **Estoria on iPad, Safari and Firefox**: today cross-device Sync needs
+   > the File System Access API (desktop Chromium only), so those browsers have
+   > local storage only. Drive over HTTPS works everywhere.
+   >
+   > - **Prerequisites are done.** §9 items 1–3 are closed, and the adapter is
+   >   per project as of 2026-10-07 (Session 64; §2 "At rest" table):
+   >   `StorageAdapter` in `store/persistence.ts` has `loadShell`/`saveShell`
+   >   and `loadProjects`/`saveProjects(puts, deletes)` — a Drive adapter is one
+   >   file per project behind those calls.
+   > - **Decide first, with the user: the OAuth origin.** §8 "Hosting migration"
+   >   says settle hosting before OAuth so it is set up once. Today the app is
+   >   served at `https://www.labrarf.com/estoria/`; Vercel is only the
+   >   "eventual home" and nothing requires it. Staying put is the simple path.
+   > - **User-only setup** (walk them through it; Claude cannot do it): a Google
+   >   Cloud project, the Drive API enabled, an OAuth consent screen, and a web
+   >   OAuth client ID with the serving origin authorized. Scope `drive.file`
+   >   only (§8). Android gets its own client ID later in the same project.
+   > - **Design constraints already decided** (§8): Google Identity Services
+   >   directly, no Supabase/Firebase; local-first stays — the browser store is
+   >   the offline cache and Drive syncs in the background; the Drive file is the
+   >   same `<slug>.estoria.json` contract the Android app reads (§8 "Cross-app
+   >   Sync"), so reuse `lib/sync.ts` (fingerprint, three-way compare) and
+   >   `lib/merge.ts` rather than inventing a second conflict path.
+   > - **Open questions for the plan:** how Drive sync coexists with the
+   >   folder Sync on desktop Chrome (replace, or both); where the Drive token
+   >   lives and how sign-out behaves; what the footer and Projects modal show
+   >   for Drive state; offline edits and conflicts on reconnect.
+   > - **Process the user expects:** plan first and have them review it (plan
+   >   mode), build, verify in the browser, then the user tests locally before
+   >   any commit/push/deploy.
+   > - **Deferred, not part of this phase:** loading only the open project at
+   >   startup (§10.7 Phase 0's other half).
+
 8. **Saved copies when no folder is connected** — *future, noted 2026-10-04.* A
    change of form saves its copy as a project in this browser, and also as a file
    in the Estoria folder when one is connected. Without a folder (Firefox,
