@@ -5508,3 +5508,26 @@ export reads `projectTitle`, which is why the two tabs disagreed.
 project title "Real Title" and book title "Imported Story": heading is
 `# Real Title` out of series, `# Imported Story` in series mode. SPECS §4
 "Export / Markdown (story map)" row updated with the heading rule.
+
+### 2026-10-07 — New project chooser in matching cards (Session 63)
+
+**Asked:** the New project dialog treated its two groups differently. Single
+piece was a paragraph, a kind picker and a Start button; Book was three
+clickable cards. Make both groups the same kind of card, pieces on top.
+
+**Changed** (`components/modals/NewBookModal.tsx`):
+- Single piece is now four cards, one per kind, built from `KINDS`: title,
+  a one-line description (`ABOUT`, local to the modal), and a "Parts are …"
+  tag. Clicking one calls the same `begin(false, kind)` the Start button did.
+- The paragraph became a short note beside each section label (`Section`).
+  Short story reads "A short narrative, read in one sitting", since a short
+  story need not be fiction.
+- The kind picker, its state and the `Choices` import are gone.
+- Unchanged flow: with content in the current project, any card goes to the
+  keep / export / discard step (which has Back); an empty project starts the
+  new one directly, as before.
+
+**Verified:** `tsc` clean; dev server, dialog opened from Welcome: 4 piece
+cards over 3 book cards on desktop, 2×2 then stacked at 375px, no console
+errors. Did not click a card through (it would replace the local project).
+SPECS §4 "Single pieces" row updated.

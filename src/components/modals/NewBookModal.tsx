@@ -3,15 +3,22 @@ import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { downloadProjectFile } from "@/store/persistence";
 import { KINDS } from "@/lib/piece";
-import { Choices } from "@/components/modals/FormChangeModal";
 import type { PieceKind } from "@/types";
 
 type Mode = "choose" | "save" | "pickSeries";
 
+/** What each kind of single piece is, on its card. */
+const ABOUT: Record<PieceKind, string> = {
+  story: "A short narrative, read in one sitting.",
+  essay: "An argument or reflection in prose.",
+  poem: "Verse, short or long.",
+  other: "Anything else that stands on its own.",
+};
+
 /**
- * "New project" chooser, in two groups. **Single piece**: one work with no
- * chapters, whose kind (story, essay, poem, other) is picked here and can be
- * changed later. **Book**: never assumed to be part of a series, so the user
+ * "New project" chooser, in two groups of cards. **Single piece**: one work
+ * with no chapters, one card per kind (story, essay, poem, other); the kind can
+ * be changed later. **Book**: never assumed to be part of a series, so the user
  * picks standalone, a new series, or adds to an existing series. When a new
  * project would replace the current one, we prompt how to keep it.
  */
@@ -27,7 +34,6 @@ export function NewBookModal() {
   const [mode, setMode] = useState<Mode>("choose");
   const [pendingSeries, setPendingSeries] = useState(false);
   const [pendingPiece, setPendingPiece] = useState<PieceKind | undefined>(undefined);
-  const [kind, setKind] = useState<PieceKind>("story");
 
   if (!show) return null;
   const close = () => {
@@ -55,7 +61,6 @@ export function NewBookModal() {
     newProject({ series: pendingSeries, keepCurrent, piece: pendingPiece });
     setMode("choose");
   };
-  const kindLabel = KINDS.find((k) => k.kind === kind)?.label ?? "piece";
 
   const addToSeries = (projectId: string) => {
     if (projectId !== doc.id) switchProject(projectId);
@@ -96,34 +101,19 @@ export function NewBookModal() {
 
         {mode === "choose" && (
           <>
-          <div className="px-[24px] pt-[18px] text-[10.5px] font-semibold uppercase tracking-wide text-faint">
-            Single piece
-          </div>
-          <div className="px-[24px] pt-[10px]">
-            <div className="flex flex-col gap-[10px] rounded-[15px] border border-rule bg-card p-[16px]">
-              <span className="text-[12px] leading-[1.5] text-soft">
-                One work, no chapters. Map it in parts, write it beside the map, and keep its characters, world and
-                notes alongside. Pick what it is; you can change this later.
-              </span>
-              <Choices
-                cols={4}
-                value={kind}
-                onChange={setKind}
-                options={KINDS.map((k) => ({ value: k.kind, label: k.label, hint: `Parts are ${k.many}` }))}
+          <Section label="Single piece" note="One work, no chapters. You can change the kind later." />
+          <div className="grid grid-cols-2 gap-[14px] px-[24px] pt-[10px] sm:grid-cols-4">
+            {KINDS.map((k) => (
+              <Card
+                key={k.kind}
+                title={k.label}
+                body={ABOUT[k.kind]}
+                tag={`Parts are ${k.many}`}
+                onClick={() => begin(false, k.kind)}
               />
-              <div className="flex justify-end">
-                <button
-                  onClick={() => begin(false, kind)}
-                  className="rounded-lg bg-ink px-[14px] py-[8px] text-[12.5px] font-semibold text-bg"
-                >
-                  Start {kind === "other" ? "piece" : kindLabel.toLowerCase()}
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-          <div className="px-[24px] pt-[18px] text-[10.5px] font-semibold uppercase tracking-wide text-faint">
-            Book
-          </div>
+          <Section label="Book" note="Chapters on a board, alone or in a series." />
           <div className="grid grid-cols-1 gap-[14px] px-[24px] pb-[24px] pt-[10px] sm:grid-cols-3">
             <Card
               title="Standalone book"
@@ -199,6 +189,15 @@ export function NewBookModal() {
         )}
       </div>
     </Scrim>
+  );
+}
+
+function Section({ label, note }: { label: string; note: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-[10px] gap-y-[2px] px-[24px] pt-[18px]">
+      <span className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">{label}</span>
+      <span className="text-[12px] text-faint">{note}</span>
+    </div>
   );
 }
 
