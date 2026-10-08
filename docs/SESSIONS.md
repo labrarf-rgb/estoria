@@ -5577,8 +5577,24 @@ the tombstone (now cleaned up by the new build); a newer database version gave
 the 5MB wall itself — this embedded browser accepted 26M characters in
 localStorage, so the ceiling the change removes could not be reproduced here;
 and the no-IndexedDB fallback, which is the old code path, checked by reading.
-The **Download data** button was not clicked (it saves a file). Not deployed:
-waiting on the user's own local testing.
+The **Download data** button was not clicked (it saves a file).
+
+**Shipped:** user tested locally and approved. Commit `90c3adb` pushed and
+deployed with `npm run deploy` (build 187); `version.json` on labrarf.com
+reports `90c3adb`. Smoke test on prod in a browser with no prior Estoria data:
+fresh start on the new layout (IndexedDB v3, `estoria:shell:v2`, no blob), no
+Recovery screen, footer "Saved". The user exported their project file before
+the deploy as an extra copy.
+
+**Spec review after shipping** caught drift and fixed it: the §3 layout tree
+(`persistence.ts` description, new `projects.ts`), §4 "Local auto-save" row
+(adapter name, maps no longer in localStorage), §9 item 18 (the new map pad
+shares the prose pad's silent-quota behavior), and two code comments
+(`storageDurability.ts`, `prose.ts`) that still said the map lives in
+localStorage. Note for later: §9 item 18 measured Chrome's localStorage taking
+~40M characters, matching this session's observation, so the shared ~5MB
+ceiling this change removes bites on Safari and Firefox (and iPad) rather than
+desktop Chrome.
 
 **Still open:** loading only the open project (§10 Phase 0's other half) —
 stashed projects are still held whole in memory because `switchProject` and

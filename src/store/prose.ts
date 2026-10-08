@@ -8,7 +8,8 @@ import { loadAllFrom, STORE_PROSE, writeTo } from "@/store/idb";
  * and in every file — export, Sync, backup and import all still see one document
  * with `manuscript` on its chapters, so the cross-app contract and the Android
  * app are untouched. The only thing that changes is that the auto-save writes
- * the map to localStorage and the prose to IndexedDB, and the load puts them
+ * the map and the prose separately (the map to its own record since 2026-10-07,
+ * `store/projects.ts`), and the load puts them
  * back together before the store ever sees them.
  *
  * Why it has to move (docs/SPECS.md §8, "Prose is already split out"):

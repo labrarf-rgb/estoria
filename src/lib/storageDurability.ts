@@ -3,9 +3,10 @@ import { useSyncExternalStore } from "react";
 /**
  * Asking the browser not to throw your book away.
  *
- * Everything Estoria holds lives in this browser: the map in localStorage, the
- * manuscripts in IndexedDB. By default both sit in the *best-effort* bucket,
- * which the browser is free to clear when the disk gets tight — quietly, with
+ * Everything Estoria holds lives in this browser: a small shell in localStorage,
+ * the project maps and manuscripts in IndexedDB. By default both sit in the
+ * *best-effort* bucket, which the browser is free to clear when the disk gets
+ * tight — quietly, with
  * no prompt and no warning, and taking the two of them together. From inside
  * the app that is indistinguishable from a first launch, which is the shape of
  * every "where did my work go" report.
