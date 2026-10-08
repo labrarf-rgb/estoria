@@ -5485,3 +5485,26 @@ at risk: projects live in the browser, and no app code ran while it was blank.
   200, not just a matching `version.json`.
 
 Not run end to end: a real deploy is the only full test, and none was due.
+
+### 2026-10-07 — Story map export kept the imported title (Session 62)
+
+**Reported:** Save to file showed the right title on the Manuscript tab, but the
+Story map tab still had the placeholder title from the original import.
+
+**Cause.** `buildMarkdown` headed the file with the active book record's title.
+That record is set once at import, and `setProjectTitle` only kept it in step
+for single pieces, so renaming a book project never reached it. The manuscript
+export reads `projectTitle`, which is why the two tabs disagreed.
+
+**Fixed:**
+- `lib/markdown.ts`: outside series mode the heading is `projectTitle`; the
+  book's own title is used only in a series, where the project title is the
+  series name. This also fixes projects already saved with a stale book title,
+  with no migration.
+- `store/useStore.ts`: `setProjectTitle` renames the active book as well when
+  not in series mode, so the record stops drifting.
+
+**Verified:** `tsc -b` clean; bundled `buildMarkdown` against a doc with
+project title "Real Title" and book title "Imported Story": heading is
+`# Real Title` out of series, `# Imported Story` in series mode. SPECS §4
+"Export / Markdown (story map)" row updated with the heading rule.

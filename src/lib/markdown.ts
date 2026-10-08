@@ -69,7 +69,9 @@ export function buildMarkdown(doc: StoryDoc): string {
   const title = doc.projectTitle || "Untitled Voyage";
   const total = doc.chapters.reduce((a, c) => a + c.words, 0);
   const charName = (id: string) => doc.characters.find((c) => c.id === id)?.name ?? id;
-  const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
+  // Outside a series the project title is the book's title; the book record's
+  // own title is only kept in step for series mode, so don't read it here.
+  const activeBook = doc.seriesMode ? doc.books.find((b) => b.id === doc.activeBookId) : undefined;
   const bookTitle = activeBook ? activeBook.title : title;
 
   let md = `# ${bookTitle}\n\nMapped in Estoria. ${total.toLocaleString()} words across ${doc.chapters.length} chapters.\n`;

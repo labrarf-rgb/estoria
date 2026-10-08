@@ -806,9 +806,16 @@ export const useStore = create<StoreState>()(
       // ---- project ----
       // A piece's title lives on the project; its one chapter carries the same
       // title so the phone, which shows a piece as a one-chapter book, reads it.
+      // Outside a series the project is the one book, so its book record follows
+      // the rename too (in a series the project title is the series' own).
       setProjectTitle: (title) =>
         set((s) => {
-          if (!isPiece(s.doc)) return { doc: { ...s.doc, projectTitle: title } };
+          if (!isPiece(s.doc)) {
+            const books = s.doc.seriesMode
+              ? s.doc.books
+              : s.doc.books.map((b) => (b.id === s.doc.activeBookId ? { ...b, title } : b));
+            return { doc: { ...s.doc, projectTitle: title, books } };
+          }
           const retitle = (chs: Chapter[]) => chs.map((c, i) => (i === 0 ? { ...c, title } : c));
           return {
             doc: {
