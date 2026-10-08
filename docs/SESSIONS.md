@@ -5583,8 +5583,8 @@ The **Download data** button was not clicked (it saves a file).
 deployed with `npm run deploy` (build 187); `version.json` on labrarf.com
 reports `90c3adb`. Smoke test on prod in a browser with no prior Estoria data:
 fresh start on the new layout (IndexedDB v3, `estoria:shell:v2`, no blob), no
-Recovery screen, footer "Saved". The user exported their project file before
-the deploy as an extra copy.
+Recovery screen, footer "Saved". The user planned to export their project file
+as an extra copy.
 
 **Spec review after shipping** caught drift and fixed it: the §3 layout tree
 (`persistence.ts` description, new `projects.ts`), §4 "Local auto-save" row
