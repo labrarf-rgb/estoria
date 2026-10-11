@@ -70,6 +70,15 @@ export function clearDriveNotice(): void {
 
 export function openDriveChooser(open = true): void {
   update({ chooserOpen: open });
+  // After a reload mid-setup this page doesn't know it's signed in yet: ask
+  // the broker quietly, so the chooser picks up where setup left off (the
+  // folder question) instead of offering Connect again.
+  if (open && driveAvailableHere() && driveAuth.status().state === "unknown") {
+    driveAuth.getAccessToken().then(
+      () => update({}),
+      () => update({})
+    );
+  }
 }
 
 // ---- Startup ---------------------------------------------------------------------
