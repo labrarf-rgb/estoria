@@ -26,7 +26,7 @@ every value and status). The history is the Session 66 entry in
 | Branch | Work is on **`feature/drive-sync`** (checked out). `main` is at `07b884b` (pushed): Phase A, the privacy page and docs. It has no Phase B code, and its SPECS/plan predate Phase B, so read the copies on this branch. |
 | Pushed | `feature/drive-sync` is on origin (B1-B3b and this handoff). Session 67's fixes are committed on top, not yet pushed. |
 | Local dev config | `.claude/launch.json` has an `estoria-auth-local` entry (runs `node auth-server/dev.mjs` on port 3000), committed with this handoff. |
-| Prod app | `www.labrarf.com/estoria`, build 200 (`49bcae9`): Phase A (Sync tests, SyncFolder, Web Lock, per-target baselines) + `privacy.html`. **No Drive code in prod.** |
+| Prod app | **Deploy B live 2026-10-11:** v4.0.0, build 217 (`a901e78`), `main` merged from `feature/drive-sync` (`0cfe0e8`). Drive hidden without `?drive=on` (checked on prod: no Drive or broker calls). Rollback: `git switch --detach 07b884b && FORCE=1 npm run deploy` (build 200), or broker `DRIVE_STATUS=off` + Vercel redeploy to stop Drive writes only. |
 | Broker | Live at `https://auth.labrarf.com` (Vercel project `estoria-auth-server`, root `auth-server`, Hobby). `/status` = on. Six env vars, Production only. Auto-redeploys when `main` is pushed with `auth-server/` changes. |
 | DNS | `auth` CNAME → `f39fd1f062c3f808.vercel-dns-017.com` at whois.com. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. |
 | Google Cloud | Project `Estoria` (`estoria-511314`, number `177782323056`); consent screen External + In production, no logo; client `Estoria web` (one secret, in Vercel); Picker key `Estoria Picker`. Values in the plan's Step 0 table. |
