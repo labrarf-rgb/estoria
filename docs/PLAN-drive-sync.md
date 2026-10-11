@@ -269,8 +269,8 @@ secret and `TOKEN_KEY` never go in this repo.
 | Project number | `177782323056` (the Picker's app ID); project ID `estoria-511314` |
 | Broker code | **Written (Session 66):** `auth-server/`, 31 tests against a fake Google, checked over real HTTP locally. Not deployed |
 | Vercel | Project `estoria-auth-server` (Hobby, root directory `auth-server`), all six settings Production only. Live at `https://estoria-auth-server.vercel.app`: `/status` on, preflight 204, other sites 403, `/auth/start` redirects to Google with the right client. Old client secret disabled in Google (delete once a real sign-in works) |
-| DNS (`auth` CNAME) | **Added 2026-10-11** at whois.com: `auth` → `f39fd1f062c3f808.vercel-dns-017.com` (TTL 28800); A, `www`, MX, TXT unchanged and the site still loads. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. Waiting on propagation + Vercel's certificate |
-| **Resume here** | When Vercel shows `auth.labrarf.com` Valid: rerun the `/status`, preflight, 403 and `/auth/start` checks against `https://auth.labrarf.com`. Then Step 1 (real Google sign-in checks), then delete the disabled old client secret |
+| DNS (`auth` CNAME) | **Added 2026-10-11** at whois.com: `auth` → `f39fd1f062c3f808.vercel-dns-017.com` (TTL 28800); A, `www`, MX, TXT unchanged and the site still loads. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. **Live:** Let's Encrypt certificate for `auth.labrarf.com`; `/status` on, preflight 204 for www.labrarf.com, other sites and missing header 403, `/auth/start` sets the sealed state cookie; website unaffected |
+| **Resume here** | Step 0 is done, and so is Deploy S. Next: Step 1, a first real Google sign-in through `auth.labrarf.com/auth/start` (proves the secret, consent screen, refresh token and cookie), then delete the disabled old client secret, then Phase B |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 
