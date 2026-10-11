@@ -138,22 +138,30 @@ describe("backing up a new project", () => {
     expect(fake.live(folderId)).toHaveLength(0);
   });
 
-  it("makes the file once asked, and starts in agreement with it", async () => {
+  it("waits for a real title: an untitled file Estoria can't see may already be there", async () => {
     const doc = project("n1", "Untitled Story");
     wantDriveBackup("n1");
+    expect(await createWantedDriveFile(drive, doc)).toBe(false);
+    expect(fake.live(folderId)).toHaveLength(0);
+    expect(await createWantedDriveFile(drive, { ...doc, projectTitle: "The Lighthouse" })).toBe(true);
+  });
+
+  it("makes the file once asked, and starts in agreement with it", async () => {
+    const doc = project("n1", "The Lighthouse");
+    wantDriveBackup("n1");
     expect(await createWantedDriveFile(drive, doc)).toBe(true);
-    expect(fake.named(folderId, "untitled-story.estoria.json")).toHaveLength(1);
+    expect(fake.named(folderId, "the-lighthouse.estoria.json")).toHaveLength(1);
     expect(await pushCanonicalIfSafe(doc)).toBe("in-sync");
   });
 
   it("waits while another project uses the name, and makes it once renamed", async () => {
-    fake.put(folderId, "untitled-story.estoria.json", JSON.stringify(project("old", "Untitled Story")));
-    const doc = project("n1", "Untitled Story");
+    fake.put(folderId, "the-lighthouse.estoria.json", JSON.stringify(project("old", "The Lighthouse")));
+    const doc = project("n1", "The Lighthouse");
     wantDriveBackup("n1");
     expect(await createWantedDriveFile(drive, doc)).toBe(false);
-    expect(fake.named(folderId, "untitled-story.estoria.json")).toHaveLength(1);
-    expect(links.has("n1")).toBe(false);
-    expect(await createWantedDriveFile(drive, { ...doc, projectTitle: "The Lighthouse" })).toBe(true);
     expect(fake.named(folderId, "the-lighthouse.estoria.json")).toHaveLength(1);
+    expect(links.has("n1")).toBe(false);
+    expect(await createWantedDriveFile(drive, { ...doc, projectTitle: "The Lighthouse II" })).toBe(true);
+    expect(fake.named(folderId, "the-lighthouse-ii.estoria.json")).toHaveLength(1);
   });
 });

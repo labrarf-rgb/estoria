@@ -164,6 +164,10 @@ export async function createWantedDriveFile(folder: DriveFolder, doc: StoryDoc):
     clearWant(doc.id);
     return true;
   }
+  // Estoria can't see files it didn't make (drive.file), so "the name is free"
+  // can miss an old "untitled-story" the phone or Drive app wrote, and the
+  // folder would get a second one. Default titles clash most: wait for a name.
+  if (hasDefaultTitle(doc)) return false;
   const name = canonicalFileName(doc);
   if ((await folder.candidates(name)).length) return false;
   await folder.createLive(doc.id, name, projectFileText(doc));
@@ -171,4 +175,9 @@ export async function createWantedDriveFile(folder: DriveFolder, doc: StoryDoc):
   // Records that Drive and this browser agree, like "Back up all".
   const r = await pushCanonicalIfSafe(doc);
   return r === "in-sync" || r === "updated";
+}
+
+/** "Untitled Story", "Untitled Poem", …: a title nobody chose yet. */
+export function hasDefaultTitle(doc: StoryDoc): boolean {
+  return /^untitled( (story|essay|poem|piece|series|book))?$/i.test((doc.projectTitle || "").trim());
 }
