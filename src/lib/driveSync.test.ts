@@ -189,3 +189,51 @@ describe("once linked", () => {
     expect(files.slice(1).every((f) => f.role === "backup")).toBe(true);
   });
 });
+
+describe("B2 safety rules", () => {
+  it("backs up local work before loading a newer file over it (H15b)", async () => {
+    const id = await connected();
+    const mineBefore = makeDoc();
+    fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "From the phone")));
+    tick();
+    expect((await syncProject(mineBefore)).kind).toBe("pulled");
+    const saved = fake.live(folderId).find((f) => f.name.endsWith("-before-pull.estoria.json"));
+    expect(saved).toBeDefined();
+    expect(await fingerprint(content(saved!.id))).toBe(await fingerprint(mineBefore));
+  });
+
+  it("resolving a conflict writes nothing if the phone saved while the dialog was open (R8)", async () => {
+    const id = await connected();
+    fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "Phone, first")));
+    tick();
+    const mine = retitle(makeDoc(), "Laptop");
+    const res = await syncProject(mine);
+    expect(res.kind).toBe("conflict");
+    if (res.kind !== "conflict") return;
+    expect(res.rev).toBeDefined();
+
+    fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "Phone, while you decided")));
+    await expect(resolveConflict(mine, res.remote, "mine", res.rev)).rejects.toBeInstanceOf(DriveRevisionMovedError);
+    expect(content(id).chapters[0].title).toBe("Phone, while you decided");
+  });
+
+  it("asks before syncing a project linked under another account (H16)", async () => {
+    const id = fake.put(folderId, LIVE, JSON.stringify(makeDoc()));
+    links.set("p1", { fileId: id, account: "old@example.com" });
+    active = new DriveFolder(
+      fake.api(),
+      folderId,
+      { get: (pid) => links.get(pid) ?? null, set: (pid, l) => (l ? links.set(pid, l) : links.delete(pid)) },
+      () => false,
+      "new@example.com"
+    );
+    expect(await syncProject(makeDoc())).toEqual({
+      kind: "account-changed",
+      fileName: LIVE,
+      from: "old@example.com",
+      to: "new@example.com",
+    });
+    expect(await pushCanonicalIfSafe(makeDoc())).toBe("unavailable");
+    expect(fake.calls.some((c) => /^(create|update)/.test(c))).toBe(false);
+  });
+});

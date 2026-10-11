@@ -1,6 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { DriveFolder, isLiveFileName, type DriveLink, type LinkStore } from "@/lib/driveFolder";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  connectDriveFolder,
+  DriveFolder,
+  isLiveFileName,
+  type DriveLink,
+  type LinkStore,
+} from "@/lib/driveFolder";
+import type { DriveFolderRef } from "@/lib/syncTarget";
+import { memoryStorage } from "@/test/memoryDir";
+import {
+  DriveAccountChangedError,
   DriveDuplicateError,
   DriveFileMissingError,
   DriveOfflineError,
@@ -23,12 +32,15 @@ const store = (): LinkStore => ({
 });
 
 beforeEach(() => {
+  vi.stubGlobal("localStorage", memoryStorage());
   fake = new FakeDrive();
   folderId = fake.folder();
   links = new Map();
   paused = false;
   folder = new DriveFolder(fake.api(), folderId, store(), () => paused, "writer@example.com");
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("files by name (backups, conflict copies)", () => {
   it("writes, then updates the same file rather than making another", async () => {
@@ -190,5 +202,109 @@ describe("kill switch", () => {
     await expect(folder.createLive("p2", "c.estoria.json", "x")).rejects.toBeInstanceOf(DrivePausedError);
     expect(((await folder.readLive("p1")) as { text: string }).text).toBe("v1");
     expect(fake.calls.filter((c) => /^(create|update|rename|trash)/.test(c))).toEqual([]);
+  });
+});
+
+describe("accounts and re-linking (H16, H1)", () => {
+  it("refuses to read a project linked under another account", async () => {
+    const id = fake.put(folderId, "a.estoria.json", "v1");
+    links.set("p1", { fileId: id, account: "old@example.com" });
+    const err = await folder.readLive("p1").catch((e) => e);
+    expect(err).toBeInstanceOf(DriveAccountChangedError);
+    expect(err).toMatchObject({ from: "old@example.com", to: "writer@example.com" });
+  });
+
+  it("linking a different file forgets the old agreement; re-linking the same one keeps it", async () => {
+    const key = "estoria:sync:lastHash:drive:p1";
+    const a = fake.put(folderId, "a.estoria.json", "v1");
+    folder.link("p1", a);
+    localStorage.setItem(key, "agreed");
+    folder.link("p1", a);
+    expect(localStorage.getItem(key)).toBe("agreed");
+    folder.link("p1", fake.put(folderId, "a-copy.estoria.json", "v0"));
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it("unlinking drops the link and the agreement, so the next Sync asks again", async () => {
+    folder.link("p1", fake.put(folderId, "a.estoria.json", "v1"));
+    localStorage.setItem("estoria:sync:lastHash:drive:p1", "agreed");
+    folder.unlink("p1");
+    expect(await folder.readLive("p1")).toBe("unlinked");
+    expect(localStorage.getItem("estoria:sync:lastHash:drive:p1")).toBeNull();
+  });
+});
+
+describe("setting up the Estoria folder", () => {
+  let ref: DriveFolderRef | null;
+  const refStore = { get: () => ref, set: (r: DriveFolderRef | null) => void (ref = r) };
+  beforeEach(() => {
+    ref = null;
+    fake = new FakeDrive();
+  });
+
+  it("creates it when Estoria has none", async () => {
+    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect(res).toMatchObject({ kind: "ready", created: true, several: false });
+    expect(ref).toMatchObject({ name: "Estoria", account: "me@example.com" });
+    expect(fake.files.get(ref!.id)?.mimeType).toBe("application/vnd.google-apps.folder");
+  });
+
+  it("finds the one it made before (another device, or a reinstall)", async () => {
+    const existing = fake.folder();
+    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect(res).toMatchObject({ kind: "ready", created: false });
+    expect(ref?.id).toBe(existing);
+  });
+
+  it("keeps the remembered folder while it's still there", async () => {
+    fake.folder();
+    const mine = fake.folder();
+    ref = { id: mine, name: "Estoria", account: "me@example.com" };
+    await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect(ref?.id).toBe(mine);
+  });
+
+  it("looks again when the remembered folder was trashed", async () => {
+    const old = fake.folder();
+    fake.files.get(old)!.trashed = true;
+    ref = { id: old, name: "Estoria", account: "me@example.com" };
+    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect(res).toMatchObject({ kind: "ready", created: true });
+    expect(ref?.id).not.toBe(old);
+  });
+
+  it("asks before switching this device to another account", async () => {
+    ref = { id: fake.folder(), name: "Estoria", account: "old@example.com" };
+    expect(await connectDriveFolder(fake.api(), "new@example.com", {}, refStore)).toEqual({
+      kind: "account-changed",
+      previous: "old@example.com",
+      current: "new@example.com",
+    });
+    expect(ref.account).toBe("old@example.com");
+    const res = await connectDriveFolder(fake.api(), "new@example.com", { allowSwitch: true }, refStore);
+    expect(res.kind).toBe("ready");
+    expect(ref?.account).toBe("new@example.com");
+  });
+
+  it("doesn't make a second folder when the create's reply was lost", async () => {
+    const api = fake.api();
+    const flaky = {
+      ...api,
+      createFolder: async (name: string) => {
+        await api.createFolder(name);
+        throw new DriveOfflineError();
+      },
+    };
+    const res = await connectDriveFolder(flaky, "me@example.com", {}, refStore);
+    expect(res.kind).toBe("ready");
+    expect([...fake.files.values()].filter((f) => f.name === "Estoria")).toHaveLength(1);
+  });
+
+  it("says when several Estoria folders exist, and uses the newest", async () => {
+    fake.folder();
+    const newer = fake.folder();
+    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect(res).toMatchObject({ kind: "ready", several: true });
+    expect(ref?.id).toBe(newer);
   });
 });

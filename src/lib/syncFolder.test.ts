@@ -110,3 +110,17 @@ describe("writeSavedCopyFile", () => {
     await expect(writeSavedCopyFile(doc)).resolves.toBeUndefined();
   });
 });
+
+describe("backup before a pull (H15b, folder target)", () => {
+  it("keeps local state as a backup before loading a newer file over it", async () => {
+    const { syncProject, fingerprint } = await import("@/lib/sync");
+    const doc = normalizeDoc({ id: "p1", projectTitle: "My Story", chapters: [{ id: "c1", title: "Mine" }] });
+    await syncProject(doc);
+    const theirs = { ...doc, chapters: [{ ...doc.chapters[0], title: "From the phone" }] };
+    folder!.put("my-story.estoria.json", JSON.stringify(theirs));
+    expect((await syncProject(doc)).kind).toBe("pulled");
+    const saved = folder!.names().find((n) => n.endsWith("-before-pull.estoria.json"));
+    expect(saved).toBeDefined();
+    expect(await fingerprint(normalizeDoc(folder!.json(saved!)))).toBe(await fingerprint(doc));
+  });
+});

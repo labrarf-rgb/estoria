@@ -190,10 +190,12 @@ export function fileStamp(d = new Date()): string {
  */
 export async function writeRotatingBackup(
   folder: SyncFolder,
-  doc: StoryDoc
+  doc: StoryDoc,
+  /** Marks why it was taken, e.g. "before-pull". It sorts before an untagged backup from the same second. */
+  opts?: { tag?: string }
 ): Promise<{ fileName: string; kept: number }> {
   const prefix = `${slugify(doc.projectTitle || "story")}-backup-`;
-  const fileName = `${prefix}${fileStamp()}.estoria.json`;
+  const fileName = `${prefix}${fileStamp()}${opts?.tag ? `-${opts.tag}` : ""}.estoria.json`;
   await folder.write(fileName, JSON.stringify(stampModified(doc), null, 2));
 
   const mine = (await folder.list()).map((f) => f.name).filter((n) => n.startsWith(prefix));

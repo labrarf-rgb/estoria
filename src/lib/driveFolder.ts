@@ -1,13 +1,16 @@
 import { drive, type DriveApi, type DriveFile } from "@/lib/drive";
+import { DRIVE_CONFIG } from "@/lib/driveConfig";
 import {
+  DriveAccountChangedError,
   DriveDuplicateError,
   DriveFileMissingError,
   DriveOfflineError,
   DrivePausedError,
   DriveRevisionMovedError,
 } from "@/lib/driveErrors";
+import { forgetLastSynced } from "@/lib/syncBaseline";
 import type { SyncFileEntry, SyncFileRead, SyncFolder } from "@/lib/syncFolder";
-import { drivePaused, driveFolderRef } from "@/lib/syncTarget";
+import { drivePaused, driveFolderRef, setDriveFolderRef, type DriveFolderRef } from "@/lib/syncTarget";
 
 /**
  * The Estoria folder in the user's Google Drive, as a `SyncFolder`, so Drive
@@ -27,6 +30,10 @@ import { drivePaused, driveFolderRef } from "@/lib/syncTarget";
  * - **H4:** a live write first checks the file's revision against the one the
  *   compare read; if it moved, nothing is written.
  * - **H7:** removing (backup pruning) moves files to Drive's trash.
+ * - **H16:** a project linked under another Google account than the one
+ *   connected now raises `DriveAccountChangedError` instead of reading, and
+ *   linking a project to a different file forgets its old "last agreed"
+ *   fingerprint, which says nothing about the new file.
  * - **Kill switch:** while paused, every write throws `DrivePausedError`.
  */
 
@@ -135,6 +142,9 @@ export class DriveFolder implements SyncFolder {
   private async linkedFile(projectId: string): Promise<DriveFile | "unlinked"> {
     const link = this.links.get(projectId);
     if (!link) return "unlinked";
+    if (link.account && this.account && link.account !== this.account) {
+      throw new DriveAccountChangedError(link.account, this.account);
+    }
     const meta = await this.api.get(link.fileId);
     if (!meta || meta.trashed) throw new DriveFileMissingError();
     return meta;
@@ -171,7 +181,19 @@ export class DriveFolder implements SyncFolder {
 
   /** "Pick it": this project's live file is that one. */
   link(projectId: string, fileId: string): void {
+    const before = this.links.get(projectId);
+    // A different file (or the same ID under another account) starts with no
+    // agreement, so its first Sync is a conflict if it differs (H1, H16).
+    if (!before || before.fileId !== fileId || before.account !== this.account) {
+      forgetLastSynced("drive", projectId);
+    }
     this.links.set(projectId, { fileId, account: this.account });
+  }
+
+  /** "Continue with this account" (H16): drop the old link; the next Sync asks for a file. */
+  unlink(projectId: string): void {
+    this.links.set(projectId, null);
+    forgetLastSynced("drive", projectId);
   }
 
   isLinked(projectId: string): boolean {
@@ -193,6 +215,67 @@ export class DriveFolder implements SyncFolder {
     this.link(projectId, created.id);
     return created.id;
   }
+}
+
+// ---- Setting up the Estoria folder in Drive ----------------------------------------
+
+export type FolderSetup =
+  | { kind: "ready"; ref: DriveFolderRef; created: boolean; several: boolean }
+  /** This device's Drive folder belongs to another account (H16): confirm before switching. */
+  | { kind: "account-changed"; previous: string; current: string };
+
+/**
+ * Find or create the Estoria folder for the connected account, once per
+ * device. With the `drive.file` permission Estoria only sees folders it made
+ * or was handed in the Picker, so "find" means one of those. Like files, a
+ * folder create is never retried blindly.
+ */
+export async function connectDriveFolder(
+  api: DriveApi,
+  account: string | undefined,
+  opts: { allowSwitch?: boolean } = {},
+  store: { get: () => DriveFolderRef | null; set: (ref: DriveFolderRef | null) => void } = {
+    get: driveFolderRef,
+    set: setDriveFolderRef,
+  }
+): Promise<FolderSetup> {
+  const ref = store.get();
+  if (ref?.account && account && ref.account !== account && !opts.allowSwitch) {
+    return { kind: "account-changed", previous: ref.account, current: account };
+  }
+  if (ref && (!ref.account || !account || ref.account === account)) {
+    const meta = await api.get(ref.id);
+    if (meta && !meta.trashed) {
+      const next = { ...ref, account: account ?? ref.account };
+      store.set(next);
+      return { kind: "ready", ref: next, created: false, several: false };
+    }
+  }
+
+  const name = DRIVE_CONFIG.folderName;
+  const found = (await api.findFolders(name)).sort(newestFirst);
+  let folder = found[0];
+  let created = false;
+  if (!folder) {
+    try {
+      folder = await api.createFolder(name);
+      created = true;
+    } catch (e) {
+      if (!(e instanceof DriveOfflineError)) throw e;
+      [folder] = await api.findFolders(name);
+      if (!folder) throw e;
+    }
+  }
+  const next: DriveFolderRef = { id: folder.id, name: folder.name, account };
+  store.set(next);
+  return { kind: "ready", ref: next, created, several: found.length > 1 };
+}
+
+/** Use a folder the person handed Estoria in Google's Picker (moving from the Drive desktop app, H17). */
+export function adoptPickedFolder(folder: { id: string; name: string }, account: string | undefined): DriveFolderRef {
+  const ref: DriveFolderRef = { id: folder.id, name: folder.name, account };
+  setDriveFolderRef(ref);
+  return ref;
 }
 
 /** This device's Drive target, or null until Drive has been set up here. */

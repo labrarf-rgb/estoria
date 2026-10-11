@@ -85,3 +85,14 @@ export class DriveDuplicateError extends Error {
     this.name = "DriveDuplicateError";
   }
 }
+
+/** The project was linked under a different Google account than the one connected now (H16). */
+export class DriveAccountChangedError extends Error {
+  constructor(
+    readonly from: string,
+    readonly to: string
+  ) {
+    super(`This project was last backed up to a different Google account (${from}). You're connected as ${to}.`);
+    this.name = "DriveAccountChangedError";
+  }
+}

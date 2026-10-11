@@ -50,7 +50,7 @@ export function Footer() {
   const [syncState, setSyncState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [conflict, setConflict] = useState<
-    (SyncConflict & { remote: StoryDoc; local: StoryDoc }) | null
+    (SyncConflict & { remote: StoryDoc; local: StoryDoc; rev?: string }) | null
   >(null);
   /** Relation of the folder file to local state, shown on the autosave line. */
   const [mirror, setMirror] = useState<"unknown" | "current" | "behind">("unknown");
@@ -127,6 +127,11 @@ export function Footer() {
           replaceDoc(res.doc);
           syncDone(`Synced · loaded newer changes from file · backup saved (${res.backup.kept} kept)`);
           return;
+        case "account-changed":
+          // Drive only. Phase B's UI slice turns this into "Continue with …?".
+          setSyncState("idle");
+          setMsg({ text: `This project was last backed up to ${res.from}. You're connected as ${res.to}.`, error: true });
+          return;
         case "needs-link":
           // Drive only (behind ?drive=on). The "pick it or create it" step
           // replaces this message in Phase B's UI slice.
@@ -151,7 +156,7 @@ export function Footer() {
   const resolveSyncConflict = async (keep: Resolution) => {
     if (!conflict) return;
     try {
-      const res = await resolveConflict(useStore.getState().doc, conflict.remote, keep);
+      const res = await resolveConflict(useStore.getState().doc, conflict.remote, keep, conflict.rev);
       if (res.applied) replaceDoc(res.applied);
       setConflict(null);
       const copies = res.conflictFileNames.join(" and ");
@@ -162,9 +167,16 @@ export function Footer() {
             ? `Synced · kept this version, file copy saved as ${copies}`
             : `Synced · loaded file version, your copy saved as ${copies}`
       );
-    } catch {
+    } catch (e) {
       setConflict(null);
-      setMsg({ text: "Couldn't resolve the conflict. Nothing was changed.", error: true });
+      setMsg({
+        // Drive explains itself (e.g. the file changed while the dialog was open).
+        text:
+          e instanceof Error && e.name.startsWith("Drive")
+            ? e.message
+            : "Couldn't resolve the conflict. Nothing was changed.",
+        error: true,
+      });
     }
   };
 

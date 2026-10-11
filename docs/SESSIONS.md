@@ -5688,6 +5688,15 @@ First real sign-in with raydaxn@gmail.com through the redirect flow: token
 refresh without a popup, `drive.file` granted, Drive answered 200 (0 files).
 Old client secret deleted afterwards; sign-in re-confirmed.
 
+**Phase B1 + B2 (on `feature/drive-sync`, not merged):** the Drive engine
+(`drive`, `driveAuth`, `driveFolder`, `syncTarget`, `syncBaseline`,
+`driveErrors`, `driveConfig`) and Drive's sync rules (needs-link, rename in
+place, revision checks incl. the conflict dialog, account check, folder
+setup, pre-pull backup on both targets). 123 app tests including sync over an
+in-memory Drive; each rule broken once on purpose and caught. No UI yet;
+without `?drive=on` the app keeps the folder target (checked in the browser:
+no calls to Google or the broker).
+
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the

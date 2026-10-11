@@ -10,12 +10,13 @@ import type {
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
 import { fileStamp, writeRotatingBackup } from "@/lib/backup";
+import { getLastSynced, setLastSynced } from "@/lib/syncBaseline";
+import { DriveAccountChangedError } from "@/lib/driveErrors";
 import {
   forgetSyncFolder,
   getSyncFolder,
   SyncFolderGoneError,
   type SyncFolder,
-  type SyncTarget,
 } from "@/lib/syncFolder";
 
 /**
@@ -80,38 +81,9 @@ export async function fingerprint(doc: StoryDoc): Promise<string> {
 }
 
 // ---- "Last agreed" hash per project (the third point of the 3-way compare) ---
+// Kept per target in lib/syncBaseline.ts, where DriveFolder can forget it too.
 
-/**
- * Kept per target, not just per project. A device that switches targets must
- * not compare a new target's file against the baseline it agreed with the old
- * one: an older Drive copy would look like "only the file changed" and load
- * over newer local work (docs/PLAN-drive-sync.md, H1). A target's first sync
- * has no baseline, so any difference is a conflict, never a silent pull.
- *
- * The folder target keeps the key it has always used, so existing devices keep
- * their baselines and a rollback to an older build finds them too.
- */
-export const lastSyncedKey = (target: SyncTarget, docId: string) =>
-  target === "folder"
-    ? `estoria:sync:lastHash:${docId}`
-    : `estoria:sync:lastHash:${target}:${docId}`;
-
-function getLastSynced(target: SyncTarget, docId: string): string | null {
-  try {
-    return localStorage.getItem(lastSyncedKey(target, docId));
-  } catch {
-    return null;
-  }
-}
-
-function setLastSynced(target: SyncTarget, docId: string, hash: string): void {
-  try {
-    localStorage.setItem(lastSyncedKey(target, docId), hash);
-  } catch {
-    // Non-fatal: without it the next divergence shows as a conflict instead
-    // of a fast-forward — safe, just noisier.
-  }
-}
+export { lastSyncedKey } from "@/lib/syncBaseline";
 
 // ---- "Last edited here" per project (display only, like modifiedAt) -----------
 
@@ -259,7 +231,14 @@ export type SyncOutcome =
       fileModifiedAt?: string;
       /** When this device last auto-saved this project, for display. */
       localEditedAt?: number;
-    };
+      /** The file's revision the compare read; resolving refuses if it moved since (R8). */
+      rev?: string;
+    }
+  /**
+   * Drive: this project was linked under another Google account (H16). Ask
+   * before continuing, so work doesn't quietly split across two Drives.
+   */
+  | { kind: "account-changed"; fileName: string; from: string; to: string };
 
 /**
  * Reconcile the given project with its canonical file — the explicit Sync
@@ -274,7 +253,13 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
     if (!folder) return { kind: "no-folder" };
 
     const fileName = canonicalFileName(doc);
-    const read = await readCanonical(folder, doc.id, fileName);
+    let read: Awaited<ReturnType<typeof readCanonical>>;
+    try {
+      read = await readCanonical(folder, doc.id, fileName);
+    } catch (e) {
+      if (e instanceof DriveAccountChangedError) return { kind: "account-changed", fileName, from: e.from, to: e.to };
+      throw e;
+    }
     if (read === "unlinked") return { kind: "needs-link", fileName };
     const localHash = await fingerprint(doc);
 
@@ -298,6 +283,11 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       return { kind: "pushed", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
     if (localHash === last) {
+      // The incoming copy is about to replace local state, so keep local state
+      // first (H15b). It may not be in the file's history: a phone reading a
+      // stale cached copy can write it back over newer work, and this pull
+      // would then be the moment it disappeared.
+      await writeRotatingBackup(folder, doc, { tag: "before-pull" });
       // Record under the incoming doc's id — after the caller applies it, that
       // is the active project the next sync will look up.
       setLastSynced(folder.target, remote.id, remoteHash);
@@ -317,6 +307,7 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       diff: diffDocs(doc, remote),
       ...(remote.modifiedAt ? { fileModifiedAt: remote.modifiedAt } : {}),
       ...(localEditedAt ? { localEditedAt } : {}),
+      ...(read.rev ? { rev: read.rev } : {}),
     };
   });
 }
@@ -351,7 +342,9 @@ export interface ResolveReceipt {
 export function resolveConflict(
   local: StoryDoc,
   remote: StoryDoc,
-  keep: Resolution
+  keep: Resolution,
+  /** The conflict's `rev`: if another device wrote while the dialog was open, write nothing (R8). */
+  expectRev?: string
 ): Promise<ResolveReceipt> {
   return locked(async () => {
     const folder = await getSyncFolder({ requestPermission: true });
@@ -380,7 +373,7 @@ export function resolveConflict(
       applied = keep === "theirs" ? remote : null;
     }
 
-    await writeLiveDoc(folder, local.id, canonicalFileName(local), winner);
+    await writeLiveDoc(folder, local.id, canonicalFileName(local), winner, expectRev);
     setLastSynced(folder.target, winner.id, await fingerprint(winner));
 
     return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
