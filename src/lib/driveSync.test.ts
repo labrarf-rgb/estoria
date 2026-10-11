@@ -182,6 +182,23 @@ describe("once linked", () => {
     expect(downloads()).toBe(before + 1);
   });
 
+  it("keeping 'theirs' names the file after the kept title, once", async () => {
+    const id = await connected();
+    const theirs = { ...retitle(makeDoc(), "From the phone"), projectTitle: "Phone Title" };
+    fake.writeExternally(id, JSON.stringify(theirs));
+    tick();
+    const mine = retitle(makeDoc(), "From the laptop");
+    const res = await syncProject(mine);
+    if (res.kind !== "conflict") throw new Error(res.kind);
+    const receipt = await resolveConflict(mine, res.remote, "theirs", res.rev);
+    expect(fake.files.get(id)!.name).toBe("phone-title.estoria.json");
+    const renames = () => fake.calls.filter((c) => c.startsWith(`rename:${id}`)).length;
+    const before = renames();
+    tick();
+    expect((await syncProject(receipt.applied!)).kind).toBe("in-sync");
+    expect(renames()).toBe(before);
+  });
+
   it("a conflict keeps both: the copy not kept is saved beside the live file", async () => {
     const id = await connected();
     fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "From the phone")));

@@ -79,10 +79,12 @@ broker).
   or "theirs" changes the active project ID.
 - **B fixed:** "Open from Google Drive" records the file as agreed, so the
   store's tidy-up on open fast-forwards instead of reading as a conflict.
-- Still open: 5 (UI tests), 6 (privacy page wording), 7 (Phase C docs), and
-  small ones: an offline start keeps Drive paused up to 30 min (re-check on
-  `online` would fix it); "theirs" renames the Drive file to the local title
-  for one Sync.
+- Also done in Session 67: 6 (privacy page names Google's sign-in page and
+  Picker); an offline start re-checks the kill switch on `online`; keeping
+  "theirs" names the Drive file after the kept title (no rename back and forth).
+  File → Google Drive opens the chooser; New project asks about Drive backup
+  (a yes creates the file from the mirror once the name is free).
+- Still open: 5 (UI tests), 7 (Phase C docs).
 
 The original Session 66 list, for reference:
 

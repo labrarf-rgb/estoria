@@ -377,7 +377,11 @@ export function resolveConflict(
       applied = keep === "theirs" ? remote : null;
     }
 
-    await writeLiveDoc(folder, local.id, canonicalFileName(local), winner, expectRev);
+    // Drive follows the file by ID and names it after what it holds, so the
+    // winner's title names it (no rename now and back on the next Sync). A
+    // folder finds the live file by name, so it keeps the name it was read at.
+    const liveName = folder.target === "drive" ? canonicalFileName(winner) : canonicalFileName(local);
+    await writeLiveDoc(folder, local.id, liveName, winner, expectRev);
     setLastSynced(folder.target, winner.id, await fingerprint(winner));
     if (winner.id !== local.id) folder.moveProject?.(local.id, winner.id);
 

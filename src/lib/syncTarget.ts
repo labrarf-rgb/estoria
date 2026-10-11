@@ -117,11 +117,22 @@ export async function refreshDriveStatus(auth: Pick<DriveAuth, "fetchDriveStatus
   return driveStatus;
 }
 
-/** Check now and every 30 minutes; returns a stop function. */
+/**
+ * Check now and every 30 minutes, and again when the device comes back
+ * online while Drive isn't confirmed on, so a page opened offline doesn't stay
+ * paused until the next half-hour check. Returns a stop function.
+ */
 export function startDriveStatusChecks(auth: Pick<DriveAuth, "fetchDriveStatus">): () => void {
   void refreshDriveStatus(auth);
   const timer = setInterval(() => void refreshDriveStatus(auth), STATUS_EVERY_MS);
-  return () => clearInterval(timer);
+  const onOnline = () => {
+    if (driveStatus !== "on") void refreshDriveStatus(auth);
+  };
+  window.addEventListener("online", onOnline);
+  return () => {
+    clearInterval(timer);
+    window.removeEventListener("online", onOnline);
+  };
 }
 
 /** Tests only. */
