@@ -5697,6 +5697,23 @@ in-memory Drive; each rule broken once on purpose and caught. No UI yet;
 without `?drive=on` the app keeps the folder target (checked in the browser:
 no calls to Google or the broker).
 
+**Phase B3 (on `feature/drive-sync`, not merged):** connect/sync UI (B3a:
+chooser, link dialog, footer Drive status line, mirror throttle, history and
+Backups on Drive) and the Projects window, Picker and iPad tip (B3b). Connect
+became a full-page redirect on every device (reasons in the plan). Browser-
+checked against a dummy local broker; 130 app tests.
+
+**Self-review at the end of the session** found four things to fix before
+Deploy B: connecting would create a second "Estoria" folder beside the Drive
+desktop app's one (data-split risk for the user's real setup); the Drive mirror
+and change check download the whole file each time (bandwidth); the live-file
+name pattern hides titles containing "backup"/"conflict"/"saved"; a link can
+stay under the old project ID after keeping another project's file. Plus: no UI
+tests, privacy page should mention Google's sign-in page and Picker, Phase C
+docs pending. All written up with fixes and the B4 steps in
+`docs/HANDOFF-drive-sync.md`. B4 (real local testing) was paused at adding
+`GOOGLE_CLIENT_SECRET` to `auth-server/.env.local`.
+
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the
