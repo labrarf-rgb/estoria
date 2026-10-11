@@ -45,17 +45,23 @@ export function SyncFileList({
   const replaceDoc = useStore((s) => s.replaceDoc);
   const [files, setFiles] = useState<ProjectFileInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active) return;
     let stale = false;
     setLoading(true);
+    setReadError(null);
     void listProjectFiles(useStore.getState().doc)
       .then((f) => {
         if (!stale) setFiles(f);
       })
-      .catch(() => {
-        if (!stale) setFiles(null);
+      .catch((e: unknown) => {
+        if (stale) return;
+        setFiles(null);
+        // Drive explains itself (offline, needs reconnecting); a folder's
+        // failure is a permission one.
+        if (e instanceof Error && e.name.startsWith("Drive")) setReadError(e.message);
       })
       .finally(() => {
         if (!stale) setLoading(false);
@@ -98,7 +104,7 @@ export function SyncFileList({
   if (!files) {
     return (
       <div className="px-[8px] py-[10px] text-[11px] text-faint">
-        Estoria wasn't allowed to read the folder.
+        {readError ?? "Estoria wasn't allowed to read the folder."}
       </div>
     );
   }

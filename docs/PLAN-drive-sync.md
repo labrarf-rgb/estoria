@@ -133,6 +133,17 @@ and never through labrarf.com. The broker only trades sign-in tokens.
   `package.json`. It's deployed on its own and never by `npm run deploy`. It's
   about 150 lines.
 
+> **Changed when building (Session 66):** connecting uses the **full-page
+> redirect on every device** (`/auth/start` → Google → `/auth/callback` →
+> back with `#drive=connected`), not Google's popup with the redirect only on
+> iPad. The redirect is the flow proven end to end with the real account; it
+> always asks consent, so Google issues each device its own refresh token
+> (the popup library can't force that, so a second device could connect and
+> then fail to stay signed in); it needs no popup (nothing for Safari to block,
+> H5) and no Google script on the page. Cost: one page load per device while
+> connecting, after saves are flushed. Points 1 and 4 below are superseded;
+> `/auth/exchange` stays in the broker unused.
+
 **Sign-in flow in the app (`src/lib/driveAuth.ts`):**
 1. **Connect** (a click) uses Google's sign-in library in *code* mode. A popup
    (or a redirect on an iPad home-screen app) returns a one-time code, and the
@@ -273,7 +284,8 @@ secret and `TOKEN_KEY` never go in this repo.
 | First real sign-in (Step 1, part) | **Passed 2026-10-11** with raydaxn@gmail.com via the redirect flow: back on `/estoria/#drive=connected`; `/auth/token` from the page returned a 60-minute token with `drive.file` and the email, no popup; Drive `files.list` answered 200 with 0 files. Still re-confirmed after the old secret was deleted. The other Step 1 checks (Picker folder access, file IDs, conditional update, Safari, phone staleness) need Phase B code |
 | Phase B progress | **B1 (Drive engine) built on `feature/drive-sync`, Session 66:** `driveConfig`, `driveErrors`, `driveAuth` (broker client, in-memory token, early refresh), `drive` (REST v3, backoff, resumable, no blind create retry), `driveFolder` (`DriveFolder`: live file by linked ID, unlinked/needs-link, rename in place, revision check, trash, duplicate stop, kill switch), `syncTarget` (`?drive=on` switch, per-device target, kill switch). `SyncFolder` gained `readLive`/`writeLive`; sync returns `needs-link` / mirror `unlinked`. 109 app tests incl. sync over a fake Drive; no behavior change without `?drive=on` |
 | B2 (sync rules for Drive) | **Built, Session 66:** before any pull the local state is saved as `<slug>-backup-<stamp>-before-pull` (H15b, **both targets**: the one folder-sync behavior change in Phase B); the conflict outcome carries the file's `rev` and resolving refuses if it moved (R8); a project linked under another account returns `account-changed` (H16) and `DriveFolder.unlink` resets it; linking a different file forgets the old fingerprint (`syncBaseline.ts`); `connectDriveFolder` finds or creates the Estoria folder (no blind retry, asks before switching accounts) and `adoptPickedFolder` takes one from the Picker (H17). 123 app tests |
-| **Resume here** | B3: the UI. Connect (GIS code popup, redirect on iPad home-screen), first-sync chooser, needs-link "Pick it / Create it", account-changed confirm, footer status line (H9), Projects modal "Open from Google Drive" (H8) + "Back up all" (H11), history/backups on the active target, kill-switch checks at startup, iPad tip (H10). Then B4 real testing |
+| B3a (connecting + syncing UI) | **Built, Session 66:** `driveSession.ts` (connect via redirect, sign-in result notices, device account switch, disconnect, "backed up" times); `DriveChooserModal` ("Back up with": Drive or a folder on this computer); `DriveLinkModal` ("Which file is this project?": pick a copy or create, refuses when the folder can't be read); Footer: Drive status line (H9: backed up · N min ago, not backed up for N, needs reconnecting + Reconnect, paused, offline, can't see file, other account), 30 s mirror throttle + flush on hide (H13), per-project account confirm (H16); history popover, File → Backups and the Backups window work on Drive; `?drive=on` read before first render, kill-switch checks at startup. Checked in the browser against a local broker: unchanged without the switch; chooser (light + dark); needs-reconnecting line; Sync asks to reconnect before linking |
+| **Resume here** | B3b: Projects modal "Open from Google Drive" (H8) + "Back up all N projects" (H11) + per-project Drive state; Picker for an existing Estoria folder (H17); iPad home-screen tip (H10). Then B4: real testing with a local broker + a localhost OAuth client |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 

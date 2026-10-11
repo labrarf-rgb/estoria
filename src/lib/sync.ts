@@ -102,7 +102,7 @@ export function recordLocalEdit(docId: string): void {
   }
 }
 
-function getLocalEditedAt(docId: string): number | null {
+export function getLocalEditedAt(docId: string): number | null {
   try {
     const v = Number(localStorage.getItem(lastEditKey(docId)));
     return Number.isFinite(v) && v > 0 ? v : null;
@@ -141,6 +141,9 @@ async function readCanonical(
 }
 
 const serialize = (doc: StoryDoc) => JSON.stringify(stampModified(doc), null, 2);
+
+/** A project as its `.estoria.json` file text (for creating a project's Drive file). */
+export const projectFileText = serialize;
 
 /** A copy beside the live file (conflict copy, saved copy). */
 async function writeDoc(folder: SyncFolder, fileName: string, doc: StoryDoc): Promise<void> {
@@ -395,7 +398,7 @@ export function resolveConflict(
  */
 export function pushCanonicalIfSafe(
   doc: StoryDoc
-): Promise<"created" | "updated" | "in-sync" | "behind" | "unlinked" | "unavailable"> {
+): Promise<"created" | "updated" | "in-sync" | "behind" | "unlinked" | "missing" | "account-changed" | "unavailable"> {
   return locked(async () => {
     const folder = await getSyncFolder();
     if (!folder) return "unavailable" as const;
@@ -430,7 +433,13 @@ export function pushCanonicalIfSafe(
       return "updated" as const;
     }
     return "behind" as const;
-  }).catch(() => "unavailable" as const);
+  }).catch((e: unknown) => {
+    // Drive's two states the footer names (H9); everything else retries quietly.
+    const name = e instanceof Error ? e.name : "";
+    if (name === "DriveFileMissingError") return "missing" as const;
+    if (name === "DriveAccountChangedError") return "account-changed" as const;
+    return "unavailable" as const;
+  });
 }
 
 // ---- Background check (open/focus + interval; notify only, never apply) -------

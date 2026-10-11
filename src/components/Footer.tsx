@@ -5,6 +5,7 @@ import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistenc
 import { chooseBackupFolder, getBackupDirName, isBackupPickerSupported } from "@/lib/backup";
 import {
   checkRemoteChanged,
+  getLocalEditedAt,
   pushCanonicalIfSafe,
   recordLocalEdit,
   resolveConflict,
@@ -12,7 +13,21 @@ import {
   type Resolution,
 } from "@/lib/sync";
 import { SyncConflictModal, type SyncConflict } from "@/components/modals/SyncConflictModal";
+import { DriveLinkModal } from "@/components/modals/DriveLinkModal";
 import { SyncHistoryPopover } from "@/components/SyncHistoryPopover";
+import { driveAuth } from "@/lib/driveAuth";
+import { driveSyncFolder } from "@/lib/driveFolder";
+import {
+  ago,
+  backedUpAt,
+  clearDriveNotice,
+  confirmAccountSwitch,
+  markBackedUp,
+  openDriveChooser,
+  startDriveConnect,
+  useDriveSession,
+} from "@/lib/driveSession";
+import { activeTarget, chosenTarget, currentDriveStatus, driveAvailableHere } from "@/lib/syncTarget";
 import type { StoryDoc } from "@/types";
 
 // Chrome refuses system-adjacent folders (home root, Library, drive roots)
@@ -22,6 +37,14 @@ const FOLDER_TIP =
 
 /** How long after an auto-save settles before mirroring it to the folder file. */
 const AUTO_PUSH_DEBOUNCE_MS = 2500;
+/**
+ * Drive: at most one mirror write per 30 s while typing (a big project is
+ * several MB, often over cellular), plus one straight away when the tab is
+ * hidden (docs/PLAN-drive-sync.md, H13).
+ */
+const DRIVE_PUSH_EVERY_MS = 30_000;
+/** Warn when edits haven't reached Drive for this long (H9). */
+const DRIVE_STALE_MS = 30 * 60 * 1000;
 
 /** Bottom bar: autosave/mirror status + cross-app Sync + canvas hint + attribution. */
 export function Footer() {
@@ -46,6 +69,22 @@ export function Footer() {
   // app. Hidden entirely where folder access doesn't exist (Firefox/Safari,
   // cross-origin embeds) — those contexts keep local auto-save + export menus.
   const pickerSupported = isBackupPickerSupported();
+  // Google Drive (behind ?drive=on): re-render on any change to the target,
+  // the sign-in, the kill switch or a notice.
+  const session = useDriveSession();
+  const driveHere = driveAvailableHere();
+  const driveMode = activeTarget() === "drive";
+  const syncVisible = pickerSupported || driveHere;
+  const askConfirm = useStore((s) => s.askConfirm);
+  const docId = useStore((s) => s.doc.id);
+  const [linkFor, setLinkFor] = useState<string | null>(null);
+  // Re-render each minute so "backed up · N min ago" stays true.
+  const [, setMinute] = useState(0);
+  useEffect(() => {
+    if (!driveMode) return;
+    const t = setInterval(() => setMinute((m) => m + 1), 60_000);
+    return () => clearInterval(t);
+  }, [driveMode]);
   const [dirName, setDirName] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
@@ -53,7 +92,33 @@ export function Footer() {
     (SyncConflict & { remote: StoryDoc; local: StoryDoc; rev?: string }) | null
   >(null);
   /** Relation of the folder file to local state, shown on the autosave line. */
-  const [mirror, setMirror] = useState<"unknown" | "current" | "behind">("unknown");
+  const [mirror, setMirror] = useState<
+    "unknown" | "current" | "behind" | "unlinked" | "missing" | "account-changed"
+  >("unknown");
+  // A different project (or target) says nothing about the last one's file.
+  useEffect(() => setMirror("unknown"), [docId, driveMode]);
+
+  // Notices from connecting (the full-page sign-in returns here).
+  useEffect(() => {
+    if (!session.notice) return;
+    setMsg(session.notice);
+    clearDriveNotice();
+  }, [session.notice]);
+
+  // This device's Drive folder belongs to another account: ask first (H16).
+  useEffect(() => {
+    const sw = session.accountSwitch;
+    if (!sw) return;
+    askConfirm({
+      message: `Switch this device to ${sw.current}?`,
+      detail:
+        `This device was backing up to ${sw.previous}'s Drive. Continuing uses ${sw.current}'s Drive from now on. ` +
+        `Nothing is deleted from ${sw.previous}.`,
+      confirmLabel: `Use ${sw.current}`,
+      onConfirm: () => void confirmAccountSwitch(),
+    });
+    // Cancelling keeps the old setup: Drive stays unused until confirmed.
+  }, [session.accountSwitch, askConfirm]);
   // Folder-icon popover: live file / backups / conflict copies, with restore.
   const [historyOpen, setHistoryOpen] = useState(false);
   const folderBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -80,6 +145,8 @@ export function Footer() {
   };
 
   const syncDone = (text: string) => {
+    // Drive now holds this project's latest state (a write, or a match).
+    if (activeTarget() === "drive") markBackedUp(useStore.getState().doc.id);
     setMsg({ text });
     setMirror("current");
     setSyncState("done");
@@ -97,6 +164,12 @@ export function Footer() {
       // whatever the store holds by the time the user decides.
       let compared = useStore.getState().doc;
       let res = await syncProject(compared);
+      if (res.kind === "no-folder" && driveHere && chosenTarget() !== "folder") {
+        // Drive is on for this device: choose where to back up first.
+        setSyncState("idle");
+        openDriveChooser();
+        return;
+      }
       if (res.kind === "no-folder") {
         // First run (or lost permission): pick the Estoria folder, then retry.
         const name = await chooseBackupFolder();
@@ -121,22 +194,50 @@ export function Footer() {
           syncDone(`Already in sync · backup saved (${res.backup.kept} kept)`);
           return;
         case "pushed":
-          syncDone(`Synced · changes written to file · backup saved (${res.backup.kept} kept)`);
+          syncDone(
+            `Synced · changes written to ${driveMode ? "Drive" : "file"} · backup saved (${res.backup.kept} kept)`
+          );
           return;
         case "pulled":
           replaceDoc(res.doc);
-          syncDone(`Synced · loaded newer changes from file · backup saved (${res.backup.kept} kept)`);
+          syncDone(
+            `Synced · loaded newer changes from ${driveMode ? "Drive" : "file"} · ` +
+              `your previous version and a backup saved (${res.backup.kept} kept)`
+          );
           return;
-        case "account-changed":
-          // Drive only. Phase B's UI slice turns this into "Continue with …?".
+        case "account-changed": {
+          // Drive (H16): don't split work across two Drives without asking.
           setSyncState("idle");
-          setMsg({ text: `This project was last backed up to ${res.from}. You're connected as ${res.to}.`, error: true });
+          setMirror("account-changed");
+          const { from, to } = res;
+          askConfirm({
+            message: "This project was backed up to a different Google account",
+            detail:
+              `Its last backup went to ${from}. You're connected as ${to}. Continue with ${to}? ` +
+              `You'll pick or create its file in ${to}'s Drive. Nothing is deleted from ${from}.`,
+            confirmLabel: `Continue with ${to}`,
+            onConfirm: () => {
+              driveSyncFolder()?.unlink(useStore.getState().doc.id);
+              void runSync();
+            },
+          });
           return;
+        }
         case "needs-link":
-          // Drive only (behind ?drive=on). The "pick it or create it" step
-          // replaces this message in Phase B's UI slice.
+          // Drive (H2b): never create the project's file unasked. Picking or
+          // creating needs Drive, so sign-in has to work first.
           setSyncState("idle");
-          setMsg({ text: `"${res.fileName}" isn't linked to a Google Drive file on this device yet.` });
+          setMirror("unlinked");
+          try {
+            await driveAuth.getAccessToken();
+          } catch (e) {
+            setMsg({
+              text: e instanceof Error && e.name === "DriveReconnectError" ? "Reconnect Google Drive first." : (e as Error).message,
+              error: true,
+            });
+            return;
+          }
+          setLinkFor(res.fileName);
           return;
         case "conflict":
           setSyncState("idle");
@@ -160,6 +261,7 @@ export function Footer() {
       if (res.applied) replaceDoc(res.applied);
       setConflict(null);
       const copies = res.conflictFileNames.join(" and ");
+      // syncDone marks Drive as holding the result.
       syncDone(
         typeof keep === "object"
           ? `Synced · merged version written, both copies saved as ${copies}`
@@ -184,33 +286,55 @@ export function Footer() {
   // canonical file too — fast-forward only, so it can never clobber changes
   // made on another device (those flip the status to "behind" instead).
   useEffect(() => {
-    if (!pickerSupported) return;
+    if (!pickerSupported && !driveMode) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let pending = false;
+    let lastPush = 0;
+    const push = () => {
+      if (stopped) return;
+      timer = null;
+      pending = false;
+      lastPush = Date.now();
+      const doc = useStore.getState().doc;
+      void pushCanonicalIfSafe(doc).then((r) => {
+        if (stopped) return;
+        if (driveMode && (r === "created" || r === "updated" || r === "in-sync")) markBackedUp(doc.id);
+        if (r === "unavailable") return; // offline, signed out or paused: shown from their own state
+        setMirror(r === "created" || r === "updated" || r === "in-sync" ? "current" : r);
+      });
+    };
     const off = onSaveStatus((s) => {
       if (s.state !== "saved") return;
+      pending = true;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (stopped) return;
-        void pushCanonicalIfSafe(useStore.getState().doc).then((r) => {
-          // "unlinked" (Drive, no file chosen yet) says nothing about the file.
-          if (stopped || r === "unavailable" || r === "unlinked") return;
-          setMirror(r === "behind" ? "behind" : "current");
-        });
-      }, AUTO_PUSH_DEBOUNCE_MS);
+      const wait = driveMode
+        ? Math.max(AUTO_PUSH_DEBOUNCE_MS, DRIVE_PUSH_EVERY_MS - (Date.now() - lastPush))
+        : AUTO_PUSH_DEBOUNCE_MS;
+      timer = setTimeout(push, wait);
     });
+    // Drive: don't sit on edits when the tab goes away (best effort; a closing
+    // tab can't carry a multi-MB upload, H13).
+    const onHide = () => {
+      if (driveMode && pending && document.visibilityState === "hidden") {
+        if (timer) clearTimeout(timer);
+        push();
+      }
+    };
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       stopped = true;
       if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onHide);
       off();
     };
-  }, [pickerSupported]);
+  }, [pickerSupported, driveMode]);
 
   // Contract's check cadence: on focus + every 5 min (mirrors the Android
   // default), notify-only — the user reviews via the Sync button, changes are
   // never auto-applied. Silent unless folder permission is already granted.
   useEffect(() => {
-    if (!pickerSupported) return;
+    if (!pickerSupported && !driveMode) return;
     let stopped = false;
     const check = () => {
       if (stopped || document.visibilityState === "hidden") return;
@@ -226,15 +350,45 @@ export function Footer() {
       window.removeEventListener("focus", check);
       clearInterval(interval);
     };
-  }, [pickerSupported]);
+  }, [pickerSupported, driveMode]);
 
   const failed = status.state === "error";
-  const mirrorSuffix =
+  const folderSuffix =
     !pickerSupported || mirror === "unknown"
       ? ""
       : mirror === "current"
         ? " · synced to file"
         : " · file changed elsewhere, press Sync";
+
+  // Drive's line (H9): can I tell whether Drive has my latest work?
+  const auth = driveAuth.status().state;
+  const needsReconnect = driveMode && (auth === "reconnect" || auth === "not-connected");
+  const backed = driveMode ? backedUpAt(docId) : null;
+  const editedAt = getLocalEditedAt(docId) ?? 0;
+  const driveStale = !!backed && editedAt > backed && Date.now() - backed > DRIVE_STALE_MS;
+  const driveSuffix = !driveMode
+    ? ""
+    : needsReconnect
+      ? " · Google Drive needs reconnecting"
+      : currentDriveStatus() !== "on" && currentDriveStatus() !== "unknown"
+        ? " · Drive backup paused"
+        : mirror === "behind"
+          ? " · changed elsewhere, press Sync"
+          : mirror === "unlinked"
+            ? " · not backed up to Drive yet, press Sync"
+            : mirror === "missing"
+              ? " · can't see this project's Drive file"
+              : mirror === "account-changed"
+                ? " · backed up under another account, press Sync"
+                : auth === "offline"
+                  ? " · Drive offline, will retry"
+                  : driveStale
+                    ? ` · not backed up to Drive for ${ago(backed!).replace(" ago", "")}`
+                    : backed
+                      ? ` · backed up to Drive ${ago(backed)}`
+                      : "";
+  const driveWarn = driveMode && (needsReconnect || driveStale || mirror === "missing");
+  const mirrorSuffix = driveMode ? driveSuffix : folderSuffix;
   const saveText = failed
     ? status.reason === "locked"
       ? "Auto-save is paused: Estoria couldn't read what's already saved here, and won't write over it. Reload, or export this to a file."
@@ -263,7 +417,7 @@ export function Footer() {
       <span
         className="flex shrink-0 items-center gap-[6px]"
         style={
-          failed
+          failed || driveWarn
             ? { color: "var(--but)" }
             : mirror === "behind"
               ? { color: "var(--soft)" }
@@ -278,15 +432,29 @@ export function Footer() {
       </span>
 
       {/* Cross-app Sync with the Estoria folder (shared with the Android app) */}
-      {pickerSupported && (
+      {syncVisible && (
         <span className="flex shrink-0 items-center gap-[5px]">
+          {needsReconnect && (
+            <button
+              onClick={() => startDriveConnect()}
+              title="Sign in to Google again on its own page, then come straight back"
+              className="rounded-md border px-[8px] py-[3px] text-[11px] font-semibold"
+              style={{ borderColor: "var(--but)", color: "var(--but)", background: "var(--card)" }}
+            >
+              Reconnect
+            </button>
+          )}
           <button
             onClick={() => void runSync()}
             disabled={syncState === "busy"}
             title={
-              dirName
-                ? `Sync this project with its file in "${dirName}" (shared with other devices). Also saves a backup copy`
-                : "Sync this project with its file in your Estoria folder (you'll pick the folder first)"
+              driveMode
+                ? `Sync this project with its file in your Estoria folder on Google Drive${
+                    driveAuth.connectedEmail() ? ` (${driveAuth.connectedEmail()})` : ""
+                  }. Also saves a backup copy`
+                : dirName
+                  ? `Sync this project with its file in "${dirName}" (shared with other devices). Also saves a backup copy`
+                  : "Sync this project with its file in your Estoria folder (you'll pick the folder first)"
             }
             className="rounded-md border px-[8px] py-[3px] text-[11px] font-semibold transition-colors disabled:opacity-60"
             style={
@@ -306,13 +474,16 @@ export function Footer() {
             onClick={() => {
               // No folder yet → pick one; otherwise show this project's files
               // (live / backups / conflict copies) with restore.
-              if (dirName) setHistoryOpen((v) => !v);
+              if (driveMode || dirName) setHistoryOpen((v) => !v);
+              else if (driveHere) openDriveChooser();
               else void pickFolder();
             }}
             title={
-              dirName
-                ? `Estoria folder: ${dirName} · click for files & restore`
-                : "Choose your Estoria folder"
+              driveMode
+                ? "Google Drive · click for files & restore"
+                : dirName
+                  ? `Estoria folder: ${dirName} · click for files & restore`
+                  : "Choose your Estoria folder"
             }
             className="flex h-[22px] w-[24px] items-center justify-center rounded-md border border-rule bg-card text-soft hover:border-faint hover:text-ink"
           >
@@ -338,15 +509,17 @@ export function Footer() {
       <div className="flex-1" />
       <span className="hidden shrink-0 max-w-[46vw] truncate text-right md:block">{hint}</span>
 
-      {dirName && (
+      {(driveMode || dirName) && (
         <SyncHistoryPopover
           open={historyOpen}
           anchorRef={folderBtnRef}
-          dirName={dirName}
+          title={driveMode ? "Google Drive" : "Estoria folder"}
+          detail={driveMode ? (driveAuth.connectedEmail() ?? "") : (dirName ?? "")}
           onClose={() => setHistoryOpen(false)}
           onChangeFolder={() => {
             setHistoryOpen(false);
-            void pickFolder();
+            if (driveHere) openDriveChooser();
+            else void pickFolder();
           }}
           onRestored={(fileName, backedUpAs) => {
             // The mirror pushes the restored state to the live file on the
@@ -354,6 +527,17 @@ export function Footer() {
             setMsg({ text: `Restored ${fileName}. Previous version saved as ${backedUpAs}` });
           }}
           onError={(message) => setMsg({ text: message, error: true })}
+        />
+      )}
+
+      {linkFor && (
+        <DriveLinkModal
+          fileName={linkFor}
+          onClose={() => setLinkFor(null)}
+          onLinked={() => {
+            setLinkFor(null);
+            void runSync();
+          }}
         />
       )}
 

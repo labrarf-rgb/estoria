@@ -233,7 +233,7 @@ describe("B2 safety rules", () => {
       from: "old@example.com",
       to: "new@example.com",
     });
-    expect(await pushCanonicalIfSafe(makeDoc())).toBe("unavailable");
+    expect(await pushCanonicalIfSafe(makeDoc())).toBe("account-changed");
     expect(fake.calls.some((c) => /^(create|update)/.test(c))).toBe(false);
   });
 });
