@@ -181,7 +181,7 @@ and never through labrarf.com. The broker only trades sign-in tokens.
 | H14 | **Rate limits, 5xx, offline.** | Back off and retry (1s, 2s, 4s…, max 5 min) on `429` and `5xx`. Offline means "will retry" and is never treated as needing reconnecting. Retries respect H2(c). |
 | H15 | **The phone reads a stale copy.** Android's Drive file provider can serve a cached version. If the phone then writes from it, a web edit could be overwritten, and on the web it would look like "only the file changed". | (a) Step 1 measures how stale the phone's reads get. (b) **New safety rule on every target: before loading a newer file over local state, write the local state as a backup first.** Today's pull backs up the incoming copy, which is already in the main file. This changes folder behavior slightly, so it ships in Phase B, not in the identical-behavior refactor. (c) If staleness turns out to be real, the Android side gets a "refresh before sync" fix in its own session (Estoria-aa). |
 | H16 | **Wrong Google account.** Connecting the iPad with a different account silently splits your work across two Drives. | Show "Google Drive · you@gmail.com" in the footer and history. Remember which account each project last synced with, and if that changes: "This project was last backed up to a different Google account (x@…). Continue with y@…?" |
-| H17 | **Moving the laptop from the folder to Drive.** The existing files in Drive were written by the Drive desktop app, so `drive.file` can't see them. | First connect opens Google's Picker on the Estoria folder, where you select the folder and your existing `*.estoria.json` files (multi-select). Per-target baselines (H1) mean the first sync reads "in sync" when the files match, and a conflict when they don't. Never a silent overwrite. |
+| H17 | **Moving the laptop from the folder to Drive.** The existing files in Drive were written by the Drive desktop app, so `drive.file` can't see them. | *(As built, Session 67.)* When Estoria sees no Estoria folder after connecting, it asks "Is there an Estoria folder in your Drive already?" and either takes it from Google's Picker (**the folder only**) or makes a new one; it never creates one unasked. Choosing the folder does **not** make the files in it visible (checked on prod), so each existing project file is handed over once, where it's needed: "Not listed? Choose it in Google Drive…" in Open from Google Drive and in the "Which file is this project?" dialog. (The first build followed the folder with a multi-select file picker; the user found it confusing and alarming with other projects in the folder.) Per-target baselines (H1) mean the first sync reads "in sync" when the files match, and a conflict when they don't. Never a silent overwrite. |
 
 ## Review against the code (Session 66)
 
@@ -372,6 +372,12 @@ The plan is written for the worst case of each, so results only simplify it.
     (R4); target and account name, "Backed up to Drive · N min ago",
     and the paused / offline / reconnect / can't-see-file states (H9, H16).
   - First-sync chooser: "Google Drive / a folder on this computer".
+    *(Session 67: also opened from **File → Google Drive**, the one place to
+    connect, change or disconnect.)*
+  - *(Session 67)* **New project** asks "Back up this project to Google
+    Drive?" (or, not connected yet, whether to connect). A yes makes the
+    file from the mirror once the title is no longer "Untitled …" and the name
+    is free in the folder (`createWantedDriveFile`).
   - **Projects modal:** "Open from Google Drive" (H8), "Back up all" (H11),
     and each project's Drive state.
   - **History popover, Backups and Toolbar:** use the active target;

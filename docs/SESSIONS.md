@@ -5769,6 +5769,29 @@ re-checks the kill switch on `online`; keeping "theirs" names the Drive file
 after the kept title; the chooser checks sign-in when opened, so a reload mid
 setup resumes at the folder question. 143 app tests.
 
-**Next:** finish the prod checklist in `HANDOFF-drive-sync.md` §5 (edit +
-rename was next), the Step 1 checks, a week of use, then Deploy C. Delete the
-scratch file from Drive after testing.
+**Later the same session (second ship):**
+- **The checklist, run by Claude** in the browser pane (signed in by the
+  user) on prod with scratch projects, "another device" being direct Drive
+  API writes: change elsewhere + pull with `-before-pull` backup, conflict +
+  Compare & merge, rotation to Drive's trash, history + restore, Open from
+  Google Drive + "Not listed?" Picker, a 5 MB project (resumable upload), the
+  bandwidth fix (no re-download on write or focus) and two tabs: all passed.
+  Picking only the folder does not expose its files (Step 1 answered). Chrome
+  on folder sync (through the Drive desktop app) and Safari on the Drive API
+  share one file correctly. Results in the handoff.
+- **Found while testing:** Disconnect revoked the token at Google, which
+  removes the whole grant and signs out **every** device. The broker's
+  `/auth/disconnect` now only clears that device's cookie.
+- **Found on prod:** a new project's file was created beside an invisible
+  July `untitled-story.estoria.json` (drive.file can't see files it didn't
+  make). New projects now wait for a real title before their Drive file is
+  made.
+- **Android deferred** by the user; its to-do list (including the same
+  backup-prune bug) is in Estoria-aa `docs/SPECS.md` §7.
+- Plan drift fixed: H17 and the UI list describe the as-built folder choice,
+  File → Google Drive and the new-project prompt.
+
+**Next:** test Disconnect + Reconnect once the broker fix is live; staying
+signed in after an hour / a day; the kill switch with the user; then move
+Chrome and the novel over, the iPad, a week of use, Deploy C. The user is
+deleting the scratch files.
