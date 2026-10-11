@@ -9,13 +9,14 @@ import type {
 } from "@/types";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
-import { fileStamp, writeRotatingBackup } from "@/lib/backup";
+import { fileStamp, parseCopyName, writeRotatingBackup } from "@/lib/backup";
+import { getLastSynced, setLastSynced } from "@/lib/syncBaseline";
+import { DriveAccountChangedError } from "@/lib/driveErrors";
 import {
   forgetSyncFolder,
   getSyncFolder,
   SyncFolderGoneError,
   type SyncFolder,
-  type SyncTarget,
 } from "@/lib/syncFolder";
 
 /**
@@ -80,38 +81,9 @@ export async function fingerprint(doc: StoryDoc): Promise<string> {
 }
 
 // ---- "Last agreed" hash per project (the third point of the 3-way compare) ---
+// Kept per target in lib/syncBaseline.ts, where DriveFolder can forget it too.
 
-/**
- * Kept per target, not just per project. A device that switches targets must
- * not compare a new target's file against the baseline it agreed with the old
- * one: an older Drive copy would look like "only the file changed" and load
- * over newer local work (docs/PLAN-drive-sync.md, H1). A target's first sync
- * has no baseline, so any difference is a conflict, never a silent pull.
- *
- * The folder target keeps the key it has always used, so existing devices keep
- * their baselines and a rollback to an older build finds them too.
- */
-export const lastSyncedKey = (target: SyncTarget, docId: string) =>
-  target === "folder"
-    ? `estoria:sync:lastHash:${docId}`
-    : `estoria:sync:lastHash:${target}:${docId}`;
-
-function getLastSynced(target: SyncTarget, docId: string): string | null {
-  try {
-    return localStorage.getItem(lastSyncedKey(target, docId));
-  } catch {
-    return null;
-  }
-}
-
-function setLastSynced(target: SyncTarget, docId: string, hash: string): void {
-  try {
-    localStorage.setItem(lastSyncedKey(target, docId), hash);
-  } catch {
-    // Non-fatal: without it the next divergence shows as a conflict instead
-    // of a fast-forward — safe, just noisier.
-  }
-}
+export { lastSyncedKey } from "@/lib/syncBaseline";
 
 // ---- "Last edited here" per project (display only, like modifiedAt) -----------
 
@@ -130,7 +102,7 @@ export function recordLocalEdit(docId: string): void {
   }
 }
 
-function getLocalEditedAt(docId: string): number | null {
+export function getLocalEditedAt(docId: string): number | null {
   try {
     const v = Number(localStorage.getItem(lastEditKey(docId)));
     return Number.isFinite(v) && v > 0 ? v : null;
@@ -146,16 +118,18 @@ export function canonicalFileName(doc: StoryDoc): string {
 }
 
 /**
- * Read + normalize the canonical file, with the folder's revision of it (so a
- * later overwrite can insist nothing moved in between). null = doesn't exist;
- * throws if corrupt.
+ * Read + normalize the project's live file, with the folder's revision of it
+ * (so a later overwrite can insist nothing moved in between). null = doesn't
+ * exist; "unlinked" = Drive hasn't been told which file is this project's
+ * (H2b: ask, never create); throws if corrupt.
  */
 async function readCanonical(
   folder: SyncFolder,
+  projectId: string,
   fileName: string
-): Promise<{ doc: StoryDoc; rev?: string } | null> {
-  const file = await folder.read(fileName);
-  if (!file) return null;
+): Promise<{ doc: StoryDoc; rev?: string } | null | "unlinked"> {
+  const file = await folder.readLive(projectId, fileName);
+  if (!file || file === "unlinked") return file;
   try {
     return { doc: normalizeDoc(JSON.parse(file.text)), rev: file.rev };
   } catch (e) {
@@ -166,13 +140,25 @@ async function readCanonical(
   }
 }
 
-async function writeDoc(
+const serialize = (doc: StoryDoc) => JSON.stringify(stampModified(doc), null, 2);
+
+/** A project as its `.estoria.json` file text (for creating a project's Drive file). */
+export const projectFileText = serialize;
+
+/** A copy beside the live file (conflict copy, saved copy). */
+async function writeDoc(folder: SyncFolder, fileName: string, doc: StoryDoc): Promise<void> {
+  await folder.write(fileName, serialize(doc));
+}
+
+/** The project's live file. `expectRev`: refuse if it moved since that read (H4). */
+async function writeLiveDoc(
   folder: SyncFolder,
+  projectId: string,
   fileName: string,
   doc: StoryDoc,
   expectRev?: string
 ): Promise<void> {
-  await folder.write(fileName, JSON.stringify(stampModified(doc), null, 2), { expectRev });
+  await folder.writeLive(projectId, fileName, serialize(doc), { expectRev });
 }
 
 // ---- Serialization of folder operations ----------------------------------------
@@ -229,6 +215,8 @@ export interface BackupReceipt {
 export type SyncOutcome =
   /** No usable folder handle (unset, or permission not granted). */
   | { kind: "no-folder" }
+  /** Drive: no file is linked to this project on this device yet. Ask "pick it or create it" (H2b). */
+  | { kind: "needs-link"; fileName: string }
   | { kind: "in-sync"; fileName: string; backup: BackupReceipt }
   /** File didn't exist yet — created it from the local project. */
   | { kind: "created"; fileName: string; backup: BackupReceipt }
@@ -246,7 +234,14 @@ export type SyncOutcome =
       fileModifiedAt?: string;
       /** When this device last auto-saved this project, for display. */
       localEditedAt?: number;
-    };
+      /** The file's revision the compare read; resolving refuses if it moved since (R8). */
+      rev?: string;
+    }
+  /**
+   * Drive: this project was linked under another Google account (H16). Ask
+   * before continuing, so work doesn't quietly split across two Drives.
+   */
+  | { kind: "account-changed"; fileName: string; from: string; to: string };
 
 /**
  * Reconcile the given project with its canonical file — the explicit Sync
@@ -261,11 +256,18 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
     if (!folder) return { kind: "no-folder" };
 
     const fileName = canonicalFileName(doc);
-    const read = await readCanonical(folder, fileName);
+    let read: Awaited<ReturnType<typeof readCanonical>>;
+    try {
+      read = await readCanonical(folder, doc.id, fileName);
+    } catch (e) {
+      if (e instanceof DriveAccountChangedError) return { kind: "account-changed", fileName, from: e.from, to: e.to };
+      throw e;
+    }
+    if (read === "unlinked") return { kind: "needs-link", fileName };
     const localHash = await fingerprint(doc);
 
     if (!read) {
-      await writeDoc(folder, fileName, doc);
+      await writeLiveDoc(folder, doc.id, fileName, doc);
       setLastSynced(folder.target, doc.id, localHash);
       return { kind: "created", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
@@ -279,14 +281,20 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
 
     const last = getLastSynced(folder.target, doc.id);
     if (remoteHash === last) {
-      await writeDoc(folder, fileName, doc, read.rev);
+      await writeLiveDoc(folder, doc.id, fileName, doc, read.rev);
       setLastSynced(folder.target, doc.id, localHash);
       return { kind: "pushed", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
     if (localHash === last) {
+      // The incoming copy is about to replace local state, so keep local state
+      // first (H15b). It may not be in the file's history: a phone reading a
+      // stale cached copy can write it back over newer work, and this pull
+      // would then be the moment it disappeared.
+      await writeRotatingBackup(folder, doc, { tag: "before-pull" });
       // Record under the incoming doc's id — after the caller applies it, that
       // is the active project the next sync will look up.
       setLastSynced(folder.target, remote.id, remoteHash);
+      if (remote.id !== doc.id) folder.moveProject?.(doc.id, remote.id);
       return {
         kind: "pulled",
         fileName,
@@ -303,6 +311,7 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       diff: diffDocs(doc, remote),
       ...(remote.modifiedAt ? { fileModifiedAt: remote.modifiedAt } : {}),
       ...(localEditedAt ? { localEditedAt } : {}),
+      ...(read.rev ? { rev: read.rev } : {}),
     };
   });
 }
@@ -337,7 +346,9 @@ export interface ResolveReceipt {
 export function resolveConflict(
   local: StoryDoc,
   remote: StoryDoc,
-  keep: Resolution
+  keep: Resolution,
+  /** The conflict's `rev`: if another device wrote while the dialog was open, write nothing (R8). */
+  expectRev?: string
 ): Promise<ResolveReceipt> {
   return locked(async () => {
     const folder = await getSyncFolder({ requestPermission: true });
@@ -366,8 +377,9 @@ export function resolveConflict(
       applied = keep === "theirs" ? remote : null;
     }
 
-    await writeDoc(folder, canonicalFileName(local), winner);
+    await writeLiveDoc(folder, local.id, canonicalFileName(local), winner, expectRev);
     setLastSynced(folder.target, winner.id, await fingerprint(winner));
+    if (winner.id !== local.id) folder.moveProject?.(local.id, winner.id);
 
     return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
   });
@@ -388,7 +400,7 @@ export function resolveConflict(
  */
 export function pushCanonicalIfSafe(
   doc: StoryDoc
-): Promise<"created" | "updated" | "in-sync" | "behind" | "unavailable"> {
+): Promise<"created" | "updated" | "in-sync" | "behind" | "unlinked" | "missing" | "account-changed" | "unavailable"> {
   return locked(async () => {
     const folder = await getSyncFolder();
     if (!folder) return "unavailable" as const;
@@ -396,14 +408,19 @@ export function pushCanonicalIfSafe(
     const fileName = canonicalFileName(doc);
     let read: Awaited<ReturnType<typeof readCanonical>>;
     try {
-      read = await readCanonical(folder, fileName);
-    } catch {
+      read = await readCanonical(folder, doc.id, fileName);
+    } catch (e) {
+      // Offline, signed out or paused is not "the file changed": let it fall
+      // through to "unavailable" so the next save retries quietly.
+      if (e instanceof Error && e.name.startsWith("Drive")) throw e;
       return "behind" as const; // unreadable — don't overwrite what we can't compare
     }
+    // Drive with no file chosen yet: never create one in the background (H2b).
+    if (read === "unlinked") return "unlinked" as const;
     const localHash = await fingerprint(doc);
 
     if (!read) {
-      await writeDoc(folder, fileName, doc);
+      await writeLiveDoc(folder, doc.id, fileName, doc);
       setLastSynced(folder.target, doc.id, localHash);
       return "created" as const;
     }
@@ -413,12 +430,18 @@ export function pushCanonicalIfSafe(
       return "in-sync" as const;
     }
     if (remoteHash === getLastSynced(folder.target, doc.id)) {
-      await writeDoc(folder, fileName, doc, read.rev);
+      await writeLiveDoc(folder, doc.id, fileName, doc, read.rev);
       setLastSynced(folder.target, doc.id, localHash);
       return "updated" as const;
     }
     return "behind" as const;
-  }).catch(() => "unavailable" as const);
+  }).catch((e: unknown) => {
+    // Drive's two states the footer names (H9); everything else retries quietly.
+    const name = e instanceof Error ? e.name : "";
+    if (name === "DriveFileMissingError") return "missing" as const;
+    if (name === "DriveAccountChangedError") return "account-changed" as const;
+    return "unavailable" as const;
+  });
 }
 
 // ---- Background check (open/focus + interval; notify only, never apply) -------
@@ -433,8 +456,8 @@ export async function checkRemoteChanged(doc: StoryDoc): Promise<boolean> {
   try {
     const folder = await getSyncFolder();
     if (!folder) return false;
-    const read = await readCanonical(folder, canonicalFileName(doc));
-    if (!read) return false;
+    const read = await readCanonical(folder, doc.id, canonicalFileName(doc));
+    if (!read || read === "unlinked") return false;
     const last = getLastSynced(folder.target, doc.id);
     if (!last) return false; // never synced — nothing to compare against
     const remoteHash = await fingerprint(read.doc);
@@ -467,14 +490,13 @@ export function listProjectFiles(doc: StoryDoc): Promise<ProjectFileInfo[] | nul
     const slug = slugify(doc.projectTitle || "story");
     const files: ProjectFileInfo[] = [];
     for (const { name, lastModified } of await folder.list()) {
+      const copy = parseCopyName(name);
       const role =
         name === live
           ? ("live" as const)
-          : name.startsWith(`${slug}-backup-`)
-            ? ("backup" as const)
-            : name.startsWith(`${slug}-conflict-`)
-              ? ("conflict" as const)
-              : null;
+          : copy?.slug === slug && copy.kind !== "saved"
+            ? copy.kind
+            : null;
       if (!role) continue; // some other project's files
       files.push({ name, role, lastModified });
     }

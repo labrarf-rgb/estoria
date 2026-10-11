@@ -3,6 +3,9 @@ import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { SyncFileList } from "@/components/SyncFileList";
 import { chooseBackupFolder, getBackupDirName } from "@/lib/backup";
+import { driveAuth } from "@/lib/driveAuth";
+import { openDriveChooser } from "@/lib/driveSession";
+import { activeTarget, driveAvailableHere } from "@/lib/syncTarget";
 
 /**
  * File → "Backups & conflict copies" (mirrors the Android app's menu item):
@@ -25,6 +28,8 @@ export function BackupsModal() {
 
   if (!show) return null;
   const close = () => setPanel("showBackups", false);
+  const driveMode = activeTarget() === "drive";
+  const where = driveMode ? (driveAuth.connectedEmail() ?? "connected") : dirName;
 
   const pickFolder = async () => {
     try {
@@ -51,8 +56,8 @@ export function BackupsModal() {
               Backups &amp; conflict copies
             </div>
             <div className="mt-[2px] text-[12px] text-soft">
-              This project's files in your Estoria folder. Restoring is undoable, your
-              current version is backed up first.
+              This project's files in your Estoria folder{driveMode ? " on Google Drive" : ""}. Restoring
+              is undoable, your current version is backed up first.
             </div>
           </div>
           <CloseButton onClick={close} />
@@ -60,19 +65,24 @@ export function BackupsModal() {
 
         <div className="mx-[24px] mt-[10px] flex items-center justify-between rounded-xl border border-rule bg-card px-[12px] py-[8px]">
           <span className="text-[12px] font-semibold text-ink">
-            Estoria folder:{" "}
-            <span className="font-normal text-soft">{dirName ?? "not set yet"}</span>
+            {driveMode ? "Google Drive" : "Estoria folder"}:{" "}
+            <span className="font-normal text-soft">{where ?? "not set yet"}</span>
           </span>
           <button
-            onClick={() => void pickFolder()}
+            onClick={() => {
+              if (driveAvailableHere()) {
+                close();
+                openDriveChooser();
+              } else void pickFolder();
+            }}
             className="shrink-0 rounded-md border border-rule bg-panel px-[9px] py-[3px] text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
           >
-            {dirName ? "Change…" : "Choose folder…"}
+            {where ? "Change…" : "Choose folder…"}
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-[10px]">
-          {dirName ? (
+          {where ? (
             <SyncFileList
               active={show}
               reloadKey={reloadKey}

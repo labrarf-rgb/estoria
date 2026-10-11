@@ -512,6 +512,8 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Revision 2 adds a
    > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
    > register, and a four-deploy rollout; its decisions are answered at the bottom.
+   > **On `feature/drive-sync`: Phase B built (not deployed); next session starts
+   > with [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md).**
    > **Phase A is done (Session 66, 2026-10-11):** Sync tests, the `SyncFolder`
    > interface, the cross-tab lock and per-target baselines; deployed as build
    > 198 (`6e5af0c`).

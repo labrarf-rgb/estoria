@@ -22,6 +22,8 @@ import { ImportModal } from "@/components/modals/ImportModal";
 import { NewBookModal } from "@/components/modals/NewBookModal";
 import { ProjectsModal } from "@/components/modals/ProjectsModal";
 import { BackupsModal } from "@/components/modals/BackupsModal";
+import { DriveChooserModal } from "@/components/modals/DriveChooserModal";
+import { startDriveRuntime } from "@/lib/driveSession";
 import { AboutModal } from "@/components/modals/AboutModal";
 import { InstallModal } from "@/components/modals/InstallModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -41,6 +43,10 @@ export function App() {
   // not a mode of the board's canvas. The series map still renders its own
   // timeline of books internally.
   const onTimeline = !onSeriesMap && view === "timeline";
+
+  // Google Drive, on devices where it's switched on: kill-switch checks, and
+  // the result of a sign-in that just returned. A no-op everywhere else.
+  useEffect(() => startDriveRuntime(), []);
 
   // Drive theming off the document model via the data-theme attribute.
   useEffect(() => {
@@ -81,6 +87,7 @@ export function App() {
       <FormChangeModal />
       <SavedNotice />
       <BackupsModal />
+      <DriveChooserModal />
       <AboutModal />
       <InstallModal />
       <ConfirmDialog />

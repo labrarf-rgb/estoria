@@ -1,4 +1,6 @@
 import { forgetBackupDir, getBackupDir, type BackupDirHandle } from "@/lib/backup";
+import { driveSyncFolder } from "@/lib/driveFolder";
+import { activeTarget } from "@/lib/syncTarget";
 
 /**
  * SyncFolder — the four file operations cross-app Sync (lib/sync.ts) and the
@@ -18,6 +20,11 @@ import { forgetBackupDir, getBackupDir, type BackupDirHandle } from "@/lib/backu
  * - When the folder itself is gone (moved, deleted, access revoked), any
  *   operation except `read` throws `SyncFolderGoneError`, so the caller can
  *   forget it and re-prompt instead of failing forever.
+ * - The project's **live file** goes through `readLive` / `writeLive`, which
+ *   also know the project. A folder finds it by name. Drive finds it by the
+ *   file ID this device linked to the project (H2a), renames it in place when
+ *   the title changes (H3), and answers `"unlinked"` rather than ever creating
+ *   one unasked (H2b).
  */
 
 export interface SyncFileRead {
@@ -40,9 +47,17 @@ export interface SyncFolder {
   write(name: string, text: string, opts?: { expectRev?: string }): Promise<void>;
   list(): Promise<SyncFileEntry[]>;
   remove(name: string): Promise<void>;
+  /** The project's live file: null = doesn't exist (folder), "unlinked" = no file chosen yet (Drive). */
+  readLive(projectId: string, name: string): Promise<SyncFileRead | null | "unlinked">;
+  writeLive(projectId: string, name: string, text: string, opts?: { expectRev?: string }): Promise<void>;
+  /**
+   * The project now goes by another ID: the file's copy was kept, and it
+   * carries a different project ID. Carry whatever ties the project to its
+   * live file over to that ID. A folder finds the file by name and needs nothing.
+   */
+  moveProject?(fromId: string, toId: string): void;
 }
 
-/** "drive" arrives in Phase B (docs/PLAN-drive-sync.md); it is named now so per-target state has its shape. */
 export type SyncTarget = "folder" | "drive";
 
 export class SyncFolderGoneError extends Error {
@@ -119,6 +134,14 @@ export class LocalFolder implements SyncFolder {
       this.gone(e);
     }
   }
+
+  readLive(_projectId: string, name: string): Promise<SyncFileRead | null> {
+    return this.read(name);
+  }
+
+  writeLive(_projectId: string, name: string, text: string): Promise<void> {
+    return this.write(name, text);
+  }
 }
 
 /**
@@ -129,11 +152,14 @@ export class LocalFolder implements SyncFolder {
 export async function getSyncFolder(opts?: {
   requestPermission?: boolean;
 }): Promise<SyncFolder | null> {
+  if (activeTarget() === "drive") return driveSyncFolder();
   const dir = await getBackupDir(opts);
   return dir ? new LocalFolder(dir) : null;
 }
 
 /** Forget the active target after it turned out to be gone, so the next action re-prompts. */
 export async function forgetSyncFolder(): Promise<void> {
-  await forgetBackupDir();
+  // Drive never raises "gone" (a missing file is DriveFileMissingError), so
+  // only the folder target has anything to forget.
+  if (activeTarget() !== "drive") await forgetBackupDir();
 }

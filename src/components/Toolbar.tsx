@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
+import { activeTarget } from "@/lib/syncTarget";
 import { isStandalone } from "@/lib/install";
 import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
 
@@ -456,8 +457,8 @@ export function Toolbar() {
             sub="Bring an existing draft via AI"
             onClick={() => setPanel("showImport", true)}
           />
-          {/* Needs folder access (File System Access API) like the footer Sync. */}
-          {isBackupPickerSupported() && (
+          {/* Needs folder access (File System Access API) or Google Drive, like the footer Sync. */}
+          {(isBackupPickerSupported() || activeTarget() === "drive") && (
             <MenuItem
               title="Backups & conflict copies"
               sub="Restore a copy from your Estoria folder"

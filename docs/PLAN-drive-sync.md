@@ -1,5 +1,8 @@
 # Plan: Back up and sync with Google Drive (revision 2)
 
+> **▶ Next session: start with [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md)**
+> (state, review findings to fix before Deploy B, and the B4 steps in order).
+>
 > **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
 > Session 64. Reviewed against the code in Session 66 (see "Review against the
 > code" below; its fixes are folded into the phases). **Phase A built in
@@ -132,6 +135,17 @@ and never through labrarf.com. The broker only trades sign-in tokens.
 - **Code lives in this repo** under `auth-server/`, with its own
   `package.json`. It's deployed on its own and never by `npm run deploy`. It's
   about 150 lines.
+
+> **Changed when building (Session 66):** connecting uses the **full-page
+> redirect on every device** (`/auth/start` → Google → `/auth/callback` →
+> back with `#drive=connected`), not Google's popup with the redirect only on
+> iPad. The redirect is the flow proven end to end with the real account; it
+> always asks consent, so Google issues each device its own refresh token
+> (the popup library can't force that, so a second device could connect and
+> then fail to stay signed in); it needs no popup (nothing for Safari to block,
+> H5) and no Google script on the page. Cost: one page load per device while
+> connecting, after saves are flushed. Points 1 and 4 below are superseded;
+> `/auth/exchange` stays in the broker unused.
 
 **Sign-in flow in the app (`src/lib/driveAuth.ts`):**
 1. **Connect** (a click) uses Google's sign-in library in *code* mode. A popup
@@ -271,7 +285,11 @@ secret and `TOKEN_KEY` never go in this repo.
 | Vercel | Project `estoria-auth-server` (Hobby, root directory `auth-server`), all six settings Production only. Live at `https://estoria-auth-server.vercel.app`: `/status` on, preflight 204, other sites 403, `/auth/start` redirects to Google with the right client. Old client secret deleted after the first real sign-in; only the one in Vercel remains |
 | DNS (`auth` CNAME) | **Added 2026-10-11** at whois.com: `auth` → `f39fd1f062c3f808.vercel-dns-017.com` (TTL 28800); A, `www`, MX, TXT unchanged and the site still loads. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. **Live:** Let's Encrypt certificate for `auth.labrarf.com`; `/status` on, preflight 204 for www.labrarf.com, other sites and missing header 403, `/auth/start` sets the sealed state cookie; website unaffected |
 | First real sign-in (Step 1, part) | **Passed 2026-10-11** with raydaxn@gmail.com via the redirect flow: back on `/estoria/#drive=connected`; `/auth/token` from the page returned a 60-minute token with `drive.file` and the email, no popup; Drive `files.list` answered 200 with 0 files. Still re-confirmed after the old secret was deleted. The other Step 1 checks (Picker folder access, file IDs, conditional update, Safari, phone staleness) need Phase B code |
-| **Resume here** | Step 0 and Deploy S are done. Next: Phase B (Drive client + UI, hidden behind `?drive=on`), running the rest of Step 1 as it goes |
+| Phase B progress | **B1 (Drive engine) built on `feature/drive-sync`, Session 66:** `driveConfig`, `driveErrors`, `driveAuth` (broker client, in-memory token, early refresh), `drive` (REST v3, backoff, resumable, no blind create retry), `driveFolder` (`DriveFolder`: live file by linked ID, unlinked/needs-link, rename in place, revision check, trash, duplicate stop, kill switch), `syncTarget` (`?drive=on` switch, per-device target, kill switch). `SyncFolder` gained `readLive`/`writeLive`; sync returns `needs-link` / mirror `unlinked`. 109 app tests incl. sync over a fake Drive; no behavior change without `?drive=on` |
+| B2 (sync rules for Drive) | **Built, Session 66:** before any pull the local state is saved as `<slug>-backup-<stamp>-before-pull` (H15b, **both targets**: the one folder-sync behavior change in Phase B); the conflict outcome carries the file's `rev` and resolving refuses if it moved (R8); a project linked under another account returns `account-changed` (H16) and `DriveFolder.unlink` resets it; linking a different file forgets the old fingerprint (`syncBaseline.ts`); `connectDriveFolder` finds or creates the Estoria folder (no blind retry, asks before switching accounts) and `adoptPickedFolder` takes one from the Picker (H17). 123 app tests |
+| B3a (connecting + syncing UI) | **Built, Session 66:** `driveSession.ts` (connect via redirect, sign-in result notices, device account switch, disconnect, "backed up" times); `DriveChooserModal` ("Back up with": Drive or a folder on this computer); `DriveLinkModal` ("Which file is this project?": pick a copy or create, refuses when the folder can't be read); Footer: Drive status line (H9: backed up · N min ago, not backed up for N, needs reconnecting + Reconnect, paused, offline, can't see file, other account), 30 s mirror throttle + flush on hide (H13), per-project account confirm (H16); history popover, File → Backups and the Backups window work on Drive; `?drive=on` read before first render, kill-switch checks at startup. Checked in the browser against a local broker: unchanged without the switch; chooser (light + dark); needs-reconnecting line; Sync asks to reconnect before linking |
+| B3b (Projects + Picker + tip) | **Built, Session 66:** Projects window in Drive mode: per-project state ("On Drive · backed up N ago", "Not on Drive yet", "Needs a look"), **Open from Google Drive…** (H8: opens and links; a project already here is switched to, not duplicated), **Back up all to Drive** (H11: linked ones fast-forward, unlinked ones get a file only if the name is free, anything else is "needs a look"; records agreement after creating); Google Picker (`drivePicker.ts`, loaded on click only) for "Not listed? Choose it in Google Drive…" and "Already have an Estoria folder in Drive? Choose it…" (H17: folder, then its files); one-time iPad Safari Home Screen tip (H10); a signed-out device stops asking the broker until it reconnects. 130 app tests; browser-checked against a dummy local broker |
+| **Resume here** | See [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md). B4 = local real testing, reusing the `Estoria web` client (user's choice); `auth-server/.env.local` is ready except `GOOGLE_CLIENT_SECRET`. Fix review findings 1-4 first (existing desktop-app Estoria folder, whole-file downloads, live-file name pattern, link re-key) |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 
