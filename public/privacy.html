@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Estoria Privacy</title>
+    <meta name="description" content="What Estoria stores, where, and what it never collects." />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&family=Hanken+Grotesk:wght@400;500;600&display=swap"
+    />
+    <style>
+      :root {
+        --bg: #e9e0cd;
+        --card: #fffdf6;
+        --ink: #2b2620;
+        --soft: #7a6f5c;
+        --line: #cdbfa2;
+        --accent: oklch(0.54 0.1 152);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #231f19;
+          --card: #352f29;
+          --ink: #e4ddd3;
+          --soft: #aaa49b;
+          --line: #4c4740;
+          --accent: oklch(0.62 0.09 152);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 400 16px/1.65 "Hanken Grotesk", system-ui, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 56px 16px 72px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin: 0 0 8px;
+      }
+      h1,
+      h2 {
+        font-family: Spectral, Georgia, serif;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 40px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 40px 0 8px;
+      }
+      .updated {
+        color: var(--soft);
+        font-size: 14px;
+        margin: 0 0 28px;
+      }
+      .summary {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+      }
+      .summary p {
+        margin: 0;
+      }
+      p,
+      ul {
+        margin: 0 0 12px;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      a {
+        color: var(--accent);
+        text-underline-offset: 2px;
+      }
+      code {
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        color: var(--soft);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Estoria</p>
+      <h1>Privacy</h1>
+      <p class="updated">Last updated 11 October 2026</p>
+
+      <div class="summary">
+        <p>
+          Estoria has no accounts, no analytics and no ads, and it never collects your writing.
+          Your projects live on your own devices and, if you choose, in your own Google Drive.
+        </p>
+      </div>
+
+      <h2>Where your work is stored</h2>
+      <ul>
+        <li>
+          <strong>In your browser.</strong> Projects, settings and pictures are saved in this
+          browser's own storage on your device. They never leave it unless you choose one of the
+          options below.
+        </li>
+        <li>
+          <strong>In a folder you pick</strong> (desktop Chrome and Edge). If you connect a folder
+          on your computer, Estoria writes your project files and backups there.
+        </li>
+        <li>
+          <strong>In your Google Drive</strong>, if you connect it. Estoria writes your project
+          files and backups to your own Drive so your other devices can open them.
+        </li>
+      </ul>
+
+      <h2>Google Drive</h2>
+      <p>When you connect Google Drive, Estoria asks Google for two things:</p>
+      <ul>
+        <li>
+          <strong>Access only to files Estoria creates or that you pick for it</strong> (the
+          <code>drive.file</code> permission). Estoria cannot see or open anything else in your
+          Drive.
+        </li>
+        <li>
+          <strong>Your email address</strong>, used only to show which Google account is
+          connected. It is kept in your browser and nowhere else.
+        </li>
+      </ul>
+      <p>
+        Your projects travel straight from your browser to Google. They never pass through a
+        server run by Estoria.
+      </p>
+      <p>
+        Estoria's use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy"
+          >Google API Services User Data Policy</a
+        >, including the Limited Use requirements. Estoria does not use your Google data for
+        advertising, does not sell it, and does not share it with anyone.
+      </p>
+
+      <h2>The sign-in helper</h2>
+      <p>
+        To keep you signed in to Google Drive, Estoria uses a small sign-in helper at
+        <code>auth.labrarf.com</code>. It exchanges Google's sign-in codes for access tokens and
+        keeps one sign-in token in an encrypted cookie on your device.
+      </p>
+      <ul>
+        <li>It never sees your writing.</li>
+        <li>It stores nothing on its side: no database, no copies of your tokens.</li>
+        <li>It does not log sign-in codes or tokens.</li>
+      </ul>
+      <p>That cookie exists only if you connect Google Drive, and it is the only cookie Estoria sets.</p>
+
+      <h2>What Estoria does not do</h2>
+      <ul>
+        <li>No analytics, tracking pixels or advertising.</li>
+        <li>No selling or sharing of any data.</li>
+        <li>No account, password or profile.</li>
+      </ul>
+
+      <h2>Services the website relies on</h2>
+      <ul>
+        <li>
+          The site is hosted on GitHub Pages, and its fonts load from Google Fonts. Like any web
+          request, these receive your IP address and browser details when the page loads. They
+          never receive your projects.
+        </li>
+        <li>
+          The Estoria Android app opens the same project file through Android's own file picker
+          and collects nothing.
+        </li>
+      </ul>
+
+      <h2>Disconnecting and deleting</h2>
+      <ul>
+        <li>
+          Disconnect Google Drive from inside Estoria, or remove Estoria's access at any time at
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        </li>
+        <li>
+          Files Estoria wrote to your Drive stay yours. Delete them in Drive whenever you like.
+        </li>
+        <li>
+          To remove everything stored in this browser, clear the site's data in your browser
+          settings. Export your projects first if you want to keep them.
+        </li>
+      </ul>
+
+      <h2>Changes and contact</h2>
+      <p>
+        If this policy changes, the date at the top will change with it. Questions:
+        <a href="mailto:info@labrarf.com">info@labrarf.com</a>.
+      </p>
+
+      <footer><a href="./">Open Estoria</a></footer>
+    </main>
+  </body>
+</html>

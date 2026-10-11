@@ -5653,6 +5653,14 @@ reports `6e5af0c`, and the previous build's assets still load (no cached-page
 404s). Nothing user-visible changes. Next: a few days of normal folder use,
 then Step 0 and the broker (Deploy S).
 
+**Privacy page shipped early:** Google's consent screen now refuses "In
+production" without a home page and privacy policy link, so
+`public/privacy.html` (planned for Phase C) was written now: storage
+locations, `drive.file` and email scopes, the Limited Use statement, the
+sign-in helper, no analytics, contact info@labrarf.com. The user published the
+Google app with home page `labrarf.com/estoria/` and that privacy link; no
+logo, so no brand review.
+
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the

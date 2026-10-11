@@ -341,7 +341,10 @@ The plan is written for the worst case of each, so results only simplify it.
 
 ### Phase C: public → Deploy C
 
-- `public/privacy.html`:
+- `public/privacy.html` **(shipped early, Session 66):** Google now requires a
+  home page and privacy policy link before the consent screen can be put "In
+  production", so the page went live ahead of Phase C. Review its wording
+  against the finished Drive feature here. It covers:
   - Estoria stores projects in your browser and, if you connect it, in your own
     Google Drive;
   - a sign-in helper at auth.labrarf.com keeps you signed in and never sees
