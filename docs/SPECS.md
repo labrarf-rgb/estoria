@@ -241,6 +241,9 @@ estoria/
 │                             #   nobody downloads isn't served
 ├─ scripts/make-icons.sh      # `npm run icons`: regenerate the icon PNGs from art/
 ├─ scripts/deploy.sh          # `npm run deploy`: build → portfolio repo → verify live
+├─ auth-server/               # Drive sign-in broker for auth.labrarf.com (own package,
+│                             #   no deps, `npm test` there; deployed on its own, never
+│                             #   by `npm run deploy`). See its README + PLAN-drive-sync.md
 ├─ docs/SPECS.md              # ← you are here: current state, §§1-9
 ├─ docs/SESSIONS.md           # dated session log (history; §N refs point here)
 ├─ docs/archives/            # closed records — read for background, don't work from

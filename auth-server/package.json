@@ -1,0 +1,14 @@
+{
+  "name": "estoria-auth-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Estoria's sign-in broker for Google Drive (auth.labrarf.com). No dependencies.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "node dev.mjs",
+    "test": "node --test"
+  }
+}

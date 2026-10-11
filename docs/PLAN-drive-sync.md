@@ -89,6 +89,7 @@ and never through labrarf.com. The broker only trades sign-in tokens.
 | --- | --- |
 | `POST /auth/exchange` | Takes the one-time code from Google's sign-in, exchanges it (using the secret) for an access token + refresh token. **Encrypts the refresh token into a cookie** (`HttpOnly; Secure; SameSite=Strict`). Returns the access token, its expiry and the account email to the page. |
 | `POST /auth/token` | Reads the cookie, asks Google for a fresh access token, returns it, and re-sets the cookie so it slides forward. If Google says the grant is revoked: clears the cookie and returns `401` (the app shows "Reconnect"). |
+| `GET /auth/start` | *(added when building, Session 66)* Begins the redirect flow: checks `?return=` is an Estoria page, seals a one-time state into a short-lived cookie, sends the browser to Google. The callback refuses any state that doesn't match it (sign-in CSRF). |
 | `GET /auth/callback` | Only for the redirect sign-in flow (iPad home-screen app, if Step 1 shows popups fail there). Does the same exchange, sets the cookie, then sends the browser back to the app with nothing in the URL. |
 | `POST /auth/disconnect` | Revokes the refresh token at Google and clears the cookie. |
 | `GET /status` | `{ drive: "on" \| "off" }`. **The kill switch** (see Prod safety). |
@@ -122,6 +123,12 @@ and never through labrarf.com. The broker only trades sign-in tokens.
     installed to the home screen; see the Hazard register, Safari 7-day wipe.)
 - **If the broker is down,** Drive pauses ("Drive paused · retrying"). Local
   work is unaffected, and nothing loops or pops up.
+- **If someone unticks Drive** on Google's consent screen, the broker gives
+  the grant straight back and answers `drive_scope_missing`; the app asks
+  them to connect again with Drive ticked. *(Added when building.)*
+- **Host request logs:** the redirect flow's `/auth/callback?code=…` may show
+  up in Vercel's request log. The code is single-use, already spent by the
+  time anyone could read it, and useless without the secret.
 - **Code lives in this repo** under `auth-server/`, with its own
   `package.json`. It's deployed on its own and never by `npm run deploy`. It's
   about 150 lines.
@@ -260,6 +267,7 @@ secret and `TOKEN_KEY` never go in this repo.
 | OAuth client (`Estoria web`) | Client ID `177782323056-c0t0uclj35u6l73tf3n0q6pvb06dbfch.apps.googleusercontent.com`; origins and redirect URIs as in item 3. Secret not kept: add a new one on the client page when Vercel is set up |
 | API key (`Estoria Picker`) | `AIzaSyCdjbT3Zk9Q8liOFG109NJyhYk7ffslG0k`; restricted to the three website origins and the Google Picker API only |
 | Project number | `177782323056` (the Picker's app ID); project ID `estoria-511314` |
+| Broker code | **Written (Session 66):** `auth-server/`, 31 tests against a fake Google, checked over real HTTP locally. Not deployed |
 | Vercel, DNS | not yet |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A

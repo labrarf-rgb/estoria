@@ -5662,6 +5662,23 @@ Google app with home page `labrarf.com/estoria/` and that privacy link; no
 logo, so no brand review. Deployed by the user as build 200 (`49bcae9`);
 `privacy.html` returns 200 on prod with the contact line.
 
+**Step 0 (Google Cloud), with the user step by step:** project `Estoria`
+(Drive + Picker APIs), consent screen published "In production" with no logo,
+OAuth client `Estoria web`, Picker API key restricted to the three origins.
+Public values recorded in the plan's "Step 0 progress" table; the client
+secret was not kept (a fresh one goes straight into Vercel later).
+
+**Broker written (not deployed):** `auth-server/`, a dependency-free
+Web-standard handler (`export default { fetch }` on Vercel, `dev.mjs` on
+localhost:3000). Routes per the plan plus `GET /auth/start` (sealed state
+cookie for the redirect flow). Refresh token sealed AES-256-GCM in an
+`HttpOnly; Secure; SameSite=Strict; Path=/auth` cookie, 400-day sliding;
+origin allowlist + `X-Estoria` header on every POST; a grant without Drive
+is revoked; `/status` reports "off" when the broker lacks settings. 31
+node:test cases against a fake Google; five deliberate breaks of the rules
+each failed a test; smoke-tested over real HTTP with dummy settings. The
+app's vitest run is now scoped to `src/` so the two suites stay apart.
+
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the

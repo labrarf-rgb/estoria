@@ -1,0 +1,3 @@
+# Local settings may hold a client secret: never commit them.
+.env*
+.vercel

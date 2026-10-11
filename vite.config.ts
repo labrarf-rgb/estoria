@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -88,6 +89,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
+    // The app's suite only. auth-server/ has its own (node:test, `npm test` there).
+    test: { include: ["src/**/*.test.ts"] },
     // PORT lets a harness assign a free port; default stays 5173 for plain `npm run dev`.
     server: {
       port: Number(process.env.PORT) || 5173,
