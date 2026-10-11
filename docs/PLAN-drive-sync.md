@@ -250,6 +250,18 @@ you made.
 8. You give me the **client ID, API key and project number.** All three are
    public by design and go in `src/lib/driveConfig.ts`.
 
+**Step 0 progress (Session 66, 2026-10-11).** Public values only; the client
+secret and `TOKEN_KEY` never go in this repo.
+
+| Item | Status / value |
+| --- | --- |
+| Google Cloud project | `Estoria`, Drive API + Picker API enabled |
+| Consent screen | External, **In production**, no logo; scopes `drive.file`, `openid`, `userinfo.email`; home page `https://www.labrarf.com/estoria/`, privacy `https://www.labrarf.com/estoria/privacy.html` |
+| OAuth client (`Estoria web`) | Client ID `177782323056-c0t0uclj35u6l73tf3n0q6pvb06dbfch.apps.googleusercontent.com`; origins and redirect URIs as in item 3. Secret not kept: add a new one on the client page when Vercel is set up |
+| API key (`Estoria Picker`) | not yet |
+| Project number | not yet confirmed (the client ID starts with `177782323056`, which is usually it) |
+| Vercel, DNS | not yet |
+
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 
 1. Add `vitest` (dev-only) and `src/lib/sync.test.ts`. It runs **against
