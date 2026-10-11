@@ -42,7 +42,8 @@ export interface SyncFolder {
   remove(name: string): Promise<void>;
 }
 
-export type SyncTarget = "folder";
+/** "drive" arrives in Phase B (docs/PLAN-drive-sync.md); it is named now so per-target state has its shape. */
+export type SyncTarget = "folder" | "drive";
 
 export class SyncFolderGoneError extends Error {
   constructor(message: string) {

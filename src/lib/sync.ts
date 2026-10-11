@@ -15,6 +15,7 @@ import {
   getSyncFolder,
   SyncFolderGoneError,
   type SyncFolder,
+  type SyncTarget,
 } from "@/lib/syncFolder";
 
 /**
@@ -80,19 +81,32 @@ export async function fingerprint(doc: StoryDoc): Promise<string> {
 
 // ---- "Last agreed" hash per project (the third point of the 3-way compare) ---
 
-const lastSyncedKey = (docId: string) => `estoria:sync:lastHash:${docId}`;
+/**
+ * Kept per target, not just per project. A device that switches targets must
+ * not compare a new target's file against the baseline it agreed with the old
+ * one: an older Drive copy would look like "only the file changed" and load
+ * over newer local work (docs/PLAN-drive-sync.md, H1). A target's first sync
+ * has no baseline, so any difference is a conflict, never a silent pull.
+ *
+ * The folder target keeps the key it has always used, so existing devices keep
+ * their baselines and a rollback to an older build finds them too.
+ */
+export const lastSyncedKey = (target: SyncTarget, docId: string) =>
+  target === "folder"
+    ? `estoria:sync:lastHash:${docId}`
+    : `estoria:sync:lastHash:${target}:${docId}`;
 
-function getLastSynced(docId: string): string | null {
+function getLastSynced(target: SyncTarget, docId: string): string | null {
   try {
-    return localStorage.getItem(lastSyncedKey(docId));
+    return localStorage.getItem(lastSyncedKey(target, docId));
   } catch {
     return null;
   }
 }
 
-function setLastSynced(docId: string, hash: string): void {
+function setLastSynced(target: SyncTarget, docId: string, hash: string): void {
   try {
-    localStorage.setItem(lastSyncedKey(docId), hash);
+    localStorage.setItem(lastSyncedKey(target, docId), hash);
   } catch {
     // Non-fatal: without it the next divergence shows as a conflict instead
     // of a fast-forward — safe, just noisier.
@@ -169,8 +183,20 @@ async function writeDoc(
  * compares. A folder that vanished mid-operation (moved/deleted) is forgotten
  * so the next action re-prompts instead of failing forever; the folder decides
  * what "vanished" means (`SyncFolderGoneError`).
+ *
+ * The per-tab chain keeps this tab's operations in order; the Web Lock makes
+ * every tab of this browser take turns too, since two open tabs share one
+ * folder and one set of baselines (docs/PLAN-drive-sync.md, H12). Where Web
+ * Locks are missing, tabs fall back to the per-tab queue alone.
  */
 let opChain: Promise<unknown> = Promise.resolve();
+
+const SYNC_LOCK = "estoria-sync";
+
+function acrossTabs<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks ? locks.request(SYNC_LOCK, fn) : fn();
+}
 
 function locked<T>(fn: () => Promise<T>): Promise<T> {
   const run = async (): Promise<T> => {
@@ -184,7 +210,10 @@ function locked<T>(fn: () => Promise<T>): Promise<T> {
       throw e;
     }
   };
-  const next = opChain.then(run, run);
+  const next = opChain.then(
+    () => acrossTabs(run),
+    () => acrossTabs(run)
+  );
   opChain = next.catch(() => {});
   return next;
 }
@@ -237,27 +266,27 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
 
     if (!read) {
       await writeDoc(folder, fileName, doc);
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return { kind: "created", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
 
     const remote = read.doc;
     const remoteHash = await fingerprint(remote);
     if (remoteHash === localHash) {
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return { kind: "in-sync", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
 
-    const last = getLastSynced(doc.id);
+    const last = getLastSynced(folder.target, doc.id);
     if (remoteHash === last) {
       await writeDoc(folder, fileName, doc, read.rev);
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return { kind: "pushed", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
     if (localHash === last) {
       // Record under the incoming doc's id — after the caller applies it, that
       // is the active project the next sync will look up.
-      setLastSynced(remote.id, remoteHash);
+      setLastSynced(folder.target, remote.id, remoteHash);
       return {
         kind: "pulled",
         fileName,
@@ -338,7 +367,7 @@ export function resolveConflict(
     }
 
     await writeDoc(folder, canonicalFileName(local), winner);
-    setLastSynced(winner.id, await fingerprint(winner));
+    setLastSynced(folder.target, winner.id, await fingerprint(winner));
 
     return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
   });
@@ -375,17 +404,17 @@ export function pushCanonicalIfSafe(
 
     if (!read) {
       await writeDoc(folder, fileName, doc);
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return "created" as const;
     }
     const remoteHash = await fingerprint(read.doc);
     if (remoteHash === localHash) {
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return "in-sync" as const;
     }
-    if (remoteHash === getLastSynced(doc.id)) {
+    if (remoteHash === getLastSynced(folder.target, doc.id)) {
       await writeDoc(folder, fileName, doc, read.rev);
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return "updated" as const;
     }
     return "behind" as const;
@@ -406,7 +435,7 @@ export async function checkRemoteChanged(doc: StoryDoc): Promise<boolean> {
     if (!folder) return false;
     const read = await readCanonical(folder, canonicalFileName(doc));
     if (!read) return false;
-    const last = getLastSynced(doc.id);
+    const last = getLastSynced(folder.target, doc.id);
     if (!last) return false; // never synced — nothing to compare against
     const remoteHash = await fingerprint(read.doc);
     return remoteHash !== last && remoteHash !== (await fingerprint(doc));
