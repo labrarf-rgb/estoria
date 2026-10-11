@@ -1119,11 +1119,26 @@ in production on its own. The manifest is *not* processed by Vite (nothing in
 `start_url`/`scope`/icon `src` resolves against the manifest's own URL, which
 gives `/` in dev and `/estoria/` in prod without a build step knowing anything.
 
-**The worker's version is the build number.** `sw.js` is static, so it can't
-have a build stamped into it. The page registers it as `sw.js?v=<build>` using
-the same commit count the About dialog shows: a new commit means a new script
-URL, which is what makes the browser install a new worker, and the query value
-is what names the cache inside it. One version source, nothing extra to bump.
+**The worker's version is the version plus build number.** `sw.js` is static,
+so it can't have a build stamped into it. The page registers it as
+`sw.js?v=<version>-<build>` (e.g. `4.0.0-3`), the same stamp the About dialog
+shows: a new commit means a new script URL, which is what makes the browser
+install a new worker, and the query value is what names the cache inside it.
+The version is in it because the build number restarts at 1 with each new
+version (see "Version and build number" below). One version source, nothing
+extra to bump.
+
+**Version and build number (2026-10-11).** About shows `v<version> · build
+<n> · <sha>`. The version is package.json's `version`, a release label set by
+hand only for a big milestone, when the user asks (3.0.0 manuscript writing,
+4.0.0 Google Drive sync). The build number counts by itself and **starts again
+at 1 with each new version**: the commit that sets the version is build 1, and
+each commit after it adds one (`buildInVersion` in `vite.config.ts`: commits
+since the newest commit that changed that version line in package.json, plus
+one). Never bump the version per change. Deploys are verified by commit SHA
+(`version.json`'s `commit`), so a repeated build number across versions is
+harmless. The Android app is separate: its `versionCode` must only ever go up,
+so it keeps the plain commit count.
 
 **Caching rules** (`public/sw.js`): hashed `/assets/*` cache-first (immutable by
 construction); navigations network-first with the cached shell as the offline

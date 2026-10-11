@@ -6,15 +6,19 @@ import { useEffect, useState } from "react";
  * Production only. A dev server serves modules fresh over HMR, and a worker
  * caching them is a way to spend an afternoon debugging a stale bundle.
  *
- * The worker is registered as `sw.js?v=<build>` so the script URL changes on
- * every commit — that's what makes the browser notice a new version at all, and
- * it's what keys the cache inside sw.js. `<build>` is the same commit count the
- * About dialog reports, injected into index.html by the estoria-build-info
- * plugin, so an installed copy and a browser tab agree on what "current" means.
+ * The worker is registered as `sw.js?v=<version>-<build>` so the script URL
+ * changes on every commit — that's what makes the browser notice a new version
+ * at all, and it's what keys the cache inside sw.js. Both come from the About
+ * dialog's stamp, injected into index.html by the estoria-build-info plugin, so
+ * an installed copy and a browser tab agree on what "current" means. The
+ * version is part of it because the build number starts again at 1 with each
+ * new version: v4.0.0 build 3 and v5.0.0 build 3 must not share a URL.
  */
 
-const swUrl = () =>
-  `${import.meta.env.BASE_URL}sw.js?v=${window.__ESTORIA_BUILD__?.build ?? "0"}`;
+const swUrl = () => {
+  const b = window.__ESTORIA_BUILD__;
+  return `${import.meta.env.BASE_URL}sw.js?v=${b ? `${b.version}-${b.build}` : "0"}`;
+};
 
 /**
  * Sticky, because otherwise the reload at the end of a reset would re-register
