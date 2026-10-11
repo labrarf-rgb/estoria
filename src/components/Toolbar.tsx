@@ -3,7 +3,9 @@ import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
-import { activeTarget } from "@/lib/syncTarget";
+import { activeTarget, driveAvailableHere } from "@/lib/syncTarget";
+import { driveAuth } from "@/lib/driveAuth";
+import { openDriveChooser } from "@/lib/driveSession";
 import { isStandalone } from "@/lib/install";
 import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
 
@@ -463,6 +465,21 @@ export function Toolbar() {
               title="Backups & conflict copies"
               sub="Restore a copy from your Estoria folder"
               onClick={() => setPanel("showBackups", true)}
+            />
+          )}
+          {/* Where this device backs up: connect Google Drive, or change or disconnect it. */}
+          {driveAvailableHere() && (
+            <MenuItem
+              title="Google Drive"
+              sub={
+                activeTarget() === "drive"
+                  ? `Backing up${driveAuth.connectedEmail() ? ` as ${driveAuth.connectedEmail()}` : " to your Drive"}`
+                  : "Back up and sync with your Google Drive"
+              }
+              onClick={() => {
+                closeNewMenu();
+                openDriveChooser();
+              }}
             />
           )}
           <div className="mx-[6px] my-1 h-px bg-rule" />

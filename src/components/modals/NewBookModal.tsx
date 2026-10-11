@@ -4,6 +4,7 @@ import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { downloadProjectFile } from "@/store/persistence";
 import { KINDS } from "@/lib/piece";
 import type { PieceKind } from "@/types";
+import { offerDriveBackup } from "@/lib/driveProjects";
 
 type Mode = "choose" | "save" | "pickSeries";
 
@@ -52,6 +53,7 @@ export function NewBookModal() {
       setMode("save");
     } else {
       newProject({ series, keepCurrent: false, piece });
+      offerDriveBackup();
       setMode("choose");
     }
   };
@@ -59,6 +61,7 @@ export function NewBookModal() {
   const finish = (keepCurrent: boolean, exportFirst: boolean) => {
     if (exportFirst) downloadProjectFile(doc);
     newProject({ series: pendingSeries, keepCurrent, piece: pendingPiece });
+    offerDriveBackup();
     setMode("choose");
   };
 

@@ -31,7 +31,7 @@ const store = {
 vi.mock("@/store/useStore", () => ({ useStore: { getState: () => store } }));
 
 const { DriveFolder } = await import("@/lib/driveFolder");
-const { backUpAll, openFromDrive } = await import("@/lib/driveProjects");
+const { backUpAll, createWantedDriveFile, openFromDrive, wantDriveBackup } = await import("@/lib/driveProjects");
 const { pushCanonicalIfSafe } = await import("@/lib/sync");
 
 let fake: FakeDrive;
@@ -129,5 +129,31 @@ describe("Back up all (H11)", () => {
     const seen: string[] = [];
     await backUpAll(drive, (id, r) => seen.push(`${id}:${r}`));
     expect(seen).toEqual(["a:working", "a:backed-up", "b:working", "b:backed-up"]);
+  });
+});
+
+describe("backing up a new project", () => {
+  it("does nothing unless the person said yes", async () => {
+    expect(await createWantedDriveFile(drive, project("n1", "Untitled Story"))).toBe(false);
+    expect(fake.live(folderId)).toHaveLength(0);
+  });
+
+  it("makes the file once asked, and starts in agreement with it", async () => {
+    const doc = project("n1", "Untitled Story");
+    wantDriveBackup("n1");
+    expect(await createWantedDriveFile(drive, doc)).toBe(true);
+    expect(fake.named(folderId, "untitled-story.estoria.json")).toHaveLength(1);
+    expect(await pushCanonicalIfSafe(doc)).toBe("in-sync");
+  });
+
+  it("waits while another project uses the name, and makes it once renamed", async () => {
+    fake.put(folderId, "untitled-story.estoria.json", JSON.stringify(project("old", "Untitled Story")));
+    const doc = project("n1", "Untitled Story");
+    wantDriveBackup("n1");
+    expect(await createWantedDriveFile(drive, doc)).toBe(false);
+    expect(fake.named(folderId, "untitled-story.estoria.json")).toHaveLength(1);
+    expect(links.has("n1")).toBe(false);
+    expect(await createWantedDriveFile(drive, { ...doc, projectTitle: "The Lighthouse" })).toBe(true);
+    expect(fake.named(folderId, "the-lighthouse.estoria.json")).toHaveLength(1);
   });
 });

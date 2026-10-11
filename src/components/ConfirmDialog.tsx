@@ -45,7 +45,7 @@ export function ConfirmDialog() {
             onClick={close}
             className="rounded-lg border border-rule bg-card px-[14px] py-[8px] text-[13px] font-medium text-ink hover:border-faint"
           >
-            Cancel
+            {confirm.cancelLabel ?? "Cancel"}
           </button>
           <button
             onClick={run}

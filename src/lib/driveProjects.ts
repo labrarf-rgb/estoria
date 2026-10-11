@@ -1,6 +1,7 @@
 import type { DriveFile } from "@/lib/drive";
 import type { DriveFolder } from "@/lib/driveFolder";
-import { markBackedUp } from "@/lib/driveSession";
+import { markBackedUp, startDriveConnect } from "@/lib/driveSession";
+import { activeTarget, chosenTarget, driveAvailableHere } from "@/lib/syncTarget";
 import { canonicalFileName, fingerprint, projectFileText, pushCanonicalIfSafe } from "@/lib/sync";
 import { setLastSynced } from "@/lib/syncBaseline";
 import { normalizeDoc } from "@/store/persistence";
@@ -86,4 +87,88 @@ export async function backUpAll(
     onProgress(doc.id, result);
   }
   return results;
+}
+
+// ---- Backing up a new project ----------------------------------------------------
+
+const wantKey = (projectId: string) => `estoria:drive:wantBackup:${projectId}`;
+
+/** The person said yes to backing up this project to Drive. */
+export function wantDriveBackup(projectId: string): void {
+  try {
+    localStorage.setItem(wantKey(projectId), "1");
+  } catch {
+    // Without storage the project is backed up from its first Sync instead.
+  }
+}
+
+export function wantsDriveBackup(projectId: string): boolean {
+  try {
+    return localStorage.getItem(wantKey(projectId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function clearWant(projectId: string): void {
+  try {
+    localStorage.removeItem(wantKey(projectId));
+  } catch {
+    // Nothing stored.
+  }
+}
+
+/**
+ * After a new project is created: ask whether to back it up to Google Drive,
+ * or, on a device not connected yet, whether to connect. Only on devices with
+ * Drive switched on, and never on one that chose a folder on this computer.
+ */
+export function offerDriveBackup(): void {
+  if (!driveAvailableHere() || chosenTarget() === "folder") return;
+  const st = useStore.getState();
+  const id = st.doc.id;
+  if (activeTarget() === "drive") {
+    st.askConfirm({
+      message: "Back up this project to Google Drive?",
+      detail:
+        "Estoria keeps a copy in your Estoria folder in Drive and updates it as you write, so your other devices " +
+        "can open it.",
+      confirmLabel: "Back up to Drive",
+      cancelLabel: "Not now",
+      onConfirm: () => wantDriveBackup(id),
+    });
+  } else {
+    st.askConfirm({
+      message: "Back up your projects with Google Drive?",
+      detail:
+        "Connect once and Estoria keeps a copy of your work in your own Google Drive, where your iPad and the " +
+        "Android app can open it. You'll sign in on Google's page, then come straight back.",
+      confirmLabel: "Connect Google Drive",
+      cancelLabel: "Not now",
+      onConfirm: () => {
+        wantDriveBackup(id);
+        startDriveConnect();
+      },
+    });
+  }
+}
+
+/**
+ * Make the Drive file for a project the person asked to back up, as soon as
+ * that needs no guessing: its name must be free in the folder (H2b), so a
+ * second "Untitled Story" waits until it's renamed. True once it's on Drive.
+ */
+export async function createWantedDriveFile(folder: DriveFolder, doc: StoryDoc): Promise<boolean> {
+  if (!wantsDriveBackup(doc.id)) return false;
+  if (folder.isLinked(doc.id)) {
+    clearWant(doc.id);
+    return true;
+  }
+  const name = canonicalFileName(doc);
+  if ((await folder.candidates(name)).length) return false;
+  await folder.createLive(doc.id, name, projectFileText(doc));
+  clearWant(doc.id);
+  // Records that Drive and this browser agree, like "Back up all".
+  const r = await pushCanonicalIfSafe(doc);
+  return r === "in-sync" || r === "updated";
 }

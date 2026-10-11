@@ -17,6 +17,7 @@ import { DriveLinkModal } from "@/components/modals/DriveLinkModal";
 import { SyncHistoryPopover } from "@/components/SyncHistoryPopover";
 import { driveAuth } from "@/lib/driveAuth";
 import { driveSyncFolder } from "@/lib/driveFolder";
+import { createWantedDriveFile, wantsDriveBackup } from "@/lib/driveProjects";
 import {
   ago,
   backedUpAt,
@@ -297,8 +298,14 @@ export function Footer() {
       pending = false;
       lastPush = Date.now();
       const doc = useStore.getState().doc;
-      void pushCanonicalIfSafe(doc).then((r) => {
+      void pushCanonicalIfSafe(doc).then(async (r) => {
         if (stopped) return;
+        // A new project the person asked to back up: make its file now, if its name is free.
+        if (r === "unlinked" && wantsDriveBackup(doc.id)) {
+          const folder = driveSyncFolder();
+          if (folder && (await createWantedDriveFile(folder, doc).catch(() => false))) r = "created";
+          if (stopped) return;
+        }
         if (driveMode && (r === "created" || r === "updated" || r === "in-sync")) markBackedUp(doc.id);
         if (r === "unavailable") return; // offline, signed out or paused: shown from their own state
         setMirror(r === "created" || r === "updated" || r === "in-sync" ? "current" : r);

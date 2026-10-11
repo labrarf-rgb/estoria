@@ -226,6 +226,8 @@ export interface ConfirmRequest {
   message: string;
   detail?: string;
   confirmLabel?: string;
+  /** Defaults to "Cancel". */
+  cancelLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
   /**
