@@ -268,7 +268,8 @@ secret and `TOKEN_KEY` never go in this repo.
 | API key (`Estoria Picker`) | `AIzaSyCdjbT3Zk9Q8liOFG109NJyhYk7ffslG0k`; restricted to the three website origins and the Google Picker API only |
 | Project number | `177782323056` (the Picker's app ID); project ID `estoria-511314` |
 | Broker code | **Written (Session 66):** `auth-server/`, 31 tests against a fake Google, checked over real HTTP locally. Not deployed |
-| Vercel, DNS | not yet |
+| Vercel | Project `estoria-auth-server` (Hobby, root directory `auth-server`), all six settings Production only. Live at `https://estoria-auth-server.vercel.app`: `/status` on, preflight 204, other sites 403, `/auth/start` redirects to Google with the right client. Old client secret disabled in Google (delete once a real sign-in works) |
+| DNS (`auth` CNAME) | not yet |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 
