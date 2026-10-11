@@ -11,7 +11,8 @@ export function AboutModal() {
   if (!show) return null;
   const close = () => setPanel("showAbout", false);
 
-  // Build stamp. `build` increments on every commit, so this changes for every
+  // Build stamp. `build` increments on every commit (starting at 1 with each
+  // new version), so this changes for every
   // change you deploy — compare it (or the SHA) against what you shipped to
   // confirm the website is serving your latest build. Injected into index.html
   // by the estoria-build-info plugin: fresh per load in dev, frozen in prod.

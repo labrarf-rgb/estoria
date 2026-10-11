@@ -9,9 +9,10 @@ import tailwindcss from "@tailwindcss/vite";
 // --- Build identity -------------------------------------------------------
 // The About dialog shows a build number that increments on EVERY commit, so any
 // change you deploy gets a distinct, auto-derived number — nothing to bump by
-// hand. `build` = git commit count (47 → 48 → 49 …); `commit` = short SHA
-// ("-dev" when the tree is dirty, i.e. uncommitted work). The semver `version`
-// (package.json) is just the human release label on top.
+// hand. It starts again at 1 with each new version: the commit that set
+// package.json's `version` is build 1, and each commit after it adds one
+// (v4.0.0 · build 1 → 2 → 3 …). `commit` = short SHA ("-dev" when the tree is
+// dirty, i.e. uncommitted work).
 //
 // It's injected into index.html rather than baked via `define`, and in dev the
 // injection runs on every page load — so a long-running dev server never shows a
@@ -34,13 +35,22 @@ function git(args: string): string {
 
 interface BuildInfo {
   version: string;
-  build: string; // incrementing commit count, e.g. "48"
+  build: string; // commits since this version was set, counting that one, e.g. "3"
   commit: string; // short SHA, "-dev" suffix if working tree is dirty
   builtAt: string; // ISO timestamp
 }
 
+/** Build number within the current version: 1 at the commit that set it. */
+function buildInVersion(version: string): string {
+  // The newest commit that added or removed this exact version line.
+  const since = git(`log -1 --format=%H -S'"version": "${version}"' -- package.json`);
+  if (!since) return "1"; // the version is set but not committed yet
+  const after = Number(git(`rev-list --count ${since}..HEAD`)) || 0;
+  return String(after + 1);
+}
+
 function currentBuild(): BuildInfo {
-  const count = git("rev-list --count HEAD");
+  const count = buildInVersion(pkg.version);
   const sha = git("rev-parse --short HEAD");
   const dirty = git("status --porcelain").length > 0;
   return {
