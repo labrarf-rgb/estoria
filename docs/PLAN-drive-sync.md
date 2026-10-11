@@ -1,184 +1,463 @@
-# Plan: Sync with Google Drive — APPROVED, NOT STARTED
+# Plan: Back up and sync with Google Drive (revision 2)
 
-> **Status (2026-10-07):** plan approved by the user in Session 64. No code
-> written yet. Linked from SPECS §6 item 7 ("NEXT UP").
+> **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
+> Session 64. Reviewed against the code in Session 66 (see "Review against the
+> code" below; its fixes are folded into the phases). **Phase A in progress
+> (Session 66), committed locally, not deployed.** Linked from SPECS §6 item 7
+> ("NEXT UP").
 >
-> **Where to start in a new session:**
-> 1. Ask the user whether they have finished **Step 0** (Google Cloud setup) and
->    for the three values: OAuth **Client ID**, **API key**, **project number**.
->    Never ask for the client secret; it is not needed.
-> 2. Step 2 (the `SyncFolder` refactor) does not need Google and can be built
->    first while the user finishes Step 0.
-> 3. Process the user expects: build, verify in the browser pane, then the user
->    tests locally; commit / push / deploy only on their go-ahead.
+> **What changed from revision 1, and why:**
+> - **A small login server (a "token broker") was added.** Without it, Google
+>   sign-in in the browser lasts about an hour, and after that background backup
+>   paused until the user tapped (a popup flashed). The user ruled that out. With
+>   the broker you stay signed in, and backup runs in the background on every
+>   device.
+> - A review against the code found hazards revision 1 didn't cover: rolling
+>   back work when switching targets, same-name duplicate files on Drive,
+>   renames, no "check, then write" on Drive, Safari blocking popups, uploads
+>   over 5 MB, two tabs syncing at once, the phone reading a stale copy, signing
+>   in with the wrong account, and a new iPad having no way to get a project.
+>   Each one has a fix below (the "Hazard register" section).
+> - The rollout is split into separate deploys, each one tested before the next,
+>   and an automated test suite comes before the refactor.
+> - A real database backend (Supabase, or Vercel + Neon) was looked at and set
+>   aside in Session 65. It would mean rebuilding the Android app's sync and
+>   holding users' manuscripts on Estoria's side. Drive + broker keeps both
+>   unchanged.
 >
-> **Step 0 walkthrough already given to the user** (console.cloud.google.com,
-> signed in with the account they will sync with):
-> 1. New project `Estoria`.
-> 2. APIs & Services → Library → enable **Google Drive API** and **Google Picker API**.
-> 3. OAuth consent screen (may be "Google Auth Platform → Branding"): External,
->    app name `Estoria`, their email as support/contact, **no logo**; scopes:
->    only `.../auth/drive.file`; Audience → **In production**. Home page and
->    privacy policy links left blank until `privacy.html` exists.
-> 4. Credentials → OAuth client ID → Web application; Authorized JavaScript
->    origins `https://www.labrarf.com`, `https://labrarf.com`,
->    `http://localhost:5173`; no redirect URIs.
-> 5. Credentials → API key → restrict to Websites (`https://www.labrarf.com/*`,
->    `https://labrarf.com/*`, `http://localhost:5173/*`) and to the Google Picker API.
-> 6. Project number from the Dashboard.
+> **Where to start in a new session:** the decisions at the bottom are
+> answered. Phase A (tests + refactor) needs nothing from Google and can begin.
+> Process the user expects: build, verify in the browser pane, then the user
+> tests locally. Commit, push and deploy only on their go-ahead, one deploy at a
+> time.
 
 ---
 
+## The goal, and how it's measured
 
-## Context
+**Estoria backs up to Google Drive seamlessly and reliably on the laptop, the
+iPad and the Android phone.** In practice:
 
-Today, cross-device Sync only works in desktop Chrome/Edge, because it writes to a folder through the browser's folder API. Safari (so every iPad browser) and Firefox have no Sync at all: your work lives only in that browser. The goal is for those browsers to sync too, using the same files the Mac and Android app already share.
+1. **Seamless:** after connecting once per device, saves reach Drive in the
+   background with no taps, popups or hourly sign-ins.
+2. **Reliable:** no path can silently overwrite work, create a duplicate file,
+   or let you believe something is backed up when it isn't. You can always see
+   when Drive last got your work.
+3. **Every device:** desktop Chrome, Safari (Mac and iPad, in the browser or
+   installed to the home screen), Firefox, and the Android app reading the same
+   file.
+4. **Prod-safe:** nobody who doesn't press Connect sees any change. Folder sync
+   in desktop Chrome behaves exactly as today. Drive can be switched off for
+   everyone without a redeploy.
 
-**Decided with you:**
-- **Drive permission:** `drive.file`. Estoria sees only the files it creates or that you pick for it once. There's no "unverified app" warning, and anyone could use it later.
-- **Sign-in address:** stay on `https://www.labrarf.com` (also `labrarf.com`), plus `http://localhost:5173` for testing. Hosting doesn't change.
-- **From SPECS §8:**
-  - Google sign-in directly (Google Identity Services), with no extra backend.
-  - Local-first stays.
-  - The Drive file is the same `<slug>.estoria.json` the Android app already reads.
+## Shape of the solution (unchanged from revision 1)
 
-**The key design choice: Drive becomes a second kind of "Estoria folder" under the existing Sync, not a new storage layer.** The current Sync (`lib/sync.ts`) already does exactly what Drive needs:
-- the three-way compare (only you changed, only the file changed, or both changed);
+**Drive becomes a second kind of "Estoria folder" under the existing Sync, not
+a new storage layer.** `lib/sync.ts` already does what Drive needs:
+
+- the three-way compare;
 - conflict copies and per-item merge;
-- rotating backups, file history and restore;
-- the auto-mirror after saves;
-- the 5-minute "file changed elsewhere" check.
+- rotating backups, history and restore;
+- the fast-forward-only auto-mirror;
+- the "file changed elsewhere" check.
 
-All of it only needs four folder operations: read a file, write a file, list files, delete a file. If those sit behind one small interface, Drive gets everything for free and the Android file contract is untouched. (A `StorageAdapter` for Drive would instead overwrite the file every 500ms with no conflict detection. That's wrong for a file your phone also edits.)
+All of it rests on four folder operations (read, write, list, remove). Put them
+behind one interface and Drive inherits all of it. The Android file contract
+(`<slug>.estoria.json`, SPECS §8) is untouched.
 
-## How this works for someone other than you
+**Decided with the user (still standing):**
+- the `drive.file` scope: Estoria sees only files it created, or files you pick
+  for it;
+- the app stays on `https://www.labrarf.com/estoria/`;
+- local-first stays;
+- the Android app keeps reading the same file through Android's file picker.
 
-- **Without Drive, nothing changes.** Anyone can open labrarf.com/estoria and use it as today, with no account; projects stay in their browser.
-- **"Connect to Google Drive" signs them in with their own Google account**, and Google asks them to allow Estoria to use files it creates. Their projects go into an Estoria folder in their own Drive and count against their own Drive storage. Each person only ever sees their own files.
-- **There is no Estoria server.** The browser talks to Google directly, so their writing never passes through labrarf.com. You can't see their data, and there's nothing to host, secure or pay for.
-- **Cost:** the Drive API is free. All users share your Google Cloud project's API quota, which is far beyond what this needs, and more can be requested if Estoria ever gets big.
-- **Google's requirements for public use** (part of Step 0):
-  - the consent screen set to "In production";
-  - a home page link (labrarf.com/estoria);
-  - a short privacy policy page. One sentence covers it: "Estoria stores your projects in your browser and, if you connect it, in your own Google Drive; nothing is sent to us."
+## The login server ("token broker")
 
-  `drive.file` needs no Google security review. A custom logo on the consent screen would need a light brand check, so we skip the logo.
-- **Their Android app:** the Android app reads the same file through Android's file picker, so it works for them too.
+**Why it's needed.** Browser-only Google sign-in hands out access tokens that
+last about an hour, and getting a new one takes a popup tied to a click. Staying
+signed in needs a **refresh token**, and getting one needs the OAuth **client
+secret**, which can't ship in a web page. So a tiny server holds the secret and
+does only that.
 
-## Step 0: Google setup (you, with me walking you through it)
+**What it does, and nothing more.** It never sees a manuscript. The browser
+still talks to Drive directly, so your writing goes from the browser to Google
+and never through labrarf.com. The broker only trades sign-in tokens.
 
-In Google Cloud Console:
-1. Create a project, called "Estoria".
-2. Enable the Google Drive API and the Google Picker API.
-3. Set up the OAuth consent screen: External, app name Estoria, and scope `drive.file` only. "In production" status is fine, because `drive.file` needs no verification.
-4. Create an OAuth client ID of type Web application. Authorized JavaScript origins:
-   - `https://www.labrarf.com`
-   - `https://labrarf.com`
-   - `http://localhost:5173`
-5. Create an API key (the Picker needs one), restricted to the Picker API and to those three origins as referrers.
-6. Add a home page link and a privacy policy page to the consent screen. I'll write the page as `privacy.html` and serve it beside the app.
-7. Note the project number (the Picker's "app ID").
+| Endpoint | Does |
+| --- | --- |
+| `POST /auth/exchange` | Takes the one-time code from Google's sign-in, exchanges it (using the secret) for an access token + refresh token. **Encrypts the refresh token into a cookie** (`HttpOnly; Secure; SameSite=Strict`). Returns the access token, its expiry and the account email to the page. |
+| `POST /auth/token` | Reads the cookie, asks Google for a fresh access token, returns it, and re-sets the cookie so it slides forward. If Google says the grant is revoked: clears the cookie and returns `401` (the app shows "Reconnect"). |
+| `GET /auth/callback` | Only for the redirect sign-in flow (iPad home-screen app, if Step 1 shows popups fail there). Does the same exchange, sets the cookie, then sends the browser back to the app with nothing in the URL. |
+| `POST /auth/disconnect` | Revokes the refresh token at Google and clears the cookie. |
+| `GET /status` | `{ drive: "on" \| "off" }`. **The kill switch** (see Prod safety). |
 
-You give me the client ID, the API key and the project number. All three are public values that ship in the page by design. They go in `src/lib/driveConfig.ts`. If they're empty, the Drive option simply doesn't appear.
+**Design rules:**
+- **No database and no stored tokens.** The only copy of a refresh token is in
+  that device's cookie, encrypted with a key that exists only in the server's
+  environment (`TOKEN_KEY`, AES-GCM). Nothing to breach at rest.
+- **Secrets live only in the host's environment settings:** the client secret
+  and `TOKEN_KEY`. They're never in the repo and never pasted into a chat.
+- **Locked to Estoria's pages.**
+  - CORS allows only `https://www.labrarf.com`, `https://labrarf.com` and
+    `http://localhost:5173`, with credentials.
+  - The allowed origins and the cookie domain are read from the broker's
+    environment (`ALLOWED_ORIGINS`, `COOKIE_DOMAIN`), not hard-coded. A future
+    domain move is then a settings change (see "A future domain of its own"
+    below).
+  - The server checks the `Origin` header.
+  - Every call needs a custom header, which forces a preflight and stops other
+    sites from triggering it (CSRF).
+- **Doesn't log tokens or codes.** Request logging stays off for those routes.
+- **Same site as the app.** It must be served from **`auth.labrarf.com`** (a
+  custom subdomain), not a `*.vercel.app` address. Safari blocks cookies for a
+  different site, but `auth.labrarf.com` and `www.labrarf.com` count as the
+  same site.
+  - **Known Safari limit:** Safari caps cookies from a subdomain hosted
+    elsewhere to 7 days. Because every refresh re-sets the cookie, this
+    means: **stay signed in as long as you open Estoria on that device at
+    least once a week.** After a longer gap, one tap reconnects. (Safari wipes
+    a website's data after 7 days without a visit anyway, unless it's
+    installed to the home screen; see the Hazard register, Safari 7-day wipe.)
+- **If the broker is down,** Drive pauses ("Drive paused · retrying"). Local
+  work is unaffected, and nothing loops or pops up.
+- **Code lives in this repo** under `auth-server/`, with its own
+  `package.json`. It's deployed on its own and never by `npm run deploy`. It's
+  about 150 lines.
 
-## Step 1: Day-one check against real Drive, before building UI
+**Sign-in flow in the app (`src/lib/driveAuth.ts`):**
+1. **Connect** (a click) uses Google's sign-in library in *code* mode. A popup
+   (or a redirect on an iPad home-screen app) returns a one-time code, and the
+   app sends it to `/auth/exchange`.
+2. The access token is kept **in memory only**, never in localStorage.
+3. **About 5 minutes before expiry,** or after any `401` from Drive, the app
+   calls `/auth/token` quietly. No popup, no click needed.
+4. **Google's sign-in script loads at startup only on devices whose Sync target
+   is Drive.** If a reconnect click had to wait for the script, Safari would
+   block the popup. Everyone else never loads it.
+5. **Scopes:** `drive.file` plus `openid email`, so the app can show which
+   account is connected. Both extra scopes are non-sensitive and need no Google
+   review.
 
-`drive.file` has two behaviors I couldn't confirm from Google's documentation, and the first-connect flow depends on them. I'll test each with your client ID and a scratch folder:
-- **Picking the folder:** if you pick only the Estoria folder in the Picker, can Estoria then list and read the files already inside it, or only create new ones there?
-- **Mac rewrites:** when the Mac writes a project file through the Drive desktop app, does Drive keep the same file ID? If the desktop app replaces the file instead, an iPad that was given access to the old file loses sight of the new one.
-- **Android writes:** do the Android app's writes keep the file ID too? (I expect yes, since they update in place.)
+## Hazard register: what could go wrong, and the fix
 
-The plan below is designed for the worst case of each, so the results only simplify it. If Mac rewrites do change the ID, the recommendation becomes: once Drive is connected, use Drive mode on the Mac too, not the folder.
+| # | Hazard | Fix in this plan |
+| --- | --- | --- |
+| H1 | **Switching target rolls work back.** The "last agreed" fingerprint is stored per project, not per target. A device switching from folder to Drive could treat an older Drive copy as "only the file changed" and load it over newer local work. | Key it per target: `estoria:sync:lastHash:<target>:<projectId>`. The first sync on a new target has no baseline, so any difference shows as a **conflict** (safe, never a silent pull). The folder target keeps reading the old key, so desktop Chrome sees no change. |
+| H2 | **Same-name duplicates.** Drive allows two files with the same name in one folder. Estoria may not see a file the phone or the Drive desktop app created. A brand-new file can be missing from a listing for a moment. A failed create, retried, can make two. | (a) The main file is **addressed by Drive file ID**, remembered per project per device, not looked up by name. (b) **Never create a project's main file without asking first:** "This project isn't in Estoria's Drive folder yet. Is it already in Drive from another device? [Pick it] [Create it]." (c) A create is never blindly retried; after a failure the app lists by name first. (d) After any create, the app lists by name, and if it finds two, it stops and shows both rather than picking one. |
+| H3 | **Rename.** Names come from the title, so a rename makes a new main file and the phone stays on the old one. | On Drive the ID stays the same: a rename **renames the file in place** (a metadata update), so the phone keeps following it. Backup and conflict copies take the new name from then on. Folder sync keeps today's behavior (out of scope, noted in SPECS). |
+| H4 | **No atomic "check, then write".** Another device can write between Estoria reading the file and writing it. | Remember the file's `headRevisionId` from the read. Right before writing, fetch only its metadata; if the revision moved, abort and re-run the compare. Step 1 tests whether Drive honors a conditional update; if it does, use that instead. Drive's own revision history (kept about 30 days) is a last-resort net under both. |
+| H5 | **Safari blocks popups** that aren't directly from a click, and today's Sync waits in a queue before it runs. | With the broker, popups happen only on Connect/Reconnect. Those clicks call Google's sign-in **before** any `await` or queue. Background refresh is a plain `fetch`. Script preloading: see the sign-in flow above. |
+| H6 | **iPad home-screen app.** Google's popup sign-in is known to misbehave in installed iOS web apps. | Detect standalone iOS and use the **redirect** flow (`/auth/callback`) there. Step 1 confirms which flow works. Any pending save is flushed before leaving the page. |
+| H7 | **Permanent delete.** Pruning to 5 backups deletes files. | On Drive, pruning moves old backups to **Drive's trash** (recoverable for 30 days). Estoria never permanently deletes a file on Drive. |
+| H8 | **A new device can't get your projects.** Sync only works on a project already open on that device. | Add **"Open from Google Drive"** in the Projects modal: it lists the main files in the Drive folder (live files only, not backups) and opens one. That links the project to its file ID, so the first Sync reads "in sync". It's also how you recover an iPad Safari wiped. |
+| H9 | **Silent failure.** Background errors are silent by design, so you can't tell whether Drive has your latest work, and on iPad Drive is the only copy that lasts. | A footer line: **"Backed up to Drive · 12 min ago"**, from the last confirmed write or match. It warns when work is unsaved to Drive for more than 30 minutes while edits exist. Separate states for offline ("will retry"), paused (broker or kill switch) and "needs reconnecting". |
+| H10 | **Safari 7-day wipe.** Safari clears a website's storage after 7 days without a visit, unless it's added to the home screen. | One-time tip on iPad Safari: "Add Estoria to your Home Screen so Safari keeps your work." H8 recovers everything from Drive if a wipe happens anyway. |
+| H11 | **Projects never opened since connecting aren't backed up.** The mirror only covers the open project. | When Drive is first connected, offer **"Back up all N projects now"**, run one at a time through the normal Sync (with H2's ask-before-create). The Projects modal shows each project's Drive state (backed up · not yet · needs review). |
+| H12 | **Two tabs at once.** Each tab has its own queue, so two tabs could interleave a compare and a write. | Wrap the existing queue in the browser's **Web Locks API** (`navigator.locks`, one lock named `estoria-sync`), so all of this browser's tabs take turns. Where Web Locks is missing, fall back to today's per-tab queue. |
+| H13 | **Big uploads.** Drive's simple multipart upload stops at 5 MB, and a large project file is 15–18 MB (SPECS §8 "How big can a project get?"). Rewriting that every few seconds on cellular is heavy. | Use Drive's **resumable upload** for any file over 4 MB. Throttle the Drive mirror: after edits settle, at most once every 30 seconds while typing, plus straight away when the tab is hidden. **Closing the tab can't be covered:** a request sent while a page unloads is capped at 64 KB, so the last ≤30 s of edits reach Drive on the next open, and H9's "unsaved to Drive" state shows it meanwhile. Folder mode keeps its 2.5 seconds. |
+| H14 | **Rate limits, 5xx, offline.** | Back off and retry (1s, 2s, 4s…, max 5 min) on `429` and `5xx`. Offline means "will retry" and is never treated as needing reconnecting. Retries respect H2(c). |
+| H15 | **The phone reads a stale copy.** Android's Drive file provider can serve a cached version. If the phone then writes from it, a web edit could be overwritten, and on the web it would look like "only the file changed". | (a) Step 1 measures how stale the phone's reads get. (b) **New safety rule on every target: before loading a newer file over local state, write the local state as a backup first.** Today's pull backs up the incoming copy, which is already in the main file. This changes folder behavior slightly, so it ships in Phase B, not in the identical-behavior refactor. (c) If staleness turns out to be real, the Android side gets a "refresh before sync" fix in its own session (Estoria-aa). |
+| H16 | **Wrong Google account.** Connecting the iPad with a different account silently splits your work across two Drives. | Show "Google Drive · you@gmail.com" in the footer and history. Remember which account each project last synced with, and if that changes: "This project was last backed up to a different Google account (x@…). Continue with y@…?" |
+| H17 | **Moving the laptop from the folder to Drive.** The existing files in Drive were written by the Drive desktop app, so `drive.file` can't see them. | First connect opens Google's Picker on the Estoria folder, where you select the folder and your existing `*.estoria.json` files (multi-select). Per-target baselines (H1) mean the first sync reads "in sync" when the files match, and a conflict when they don't. Never a silent overwrite. |
 
-## Step 2: Put a folder interface under Sync (no behavior change)
+## Review against the code (Session 66)
 
-- **New `src/lib/syncFolder.ts`:**
-  - `interface SyncFolder { name; read(fileName) → text | null; write(fileName, text); list() → {name, lastModified}[]; remove(fileName) }`
-  - `LocalFolder` wraps today's `BackupDirHandle`. It moves the existing `getFileHandle` / `createWritable` / `values` / `removeEntry` calls out of `sync.ts` and `backup.ts`.
-- **`lib/sync.ts`:** `readCanonical`, `writeDoc`, `listProjectFiles` and `restoreFromFile` take a `SyncFolder`. `syncProject`, `resolveConflict`, `pushCanonicalIfSafe` and `checkRemoteChanged` get their folder from a single `getSyncFolder({ interactive })`. Not changing:
-  - the `locked()` operation chain;
-  - the fingerprint;
-  - the last-agreed hash;
-  - `diffDocs` and `merge.ts`.
-- **`lib/backup.ts`:** `writeRotatingBackup` and `writeSavedCopyFile` write through the `SyncFolder`. The folder-handle remembering stays here, used by `LocalFolder`.
+Checked against `lib/sync.ts`, `lib/backup.ts` and `Footer.tsx` before Phase A.
+The design holds; these are places where the code forces a decision the plan
+hadn't made. Each fix is folded into the phase it belongs to.
 
-Desktop Chrome with a folder must behave exactly as today. I'll check that first, before any Drive code exists.
+| # | Gap | Fix |
+| --- | --- | --- |
+| R1 | The name-keyed `read / write / list / remove` interface has no room for H4's revision check, H2a's file-ID addressing or H3's rename. | Shape it in Phase A so `sync.ts` changes once: `read(name)` → `{ text, rev? }` or `null` (not found); `write(name, text, opts?: { expectRev? })`; `list()` → `{ name, lastModified }[]` (the history popover shows the date); `remove(name)` (trash on Drive). Name → file ID, rename and ask-before-create live inside `DriveFolder`. |
+| R2 | `locked()` in `sync.ts` forgets the folder on any `NotFoundError`. Behind a shared interface, a Drive "file not found" would wipe the remembered folder. | Each folder kind raises its own `SyncFolderGoneError`; `locked()` reacts only to that, and `LocalFolder` decides what "gone" means for a directory handle. |
+| R3 | Both the mirror and the Sync button create the main file when it's missing, which H2b forbids on Drive. | Phase B adds a `needs-link` outcome to `syncProject` and the mirror, and the Footer handles it (the "Pick it / Create it" ask). Folder target keeps creating. |
+| R4 | The Footer hides all of Sync when the folder picker is unsupported (`pickerSupported`), which is exactly Safari and iPad, where Drive is the target. | Phase B: Sync visibility comes from `syncTarget.ts` (a target is configured or offered), not from the picker check. |
+| R5 | H13's "straight away when closed" can't be delivered for multi-MB files (64 KB cap on unload requests). | Wording fixed in H13: best effort on hide; H9 covers the gap. |
+| R6 | The tests must pass "unchanged" before and after the refactor, so they need a seam that exists in both. | The suite mocks only `getBackupDir()` (and `forgetBackupDir()`) to return an in-memory directory handle. `LocalFolder` wraps that same handle, so the identical suite runs against old and new code. Tests assert outcomes, never localStorage key names (A.5 renames the keys). |
+| R7 | Small: Web Locks changes how tabs interleave (same outcomes, so "identical behavior" means identical results); `checkRemoteChanged` stays unlocked as today; tests need a `localStorage` stand-in; Vercel may ask for a TXT verification record next to the `auth` CNAME. | Noted in the relevant steps. |
 
-## Step 3: Drive client and DriveFolder
+## Prod safety
 
-**New `src/lib/drive.ts`:**
-- **Loading:** loads Google's sign-in script (`accounts.google.com/gsi/client`) and the Picker (`apis.google.com/js/api.js`) only when you connect, never on page load.
-- **Token:** sign-in uses the Google Identity Services token flow. The access token lasts about an hour, is held in memory and never written to storage, and is refreshed silently on your next click (`prompt: ''`).
-  - **Background steps never open a popup.** Safari blocks popups that aren't from a click. Without a valid token, the background mirror and check do nothing, just as today without folder permission. The footer then says Drive needs reconnecting, and one click reconnects.
-- **REST calls (Drive API v3, `fetch`):**
-  - `files.list`, filtered by parent folder, file name and not trashed;
-  - downloading a file (`alt=media`);
-  - creating a file (multipart upload);
-  - updating a file's content (`PATCH` media upload);
-  - deleting a file, used only for pruning Estoria's own backups.
-- **`DriveFolder implements SyncFolder`.** It caches file name → file ID. It also remembers, on this device, the file ID each project last synced with (`estoria:drive:file:<projectId>`).
-  - **Guard against duplicate files:** if that remembered file is gone or trashed, it **does not** create a new file with the same name. Sync reports "can't see this project's file any more" and offers the Picker to pick it again. This is the worst case from Step 1.
-- **First connect (Picker):**
-  - **If you already have an Estoria folder in Drive:** pick that folder plus your existing `*.estoria.json` files. The Picker shows folders and `.estoria.json` files, with multi-select.
-  - **If you don't:** Estoria creates a folder named "Estoria".
-  - The folder ID and name are stored in `estoria:drive:v1`.
+**Who is affected by each deploy.** Nothing changes for anyone who doesn't
+press Connect. Desktop Chrome folder sync must behave identically, and it's
+proven by tests rather than by eye.
 
-## Step 4: Choosing where to sync, per device
+**Kill switch.** The app checks `auth.labrarf.com/status` when it starts and
+every 30 minutes. If it says `off`, or the broker is unreachable on startup,
+Drive does no writes and the footer says "Drive backup paused". Flipping it is
+an environment change on the broker, so there's no app deploy, and local work
+keeps saving.
 
-- **New `src/lib/syncTarget.ts`:**
-  - Each device has an active target: `"folder"`, `"drive"`, or none, stored in localStorage.
-  - `getSyncFolder()` returns the matching `SyncFolder` or null.
-  - What's available:
-    - Safari and Firefox (including iPad): Drive only.
-    - Desktop Chrome: both, and you choose.
-    - Embedded frames: unchanged.
-- **Footer (`Footer.tsx`):**
-  - The Sync button and folder icon appear when either target is possible. Today they're hidden whenever folder access is missing.
-  - The first Sync opens a small "Sync with Google Drive / a folder on this computer" choice. On iPad it goes straight to Drive.
-  - Labels and tooltips name the target, e.g. "Google Drive · Estoria".
-  - New footer states for "Drive needs reconnecting" and "can't see this project's file".
-- **History popover / Backups (`SyncHistoryPopover.tsx`, `SyncFileList.tsx`, `BackupsModal.tsx`, the Toolbar menu item):**
-  - These use the active `SyncFolder`.
-  - "Change…" lets you switch target, or disconnect Drive (which forgets the folder and token on this device).
-  - The Backups menu item shows when a target exists.
-- **`useStore.ts`:** saved copies go through the same target (one import change).
+**Rollback.** The app's deploy and the broker's deploy are separate. Each can
+be rolled back on its own: the app by redeploying the previous commit, the
+broker from the host's dashboard. With the Drive settings empty in
+`src/lib/driveConfig.ts`, the Drive option disappears entirely.
 
-## Step 5: Docs
-- **SPECS:**
-  - §8: Drive as a sync target, the `drive.file` and Picker flow, token handling, and the duplicate-file guard.
-  - §6 item 7: mark the "NEXT UP" handoff done.
-  - §4: the Persist rows.
-  - §7 note "Firefox/Safari have no folder access": they now have Drive.
-- A `SESSIONS.md` entry.
-- Commit only after you've tested it, then push and deploy only on your go-ahead.
+**The rollout, one deploy at a time, each with your go-ahead:**
+
+| Deploy | Ships | Visible to | Gate before the next |
+| --- | --- | --- | --- |
+| **A** | Automated tests for today's `sync.ts` (dev-only, never shipped), then the `SyncFolder` refactor with **identical behavior**, plus Web Locks (H12) | Nobody (internal) | Tests pass on the old code **and** the new code. You use folder sync normally for a few days |
+| **S** | The broker at `auth.labrarf.com` (no app change) | Nobody | Step 1 checks pass against it |
+| **B** | All Drive code, **hidden behind a per-device switch** (`?drive=on`, remembered on that device only) | Only devices you turn it on for | You run it on your real laptop, iPad (Safari and home-screen app) and Android against prod for about a week |
+| **C** | Show "Connect Google Drive" to everyone, plus `privacy.html` | Anyone who presses Connect | Proven in B |
+
+## Phases of work
+
+### Step 0: Google + hosting setup (you, with me walking you through it)
+
+This is in addition to revision 1's Step 0. If you've already started, keep what
+you made.
+
+1. Google Cloud project `Estoria`, with the **Drive API** and the **Picker API**
+   enabled.
+2. **Consent screen:**
+   - External, app name `Estoria`, no logo;
+   - scopes `drive.file`, `openid`, `email`;
+   - Audience **In production**. In "Testing", refresh tokens expire after 7
+     days.
+3. **OAuth client (Web application):**
+   - JavaScript origins: `https://www.labrarf.com`, `https://labrarf.com`,
+     `http://localhost:5173`;
+   - Redirect URIs: `https://auth.labrarf.com/auth/callback` and
+     `http://localhost:3000/auth/callback`.
+   - **Copy the client secret straight into the host's environment settings
+     (step 6). Never into a chat or a file.**
+4. **API key** restricted to the Picker API and those three origins.
+5. **Project number** (the Picker's app ID).
+6. **Broker host** (see Open decisions):
+   - create the project, pointing at `auth-server/`;
+   - set the environment variables `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+     `TOKEN_KEY` (you generate it with `openssl rand -base64 32`) and
+     `DRIVE_STATUS=on`.
+7. **DNS, at whois.com** (labrarf.com's nameservers are `ns1–ns4.whois.com`):
+   **add one** CNAME record, `auth` → the target Vercel gives you (plus a TXT
+   record only if Vercel asks to verify the domain). This is the
+   only DNS change in the whole plan, and the one step that could affect the
+   portfolio site or email, so:
+   - **Before:** screenshot every existing record. As of 2026-10-11 they are:
+     - the apex `labrarf.com` A records → GitHub Pages (`185.199.108–111.153`);
+     - `www` → `labrarf-rgb.github.io`;
+     - MX → `mx1/mx2.improvmx.com` (email).
+   - **Add only. Never edit or delete** the apex, `www` or MX records.
+   - **After:** Claude checks with `dig` that `auth.labrarf.com` resolves, that
+     the apex, `www` and MX records are unchanged, and that
+     `https://www.labrarf.com` and `/estoria/` still load. If anything is off,
+     restore from the screenshot.
+8. You give me the **client ID, API key and project number.** All three are
+   public by design and go in `src/lib/driveConfig.ts`.
+
+### Phase A: tests, then the folder interface (no behavior change) → Deploy A
+
+1. Add `vitest` (dev-only) and `src/lib/sync.test.ts`. It runs **against
+   today's code** with an in-memory folder, covering:
+   - created / in-sync / pushed / pulled / conflict;
+   - resolve mine / theirs / merge (both copies kept);
+   - mirror fast-forward and "behind";
+   - check-changed;
+   - list and restore (read-before-prune);
+   - rotation to 5;
+   - a too-new schema refused;
+   - corrupt file never overwritten by the mirror.
+   The only seam is `getBackupDir()` / `forgetBackupDir()`, mocked to an
+   in-memory directory handle (R6).
+2. **New `src/lib/syncFolder.ts`:**
+   - `interface SyncFolder { id; label; read(name); write(name, text, opts?); list(); remove(name) }`
+     with the shapes in R1, plus `SyncFolderGoneError` (R2)
+   - `LocalFolder` wraps today's handle, moving the `getFileHandle` /
+     `createWritable` / `values` / `removeEntry` calls out of `sync.ts` and
+     `backup.ts`.
+3. **`sync.ts` and `backup.ts`** take a `SyncFolder` from one `getSyncFolder()`.
+   - The same tests must pass **unchanged**.
+   - Not touched: the fingerprint, `diffDocs`, `merge.ts`, the conflict
+     dialog, the file format.
+4. Wrap the queue in Web Locks (H12).
+5. Baselines move to per-target keys **with a fallback read of the old key for
+   the folder target**, so nothing re-baselines (H1).
+6. Verify: typecheck, build, tests, and the folder flows on the dev server (an
+   OPFS folder as stand-in, as in earlier sessions).
+
+### Step 1: day-one checks against real Drive (needs Step 0 + Deploy S)
+
+With a scratch folder and your account (you sign in yourself; I never enter
+credentials):
+
+- **Folder access:** after picking only the folder in the Picker, can Estoria
+  list and read the files already inside it?
+- **File IDs:** do Drive desktop writes on the Mac keep the file ID? Android's
+  `"wt"` writes should; confirm.
+- **Conditional update:** does Drive reject a write when the revision moved
+  (H4)?
+- **Refresh token:** does code-mode sign-in reliably return one, and does
+  `/auth/token` work after an hour?
+- **Safari:** cookie and refresh on Mac Safari locally. iPad Safari and the
+  home-screen app **only after Deploy B**, because real devices can only sign
+  in on registered addresses.
+- **Phone staleness (H15):** after a web write, how long until the Android app
+  reads the new content?
+
+The plan is written for the worst case of each, so results only simplify it.
+
+### Phase B: the Drive client and UI → Deploy B (hidden)
+
+- **`src/lib/drive.ts`:** Drive v3 over `fetch`:
+  - list (by folder, name, not trashed);
+  - read (`alt=media`, with its `headRevisionId`);
+  - create (resumable over 4 MB);
+  - update (revision check per H4);
+  - rename;
+  - trash.
+  - Backoff per H14.
+- **`src/lib/driveAuth.ts`:** the broker calls, the in-memory token, early
+  refresh, the popup or redirect choice, the account email.
+- **`DriveFolder implements SyncFolder`:**
+  - file ID by project (H2a, H3);
+  - ask-before-create (H2b);
+  - duplicate check (H2d);
+  - trash on prune (H7).
+- **`src/lib/syncTarget.ts`:** the active target per device (`folder` / `drive`
+  / none).
+  - Safari, Firefox and iPad: Drive only. Desktop Chrome: you choose.
+  - The `?drive=on` switch for Deploy B. The status kill switch.
+- **Pull-safety rule** (H15b) on both targets, with a test added.
+- **`needs-link` outcome** from `syncProject` and the mirror on Drive (R3).
+- **UI:**
+  - **Footer:** Sync visibility from the active target, not the picker check
+    (R4); target and account name, "Backed up to Drive · N min ago",
+    and the paused / offline / reconnect / can't-see-file states (H9, H16).
+  - First-sync chooser: "Google Drive / a folder on this computer".
+  - **Projects modal:** "Open from Google Drive" (H8), "Back up all" (H11),
+    and each project's Drive state.
+  - **History popover, Backups and Toolbar:** use the active target;
+    "Change…" switches target or disconnects.
+  - The iPad home-screen tip (H10).
+- **`useStore.ts`:** saved copies go through the active target (one import
+  change).
+
+### Phase C: public → Deploy C
+
+- `public/privacy.html`:
+  - Estoria stores projects in your browser and, if you connect it, in your own
+    Google Drive;
+  - a sign-in helper at auth.labrarf.com keeps you signed in and never sees
+    your writing;
+  - nothing else is collected.
+- Link it and the home page on the consent screen.
+- Remove the `?drive=on` gate.
+- **Docs:**
+  - SPECS §8: Drive as a target, the broker, the hazard rules;
+  - SPECS §4: the Persist rows;
+  - SPECS §6 item 7: done;
+  - the SPECS §7 note on Firefox/Safari;
+  - a SESSIONS entry.
 
 ## Out of scope
+
 - Images as separate Drive files (§9 item 13).
-- The Android app calling the Drive API (it keeps reading the same file through Android's file picker).
+- The Android app calling the Drive API. It keeps the file picker. A
+  staleness fix, if Step 1 shows one is needed, is its own session in
+  Estoria-aa.
+- Fixing folder-mode renames.
 - Loading only the open project.
 - Real-time collaboration.
 
+## A future domain of its own (considered 2026-10-11, deferred)
+
+The user asked whether Estoria should get its own domain (e.g. `estoria.app`).
+**Not now.** Browsers keep a website's data under its exact address, so moving
+the app strands everything saved locally: projects, settings, the folder handle,
+the iPad home-screen install. iPad projects are the most exposed, because Safari
+has no sync today. Moving before Drive works would mean exporting and
+importing every project by hand on every device.
+
+**After Drive works, a move is cheap.** `drive.file` access is tied to the
+Google Cloud project, not the web address. The steps would be:
+
+1. Add the new origin to the OAuth client and the broker's `ALLOWED_ORIGINS`.
+2. Open Estoria at the new address.
+3. On each device, use "Open from Google Drive" (H8).
+
+Android doesn't care either way. Hosting the app and broker together on one
+domain would also remove the Safari 7-day cookie cap. So: build on
+`labrarf.com`, and move only once every device's projects are confirmed in
+Drive.
+
 ## Files
-- **New:** `src/lib/syncFolder.ts`, `src/lib/drive.ts`, `src/lib/driveConfig.ts`, `src/lib/syncTarget.ts`, `public/privacy.html`
-- **Changed:** `src/lib/sync.ts`, `src/lib/backup.ts`, `src/components/Footer.tsx`, `SyncHistoryPopover.tsx`, `SyncFileList.tsx`, `modals/BackupsModal.tsx`, `Toolbar.tsx`, `store/useStore.ts` (import only)
-- **Unchanged on purpose:** `store/persistence.ts`, `lib/merge.ts`, `SyncConflictModal.tsx`, the file format
+
+- **New:**
+  - `auth-server/` (exchange, token, callback, disconnect, status, crypto,
+    config)
+  - `src/lib/syncFolder.ts`
+  - `src/lib/drive.ts`
+  - `src/lib/driveAuth.ts`
+  - `src/lib/driveConfig.ts`
+  - `src/lib/syncTarget.ts`
+  - `src/lib/sync.test.ts`
+  - `public/privacy.html`
+- **Changed:**
+  - `src/lib/sync.ts`
+  - `src/lib/backup.ts`
+  - `src/components/Footer.tsx`
+  - `SyncHistoryPopover.tsx`
+  - `SyncFileList.tsx`
+  - `modals/BackupsModal.tsx`
+  - `modals/ProjectsModal.tsx`
+  - `Toolbar.tsx`
+  - `store/useStore.ts` (import only)
+  - `package.json` (vitest, dev-only)
+- **Unchanged on purpose:**
+  - `store/persistence.ts`
+  - `lib/merge.ts`
+  - `SyncConflictModal.tsx`
+  - the file format and the Android contract
+  - `public/sw.js` (it already ignores other sites' requests, so Google's
+    APIs are never cached)
 
 ## Verification
-- **`npm run typecheck` and `npm run build`.**
-- **Folder sync didn't regress.** On the dev server with an OPFS folder standing in for the picked one (as earlier sessions did), I'll check: create, push, pull, conflict with keep / merge, history and restore, and backup rotation, all exactly as before.
-- **Drive (needs Step 0, and you sign in yourself in the browser pane; I never enter credentials):**
+
+- **Every phase:** `npm run typecheck`, `npm run build`, and the test suite.
+- **Phase A:** the suite passes before and after the refactor, plus the folder
+  flows by hand on the dev server.
+- **Phase B, on localhost with the broker running locally** (you sign in):
   - connect;
-  - first Sync creates the file;
-  - the edit mirror updates it;
-  - a "phone edit" (changing the Drive file directly through the API from the console) shows "file changed elsewhere", then pulls;
-  - both sides changed opens the conflict dialog, and the conflict copy appears in Drive;
-  - backups rotate to 5;
+  - the first Sync asks before creating;
+  - the mirror updates the file;
+  - an edit made directly in Drive shows "file changed elsewhere", then
+    pulls (with the pre-pull backup);
+  - both sides changed opens the conflict dialog, and the conflict copy
+    appears in Drive;
+  - backups rotate to 5 and old ones go to Drive's trash;
   - history and restore;
-  - an expired token is forced: the background stays silent and the footer offers Reconnect;
-  - the remembered file is trashed: the footer says it can't see the file, with no duplicate created.
-- **iPad:** Safari in the iOS Simulator at `localhost:5173` (a real WebKit engine) for the connect flow and layout.
-- **Then you:**
-  - your Mac and the iOS Simulator locally;
-  - your phone's Android app opening the Drive-created file;
-  - after deploy, your real iPad. Real devices can only sign in on registered addresses, so a real iPad can be tested only once it's deployed.
-  - The deploy itself is low-risk: nothing changes for anyone until they press Connect to Google Drive.
+  - a rename keeps the file ID;
+  - a forced token expiry refreshes silently;
+  - revoking access shows Reconnect;
+  - kill switch `off` pauses writes;
+  - a second tab is serialized;
+  - a 20 MB project uploads;
+  - a trashed main file shows "can't see this file", with no duplicate
+    created;
+  - a different account shows the warning.
+- **iPad:** layout and the connect flow in Safari in the iOS Simulator at
+  `localhost:5173`.
+- **Then you, on Deploy B against prod:**
+  - your laptop;
+  - your real iPad, in Safari and as a home-screen app;
+  - your phone's Android app opening the Drive file;
+  - a week of normal use before Deploy C.
+
+## Decisions (answered by the user, 2026-10-11)
+
+1. **Laptop: Drive mode everywhere.** Once Drive is connected, every web device
+   uses the Drive API, so all of them see the same files and the Drive desktop
+   app can't create "(1)" duplicates. Folder sync stays available for folders
+   outside Drive.
+2. **Rollout: four separate deploys (A, S, B, C)**, including the dev-only test
+   package.
+3. **Broker host: Vercel Hobby.** Free for personal, non-commercial use. If
+   Estoria ever earns money, it moves to Vercel Pro ($20/month) or Cloudflare
+   Workers (same code).
+4. **DNS: whois.com.** `labrarf.com`'s nameservers are `ns1–ns4.whois.com`
+   (checked 2026-10-11), so the `auth` CNAME goes in whois.com's DNS panel.
+   `www` currently points at GitHub Pages (`labrarf-rgb.github.io`), and that
+   record must not be touched.

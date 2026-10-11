@@ -500,8 +500,10 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    then build `GoogleDriveStorageAdapter`. This is the **only** external
    surface Estoria is getting: third-party integrations are closed (§7).
 
-   > **▶ NEXT UP (handoff, 2026-10-07).** **The plan is written and approved:
-   > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Decided with the
+   > **▶ NEXT UP (handoff, 2026-10-07; plan revised 2026-10-11).** **The plan is
+   > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Revision 2 adds a
+   > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
+   > register, and a four-deploy rollout; its decisions are answered at the bottom. Decided with the
    > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in
    > stays on `www.labrarf.com`, and Drive becomes a second kind of "Estoria
    > folder" *under the existing Sync* (a `SyncFolder` interface) rather than a
