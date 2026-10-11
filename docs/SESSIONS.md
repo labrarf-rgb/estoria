@@ -5719,3 +5719,56 @@ detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the
 plan superseded (app stays on labrarf.com, Drive is a `SyncFolder`); its
 NEXT UP box now records Phase A as done.
+
+### 2026-10-11 — Drive review, fixes, Deploy B, v4 (Session 67)
+
+**Review of Session 66's Drive work** against the plan and the code: sound,
+nothing redone. Confirmed the four self-review findings and found two more:
+backup rotation matched `<slug>-backup-` as a prefix, so a project titled like
+"My Story Backup 1" was **deleted** as My Story's oldest backup (live for
+folder sync in prod); and "Open from Google Drive" recorded no agreement, so
+the store's tidy-up on open read as a conflict. All six fixed, each with a
+test that fails without it: ask before creating a second Estoria folder
+(`connectDriveFolder` → `none`; the chooser asks "Is there an Estoria folder
+in your Drive already?"); skip downloading a live file whose Drive revision
+hasn't moved (in-memory copy per file and revision); `parseCopyName` for
+stamped copy names; `SyncFolder.moveProject` keeps the Drive link when a pull
+changes the project ID; Open from Drive sets the baseline.
+
+**Testing moved to prod.** The client secret can't be read back from Vercel
+(all six variables are Sensitive) and the user chose not to make a second one,
+so the local B4 plan was dropped. Deploy B went out as build 217 (`a901e78`):
+Drive hidden without `?drive=on`, checked on prod (no Drive or broker calls).
+Rollback steps are in the handoff.
+
+**Versioning (user decisions):** this is **v4**. The version shows as one
+number (`v4 · build N`; package.json keeps `4.0.0` for npm) and the build
+number **restarts at 1 with each version** (`buildInVersion` in
+`vite.config.ts`). The service worker is now keyed `sw.js?v=<version>-<build>`
+so a restart can't reuse an old URL. SPECS "Version and build number".
+
+**UI, from the user:** File → Google Drive opens the chooser; New project asks
+"Back up … to Google Drive?" (or to connect), and a yes creates the file from
+the mirror once its name is free in the folder; choosing an existing Estoria
+folder is one step (the follow-up multi-select file picker alarmed the user
+with other projects in the folder) and files are picked one at a time where
+needed ("Not listed? Choose it in Google Drive…" in Open from Google Drive);
+New chapter removed from the File menu (the board has its own button).
+
+**First real test (Safari, scratch project):** the Picker said "The API
+developer key is invalid". The key worked in Chromium; Google rejects the key
+with no referrer, which is what Safari's picker sent. The user set the
+`Estoria Picker` key's application restriction to **None** (it stays
+restricted to the Google Picker API only; checked). Then: connected, chose the
+Drive desktop app's Estoria folder, and the new project's file
+`untitled-story.estoria.json` appeared **in that folder** (one Estoria folder
+in Drive, verified through the Drive connector).
+
+Also: privacy page names Google's sign-in page and Picker; an offline start
+re-checks the kill switch on `online`; keeping "theirs" names the Drive file
+after the kept title; the chooser checks sign-in when opened, so a reload mid
+setup resumes at the folder question. 143 app tests.
+
+**Next:** finish the prod checklist in `HANDOFF-drive-sync.md` §5 (edit +
+rename was next), the Step 1 checks, a week of use, then Deploy C. Delete the
+scratch file from Drive after testing.

@@ -456,7 +456,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Persist | Nothing is written before the load answers | ✅ | The load lock (§2, 2026-08-11). Reading the store is async, so until it lands the store holds its defaults — the sample and `onboarded: false`, i.e. the first-launch chooser over a document that exists, with buttons that replace it. `writesArmed` gates every flush until a load reaches a definite answer; `Welcome` is gated on hydration, `Recovery` shows when the load failed, and `navigator.storage.persist()` is asked for at startup so the browser stops treating projects as evictable. |
 | Onboarding | The chooser knows when it's wrong | ✅ | If it comes up over a document with work in it, "Keep working on this" leads and resolves the state without touching anything. The two replacing options go through a confirm that names the project and **carries a "Download a copy"** — the welcome screen is a full-screen overlay, so pointing at the File menu underneath it would be advice you cannot follow. Skipped entirely on a genuine first launch, where `doc` is still the untouched `sampleStory` object. |
 | Onboarding | The sample opens as a map | ✅ | Its authored coordinates run left to right across ~2100px, so `useSample` auto-arranges on load with `bestColumns` sized to the current window (2026-08-11). The "Alt ending" fork takes the same positions — it exists to compare two endings, and the map shouldn't move underneath that. |
-| Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only). Replaced the "Back up" button 2026-07-03; see §8. |
+| Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon (File System Access API). Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only). Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Hidden on Firefox/Safari/embeds (no folder API there — local auto-save + export menus only), except on a device with Google Drive switched on (`?drive=on`, Deploy B, 2026-10-11), where Sync works through Drive: see [`PLAN-drive-sync.md`](PLAN-drive-sync.md) until Phase C writes it up here. Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
 | App | A crash you can get out of | ✅ | **2026-09-07.** React's answer to a component that throws mid-render is to unmount the whole tree, which is a white page — and in the installed app there is no address bar to reload from, so the only move left was quit and restart. Two `ErrorBoundary`s now stand between that and the writer. **Around the chapter modal**, keyed on `openCh` + `chapterMode`: a chapter that will not draw costs you the chapter, not the session, so the board, the toolbar and everything unsaved stay live behind a card offering *Close the chapter* / *Try again* / *Download a copy*, and the key re-arms the boundary as you navigate — without it one bad chapter would poison every chapter opened after it. **At the root**, in `main.tsx`: everything else lands on a full page saying the writing is saved, with *Reload Estoria* as the way out. Both write the error and its component stack to the console, and both put a whole-project `.estoria.json` one click away (`downloadProjectFile` straight off `useStore.getState()`), the same instinct as `Recovery`'s rescued copy — say nothing is lost, put a copy within reach, then offer the way on. Honest limits: **render errors only** (handlers, timers and promises never pass through render, so React never routes them here), and the theme comes from the `data-theme` the app already wrote on the document element, falling back to the OS preference for the one case that has neither — a crash on the very first render, where no effect has run and the store has not finished rehydrating. |
@@ -512,13 +512,13 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Revision 2 adds a
    > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
    > register, and a four-deploy rollout; its decisions are answered at the bottom.
-   > **On `feature/drive-sync`: Phase B built (not deployed); next session starts
-   > with [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md).**
-   > **Phase A is done (Session 66, 2026-10-11):** Sync tests, the `SyncFolder`
-   > interface, the cross-tab lock and per-target baselines; deployed as build
-   > 198 (`6e5af0c`).
-   > Next: a few days of normal folder use, then Step 0 (Google + DNS setup)
-   > and the broker (Deploy S). Decided with the
+   > **Deploy B is live (Session 67, 2026-10-11):** all Drive code is on prod
+   > behind the per-device `?drive=on` switch (v4). Phase A (tests, `SyncFolder`,
+   > cross-tab lock, per-target baselines) and the broker (Deploy S,
+   > `auth.labrarf.com`) went out earlier the same day. **Next:** the real-Drive
+   > checklist on prod and a week of use on laptop, iPad and Android, then
+   > Deploy C (remove the switch, write Drive up in §4/§8). Start with
+   > [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md). Decided with the
    > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in
    > stays on `www.labrarf.com`, and Drive becomes a second kind of "Estoria
    > folder" *under the existing Sync* (a `SyncFolder` interface) rather than a
@@ -897,7 +897,10 @@ web half shipped later the same day (Session 24). **The contract:**
   device that switches from the folder to Drive starts with no baseline and
   sees a conflict rather than pulling an older copy). Compare:
   local == remote → in sync; remote == last-synced → local ahead (offer
-  write); local == last-synced → remote ahead (offer reload); else →
+  write); local == last-synced → remote ahead (offer reload; since
+  2026-10-11 the web first saves the local state as
+  `<slug>-backup-<stamp>-before-pull`, on every target, so a phone writing
+  back a stale cached copy can't make newer work vanish); else →
   conflict. Android hashes SHA-256 over the codec-canonical encoding with
   `modifiedAt` stripped; the web side must likewise hash a canonical,
   `modifiedAt`-less serialization of its own (the two hashes never cross the
@@ -957,7 +960,11 @@ extensions that go beyond the original to-do.** The web behavior is now:
 - **The footer "Back up" button is gone; Sync absorbed it.** Every completed
   explicit Sync (including "already in sync" and conflict resolutions) writes
   one timestamped `<slug>-backup-<stamp>.estoria.json` and prunes to the
-  newest 5 — the old Back up rotation, now a side effect of Sync. Backups are
+  newest 5 — the old Back up rotation, now a side effect of Sync. Copies are
+  recognized by their full stamped name (`parseCopyName` in `lib/backup.ts`),
+  not a `<slug>-backup-` prefix: until 2026-10-11 a project titled e.g. "My
+  Story Backup 1" (`my-story-backup-1.estoria.json`) counted as My Story's
+  oldest backup and was deleted by the prune. Backups are
   NOT written by the background mirror (below), so a long editing session
   can't churn out the 5 good copies.
 - **Auto-save mirrors into the canonical file.** Local auto-save (localStorage
