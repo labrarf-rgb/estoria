@@ -1,7 +1,8 @@
 import type { DriveFile } from "@/lib/drive";
 import type { DriveFolder } from "@/lib/driveFolder";
 import { markBackedUp } from "@/lib/driveSession";
-import { canonicalFileName, projectFileText, pushCanonicalIfSafe } from "@/lib/sync";
+import { canonicalFileName, fingerprint, projectFileText, pushCanonicalIfSafe } from "@/lib/sync";
+import { setLastSynced } from "@/lib/syncBaseline";
 import { normalizeDoc } from "@/store/persistence";
 import { useStore } from "@/store/useStore";
 import type { StoryDoc } from "@/types";
@@ -30,6 +31,11 @@ export async function openFromDrive(folder: DriveFolder, file: DriveFile): Promi
   st.openDoc(doc);
   const opened = useStore.getState().doc.id;
   folder.link(opened, file.id);
+  // This browser's copy was just read from that file, so the two agree.
+  // Opening can tidy the project (word counts recounted, an older file
+  // brought up to date); recording the file as agreed lets that tidy-up
+  // fast-forward to Drive instead of reading as a conflict on the first Sync.
+  setLastSynced("drive", opened, await fingerprint(doc));
   markBackedUp(opened);
   return "opened";
 }

@@ -183,6 +183,29 @@ export function fileStamp(d = new Date()): string {
 }
 
 /**
+ * The copies Sync keeps beside a project's live file, by name:
+ * `<slug>-backup-<stamp>[-tag]`, `<slug>-conflict-<stamp>[-local|-file]` and
+ * `<slug>-saved-<reason>-<stamp>`, each `.estoria.json`. Matching the stamp,
+ * not just the word, matters: a project titled "Alpha Backup 1" has the live
+ * file `alpha-backup-1.estoria.json`, which must never be counted (and pruned)
+ * as one of Alpha's backups, nor hidden as a copy.
+ */
+const COPY_NAME = /^(.+)-(backup|conflict|saved-[a-z]+)-(\d{8}-\d{6})(-[a-z-]+)?\.estoria\.json$/;
+
+export interface CopyName {
+  /** The project's slug, as in its live file `<slug>.estoria.json`. */
+  slug: string;
+  kind: "backup" | "conflict" | "saved";
+}
+
+/** What kind of copy this file is, or null for a live project file (or anything else). */
+export function parseCopyName(name: string): CopyName | null {
+  const m = COPY_NAME.exec(name);
+  if (!m) return null;
+  return { slug: m[1], kind: m[2].startsWith("saved-") ? "saved" : (m[2] as "backup" | "conflict") };
+}
+
+/**
  * Write a timestamped `<slug>-backup-<stamp>.estoria.json` into the folder,
  * then prune to the newest MAX_BACKUPS for that project (timestamps in the
  * name sort lexicographically, so a name sort is a date sort). Called by Sync
@@ -194,11 +217,16 @@ export async function writeRotatingBackup(
   /** Marks why it was taken, e.g. "before-pull". It sorts before an untagged backup from the same second. */
   opts?: { tag?: string }
 ): Promise<{ fileName: string; kept: number }> {
-  const prefix = `${slugify(doc.projectTitle || "story")}-backup-`;
-  const fileName = `${prefix}${fileStamp()}${opts?.tag ? `-${opts.tag}` : ""}.estoria.json`;
+  const slug = slugify(doc.projectTitle || "story");
+  const fileName = `${slug}-backup-${fileStamp()}${opts?.tag ? `-${opts.tag}` : ""}.estoria.json`;
   await folder.write(fileName, JSON.stringify(stampModified(doc), null, 2));
 
-  const mine = (await folder.list()).map((f) => f.name).filter((n) => n.startsWith(prefix));
+  const mine = (await folder.list())
+    .map((f) => f.name)
+    .filter((n) => {
+      const copy = parseCopyName(n);
+      return copy?.kind === "backup" && copy.slug === slug;
+    });
   mine.sort(); // oldest first
   for (const name of mine.slice(0, Math.max(0, mine.length - MAX_BACKUPS))) {
     await folder.remove(name).catch(() => {});

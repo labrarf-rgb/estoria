@@ -1,3 +1,4 @@
+import { parseCopyName } from "@/lib/backup";
 import { drive, type DriveApi, type DriveFile } from "@/lib/drive";
 import { DRIVE_CONFIG } from "@/lib/driveConfig";
 import {
@@ -70,11 +71,22 @@ export const localLinks: LinkStore = {
   },
 };
 
+/**
+ * The live-file content this page last read or wrote, per file and revision
+ * (H13). A Drive revision ID names exact content, so while a file's revision
+ * hasn't moved, its content is already here: the mirror's check before every
+ * write (each 30 s while typing) and the change check on focus cost one small
+ * metadata call, not a download of a project that can be 15-18 MB. Kept per
+ * Drive client (tests each have their own), and only the newest two, since a
+ * page works on one project at a time.
+ */
+const liveCopies = new WeakMap<DriveApi, Map<string, { rev: string; text: string }>>();
+const KEEP_LIVE_COPIES = 2;
+
 const newestFirst = (a: DriveFile, b: DriveFile) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? "");
 
 /** A project's live file, as opposed to its backups, conflict copies and saved copies. */
-export const isLiveFileName = (name: string) =>
-  name.endsWith(".estoria.json") && !/-(backup|conflict|saved)-/.test(name);
+export const isLiveFileName = (name: string) => name.endsWith(".estoria.json") && !parseCopyName(name);
 
 export class DriveFolder implements SyncFolder {
   readonly target = "drive" as const;
@@ -90,6 +102,30 @@ export class DriveFolder implements SyncFolder {
 
   private guard(): void {
     if (this.paused()) throw new DrivePausedError();
+  }
+
+  private copies(): Map<string, { rev: string; text: string }> {
+    let m = liveCopies.get(this.api);
+    if (!m) liveCopies.set(this.api, (m = new Map()));
+    return m;
+  }
+
+  /** Remember a live file's content at a revision (one we just read or wrote). */
+  private remember(file: DriveFile, text: string): void {
+    if (!file.headRevisionId) return;
+    const m = this.copies();
+    m.delete(file.id);
+    m.set(file.id, { rev: file.headRevisionId, text });
+    while (m.size > KEEP_LIVE_COPIES) m.delete(m.keys().next().value!);
+  }
+
+  /** A live file's content: from memory while its revision hasn't moved, else downloaded. */
+  private async liveText(file: DriveFile): Promise<string> {
+    const known = this.copies().get(file.id);
+    if (known && file.headRevisionId && known.rev === file.headRevisionId) return known.text;
+    const text = await this.api.download(file.id);
+    this.remember(file, text);
+    return text;
   }
 
   private async byName(name: string): Promise<DriveFile[]> {
@@ -155,7 +191,7 @@ export class DriveFolder implements SyncFolder {
     // hold is the older one, so the next write's check fails safe.
     const file = await this.linkedFile(projectId);
     if (file === "unlinked") return file;
-    return { text: await this.api.download(file.id), rev: file.headRevisionId };
+    return { text: await this.liveText(file), rev: file.headRevisionId };
   }
 
   async writeLive(projectId: string, name: string, text: string, opts?: { expectRev?: string }): Promise<void> {
@@ -164,7 +200,7 @@ export class DriveFolder implements SyncFolder {
     if (file === "unlinked") throw new Error("This project isn't linked to a Drive file yet.");
     if (opts?.expectRev && file.headRevisionId !== opts.expectRev) throw new DriveRevisionMovedError();
     if (file.name !== name) await this.api.rename(file.id, name);
-    await this.api.update(file.id, text);
+    this.remember(await this.api.update(file.id, text), text);
   }
 
   // ---- Linking a project to its file (the "needs-link" answers) --------------------
@@ -178,7 +214,7 @@ export class DriveFolder implements SyncFolder {
   async readFile(fileId: string): Promise<SyncFileRead> {
     const meta = await this.api.get(fileId);
     if (!meta || meta.trashed) throw new DriveFileMissingError();
-    return { text: await this.api.download(fileId), rev: meta.headRevisionId };
+    return { text: await this.liveText(meta), rev: meta.headRevisionId };
   }
 
   /** Files already carrying this name: the "is it already in Drive?" candidates. */
@@ -203,6 +239,19 @@ export class DriveFolder implements SyncFolder {
     forgetLastSynced("drive", projectId);
   }
 
+  /**
+   * Keeping the file's copy can change the active project's ID (the file
+   * holds another project ID). Keep the link with the project, or the next
+   * Sync would ask "Which file is this project?" again. The agreement is
+   * already recorded under the new ID, so it isn't forgotten here.
+   */
+  moveProject(fromId: string, toId: string): void {
+    const link = this.links.get(fromId);
+    if (fromId === toId || !link) return;
+    this.links.set(toId, link);
+    this.links.set(fromId, null);
+  }
+
   isLinked(projectId: string): boolean {
     return !!this.links.get(projectId);
   }
@@ -219,6 +268,7 @@ export class DriveFolder implements SyncFolder {
     const created = await this.createOnce(name, text);
     const after = await this.byName(name);
     if (after.length > 1) throw new DriveDuplicateError(name, after.map((f) => f.id));
+    this.remember(created, text);
     this.link(projectId, created.id);
     return created.id;
   }
@@ -228,19 +278,27 @@ export class DriveFolder implements SyncFolder {
 
 export type FolderSetup =
   | { kind: "ready"; ref: DriveFolderRef; created: boolean; several: boolean }
+  /**
+   * Estoria can't see an Estoria folder in this Drive. There may still be one
+   * (made by the Drive desktop app, or used by the Android app) that
+   * `drive.file` hides: ask before making a second one, which would split
+   * the work between two folders (H17).
+   */
+  | { kind: "none" }
   /** This device's Drive folder belongs to another account (H16): confirm before switching. */
   | { kind: "account-changed"; previous: string; current: string };
 
 /**
- * Find or create the Estoria folder for the connected account, once per
- * device. With the `drive.file` permission Estoria only sees folders it made
- * or was handed in the Picker, so "find" means one of those. Like files, a
- * folder create is never retried blindly.
+ * Find the Estoria folder for the connected account, once per device, and
+ * create one only when asked (`create`, the person's "Make a new one"). With
+ * the `drive.file` permission Estoria only sees folders it made or was handed
+ * in the Picker, so "find" means one of those. Like files, a folder create is
+ * never retried blindly.
  */
 export async function connectDriveFolder(
   api: DriveApi,
   account: string | undefined,
-  opts: { allowSwitch?: boolean } = {},
+  opts: { allowSwitch?: boolean; create?: boolean } = {},
   store: { get: () => DriveFolderRef | null; set: (ref: DriveFolderRef | null) => void } = {
     get: driveFolderRef,
     set: setDriveFolderRef,
@@ -264,6 +322,7 @@ export async function connectDriveFolder(
   let folder = found[0];
   let created = false;
   if (!folder) {
+    if (!opts.create) return { kind: "none" };
     try {
       folder = await api.createFolder(name);
       created = true;
@@ -278,11 +337,39 @@ export async function connectDriveFolder(
   return { kind: "ready", ref: next, created, several: found.length > 1 };
 }
 
-/** Use a folder the person handed Estoria in Google's Picker (moving from the Drive desktop app, H17). */
-export function adoptPickedFolder(folder: { id: string; name: string }, account: string | undefined): DriveFolderRef {
+/**
+ * Use a folder the person handed Estoria in Google's Picker (moving from the
+ * Drive desktop app, H17). Switching to a different folder drops this
+ * device's links to files in the old one, or Sync would keep writing there by
+ * file ID; each project's next Sync asks which file in the new folder is its.
+ */
+export function adoptPickedFolder(
+  folder: { id: string; name: string },
+  account: string | undefined,
+  links: { forgetAll: () => void } = { forgetAll: forgetAllLinks }
+): DriveFolderRef {
+  const before = driveFolderRef();
+  if (before && before.id !== folder.id) links.forgetAll();
   const ref: DriveFolderRef = { id: folder.id, name: folder.name, account };
   setDriveFolderRef(ref);
   return ref;
+}
+
+/** Forget every project's Drive link (and its agreement) on this device. */
+export function forgetAllLinks(): void {
+  try {
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(LINK_PREFIX)) ids.push(key.slice(LINK_PREFIX.length));
+    }
+    for (const id of ids) {
+      localLinks.set(id, null);
+      forgetLastSynced("drive", id);
+    }
+  } catch {
+    // Without storage there are no links to forget.
+  }
 }
 
 /** This device's Drive target, or null until Drive has been set up here. */

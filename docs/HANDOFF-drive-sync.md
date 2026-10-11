@@ -24,7 +24,7 @@ every value and status). The history is the Session 66 entry in
 | Thing | State |
 | --- | --- |
 | Branch | Work is on **`feature/drive-sync`** (checked out). `main` is at `07b884b` (pushed): Phase A, the privacy page and docs. It has no Phase B code, and its SPECS/plan predate Phase B, so read the copies on this branch. |
-| Unpushed | 4 commits on `feature/drive-sync` (B1 `0a77d47`, B2 `71c017f`, B3a `c24c693`, B3b `ea6f91f`) and this handoff. User runs `git push origin feature/drive-sync`. |
+| Pushed | `feature/drive-sync` is on origin (B1-B3b and this handoff). Session 67's fixes are committed on top, not yet pushed. |
 | Local dev config | `.claude/launch.json` has an `estoria-auth-local` entry (runs `node auth-server/dev.mjs` on port 3000), committed with this handoff. |
 | Prod app | `www.labrarf.com/estoria`, build 200 (`49bcae9`): Phase A (Sync tests, SyncFolder, Web Lock, per-target baselines) + `privacy.html`. **No Drive code in prod.** |
 | Broker | Live at `https://auth.labrarf.com` (Vercel project `estoria-auth-server`, root `auth-server`, Hobby). `/status` = on. Six env vars, Production only. Auto-redeploys when `main` is pushed with `auth-server/` changes. |
@@ -32,7 +32,7 @@ every value and status). The history is the Session 66 entry in
 | Google Cloud | Project `Estoria` (`estoria-511314`, number `177782323056`); consent screen External + In production, no logo; client `Estoria web` (one secret, in Vercel); Picker key `Estoria Picker`. Values in the plan's Step 0 table. |
 | Real sign-in | Proven once end to end with raydaxn@gmail.com through the broker's redirect flow (Step 1, part). Not yet from inside the app. |
 | Local test settings | `auth-server/.env.local` (gitignored, mode 600) has `GOOGLE_CLIENT_ID`, `BROKER_URL=http://localhost:3000`, `ALLOWED_ORIGINS=http://localhost:5173`, `DRIVE_STATUS=on`, a generated `TOKEN_KEY`. **`GOOGLE_CLIENT_SECRET` is not in it yet** (see section 4). |
-| Tests | 130 app tests (`npm test`), 31 broker tests (`cd auth-server && npm test`). Typecheck and build clean. |
+| Tests | 138 app tests (`npm test`), 31 broker tests (`cd auth-server && npm test`). Typecheck and build clean. |
 
 ## 2. What Phase B contains (built, not yet tried with real Google from the app)
 
@@ -57,7 +57,34 @@ broker).
 - **B3b:** Projects window (per-project state, Open from Google Drive, Back up
   all), `drivePicker` (Google Picker, loaded on click), iPad Home Screen tip.
 
-## 3. Review findings (Session 66 self-review). Fix these before Deploy B
+## 3. Review findings (Session 66 self-review, Session 67 review)
+
+**Session 67 (2026-10-11): findings 1-4 fixed, plus two more found in review
+(A, B).** Each has a test that fails without its fix.
+- **1 fixed:** connecting no longer creates a folder when Estoria sees none
+  (`connectDriveFolder` returns `none` unless `create`). The chooser asks "Is
+  there an Estoria folder in your Drive already?" → Picker (folder, then its
+  files) or "No, make a new one". Choosing a different folder drops this
+  device's links to files in the old one (`adoptPickedFolder` → `forgetAllLinks`).
+- **2 fixed:** `DriveFolder` remembers the live file's content per file ID and
+  revision (newest two, in memory), so an unchanged file is never downloaded
+  again; writes and creates remember what they wrote.
+- **3 fixed:** `parseCopyName` in `lib/backup.ts` matches the stamped patterns
+  only; used by `isLiveFileName`, backup rotation and history.
+- **A fixed (was live in prod for folder sync):** backup rotation matched
+  `<slug>-backup-` as a prefix, so a project titled e.g. "My Story Backup 1"
+  (`my-story-backup-1.estoria.json`) counted as My Story's oldest backup and
+  was **deleted** once My Story had 5. Same fix as 3.
+- **4 fixed:** `SyncFolder.moveProject` (Drive only) moves the link when a pull
+  or "theirs" changes the active project ID.
+- **B fixed:** "Open from Google Drive" records the file as agreed, so the
+  store's tidy-up on open fast-forwards instead of reading as a conflict.
+- Still open: 5 (UI tests), 6 (privacy page wording), 7 (Phase C docs), and
+  small ones: an offline start keeps Drive paused up to 30 min (re-check on
+  `online` would fix it); "theirs" renames the Drive file to the local title
+  for one Sync.
+
+The original Session 66 list, for reference:
 
 Ordered by importance. Each needs a test where it can have one.
 
@@ -117,16 +144,31 @@ Ordered by importance. Each needs a test where it can have one.
    Firefox/Safari, README (auth-server, `?drive=on`). SPECS on `main` doesn't
    describe Phase B at all yet.
 
-## 4. Next steps, in order (B4: real testing, locally)
+## 4. Next steps (changed in Session 67: test on prod, not locally)
+
+**Decided 2026-10-11:** the client secret can't be read back from Vercel (all
+six variables are Sensitive), and the user chose not to make a second secret.
+So B4 runs **on prod after Deploy B**, against the live broker, with Drive
+still hidden behind `?drive=on`. Local testing (the old 4.1-4.4 below) is
+dropped. Next:
+1. User pushes the branch, merges to `main` (no-ff) and runs `npm run deploy`
+   (Claude hands over the commands).
+2. On `https://www.labrarf.com/estoria/?drive=on`, with a **scratch project**,
+   run the section 5 checklist one step at a time with the user. The "existing
+   Estoria folder" question should appear on first connect: choose the Drive
+   desktop app's folder.
+3. The Step 1 checks (4.5 below) and a week of real use, then Deploy C.
+
+The old local plan, kept for reference:
 
 The user chose **local testing first**, and to **reuse the `Estoria web`
 client** rather than make a separate localhost-only one. Its existing secret
 was shown once by Google and was not kept, so it exists only in Vercel.
 
 **Step 4.1: get the secret into `auth-server/.env.local` (user does this).**
-- Option A (reuse the existing secret): Vercel → `estoria-auth-server` →
-  Settings → Environment Variables → `GOOGLE_CLIENT_SECRET` → reveal/copy. If
-  Vercel marks it Sensitive it can't be read back; use option B.
+- ~~Option A (reuse the existing secret from Vercel)~~ **Not possible
+  (checked 2026-10-11):** all six Vercel variables are locked (Sensitive);
+  "Copy to Clipboard" is disabled. Don't send the user looking for it again.
 - Option B (a second secret on the same client): Google Cloud → Google Auth
   Platform → Clients → Estoria web → Client secrets → + Add secret → copy.
   Delete that second secret after testing.

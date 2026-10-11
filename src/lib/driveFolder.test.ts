@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  adoptPickedFolder,
   connectDriveFolder,
   DriveFolder,
   isLiveFileName,
+  localLinks,
   type DriveLink,
   type LinkStore,
 } from "@/lib/driveFolder";
-import type { DriveFolderRef } from "@/lib/syncTarget";
+import { driveFolderRef, setDriveFolderRef, type DriveFolderRef } from "@/lib/syncTarget";
 import { memoryStorage } from "@/test/memoryDir";
 import {
   DriveAccountChangedError,
@@ -187,7 +189,27 @@ describe("linking a project (the needs-link answers)", () => {
     fake.put(folderId, "b.estoria.json", "{}");
     expect((await folder.liveFiles()).map((f) => f.name).sort()).toEqual(["a.estoria.json", "b.estoria.json"]);
     expect(isLiveFileName("my-story.estoria.json")).toBe(true);
-    expect(isLiveFileName("my-story-backup-1.estoria.json")).toBe(false);
+    expect(isLiveFileName("my-story-backup-20261011-090000-before-pull.estoria.json")).toBe(false);
+    expect(isLiveFileName("my-story-conflict-20261011-090000-local.estoria.json")).toBe(false);
+  });
+
+  it("lists projects whose titles contain backup, conflict or saved", async () => {
+    // Titles like "My Backup Plan" are projects, not copies: only a real
+    // stamped copy name is left out.
+    for (const name of [
+      "my-backup-plan.estoria.json",
+      "conflict-resolution.estoria.json",
+      "saved-by-the-bell.estoria.json",
+      "alpha-backup-1.estoria.json",
+    ]) {
+      fake.put(folderId, name, "{}");
+    }
+    expect((await folder.liveFiles()).map((f) => f.name).sort()).toEqual([
+      "alpha-backup-1.estoria.json",
+      "conflict-resolution.estoria.json",
+      "my-backup-plan.estoria.json",
+      "saved-by-the-bell.estoria.json",
+    ]);
   });
 });
 
@@ -242,8 +264,17 @@ describe("setting up the Estoria folder", () => {
     fake = new FakeDrive();
   });
 
-  it("creates it when Estoria has none", async () => {
-    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+  it("asks before creating one: an Estoria folder it can't see may exist (H17)", async () => {
+    // The Drive desktop app's folder is invisible to drive.file.
+    fake.put("root", "Estoria", "", "application/vnd.google-apps.folder");
+    const hidden = { ...fake.api(), findFolders: async () => [] };
+    expect(await connectDriveFolder(hidden, "me@example.com", {}, refStore)).toEqual({ kind: "none" });
+    expect(ref).toBeNull();
+    expect([...fake.files.values()].filter((f) => f.name === "Estoria")).toHaveLength(1);
+  });
+
+  it("creates it when asked to", async () => {
+    const res = await connectDriveFolder(fake.api(), "me@example.com", { create: true }, refStore);
     expect(res).toMatchObject({ kind: "ready", created: true, several: false });
     expect(ref).toMatchObject({ name: "Estoria", account: "me@example.com" });
     expect(fake.files.get(ref!.id)?.mimeType).toBe("application/vnd.google-apps.folder");
@@ -268,7 +299,8 @@ describe("setting up the Estoria folder", () => {
     const old = fake.folder();
     fake.files.get(old)!.trashed = true;
     ref = { id: old, name: "Estoria", account: "me@example.com" };
-    const res = await connectDriveFolder(fake.api(), "me@example.com", {}, refStore);
+    expect((await connectDriveFolder(fake.api(), "me@example.com", {}, refStore)).kind).toBe("none");
+    const res = await connectDriveFolder(fake.api(), "me@example.com", { create: true }, refStore);
     expect(res).toMatchObject({ kind: "ready", created: true });
     expect(ref?.id).not.toBe(old);
   });
@@ -295,9 +327,19 @@ describe("setting up the Estoria folder", () => {
         throw new DriveOfflineError();
       },
     };
-    const res = await connectDriveFolder(flaky, "me@example.com", {}, refStore);
+    const res = await connectDriveFolder(flaky, "me@example.com", { create: true }, refStore);
     expect(res.kind).toBe("ready");
     expect([...fake.files.values()].filter((f) => f.name === "Estoria")).toHaveLength(1);
+  });
+
+  it("choosing a different folder drops links to files in the old one", () => {
+    setDriveFolderRef({ id: "old-folder", name: "Estoria", account: "me@example.com" });
+    localLinks.set("p1", { fileId: "f-old", account: "me@example.com" });
+    adoptPickedFolder({ id: "old-folder", name: "Estoria" }, "me@example.com");
+    expect(localLinks.get("p1")?.fileId).toBe("f-old"); // same folder: links stay
+    adoptPickedFolder({ id: "desktop-folder", name: "Estoria" }, "me@example.com");
+    expect(localLinks.get("p1")).toBeNull();
+    expect(driveFolderRef()?.id).toBe("desktop-folder");
   });
 
   it("says when several Estoria folders exist, and uses the newest", async () => {

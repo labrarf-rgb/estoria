@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { drive } from "@/lib/drive";
 import { consumeRedirectResult, driveAuth } from "@/lib/driveAuth";
-import { connectDriveFolder } from "@/lib/driveFolder";
+import { adoptPickedFolder, connectDriveFolder } from "@/lib/driveFolder";
 import { flushNow } from "@/store/persistence";
 import { detectBrowser, isStandalone } from "@/lib/install";
 import {
@@ -39,9 +39,14 @@ interface State {
   accountSwitch: { previous: string; current: string } | null;
   /** "Back up with…" chooser (Drive or a folder on this computer). */
   chooserOpen: boolean;
+  /**
+   * Connected, but Estoria sees no Estoria folder in this Drive: ask whether
+   * one exists (the Drive app's, the phone's) before making another (H17).
+   */
+  folderAsk: boolean;
 }
 
-let state: State = { version: 0, notice: null, accountSwitch: null, chooserOpen: false };
+let state: State = { version: 0, notice: null, accountSwitch: null, chooserOpen: false, folderAsk: false };
 const listeners = new Set<() => void>();
 
 function update(patch: Partial<State>): void {
@@ -134,34 +139,65 @@ export function startDriveConnect(): void {
   location.assign(driveAuth.redirectSignInUrl(back));
 }
 
-async function finishConnect(allowSwitch: boolean): Promise<void> {
+async function finishConnect(allowSwitch: boolean, create = false): Promise<void> {
   try {
     await driveAuth.getAccessToken();
     const email = driveAuth.connectedEmail();
-    const setup = await connectDriveFolder(drive, email, { allowSwitch });
+    const setup = await connectDriveFolder(drive, email, { allowSwitch, create });
     if (setup.kind === "account-changed") {
       update({ accountSwitch: { previous: setup.previous, current: setup.current } });
       return;
     }
-    setChosenTarget("drive");
-    update({
-      accountSwitch: null,
-      chooserOpen: false,
-      notice: {
-        text:
-          `Connected to Google Drive${email ? ` as ${email}` : ""}. ` +
-          (setup.created ? "Estoria made a folder called Estoria there. " : "Using your Estoria folder there. ") +
-          "Press Sync to back up this project.",
-      },
-    });
+    if (setup.kind === "none") {
+      // Don't make a second Estoria folder beside one Estoria can't see yet.
+      update({ accountSwitch: null, folderAsk: true, chooserOpen: true });
+      return;
+    }
+    connected(
+      setup.created ? "Estoria made a folder called Estoria there. " : "Using your Estoria folder there. "
+    );
   } catch (e) {
     update({ notice: { text: e instanceof Error ? e.message : "Couldn't finish connecting.", error: true } });
   }
 }
 
+function connected(folderNote: string): void {
+  const email = driveAuth.connectedEmail();
+  setChosenTarget("drive");
+  update({
+    accountSwitch: null,
+    folderAsk: false,
+    chooserOpen: false,
+    notice: {
+      text: `Connected to Google Drive${email ? ` as ${email}` : ""}. ${folderNote}Press Sync to back up this project.`,
+    },
+  });
+}
+
 /** "Continue with the new account" (H16): use it on this device from now on. */
 export function confirmAccountSwitch(): Promise<void> {
   return finishConnect(true);
+}
+
+/** "No, make a new one": there's no Estoria folder in this Drive yet. */
+export function makeNewDriveFolder(): Promise<void> {
+  return finishConnect(false, true);
+}
+
+/** The person chose their existing Estoria folder, then its project files, in Google's Picker (H17). */
+export function useExistingDriveFolder(folder: { id: string; name: string }, filesChosen: number): void {
+  adoptPickedFolder(folder, driveAuth.connectedEmail());
+  connected(
+    `Using your folder "${folder.name}" there` +
+      (filesChosen
+        ? `, with ${filesChosen} project file${filesChosen === 1 ? "" : "s"} Estoria can now see. `
+        : ". No project files were chosen, so Estoria only sees files it makes there. ")
+  );
+}
+
+/** Connected, but no Estoria folder is set up on this device yet. */
+export function needsFolderAnswer(): boolean {
+  return state.folderAsk || (driveAuth.status().state === "connected" && !driveFolderRef());
 }
 
 /** Stop using Drive on this device: revoke the sign-in, fall back to a folder (or nothing). */

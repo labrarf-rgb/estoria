@@ -32,6 +32,7 @@ vi.mock("@/store/useStore", () => ({ useStore: { getState: () => store } }));
 
 const { DriveFolder } = await import("@/lib/driveFolder");
 const { backUpAll, openFromDrive } = await import("@/lib/driveProjects");
+const { pushCanonicalIfSafe } = await import("@/lib/sync");
 
 let fake: FakeDrive;
 let folderId: string;
@@ -67,6 +68,21 @@ describe("Open from Google Drive (H8)", () => {
     expect(await openFromDrive(drive, file)).toBe("opened");
     expect(store.doc.projectTitle).toBe("Gamma");
     expect(links.get(store.doc.id)?.fileId).toBe(id);
+  });
+
+  it("a project opened from Drive starts in agreement with its file", async () => {
+    const id = fake.put(folderId, "gamma.estoria.json", JSON.stringify(project("g", "Gamma")));
+    // Opening tidies the project (the real store recounts words and brings
+    // older files up to date), so the copy here can differ from the file.
+    store.openDoc.mockImplementationOnce((doc: StoryDoc) => {
+      store.projectStash = { ...store.projectStash, [store.doc.id]: store.doc };
+      store.doc = { ...doc, chapters: doc.chapters.map((c) => ({ ...c, title: `${c.title} (tidied)` })) };
+    });
+    const [file] = await drive.liveFiles();
+    await openFromDrive(drive, file);
+    // A fast-forward to Drive, not "changed elsewhere" and a conflict.
+    expect(await pushCanonicalIfSafe(store.doc)).toBe("updated");
+    expect(JSON.parse(fake.files.get(id)!.content).chapters[0].title).toBe("One (tidied)");
   });
 
   it("switches to a project already here instead of duplicating it", async () => {

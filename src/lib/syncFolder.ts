@@ -50,6 +50,12 @@ export interface SyncFolder {
   /** The project's live file: null = doesn't exist (folder), "unlinked" = no file chosen yet (Drive). */
   readLive(projectId: string, name: string): Promise<SyncFileRead | null | "unlinked">;
   writeLive(projectId: string, name: string, text: string, opts?: { expectRev?: string }): Promise<void>;
+  /**
+   * The project now goes by another ID: the file's copy was kept, and it
+   * carries a different project ID. Carry whatever ties the project to its
+   * live file over to that ID. A folder finds the file by name and needs nothing.
+   */
+  moveProject?(fromId: string, toId: string): void;
 }
 
 export type SyncTarget = "folder" | "drive";

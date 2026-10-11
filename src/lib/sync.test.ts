@@ -395,6 +395,23 @@ describe("rotating backups", () => {
     expect(backupsOf(dir(), "other-tale")).toHaveLength(5);
     expect(backupsOf(dir())).toHaveLength(5);
   });
+
+  it("never prunes another project whose title starts like a backup name", async () => {
+    // "My Story Backup 1" lives in my-story-backup-1.estoria.json. Its name
+    // starts with "my-story-backup-" and sorts before every stamped backup,
+    // so a prefix match would delete it as My Story's oldest backup.
+    const neighbour = makeDoc({ id: "p2", projectTitle: "My Story Backup 1" });
+    writeExternally(dir(), "my-story-backup-1.estoria.json", neighbour);
+    const doc = makeDoc();
+    for (let i = 0; i < 7; i++) {
+      tick();
+      await syncProject(edit(doc, "c1", `Take ${i}`));
+    }
+    expect(dir().names()).toContain("my-story-backup-1.estoria.json");
+    expect(backupsOf(dir()).filter((n) => n !== "my-story-backup-1.estoria.json")).toHaveLength(5);
+    const files = (await listProjectFiles(doc))!;
+    expect(files.map((f) => f.name)).not.toContain("my-story-backup-1.estoria.json");
+  });
 });
 
 describe("folder history (list + restore)", () => {

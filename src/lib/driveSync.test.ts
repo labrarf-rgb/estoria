@@ -129,6 +129,59 @@ describe("once linked", () => {
     if (res.kind === "pulled") expect(await fingerprint(res.doc)).toBe(await fingerprint(theirs));
   });
 
+  it("keeps the link when the pulled file carries another project ID", async () => {
+    const id = await connected();
+    // Linked to a file that holds a different project ID (picked by hand, or
+    // written by another device's copy of the project).
+    const theirs = { ...retitle(makeDoc(), "From the phone"), id: "p9" };
+    fake.writeExternally(id, JSON.stringify(theirs));
+    tick();
+    const res = await syncProject(makeDoc());
+    expect(res.kind).toBe("pulled");
+    if (res.kind !== "pulled") return;
+    // The app now works on the pulled project, under its ID.
+    expect(links.get("p9")?.fileId).toBe(id);
+    expect(links.has("p1")).toBe(false);
+    tick();
+    expect((await syncProject(res.doc)).kind).toBe("in-sync");
+  });
+
+  it("keeps the link when 'theirs' wins a conflict and carries another project ID", async () => {
+    const id = await connected();
+    const theirs = { ...retitle(makeDoc(), "From the phone"), id: "p9" };
+    fake.writeExternally(id, JSON.stringify(theirs));
+    tick();
+    const mine = retitle(makeDoc(), "From the laptop");
+    const res = await syncProject(mine);
+    expect(res.kind).toBe("conflict");
+    if (res.kind !== "conflict") return;
+    const receipt = await resolveConflict(mine, res.remote, "theirs", res.rev);
+    expect(links.get("p9")?.fileId).toBe(id);
+    tick();
+    expect((await syncProject(receipt.applied!)).kind).toBe("in-sync");
+  });
+
+  it("downloads the live file only when its revision moved (H13)", async () => {
+    const id = await connected();
+    const downloads = () => fake.calls.filter((c) => c === `download:${id}`).length;
+    const before = downloads();
+    // Mirror writes while typing, and checks on focus: the file only changes
+    // by this device's own writes, so nothing is downloaded.
+    let doc = makeDoc();
+    for (let i = 0; i < 3; i++) {
+      doc = retitle(doc, `Take ${i}`);
+      expect(await pushCanonicalIfSafe(doc)).toBe("updated");
+      expect(await checkRemoteChanged(doc)).toBe(false);
+    }
+    expect(downloads()).toBe(before);
+    // The phone writes: one download, then nothing again until the next change.
+    fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "From the phone")));
+    expect(await checkRemoteChanged(doc)).toBe(true);
+    expect(await checkRemoteChanged(doc)).toBe(true);
+    expect(await pushCanonicalIfSafe(doc)).toBe("behind");
+    expect(downloads()).toBe(before + 1);
+  });
+
   it("a conflict keeps both: the copy not kept is saved beside the live file", async () => {
     const id = await connected();
     fake.writeExternally(id, JSON.stringify(retitle(makeDoc(), "From the phone")));

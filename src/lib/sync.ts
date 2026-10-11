@@ -9,7 +9,7 @@ import type {
 } from "@/types";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
-import { fileStamp, writeRotatingBackup } from "@/lib/backup";
+import { fileStamp, parseCopyName, writeRotatingBackup } from "@/lib/backup";
 import { getLastSynced, setLastSynced } from "@/lib/syncBaseline";
 import { DriveAccountChangedError } from "@/lib/driveErrors";
 import {
@@ -294,6 +294,7 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       // Record under the incoming doc's id — after the caller applies it, that
       // is the active project the next sync will look up.
       setLastSynced(folder.target, remote.id, remoteHash);
+      if (remote.id !== doc.id) folder.moveProject?.(doc.id, remote.id);
       return {
         kind: "pulled",
         fileName,
@@ -378,6 +379,7 @@ export function resolveConflict(
 
     await writeLiveDoc(folder, local.id, canonicalFileName(local), winner, expectRev);
     setLastSynced(folder.target, winner.id, await fingerprint(winner));
+    if (winner.id !== local.id) folder.moveProject?.(local.id, winner.id);
 
     return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
   });
@@ -488,14 +490,13 @@ export function listProjectFiles(doc: StoryDoc): Promise<ProjectFileInfo[] | nul
     const slug = slugify(doc.projectTitle || "story");
     const files: ProjectFileInfo[] = [];
     for (const { name, lastModified } of await folder.list()) {
+      const copy = parseCopyName(name);
       const role =
         name === live
           ? ("live" as const)
-          : name.startsWith(`${slug}-backup-`)
-            ? ("backup" as const)
-            : name.startsWith(`${slug}-conflict-`)
-              ? ("conflict" as const)
-              : null;
+          : copy?.slug === slug && copy.kind !== "saved"
+            ? copy.kind
+            : null;
       if (!role) continue; // some other project's files
       files.push({ name, role, lastModified });
     }
