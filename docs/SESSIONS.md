@@ -5679,6 +5679,15 @@ node:test cases against a fake Google; five deliberate breaks of the rules
 each failed a test; smoke-tested over real HTTP with dummy settings. The
 app's vitest run is now scoped to `src/` so the two suites stay apart.
 
+**Broker live (Deploy S):** Vercel project `estoria-auth-server` (Hobby,
+root `auth-server`, six settings Production-only; secrets pasted straight from
+the clipboard, never shown). `auth` CNAME added at whois.com after
+before-screenshots (kept locally, outside git); Let's Encrypt cert issued.
+All checks pass on `https://auth.labrarf.com`, and the website is unaffected.
+First real sign-in with raydaxn@gmail.com through the redirect flow: token
+refresh without a popup, `drive.file` granted, Drive answered 200 (0 files).
+Old client secret deleted afterwards; sign-in re-confirmed.
+
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
 "move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the

@@ -268,9 +268,10 @@ secret and `TOKEN_KEY` never go in this repo.
 | API key (`Estoria Picker`) | `AIzaSyCdjbT3Zk9Q8liOFG109NJyhYk7ffslG0k`; restricted to the three website origins and the Google Picker API only |
 | Project number | `177782323056` (the Picker's app ID); project ID `estoria-511314` |
 | Broker code | **Written (Session 66):** `auth-server/`, 31 tests against a fake Google, checked over real HTTP locally. Not deployed |
-| Vercel | Project `estoria-auth-server` (Hobby, root directory `auth-server`), all six settings Production only. Live at `https://estoria-auth-server.vercel.app`: `/status` on, preflight 204, other sites 403, `/auth/start` redirects to Google with the right client. Old client secret disabled in Google (delete once a real sign-in works) |
+| Vercel | Project `estoria-auth-server` (Hobby, root directory `auth-server`), all six settings Production only. Live at `https://estoria-auth-server.vercel.app`: `/status` on, preflight 204, other sites 403, `/auth/start` redirects to Google with the right client. Old client secret deleted after the first real sign-in; only the one in Vercel remains |
 | DNS (`auth` CNAME) | **Added 2026-10-11** at whois.com: `auth` → `f39fd1f062c3f808.vercel-dns-017.com` (TTL 28800); A, `www`, MX, TXT unchanged and the site still loads. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. **Live:** Let's Encrypt certificate for `auth.labrarf.com`; `/status` on, preflight 204 for www.labrarf.com, other sites and missing header 403, `/auth/start` sets the sealed state cookie; website unaffected |
-| **Resume here** | Step 0 is done, and so is Deploy S. Next: Step 1, a first real Google sign-in through `auth.labrarf.com/auth/start` (proves the secret, consent screen, refresh token and cookie), then delete the disabled old client secret, then Phase B |
+| First real sign-in (Step 1, part) | **Passed 2026-10-11** with raydaxn@gmail.com via the redirect flow: back on `/estoria/#drive=connected`; `/auth/token` from the page returned a 60-minute token with `drive.file` and the email, no popup; Drive `files.list` answered 200 with 0 files. Still re-confirmed after the old secret was deleted. The other Step 1 checks (Picker folder access, file IDs, conditional update, Safari, phone staleness) need Phase B code |
+| **Resume here** | Step 0 and Deploy S are done. Next: Phase B (Drive client + UI, hidden behind `?drive=on`), running the rest of Step 1 as it goes |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
 
