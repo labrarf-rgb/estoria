@@ -5659,7 +5659,8 @@ production" without a home page and privacy policy link, so
 locations, `drive.file` and email scopes, the Limited Use statement, the
 sign-in helper, no analytics, contact info@labrarf.com. The user published the
 Google app with home page `labrarf.com/estoria/` and that privacy link; no
-logo, so no brand review.
+logo, so no brand review. Deployed by the user as build 200 (`49bcae9`);
+`privacy.html` returns 200 on prod with the contact line.
 
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
