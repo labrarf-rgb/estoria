@@ -34,20 +34,15 @@ export function DriveChooserModal() {
 
   /**
    * Moving from the Drive desktop app (H17): hand Estoria the existing Estoria
-   * folder, then the project files in it, since Estoria can only see what it
-   * made or was given.
+   * folder. Only the folder: project files in it are handed over one at a
+   * time, when the person opens or links one (Open from Google Drive, or
+   * "Which file is this project?"), so nothing here asks about files.
    */
   const chooseExistingFolder = async () => {
     setErr(null);
     try {
       const [folder] = await pickFromDrive("folder");
-      if (!folder) return;
-      const files = await pickFromDrive("files", {
-        parentId: folder.id,
-        multiple: true,
-        title: "Now choose the project files in it (select them all)",
-      });
-      useExistingDriveFolder(folder, files.length);
+      if (folder) useExistingDriveFolder(folder);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't open Google's file picker.");
     }
@@ -105,7 +100,7 @@ export function DriveChooserModal() {
             </button>
           </div>
           <div className="border-t border-rule px-[24px] py-[10px] text-[11px] text-faint">
-            Choosing it opens Google's own file picker: pick the folder, then the project files in it.
+            Choosing it opens Google's file picker, where you pick the folder. Nothing in it is opened or changed.
           </div>
           {err && (
             <div className="border-t border-rule px-[24px] py-[10px] text-[12px]" style={{ color: "var(--but)" }}>

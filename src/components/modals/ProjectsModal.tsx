@@ -15,6 +15,7 @@ import type { ProjectMeta } from "@/store/useStore";
 import type { DriveFile } from "@/lib/drive";
 import { driveAuth } from "@/lib/driveAuth";
 import { driveSyncFolder } from "@/lib/driveFolder";
+import { pickFromDrive } from "@/lib/drivePicker";
 import { backUpAll, openFromDrive, type BackupResult } from "@/lib/driveProjects";
 import { ago, backedUpAt, useDriveSession } from "@/lib/driveSession";
 import { activeTarget } from "@/lib/syncTarget";
@@ -84,6 +85,25 @@ export function ProjectsModal() {
       setDriveNote({ text: e instanceof Error ? e.message : "Couldn't open that file.", error: true });
     } finally {
       setDriveBusy(false);
+    }
+  };
+
+  /**
+   * Estoria only sees project files it made or was handed (drive.file), so one
+   * the Drive app or the phone wrote is chosen here, in Google's picker, the
+   * first time it's opened on any device.
+   */
+  const pickDriveFile = async () => {
+    if (!driveFolder) return;
+    setDriveNote(null);
+    try {
+      const [picked] = await pickFromDrive("files", {
+        parentId: driveFolder.folderId,
+        title: "Choose a project to open",
+      });
+      if (picked) await openDriveFile({ id: picked.id, name: picked.name });
+    } catch (e) {
+      setDriveNote({ text: e instanceof Error ? e.message : "Couldn't open Google's file picker.", error: true });
     }
   };
 
@@ -183,7 +203,7 @@ export function ProjectsModal() {
             {driveFiles === "loading" ? (
               <div className="text-[12.5px] text-soft">Reading your Estoria folder…</div>
             ) : driveFiles.length === 0 ? (
-              <div className="text-[12.5px] text-soft">There are no projects in your Estoria folder yet.</div>
+              <div className="text-[12.5px] text-soft">Estoria doesn't see any projects in your Estoria folder yet.</div>
             ) : (
               driveFiles.map((f) => (
                 <div key={f.id} className="flex items-center gap-[10px] rounded-[13px] border border-rule bg-card p-[12px_14px]">
@@ -202,6 +222,15 @@ export function ProjectsModal() {
                   </button>
                 </div>
               ))
+            )}
+            {driveFiles !== "loading" && (
+              <button
+                disabled={driveBusy}
+                onClick={() => void pickDriveFile()}
+                className="self-start px-[2px] text-[11.5px] font-medium text-soft underline decoration-rule underline-offset-2 hover:text-ink disabled:opacity-60"
+              >
+                Not listed? Choose it in Google Drive…
+              </button>
             )}
           </div>
         ) : mergeId ? (

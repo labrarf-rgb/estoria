@@ -193,14 +193,11 @@ export function makeNewDriveFolder(): Promise<void> {
   return finishConnect(false, true);
 }
 
-/** The person chose their existing Estoria folder, then its project files, in Google's Picker (H17). */
-export function useExistingDriveFolder(folder: { id: string; name: string }, filesChosen: number): void {
+/** The person chose their existing Estoria folder in Google's Picker (H17). */
+export function useExistingDriveFolder(folder: { id: string; name: string }): void {
   adoptPickedFolder(folder, driveAuth.connectedEmail());
   connected(
-    `Using your folder "${folder.name}" there` +
-      (filesChosen
-        ? `, with ${filesChosen} project file${filesChosen === 1 ? "" : "s"} Estoria can now see. `
-        : ". No project files were chosen, so Estoria only sees files it makes there. ")
+    `Using your folder "${folder.name}" there. To open a project that's already in it, use Open project, then Open from Google Drive. `
   );
 }
 
