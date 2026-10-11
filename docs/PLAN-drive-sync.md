@@ -259,7 +259,7 @@ secret and `TOKEN_KEY` never go in this repo.
 | Consent screen | External, **In production**, no logo; scopes `drive.file`, `openid`, `userinfo.email`; home page `https://www.labrarf.com/estoria/`, privacy `https://www.labrarf.com/estoria/privacy.html` |
 | OAuth client (`Estoria web`) | Client ID `177782323056-c0t0uclj35u6l73tf3n0q6pvb06dbfch.apps.googleusercontent.com`; origins and redirect URIs as in item 3. Secret not kept: add a new one on the client page when Vercel is set up |
 | API key (`Estoria Picker`) | `AIzaSyCdjbT3Zk9Q8liOFG109NJyhYk7ffslG0k`; restricted to the three website origins and the Google Picker API only |
-| Project number | not yet confirmed (the client ID starts with `177782323056`, which is usually it) |
+| Project number | `177782323056` (the Picker's app ID); project ID `estoria-511314` |
 | Vercel, DNS | not yet |
 
 ### Phase A: tests, then the folder interface (no behavior change) → Deploy A
