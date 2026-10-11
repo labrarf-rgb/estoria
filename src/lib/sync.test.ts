@@ -372,7 +372,7 @@ describe("rotating backups", () => {
     for (let i = 0; i < 7; i++) {
       tick();
       const res = await syncProject(edit(doc, "c1", `Take ${i}`));
-      expect(res.kind !== "conflict" && res.kind !== "no-folder" && res.backup.kept).toBe(
+      expect("backup" in res && res.backup.kept).toBe(
         Math.min(i + 1, 5)
       );
     }

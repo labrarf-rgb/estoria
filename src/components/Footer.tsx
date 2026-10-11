@@ -127,6 +127,12 @@ export function Footer() {
           replaceDoc(res.doc);
           syncDone(`Synced · loaded newer changes from file · backup saved (${res.backup.kept} kept)`);
           return;
+        case "needs-link":
+          // Drive only (behind ?drive=on). The "pick it or create it" step
+          // replaces this message in Phase B's UI slice.
+          setSyncState("idle");
+          setMsg({ text: `"${res.fileName}" isn't linked to a Google Drive file on this device yet.` });
+          return;
         case "conflict":
           setSyncState("idle");
           setMirror("behind");
@@ -175,7 +181,8 @@ export function Footer() {
       timer = setTimeout(() => {
         if (stopped) return;
         void pushCanonicalIfSafe(useStore.getState().doc).then((r) => {
-          if (stopped || r === "unavailable") return;
+          // "unlinked" (Drive, no file chosen yet) says nothing about the file.
+          if (stopped || r === "unavailable" || r === "unlinked") return;
           setMirror(r === "behind" ? "behind" : "current");
         });
       }, AUTO_PUSH_DEBOUNCE_MS);

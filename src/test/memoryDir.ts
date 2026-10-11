@@ -21,6 +21,18 @@ export class MemoryDir {
   gone = false;
   /** Yield to the event loop inside reads, so unserialized callers would interleave. */
   slowReads = false;
+  private barrier: { waiting: number; size: number; release: () => void; done: Promise<void> } | null = null;
+
+  /**
+   * Hold every read until `size` reads have started, then let them all go:
+   * proves callers overlapped without depending on timing. Only for callers
+   * that are *not* serialized (a serialized one would wait forever).
+   */
+  readBarrier(size: number): void {
+    let release!: () => void;
+    const done = new Promise<void>((r) => (release = r));
+    this.barrier = { waiting: 0, size, release, done };
+  }
 
   private notFound(): DOMException {
     return new DOMException("A requested file or directory could not be found.", "NotFoundError");
@@ -52,6 +64,11 @@ export class MemoryDir {
         const f = this.files.get(name);
         if (!f) throw this.notFound();
         if (this.slowReads) await new Promise((r) => setTimeout(r, 5));
+        if (this.barrier) {
+          const b = this.barrier;
+          if (++b.waiting >= b.size) b.release();
+          await b.done;
+        }
         this.log.push(`read:${name}`);
         return { lastModified: f.lastModified, text: async () => f.text };
       },

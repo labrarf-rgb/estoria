@@ -35,6 +35,8 @@ function folderAs(target: SyncTarget, dir: MemoryDir): SyncFolder {
     write: (n, t) => f.write(n, t),
     list: () => f.list(),
     remove: (n) => f.remove(n),
+    readLive: (id, n) => f.readLive(id, n),
+    writeLive: (id, n, t) => f.writeLive(id, n, t),
   };
 }
 
@@ -125,14 +127,15 @@ describe("tabs take turns (H12)", () => {
     return [a, b] as const;
   }
 
-  async function raceMirrors() {
+  async function raceMirrors(opts: { barrier?: boolean } = {}) {
     const dir = new MemoryDir();
     active = folderAs("folder", dir);
     const [tabA, tabB] = await twoTabs();
     const doc = makeDoc();
     await tabA.pushCanonicalIfSafe(doc);
     dir.log = [];
-    dir.slowReads = true;
+    if (opts.barrier) dir.readBarrier(2);
+    else dir.slowReads = true;
     await Promise.all([
       tabA.pushCanonicalIfSafe(retitle(doc, "From tab A")),
       tabB.pushCanonicalIfSafe(retitle(doc, "From tab B")),
@@ -153,6 +156,6 @@ describe("tabs take turns (H12)", () => {
     vi.stubGlobal("navigator", {});
     // Both tabs read before either writes: each compare runs on a state the
     // other is about to change.
-    expect((await raceMirrors()).slice(0, 2)).toEqual([`read:${LIVE}`, `read:${LIVE}`]);
+    expect((await raceMirrors({ barrier: true })).slice(0, 2)).toEqual([`read:${LIVE}`, `read:${LIVE}`]);
   });
 });
