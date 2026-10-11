@@ -94,7 +94,7 @@ and never through labrarf.com. The broker only trades sign-in tokens.
 | `POST /auth/token` | Reads the cookie, asks Google for a fresh access token, returns it, and re-sets the cookie so it slides forward. If Google says the grant is revoked: clears the cookie and returns `401` (the app shows "Reconnect"). |
 | `GET /auth/start` | *(added when building, Session 66)* Begins the redirect flow: checks `?return=` is an Estoria page, seals a one-time state into a short-lived cookie, sends the browser to Google. The callback refuses any state that doesn't match it (sign-in CSRF). |
 | `GET /auth/callback` | Only for the redirect sign-in flow (iPad home-screen app, if Step 1 shows popups fail there). Does the same exchange, sets the cookie, then sends the browser back to the app with nothing in the URL. |
-| `POST /auth/disconnect` | Revokes the refresh token at Google and clears the cookie. |
+| `POST /auth/disconnect` | Clears this device's cookie. *(Changed Session 67: it no longer revokes at Google, because a revoke removes the person's whole grant to the project and signs out every device. Removing Estoria everywhere is done at myaccount.google.com/permissions.)* |
 | `GET /status` | `{ drive: "on" \| "off" }`. **The kill switch** (see Prod safety). |
 
 **Design rules:**

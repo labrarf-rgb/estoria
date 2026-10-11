@@ -297,17 +297,17 @@ describe("POST /auth/token (staying signed in)", () => {
 });
 
 describe("POST /auth/disconnect", () => {
-  it("revokes at Google and clears the cookie", async () => {
+  it("forgets this device only: clears the cookie, never revokes at Google", async () => {
+    // A revoke removes the whole grant, signing out every other device.
     const session = await connected();
-    google.queue.push({ body: {} });
+    const before = google.calls.length;
     const res = await call("/auth/disconnect", { cookie: session });
     assert.equal(res.status, 200);
-    assert.equal(google.calls.at(-1).url, "https://oauth2.googleapis.com/revoke");
-    assert.equal(google.calls.at(-1).params.token, "rt-1");
+    assert.equal(google.calls.length, before);
     assert.match(res.headers.getSetCookie()[0], /^estoria_rt=; .*Max-Age=0/);
   });
 
-  it("still clears the cookie when there is nothing to revoke", async () => {
+  it("clears the cookie when there is no sign-in", async () => {
     const res = await call("/auth/disconnect");
     assert.equal(res.status, 200);
     assert.equal(google.calls.length, 0);

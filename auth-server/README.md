@@ -16,7 +16,7 @@ database and no dependencies. Design and reasoning:
 | `GET /status` | `{ "drive": "on" \| "off" }`, the kill switch (`DRIVE_STATUS`) |
 | `POST /auth/exchange` | Popup sign-in: `{ code }` → access token, sets the cookie |
 | `POST /auth/token` | Fresh access token from the cookie; `401 reconnect` if revoked |
-| `POST /auth/disconnect` | Revokes at Google, clears the cookie |
+| `POST /auth/disconnect` | Forgets this device (clears the cookie). Never revokes: that would sign out every device |
 | `GET /auth/start?return=…` | Redirect sign-in (iPad home-screen app): off to Google |
 | `GET /auth/callback` | Back from Google: sets the cookie, returns to the app with `#drive=connected` |
 

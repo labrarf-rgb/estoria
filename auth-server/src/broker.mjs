@@ -277,8 +277,12 @@ export function createBroker(env, deps = {}) {
 
   /** @param {Record<string, string>} cookies @param {string | null} origin */
   async function disconnect(cookies, origin) {
-    const session = await unseal(await key(), cookies[RT_COOKIE], RT_PURPOSE);
-    await revoke(session?.rt);
+    // Forget this device only. Revoking at Google removes the person's whole
+    // grant to the project, which would sign out every other device too
+    // (Google: revocation "removes all OAuth 2.0 scopes previously granted to
+    // a project"). Removing Estoria everywhere is done at
+    // myaccount.google.com/permissions, as the privacy page says.
+    void cookies;
     return json(200, { ok: true }, { origin, cookies: [clearSession()] });
   }
 

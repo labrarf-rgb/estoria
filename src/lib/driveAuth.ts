@@ -145,7 +145,10 @@ export function createDriveAuth(deps: DriveAuthDeps) {
       );
     },
 
-    /** Revoke at Google and forget the sign-in on this device. */
+    /**
+     * Forget the sign-in on this device. The broker doesn't revoke at Google:
+     * that removes the whole grant and would sign out every other device.
+     */
     async disconnect(): Promise<void> {
       token = null;
       try {
