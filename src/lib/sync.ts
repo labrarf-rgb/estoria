@@ -9,21 +9,22 @@ import type {
 } from "@/types";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
+import { fileStamp, writeRotatingBackup } from "@/lib/backup";
 import {
-  fileStamp,
-  forgetBackupDir,
-  getBackupDir,
-  writeRotatingBackup,
-  type BackupDirHandle,
-} from "@/lib/backup";
+  forgetSyncFolder,
+  getSyncFolder,
+  SyncFolderGoneError,
+  type SyncFolder,
+  type SyncTarget,
+} from "@/lib/syncFolder";
 
 /**
  * Cross-app Sync — the web half of the contract in docs/SPECS.md §8
  * ("Cross-app Sync — CONTRACT SETTLED 2026-07-03"), shared with the Android
  * companion app.
  *
- * One canonical file per project lives in the user's Estoria folder (the same
- * remembered directory handle lib/backup.ts uses): `<slug>.estoria.json`.
+ * One canonical file per project lives in the user's Estoria folder (a
+ * `SyncFolder`, lib/syncFolder.ts): `<slug>.estoria.json`.
  * Reconciliation is three-way, by content fingerprint:
  *
  *   local == remote                → in sync
@@ -80,19 +81,32 @@ export async function fingerprint(doc: StoryDoc): Promise<string> {
 
 // ---- "Last agreed" hash per project (the third point of the 3-way compare) ---
 
-const lastSyncedKey = (docId: string) => `estoria:sync:lastHash:${docId}`;
+/**
+ * Kept per target, not just per project. A device that switches targets must
+ * not compare a new target's file against the baseline it agreed with the old
+ * one: an older Drive copy would look like "only the file changed" and load
+ * over newer local work (docs/PLAN-drive-sync.md, H1). A target's first sync
+ * has no baseline, so any difference is a conflict, never a silent pull.
+ *
+ * The folder target keeps the key it has always used, so existing devices keep
+ * their baselines and a rollback to an older build finds them too.
+ */
+export const lastSyncedKey = (target: SyncTarget, docId: string) =>
+  target === "folder"
+    ? `estoria:sync:lastHash:${docId}`
+    : `estoria:sync:lastHash:${target}:${docId}`;
 
-function getLastSynced(docId: string): string | null {
+function getLastSynced(target: SyncTarget, docId: string): string | null {
   try {
-    return localStorage.getItem(lastSyncedKey(docId));
+    return localStorage.getItem(lastSyncedKey(target, docId));
   } catch {
     return null;
   }
 }
 
-function setLastSynced(docId: string, hash: string): void {
+function setLastSynced(target: SyncTarget, docId: string, hash: string): void {
   try {
-    localStorage.setItem(lastSyncedKey(docId), hash);
+    localStorage.setItem(lastSyncedKey(target, docId), hash);
   } catch {
     // Non-fatal: without it the next divergence shows as a conflict instead
     // of a fast-forward — safe, just noisier.
@@ -131,18 +145,19 @@ export function canonicalFileName(doc: StoryDoc): string {
   return `${slugify(doc.projectTitle || "story")}.estoria.json`;
 }
 
-/** Read + normalize the canonical file. null = doesn't exist; throws if corrupt. */
-async function readCanonical(dir: BackupDirHandle, fileName: string): Promise<StoryDoc | null> {
-  let text: string;
+/**
+ * Read + normalize the canonical file, with the folder's revision of it (so a
+ * later overwrite can insist nothing moved in between). null = doesn't exist;
+ * throws if corrupt.
+ */
+async function readCanonical(
+  folder: SyncFolder,
+  fileName: string
+): Promise<{ doc: StoryDoc; rev?: string } | null> {
+  const file = await folder.read(fileName);
+  if (!file) return null;
   try {
-    const fh = await dir.getFileHandle(fileName);
-    text = await (await fh.getFile()).text();
-  } catch (e) {
-    if ((e as DOMException)?.name === "NotFoundError") return null;
-    throw e;
-  }
-  try {
-    return normalizeDoc(JSON.parse(text));
+    return { doc: normalizeDoc(JSON.parse(file.text)), rev: file.rev };
   } catch (e) {
     // A too-new file must surface as exactly that — syncing over it from an
     // older app would silently drop the fields this app doesn't know.
@@ -151,11 +166,13 @@ async function readCanonical(dir: BackupDirHandle, fileName: string): Promise<St
   }
 }
 
-async function writeDoc(dir: BackupDirHandle, fileName: string, doc: StoryDoc): Promise<void> {
-  const fh = await dir.getFileHandle(fileName, { create: true });
-  const w = await fh.createWritable();
-  await w.write(JSON.stringify(stampModified(doc), null, 2));
-  await w.close();
+async function writeDoc(
+  folder: SyncFolder,
+  fileName: string,
+  doc: StoryDoc,
+  expectRev?: string
+): Promise<void> {
+  await folder.write(fileName, JSON.stringify(stampModified(doc), null, 2), { expectRev });
 }
 
 // ---- Serialization of folder operations ----------------------------------------
@@ -164,25 +181,39 @@ async function writeDoc(dir: BackupDirHandle, fileName: string, doc: StoryDoc): 
  * All folder read/compare/write sequences run one at a time: the background
  * auto-push and an explicit Sync click must never interleave their three-way
  * compares. A folder that vanished mid-operation (moved/deleted) is forgotten
- * so the next action re-prompts instead of failing forever.
+ * so the next action re-prompts instead of failing forever; the folder decides
+ * what "vanished" means (`SyncFolderGoneError`).
+ *
+ * The per-tab chain keeps this tab's operations in order; the Web Lock makes
+ * every tab of this browser take turns too, since two open tabs share one
+ * folder and one set of baselines (docs/PLAN-drive-sync.md, H12). Where Web
+ * Locks are missing, tabs fall back to the per-tab queue alone.
  */
 let opChain: Promise<unknown> = Promise.resolve();
+
+const SYNC_LOCK = "estoria-sync";
+
+function acrossTabs<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks ? locks.request(SYNC_LOCK, fn) : fn();
+}
 
 function locked<T>(fn: () => Promise<T>): Promise<T> {
   const run = async (): Promise<T> => {
     try {
       return await fn();
     } catch (e) {
-      if ((e as DOMException)?.name === "NotFoundError") {
-        await forgetBackupDir();
-        throw new Error(
-          "The Estoria folder seems to have moved. Click the folder icon to pick it again."
-        );
+      if (e instanceof SyncFolderGoneError) {
+        await forgetSyncFolder();
+        throw new Error(e.message);
       }
       throw e;
     }
   };
-  const next = opChain.then(run, run);
+  const next = opChain.then(
+    () => acrossTabs(run),
+    () => acrossTabs(run)
+  );
   opChain = next.catch(() => {});
   return next;
 }
@@ -226,40 +257,41 @@ export type SyncOutcome =
  */
 export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
   return locked(async () => {
-    const dir = await getBackupDir({ requestPermission: true });
-    if (!dir) return { kind: "no-folder" };
+    const folder = await getSyncFolder({ requestPermission: true });
+    if (!folder) return { kind: "no-folder" };
 
     const fileName = canonicalFileName(doc);
-    const remote = await readCanonical(dir, fileName);
+    const read = await readCanonical(folder, fileName);
     const localHash = await fingerprint(doc);
 
-    if (!remote) {
-      await writeDoc(dir, fileName, doc);
-      setLastSynced(doc.id, localHash);
-      return { kind: "created", fileName, backup: await writeRotatingBackup(dir, doc) };
+    if (!read) {
+      await writeDoc(folder, fileName, doc);
+      setLastSynced(folder.target, doc.id, localHash);
+      return { kind: "created", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
 
+    const remote = read.doc;
     const remoteHash = await fingerprint(remote);
     if (remoteHash === localHash) {
-      setLastSynced(doc.id, localHash);
-      return { kind: "in-sync", fileName, backup: await writeRotatingBackup(dir, doc) };
+      setLastSynced(folder.target, doc.id, localHash);
+      return { kind: "in-sync", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
 
-    const last = getLastSynced(doc.id);
+    const last = getLastSynced(folder.target, doc.id);
     if (remoteHash === last) {
-      await writeDoc(dir, fileName, doc);
-      setLastSynced(doc.id, localHash);
-      return { kind: "pushed", fileName, backup: await writeRotatingBackup(dir, doc) };
+      await writeDoc(folder, fileName, doc, read.rev);
+      setLastSynced(folder.target, doc.id, localHash);
+      return { kind: "pushed", fileName, backup: await writeRotatingBackup(folder, doc) };
     }
     if (localHash === last) {
       // Record under the incoming doc's id — after the caller applies it, that
       // is the active project the next sync will look up.
-      setLastSynced(remote.id, remoteHash);
+      setLastSynced(folder.target, remote.id, remoteHash);
       return {
         kind: "pulled",
         fileName,
         doc: remote,
-        backup: await writeRotatingBackup(dir, remote),
+        backup: await writeRotatingBackup(folder, remote),
       };
     }
 
@@ -308,15 +340,15 @@ export function resolveConflict(
   keep: Resolution
 ): Promise<ResolveReceipt> {
   return locked(async () => {
-    const dir = await getBackupDir({ requestPermission: true });
-    if (!dir) throw new Error("The sync folder is no longer available.");
+    const folder = await getSyncFolder({ requestPermission: true });
+    if (!folder) throw new Error("The sync folder is no longer available.");
 
     const slug = slugify(local.projectTitle || "story");
     const stamp = fileStamp();
     const conflictFileNames: string[] = [];
     const preserve = async (doc: StoryDoc, suffix: string) => {
       const name = `${slug}-conflict-${stamp}${suffix}.estoria.json`;
-      await writeDoc(dir, name, doc);
+      await writeDoc(folder, name, doc);
       conflictFileNames.push(name);
     };
 
@@ -334,10 +366,10 @@ export function resolveConflict(
       applied = keep === "theirs" ? remote : null;
     }
 
-    await writeDoc(dir, canonicalFileName(local), winner);
-    setLastSynced(winner.id, await fingerprint(winner));
+    await writeDoc(folder, canonicalFileName(local), winner);
+    setLastSynced(folder.target, winner.id, await fingerprint(winner));
 
-    return { conflictFileNames, applied, backup: await writeRotatingBackup(dir, winner) };
+    return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
   });
 }
 
@@ -358,31 +390,31 @@ export function pushCanonicalIfSafe(
   doc: StoryDoc
 ): Promise<"created" | "updated" | "in-sync" | "behind" | "unavailable"> {
   return locked(async () => {
-    const dir = await getBackupDir();
-    if (!dir) return "unavailable" as const;
+    const folder = await getSyncFolder();
+    if (!folder) return "unavailable" as const;
 
     const fileName = canonicalFileName(doc);
-    let remote: StoryDoc | null;
+    let read: Awaited<ReturnType<typeof readCanonical>>;
     try {
-      remote = await readCanonical(dir, fileName);
+      read = await readCanonical(folder, fileName);
     } catch {
       return "behind" as const; // unreadable — don't overwrite what we can't compare
     }
     const localHash = await fingerprint(doc);
 
-    if (!remote) {
-      await writeDoc(dir, fileName, doc);
-      setLastSynced(doc.id, localHash);
+    if (!read) {
+      await writeDoc(folder, fileName, doc);
+      setLastSynced(folder.target, doc.id, localHash);
       return "created" as const;
     }
-    const remoteHash = await fingerprint(remote);
+    const remoteHash = await fingerprint(read.doc);
     if (remoteHash === localHash) {
-      setLastSynced(doc.id, localHash);
+      setLastSynced(folder.target, doc.id, localHash);
       return "in-sync" as const;
     }
-    if (remoteHash === getLastSynced(doc.id)) {
-      await writeDoc(dir, fileName, doc);
-      setLastSynced(doc.id, localHash);
+    if (remoteHash === getLastSynced(folder.target, doc.id)) {
+      await writeDoc(folder, fileName, doc, read.rev);
+      setLastSynced(folder.target, doc.id, localHash);
       return "updated" as const;
     }
     return "behind" as const;
@@ -399,13 +431,13 @@ export function pushCanonicalIfSafe(
  */
 export async function checkRemoteChanged(doc: StoryDoc): Promise<boolean> {
   try {
-    const dir = await getBackupDir();
-    if (!dir) return false;
-    const remote = await readCanonical(dir, canonicalFileName(doc));
-    if (!remote) return false;
-    const last = getLastSynced(doc.id);
+    const folder = await getSyncFolder();
+    if (!folder) return false;
+    const read = await readCanonical(folder, canonicalFileName(doc));
+    if (!read) return false;
+    const last = getLastSynced(folder.target, doc.id);
     if (!last) return false; // never synced — nothing to compare against
-    const remoteHash = await fingerprint(remote);
+    const remoteHash = await fingerprint(read.doc);
     return remoteHash !== last && remoteHash !== (await fingerprint(doc));
   } catch {
     return false;
@@ -428,25 +460,23 @@ export interface ProjectFileInfo {
  */
 export function listProjectFiles(doc: StoryDoc): Promise<ProjectFileInfo[] | null> {
   return locked(async () => {
-    const dir = await getBackupDir({ requestPermission: true });
-    if (!dir) return null;
+    const folder = await getSyncFolder({ requestPermission: true });
+    if (!folder) return null;
 
     const live = canonicalFileName(doc);
     const slug = slugify(doc.projectTitle || "story");
     const files: ProjectFileInfo[] = [];
-    for await (const entry of dir.values()) {
-      if (entry.kind !== "file" || !entry.name.endsWith(".estoria.json")) continue;
+    for (const { name, lastModified } of await folder.list()) {
       const role =
-        entry.name === live
+        name === live
           ? ("live" as const)
-          : entry.name.startsWith(`${slug}-backup-`)
+          : name.startsWith(`${slug}-backup-`)
             ? ("backup" as const)
-            : entry.name.startsWith(`${slug}-conflict-`)
+            : name.startsWith(`${slug}-conflict-`)
               ? ("conflict" as const)
               : null;
       if (!role) continue; // some other project's files
-      const f = await (entry as FileSystemFileHandle).getFile();
-      files.push({ name: entry.name, role, lastModified: f.lastModified });
+      files.push({ name, role, lastModified });
     }
     files.sort((a, b) =>
       a.role === "live" ? -1 : b.role === "live" ? 1 : b.lastModified - a.lastModified
@@ -468,22 +498,45 @@ export function restoreFromFile(
   fileName: string
 ): Promise<{ doc: StoryDoc; backedUpAs: string }> {
   return locked(async () => {
-    const dir = await getBackupDir({ requestPermission: true });
-    if (!dir) throw new Error("The Estoria folder is no longer available.");
+    const folder = await getSyncFolder({ requestPermission: true });
+    if (!folder) throw new Error("The Estoria folder is no longer available.");
 
     // Read the copy before writing anything: the pre-restore backup below may
     // prune this very file if it is the oldest of 5.
     let restored: StoryDoc;
     try {
-      const text = await (await (await dir.getFileHandle(fileName)).getFile()).text();
-      restored = normalizeDoc(JSON.parse(text));
+      const file = await folder.read(fileName);
+      if (!file) throw new Error("missing");
+      restored = normalizeDoc(JSON.parse(file.text));
     } catch (e) {
       if (e instanceof SchemaTooNewError) throw e;
       throw new Error(`"${fileName}" couldn't be read as an Estoria project.`);
     }
-    const receipt = await writeRotatingBackup(dir, current);
+    const receipt = await writeRotatingBackup(folder, current);
     return { doc: restored, backedUpAs: receipt.fileName };
   });
+}
+
+// ---- Saved copies -----------------------------------------------------------------
+
+/**
+ * Write a saved copy (see `lib/piece.ts`) into the Estoria folder as its own
+ * file, `<slug>-saved-<reason>-<stamp>.estoria.json`, beside the project's live
+ * file and backups. Best effort and silent: only when a folder is already
+ * connected with permission, because a change of form is not a moment to show
+ * a folder picker. Without one, the copy still lives in this browser's
+ * projects. Never pruned — unlike backups, a saved copy is the way back from a
+ * specific change, and only the writer knows when that is no longer wanted.
+ */
+export async function writeSavedCopyFile(doc: StoryDoc): Promise<void> {
+  try {
+    const folder = await getSyncFolder({ requestPermission: false });
+    if (!folder || !doc.savedCopy) return;
+    const name = `${slugify(doc.projectTitle || "story")}-saved-${doc.savedCopy.reason}-${fileStamp()}.estoria.json`;
+    await writeDoc(folder, name, doc);
+  } catch {
+    // The browser copy is the copy; the file is a bonus.
+  }
 }
 
 // ---- Conflict diff report --------------------------------------------------------

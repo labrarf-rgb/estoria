@@ -286,10 +286,12 @@ estoria/
    │  ├─ zip.ts               # minimal store-only ZIP writer (a .docx is a ZIP)
    │  ├─ templates.ts         # story-structure skeletons (34 cards, 3 facets)
    │  ├─ sync.ts              # cross-app sync: fingerprint, 3-way compare, addressable
-   │  │                       #   conflict diff, file history
+   │  │                       #   conflict diff, file history, saved-copy files
+   │  ├─ syncFolder.ts        # SyncFolder: read/write/list/remove behind one interface
+   │  │                       #   (LocalFolder today; Drive next, PLAN-drive-sync.md)
    │  ├─ merge.ts             # per-entity conflict merge over sync.ts's diff, incl.
    │  │                       #   reference closure (§8 "Conflicts (v2)")
-   │  ├─ backup.ts            # folder handle + rotating backups (File System Access)
+   │  ├─ backup.ts            # folder handle (File System Access) + rotating backups
    │  ├─ drafts.ts            # version-fork helpers (clone/stash a board)
    │  ├─ piece.ts             # single pieces: kinds and part names, form labels, and
    │  │                       #   the changes of form (expand, collapse, saved copies)
@@ -466,6 +468,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build to dist/
 npm run typecheck  # types only
+npm test           # vitest: the Sync suite (src/lib/*.test.ts), dev-only, never shipped
 npm run preview    # serve the production build
 npm run icons      # regenerate the app icons from art/icon-source.png (ImageMagick)
 npm run deploy     # build + publish to www.labrarf.com/estoria, then verify it's live
@@ -500,8 +503,10 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    then build `GoogleDriveStorageAdapter`. This is the **only** external
    surface Estoria is getting: third-party integrations are closed (§7).
 
-   > **▶ NEXT UP (handoff, 2026-10-07).** **The plan is written and approved:
-   > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Decided with the
+   > **▶ NEXT UP (handoff, 2026-10-07; plan revised 2026-10-11).** **The plan is
+   > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Revision 2 adds a
+   > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
+   > register, and a four-deploy rollout; its decisions are answered at the bottom. Decided with the
    > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in
    > stays on `www.labrarf.com`, and Drive becomes a second kind of "Estoria
    > folder" *under the existing Sync* (a `SyncFolder` interface) rather than a
@@ -968,10 +973,14 @@ extensions that go beyond the original to-do.** The web behavior is now:
 - Implementation: `lib/sync.ts` (fingerprint = SHA-256 over key-sorted,
   `modifiedAt`-stripped JSON of the `normalizeDoc`-normalized doc; three-way
   compare; addressable conflict diff; conflict copies; all folder ops
-  serialized through one lock so the mirror and a Sync click can't interleave),
+  serialized through one lock so the mirror and a Sync click can't interleave,
+  and since 2026-10-11 a Web Lock so open tabs take turns too; "last agreed"
+  fingerprints kept per target, the folder target on its original key),
+  `lib/syncFolder.ts` (2026-10-11: every file operation goes through a
+  `SyncFolder`; `LocalFolder` wraps the directory handle, Drive is next),
   `lib/merge.ts` (per-entity merge + reference closure, added 2026-08-08),
   `lib/backup.ts` (folder handle + `writeRotatingBackup`, `backupProject`
-  removed), `SyncConflictModal` (summary + compare-and-merge modes),
+  removed), the behavior suite in `lib/sync.test.ts` (`npm test`), `SyncConflictModal` (summary + compare-and-merge modes),
   footer wiring in `Footer.tsx` (focus + 5-min notify-only check per the
   cadence bullet). `modifiedAt` stamped by `stampModified()` on every file
   write incl. exports; preserved through `normalizeDoc`.

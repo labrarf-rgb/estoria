@@ -27,7 +27,7 @@ import {
   shortDate,
   type ChapterJoin,
 } from "@/lib/piece";
-import { writeSavedCopyFile } from "@/lib/backup";
+import { writeSavedCopyFile } from "@/lib/sync";
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
