@@ -175,6 +175,44 @@ removed, see SESSIONS 67); new project's file created in the real Estoria
 folder ✓ (one folder); rename keeps the same file ID ✓
 (`drive-test.estoria.json`, id `1uIV8H7C0hTpEaw6-wqw6k0U2mqGYXueS`).
 
+**Run by Claude in the browser pane (signed in by the user), 2026-10-11, on
+prod build 11, scratch projects only.** "Another device" = writes straight
+through the Drive API from page JS, as the phone's app would.
+- Change elsewhere ✓: focus → "changed elsewhere, press Sync", nothing applied
+  on its own; Sync pulled it; `-before-pull` backup written first.
+- Both changed ✓: the mirror refused to write ("changed elsewhere"); Sync
+  opened the conflict dialog; Compare & merge kept the laptop's chapter 2 and
+  the phone's chapter 3; the live file holds both; `-local` and `-file`
+  conflict copies saved.
+- Backup rotation ✓: 5 kept per project, older ones in Drive's trash.
+- History + restore ✓: Drive files listed with Live/Backup/Conflict badges;
+  restore read the copy and saved the replaced state as a new backup.
+- Open from Google Drive ✓ (lists only files Estoria made or was given);
+  "Not listed? Choose it in Google Drive…" ✓ opened Chrome's folder-synced
+  scratch project, which then stays listed.
+- **Step 1 answer:** picking only the folder does **not** let Estoria see the
+  files already in it. Files are handed over one at a time (the Picker).
+- Folder sync and Drive API share one file ✓: Chrome (folder sync through the
+  Drive desktop app) and Safari/pane (Drive API) wrote the same
+  `drive-test.estoria.json`; Chrome's backups are invisible to Estoria's API
+  side (made by the desktop app) and are rotated by Chrome only.
+- Over 4 MB ✓: a 5.01 MB project opened, an edit went up as a resumable
+  upload; the open-time word recount fast-forwarded (no false conflict).
+- Bandwidth ✓: after the first download, the mirror's write and two focus
+  checks downloaded nothing (metadata only).
+- Two tabs ✓: Sync pressed in both at once on the 5 MB project; they took
+  turns, one live file, no duplicates.
+- **Found and fixed:** Disconnect revoked at Google, which removes the whole
+  grant and signs out every device (`047f45b`, needs the broker redeployed:
+  push `main`). **Until then, don't press Disconnect.**
+- Not run: kill switch (needs `DRIVE_STATUS=off` on Vercel; unit-tested),
+  Reconnect after removing access at Google (would sign out every device;
+  retest with Disconnect once the fix is live), offline (unit-tested),
+  another Google account, staying signed in after an hour / a day (time).
+- Scratch files to delete from Drive afterwards: `drive-test*`,
+  `big-drive-test*` (≈15 MB with its backups), `test-story-for-drive-sync*`,
+  `test-story-for-drive-sync-test-1*`, the 4:28 PM `untitled-story.estoria.json`.
+
 The old local plan, kept for reference:
 
 The user chose **local testing first**, and to **reuse the `Estoria web`
