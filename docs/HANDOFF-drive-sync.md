@@ -161,6 +161,20 @@ dropped. Next:
    desktop app's folder.
 3. The Step 1 checks (4.5 below) and a week of real use, then Deploy C.
 
+**Android is out of scope for now (user, 2026-10-11).** Checklist steps that
+need the phone (an edit made on the phone, phone staleness, the phone reading
+an iPad-made project) are deferred. What the phone needs is written up in the
+Android repo: `/Users/rfcl/AndroidStudioProjects/Estoria-aa/docs/SPECS.md` §7,
+"Google Drive sync on the web — TO DO on Android" (includes the same backup
+prune bug the web fixed). For "changed elsewhere" tests on the web, make the
+outside change from another browser on Drive instead (e.g. Safari vs the iPad).
+
+**Prod checklist so far (2026-10-11, Safari, scratch projects):** connect ✓;
+existing-folder question + Picker ✓ (after the key's website restriction was
+removed, see SESSIONS 67); new project's file created in the real Estoria
+folder ✓ (one folder); rename keeps the same file ID ✓
+(`drive-test.estoria.json`, id `1uIV8H7C0hTpEaw6-wqw6k0U2mqGYXueS`).
+
 The old local plan, kept for reference:
 
 The user chose **local testing first**, and to **reuse the `Estoria web`
