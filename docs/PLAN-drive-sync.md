@@ -2,8 +2,10 @@
 
 > **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
 > Session 64. Reviewed against the code in Session 66 (see "Review against the
-> code" below; its fixes are folded into the phases). **Phase A in progress
-> (Session 66), committed locally, not deployed.** Linked from SPECS §6 item 7
+> code" below; its fixes are folded into the phases). **Phase A built and
+> committed locally in Session 66; not pushed or deployed.** Next: the user
+> tests folder sync locally, then Deploy A on their go-ahead, then a few days
+> of normal use (the gate before Deploy S). Linked from SPECS §6 item 7
 > ("NEXT UP").
 >
 > **What changed from revision 1, and why:**
@@ -176,6 +178,7 @@ hadn't made. Each fix is folded into the phase it belongs to.
 | R5 | H13's "straight away when closed" can't be delivered for multi-MB files (64 KB cap on unload requests). | Wording fixed in H13: best effort on hide; H9 covers the gap. |
 | R6 | The tests must pass "unchanged" before and after the refactor, so they need a seam that exists in both. | The suite mocks only `getBackupDir()` (and `forgetBackupDir()`) to return an in-memory directory handle. `LocalFolder` wraps that same handle, so the identical suite runs against old and new code. Tests assert outcomes, never localStorage key names (A.5 renames the keys). |
 | R7 | Small: Web Locks changes how tabs interleave (same outcomes, so "identical behavior" means identical results); `checkRemoteChanged` stays unlocked as today; tests need a `localStorage` stand-in; Vercel may ask for a TXT verification record next to the `auth` CNAME. | Noted in the relevant steps. |
+| R8 | Found while building Phase A: `resolveConflict` writes the winner without re-reading, so a phone write during the dialog would be overwritten. The folder target has always worked this way. | Phase B: the conflict outcome carries the file's `rev`, and `resolveConflict` passes it as `expectRev` on Drive, so a mid-dialog change aborts and re-runs the compare. |
 
 ## Prod safety
 
@@ -273,8 +276,10 @@ you made.
    - Not touched: the fingerprint, `diffDocs`, `merge.ts`, the conflict
      dialog, the file format.
 4. Wrap the queue in Web Locks (H12).
-5. Baselines move to per-target keys **with a fallback read of the old key for
-   the folder target**, so nothing re-baselines (H1).
+5. Baselines move to per-target keys (H1). **As built:** the folder target
+   keeps its original key (`estoria:sync:lastHash:<projectId>`) and other
+   targets get `estoria:sync:lastHash:<target>:<projectId>`. Same protection,
+   no migration, and a rollback of Deploy A finds every baseline where it was.
 6. Verify: typecheck, build, tests, and the folder flows on the dev server (an
    OPFS folder as stand-in, as in earlier sessions).
 

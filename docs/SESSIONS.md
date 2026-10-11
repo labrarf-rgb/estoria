@@ -5599,3 +5599,51 @@ desktop Chrome.
 **Still open:** loading only the open project (§10 Phase 0's other half) —
 stashed projects are still held whole in memory because `switchProject` and
 friends read them synchronously.
+
+### 2026-10-11 — Drive plan reviewed; Phase A built (Session 66)
+
+**Asked:** review the revised Drive sync plan (`docs/PLAN-drive-sync.md`,
+revision 2 from Session 65), update it, then build Phase A and commit locally
+for the user to test before anything goes to prod.
+
+**Plan review.** Checked against `sync.ts`, `backup.ts` and `Footer.tsx`; the
+design holds. Added a "Review against the code" table (R1–R8): the folder
+interface needs a file revision and a folder-gone error; `locked()` must stop
+forgetting the folder on any `NotFoundError`; the mirror and Sync button both
+create missing files, which Drive's ask-before-create forbids; the Footer
+hides Sync wherever the folder picker is missing (Safari, iPad); "flush on
+close" can't carry a multi-MB upload; how the tests stay unchanged across the
+refactor; `resolveConflict` writes without re-reading (Phase B fix on Drive).
+
+**Changed (Phase A, no visible change):**
+- `vitest` (dev-only) and `npm test`. `lib/sync.test.ts`: 36 behavior tests of
+  today's Sync against an in-memory folder (`src/test/memoryDir.ts`), the only
+  seam being the folder handle. Written and green on the old code first; five
+  deliberate breaks of core rules were each caught.
+- `lib/syncFolder.ts` (new): `SyncFolder` (`read` with an optional revision,
+  `write` with `expectRev`, `list`, `remove`) and `LocalFolder` over the
+  remembered directory handle; `SyncFolderGoneError` replaces the raw
+  `NotFoundError` check in `locked()`. `sync.ts` and `writeRotatingBackup` go
+  through it; `writeSavedCopyFile` moved from `backup.ts` to `sync.ts` (import
+  cycle). The 36 tests passed unchanged; `syncFolder.test.ts` adds 10.
+- H12: the per-tab queue now also takes a Web Lock (`estoria-sync`), so open
+  tabs take turns. H1: "last agreed" fingerprints keyed per target; the folder
+  target keeps its original key (no migration, rollback-safe), others get
+  `estoria:sync:lastHash:<target>:<id>`. `syncTargets.test.ts` (5 tests)
+  covers both, including that a target switch can't pull an older copy over
+  newer work; breaking either rule fails it.
+
+**Verified:** 51 tests, `tsc -b`, `vite build` clean. Dev server with an OPFS
+stand-in folder: mirror created the file; Sync in-sync; phone-side edit →
+focus check "file changed elsewhere" → Sync pulled it (backup written); both
+sides edited → mirror refused, Sync opened the conflict dialog ("Chapters: 2
+differ") → keep mine wrote the conflict copy and the live file; history popover
+listed live / backups / conflict copy; restoring the conflict copy backed up
+the current state first and the mirror then updated the live file; rotation
+held at 5 and kept the conflict copy; deleting the folder → "The Estoria
+folder seems to have moved…" and the handle was forgotten. No console errors.
+**Not shown:** two real tabs racing (covered by the Web Lock test only); a
+real picked folder on disk (OPFS stands in, as in earlier sessions).
+
+**Not shipped:** committed locally only. Next: the user tests folder sync
+locally; Deploy A on their go-ahead; a few days of normal use before Deploy S.
