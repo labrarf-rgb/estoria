@@ -498,15 +498,21 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 6. ~~**Open a project file from disk**~~ — ✅ done (Session 9). "Open file..." in
    the Projects modal. (Drag-drop onto the board still a nice-to-have.)
 7. **Cloud backend = Google Drive + Google sign-in** — decided 2026-07-01, see
-   §8 for the full plan. Prerequisites first: fix the persistence seam and
-   quota/perf issues in §9 (items 1–3), then move hosting to Vercel (§8),
-   then build `GoogleDriveStorageAdapter`. This is the **only** external
+   §8 for the background. Prerequisites (§9 items 1–3) are done. The plan in
+   force is [`PLAN-drive-sync.md`](PLAN-drive-sync.md): the app stays on
+   labrarf.com, only a small sign-in broker goes on Vercel, and Drive is a
+   `SyncFolder` under Sync rather than a `GoogleDriveStorageAdapter`
+   (superseding the older wording here). This is the **only** external
    surface Estoria is getting: third-party integrations are closed (§7).
 
    > **▶ NEXT UP (handoff, 2026-10-07; plan revised 2026-10-11).** **The plan is
    > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) — start there.** Revision 2 adds a
    > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
-   > register, and a four-deploy rollout; its decisions are answered at the bottom. Decided with the
+   > register, and a four-deploy rollout; its decisions are answered at the bottom.
+   > **Phase A is done (Session 66, 2026-10-11):** Sync tests, the `SyncFolder`
+   > interface, the cross-tab lock and per-target baselines, merged to main.
+   > Next: a few days of normal folder use, then Step 0 (Google + DNS setup)
+   > and the broker (Deploy S). Decided with the
    > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in
    > stays on `www.labrarf.com`, and Drive becomes a second kind of "Estoria
    > folder" *under the existing Sync* (a `SyncFolder` interface) rather than a
@@ -881,7 +887,9 @@ web half shipped later the same day (Session 24). **The contract:**
   "Why a synced folder of files was dropped", including the correction box there.
 - **Change detection = per-device content fingerprint + `modifiedAt`.**
   Each device remembers a hash of the state it last agreed on with the file
-  (web: localStorage/IDB alongside the dir handle). Compare:
+  (web: localStorage, one per project **per target** since 2026-10-11, so a
+  device that switches from the folder to Drive starts with no baseline and
+  sees a conflict rather than pulling an older copy). Compare:
   local == remote → in sync; remote == last-synced → local ahead (offer
   write); local == last-synced → remote ahead (offer reload); else →
   conflict. Android hashes SHA-256 over the codec-canonical encoding with

@@ -5645,5 +5645,15 @@ folder seems to have moved…" and the handle was forgotten. No console errors.
 **Not shown:** two real tabs racing (covered by the Web Lock test only); a
 real picked folder on disk (OPFS stands in, as in earlier sessions).
 
-**Not shipped:** committed locally only. Next: the user tests folder sync
-locally; Deploy A on their go-ahead; a few days of normal use before Deploy S.
+**Shipped (partly):** on the user's /ship, merged `feature/drive-sync` into
+main (`97a40a0`, no-ff) and pushed main and the branch to GitHub. The deploy
+itself (`npm run deploy`) was blocked by the session's permission check, so
+**Deploy A is pending:** the user runs it. Nothing user-visible changes for
+anyone either way. Next: a few days of normal folder use, then Step 0 and the
+broker (Deploy S).
+
+**Spec review after merging:** fixed three drifts in SPECS: §8 "Change
+detection" now says baselines are per target; §6 item 7's lead still said
+"move hosting to Vercel, then build `GoogleDriveStorageAdapter`", which the
+plan superseded (app stays on labrarf.com, Drive is a `SyncFolder`); its
+NEXT UP box now records Phase A as done.

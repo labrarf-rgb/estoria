@@ -2,10 +2,9 @@
 
 > **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
 > Session 64. Reviewed against the code in Session 66 (see "Review against the
-> code" below; its fixes are folded into the phases). **Phase A built and
-> committed locally in Session 66; not pushed or deployed.** Next: the user
-> tests folder sync locally, then Deploy A on their go-ahead, then a few days
-> of normal use (the gate before Deploy S). Linked from SPECS §6 item 7
+> code" below; its fixes are folded into the phases). **Phase A built in
+> Session 66 and merged to main (`97a40a0`); Deploy A pending.** Next: a few
+> days of normal folder use (the gate before Deploy S). Linked from SPECS §6 item 7
 > ("NEXT UP").
 >
 > **What changed from revision 1, and why:**
