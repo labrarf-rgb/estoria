@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
  * dialog's stamp, injected into index.html by the estoria-build-info plugin, so
  * an installed copy and a browser tab agree on what "current" means. The
  * version is part of it because the build number starts again at 1 with each
- * new version: v4.0.0 build 3 and v5.0.0 build 3 must not share a URL.
+ * new version: v4 build 3 and v5 build 3 must not share a URL.
  */
 
 const swUrl = () => {

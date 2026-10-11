@@ -11,8 +11,9 @@ import tailwindcss from "@tailwindcss/vite";
 // change you deploy gets a distinct, auto-derived number — nothing to bump by
 // hand. It starts again at 1 with each new version: the commit that set
 // package.json's `version` is build 1, and each commit after it adds one
-// (v4.0.0 · build 1 → 2 → 3 …). `commit` = short SHA ("-dev" when the tree is
-// dirty, i.e. uncommitted work).
+// (v4 · build 1 → 2 → 3 …). The version shown is package.json's major number
+// alone: npm needs "4.0.0" there, and only the first number is ever changed.
+// `commit` = short SHA ("-dev" when the tree is dirty, i.e. uncommitted work).
 //
 // It's injected into index.html rather than baked via `define`, and in dev the
 // injection runs on every page load — so a long-running dev server never shows a
@@ -54,7 +55,7 @@ function currentBuild(): BuildInfo {
   const sha = git("rev-parse --short HEAD");
   const dirty = git("status --porcelain").length > 0;
   return {
-    version: pkg.version,
+    version: String(pkg.version).split(".")[0],
     build: count || "0",
     commit: sha ? (dirty ? `${sha}-dev` : sha) : "unknown",
     builtAt: new Date().toISOString(),
