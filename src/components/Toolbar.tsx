@@ -488,18 +488,6 @@ export function Toolbar() {
             sub="A single piece, a book, or a series"
             onClick={() => setPanel("showNewBook", true)}
           />
-          {/* Chapter-level actions don't apply to the series map, or to a
-              piece, which has no chapters. */}
-          {!piece && !onSeriesMap && (
-            <MenuItem
-              title="New chapter"
-              sub="A single empty chapter"
-              onClick={() => {
-                addChapter();
-                closeNewMenu();
-              }}
-            />
-          )}
           {/* Changes of form. Each opens a dialog that says what happens, and
               each saves a copy first. */}
           {piece && (
