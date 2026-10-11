@@ -3,7 +3,7 @@
 > **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
 > Session 64. Reviewed against the code in Session 66 (see "Review against the
 > code" below; its fixes are folded into the phases). **Phase A built in
-> Session 66 and merged to main (`97a40a0`); Deploy A pending.** Next: a few
+> Session 66 and shipped as Deploy A (build 198, `6e5af0c`, 2026-10-11).** Next: a few
 > days of normal folder use (the gate before Deploy S). Linked from SPECS §6 item 7
 > ("NEXT UP").
 >

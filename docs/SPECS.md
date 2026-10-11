@@ -510,7 +510,8 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
    > small token-broker server (`auth.labrarf.com`) so sign-in persists, a hazard
    > register, and a four-deploy rollout; its decisions are answered at the bottom.
    > **Phase A is done (Session 66, 2026-10-11):** Sync tests, the `SyncFolder`
-   > interface, the cross-tab lock and per-target baselines, merged to main.
+   > interface, the cross-tab lock and per-target baselines; deployed as build
+   > 198 (`6e5af0c`).
    > Next: a few days of normal folder use, then Step 0 (Google + DNS setup)
    > and the broker (Deploy S). Decided with the
    > user: `drive.file` scope (Estoria sees only its own / picked files), sign-in

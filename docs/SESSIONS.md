@@ -5645,12 +5645,13 @@ folder seems to have moved…" and the handle was forgotten. No console errors.
 **Not shown:** two real tabs racing (covered by the Web Lock test only); a
 real picked folder on disk (OPFS stands in, as in earlier sessions).
 
-**Shipped (partly):** on the user's /ship, merged `feature/drive-sync` into
-main (`97a40a0`, no-ff) and pushed main and the branch to GitHub. The deploy
-itself (`npm run deploy`) was blocked by the session's permission check, so
-**Deploy A is pending:** the user runs it. Nothing user-visible changes for
-anyone either way. Next: a few days of normal folder use, then Step 0 and the
-broker (Deploy S).
+**Shipped (Deploy A):** on the user's /ship, merged `feature/drive-sync` into
+main (`97a40a0`, no-ff). The session's permission check blocked the push of
+the docs commit and `npm run deploy`, so the user ran both: main and the
+branch at `6e5af0c`, deployed as build 198. `version.json` on labrarf.com
+reports `6e5af0c`, and the previous build's assets still load (no cached-page
+404s). Nothing user-visible changes. Next: a few days of normal folder use,
+then Step 0 and the broker (Deploy S).
 
 **Spec review after merging:** fixed three drifts in SPECS: §8 "Change
 detection" now says baselines are per target; §6 item 7's lead still said
