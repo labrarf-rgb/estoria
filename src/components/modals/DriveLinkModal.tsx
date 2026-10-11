@@ -3,6 +3,7 @@ import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import type { DriveFile } from "@/lib/drive";
 import { DriveDuplicateError } from "@/lib/driveErrors";
 import { driveSyncFolder } from "@/lib/driveFolder";
+import { pickFromDrive } from "@/lib/drivePicker";
 import { projectFileText } from "@/lib/sync";
 import { useStore } from "@/store/useStore";
 
@@ -81,6 +82,17 @@ export function DriveLinkModal({
     }
   };
 
+  /** A copy Estoria can't see yet (written by the Drive desktop app, H17): choose it in Google's Picker. */
+  const pickElsewhere = async () => {
+    setErr(null);
+    try {
+      const [picked] = await pickFromDrive("files", { title: `Choose the file for this project` });
+      if (picked) pick({ id: picked.id, name: picked.name });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't open Google's file picker.");
+    }
+  };
+
   const sameName = files?.filter((f) => f.name === fileName) ?? [];
 
   return (
@@ -133,6 +145,15 @@ export function DriveLinkModal({
                 </button>
               </div>
             ))
+          )}
+          {!unreadable && files !== null && (
+            <button
+              disabled={busy}
+              onClick={() => void pickElsewhere()}
+              className="mt-[6px] px-[8px] text-[11.5px] font-medium text-soft underline decoration-rule underline-offset-2 hover:text-ink disabled:opacity-60"
+            >
+              Not listed? Choose it in Google Drive…
+            </button>
           )}
         </div>
 

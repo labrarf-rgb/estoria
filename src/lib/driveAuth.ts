@@ -110,6 +110,11 @@ export function createDriveAuth(deps: DriveAuthDeps) {
     /** A valid access token, refreshed quietly through the broker when due. */
     getAccessToken(): Promise<string> {
       if (token && token.expiresAt - deps.now() > EARLY_REFRESH_MS) return Promise.resolve(token.value);
+      // Known to be signed out: don't ask the broker again on every save.
+      // Connecting reloads the page, which starts this fresh.
+      if (status.state === "not-connected" || status.state === "reconnect") {
+        return Promise.reject(new DriveReconnectError(status.state === "reconnect" ? "revoked" : "not-connected"));
+      }
       // One refresh at a time, however many requests are waiting on it.
       inflight ??= refresh().finally(() => {
         inflight = null;

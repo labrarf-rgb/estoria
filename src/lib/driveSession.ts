@@ -3,6 +3,7 @@ import { drive } from "@/lib/drive";
 import { consumeRedirectResult, driveAuth } from "@/lib/driveAuth";
 import { connectDriveFolder } from "@/lib/driveFolder";
 import { flushNow } from "@/store/persistence";
+import { detectBrowser, isStandalone } from "@/lib/install";
 import {
   activeTarget,
   driveAvailableHere,
@@ -78,11 +79,33 @@ export function startDriveRuntime(): void {
   onDriveStatus(() => update({}));
   startDriveStatusChecks(driveAuth);
   const result = consumeRedirectResult();
+  showHomeScreenTipOnce();
   if (result) void handleSignInResult(result);
   else if (activeTarget() === "drive") {
     // Learn the account (and whether sign-in still holds) without waiting for a save.
     driveAuth.getAccessToken().catch(() => {});
   }
+}
+
+const TIP_KEY = "estoria:drive:homeScreenTip";
+
+/**
+ * iPad and iPhone Safari clear a website's storage after 7 days without a
+ * visit, unless it's on the Home Screen (H10). Say so once; Drive (and "Open
+ * from Google Drive") is the way back if it happens anyway.
+ */
+function showHomeScreenTipOnce(): void {
+  try {
+    if (detectBrowser() !== "ios-safari" || isStandalone() || localStorage.getItem(TIP_KEY)) return;
+    localStorage.setItem(TIP_KEY, "1");
+  } catch {
+    return;
+  }
+  update({
+    notice: {
+      text: "Tip: add Estoria to your Home Screen (Share, then Add to Home Screen) so Safari keeps your work on this device.",
+    },
+  });
 }
 
 async function handleSignInResult(result: string): Promise<void> {

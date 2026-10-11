@@ -174,6 +174,13 @@ export class DriveFolder implements SyncFolder {
     return (await this.api.list({ parent: this.folderId })).filter((f) => isLiveFileName(f.name)).sort(newestFirst);
   }
 
+  /** One file's content, by ID (opening a project from Drive, H8). */
+  async readFile(fileId: string): Promise<SyncFileRead> {
+    const meta = await this.api.get(fileId);
+    if (!meta || meta.trashed) throw new DriveFileMissingError();
+    return { text: await this.api.download(fileId), rev: meta.headRevisionId };
+  }
+
   /** Files already carrying this name: the "is it already in Drive?" candidates. */
   candidates(name: string): Promise<DriveFile[]> {
     return this.byName(name);

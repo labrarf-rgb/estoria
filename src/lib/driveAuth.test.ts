@@ -84,10 +84,19 @@ describe("getAccessToken", () => {
     expect((first as DriveReconnectError).reason).toBe("not-connected");
     expect(a.status().state).toBe("not-connected");
 
+    const b = auth();
     replies.push({ status: 401, body: { error: "reconnect" } });
-    const second = await a.getAccessToken().catch((e) => e);
+    const second = await b.getAccessToken().catch((e) => e);
     expect((second as DriveReconnectError).reason).toBe("revoked");
-    expect(a.status().state).toBe("reconnect");
+    expect(b.status().state).toBe("reconnect");
+  });
+
+  it("stops asking the broker once it knows this device is signed out", async () => {
+    const a = auth();
+    replies.push({ status: 401, body: { error: "not_connected" } });
+    await expect(a.getAccessToken()).rejects.toBeInstanceOf(DriveReconnectError);
+    await expect(a.getAccessToken()).rejects.toBeInstanceOf(DriveReconnectError);
+    expect(calls).toHaveLength(1);
   });
 
   it("is offline, not signed out, when the broker or Google can't be reached", async () => {

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { chooseBackupFolder, isBackupPickerSupported } from "@/lib/backup";
 import { driveAuth } from "@/lib/driveAuth";
+import { adoptPickedFolder } from "@/lib/driveFolder";
+import { pickFromDrive } from "@/lib/drivePicker";
 import {
   chooseFolderTarget,
   disconnectDrive,
@@ -21,12 +23,41 @@ export function DriveChooserModal() {
   const session = useDriveSession();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   if (!session.chooserOpen || !driveAvailableHere()) return null;
 
   const close = () => openDriveChooser(false);
   const onDrive = activeTarget() === "drive";
   const connectedAs = driveAuth.status().state === "connected" ? driveAuth.connectedEmail() : undefined;
   const folderPossible = isBackupPickerSupported();
+
+  /**
+   * Moving from the Drive desktop app (H17): hand Estoria the existing Estoria
+   * folder, then the project files in it, since Estoria can only see what it
+   * made or was given.
+   */
+  const chooseExistingFolder = async () => {
+    setErr(null);
+    setNote(null);
+    try {
+      const [folder] = await pickFromDrive("folder");
+      if (!folder) return;
+      adoptPickedFolder(folder, driveAuth.connectedEmail());
+      const files = await pickFromDrive("files", {
+        parentId: folder.id,
+        multiple: true,
+        title: "Now choose the project files in it (select them all)",
+      });
+      setNote(
+        `Using "${folder.name}". ` +
+          (files.length
+            ? `Estoria can now see ${files.length} project file${files.length === 1 ? "" : "s"} there.`
+            : "No files chosen, so Estoria only sees files it makes there.")
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't open Google's file picker.");
+    }
+  };
 
   const pickFolder = async () => {
     setErr(null);
@@ -93,6 +124,14 @@ export function DriveChooserModal() {
                 You'll sign in with Google on its own page, then come straight back here.
               </div>
             )}
+            {onDrive && connectedAs && (
+              <button
+                onClick={() => void chooseExistingFolder()}
+                className="mt-[8px] text-[11.5px] font-medium text-soft underline decoration-rule underline-offset-2 hover:text-ink"
+              >
+                Already have an Estoria folder in Drive? Choose it…
+              </button>
+            )}
           </div>
 
           {folderPossible && (
@@ -114,6 +153,9 @@ export function DriveChooserModal() {
           )}
         </div>
 
+        {note && (
+          <div className="border-t border-rule px-[24px] py-[10px] text-[12px] text-soft">{note}</div>
+        )}
         {err && (
           <div className="border-t border-rule px-[24px] py-[10px] text-[12px]" style={{ color: "var(--but)" }}>
             {err}
