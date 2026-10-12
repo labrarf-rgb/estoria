@@ -5926,5 +5926,8 @@ single pieces at Android parity (Android Session 32).
 the toolbar circle and the ⋯ fold), "File → Google Drive" (twice) and "File →
 Install Estoria" now say Settings.
 
-**Next:** none for this change. If the phone has a Settings screen, About and
-Contact sitting at its bottom would match.
+**Decided:** Android keeps its single menu as it is; the split is web-only and
+not a parity gap. Recorded in SPECS (the "File and Settings menus" row) and in
+the Android SPECS §7.
+
+**Next:** none for this change.
