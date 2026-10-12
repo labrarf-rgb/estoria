@@ -101,8 +101,16 @@ function boardsOf(doc: StoryDoc): Boards {
 }
 
 /** Put the boards back together, with `activeBookId` deciding what sits on top. */
-function recompose(shell: StoryDoc, boards: Boards, activeBookId: string): StoryDoc {
-  const board = (id: string) => ({
+function recompose(
+  shell: StoryDoc,
+  boards: Boards,
+  activeBookId: string,
+  stashed: Record<string, BookData>
+): StoryDoc {
+  // Starts from the board already stashed for this book, so a BookData field
+  // this function doesn't name rides through instead of being dropped.
+  const board = (id: string): BookData => ({
+    ...stashed[id],
     chapters: boards.chapters.get(id) ?? [],
     links: boards.links.get(id) ?? [],
     storyNotes: boards.notes.get(id) ?? "",
@@ -208,7 +216,19 @@ export function mergeDocs(
   let bookLinks = mine.bookLinks;
   let seriesMode = mine.seriesMode;
   let activeBookId = mine.activeBookId;
+  let form: Pick<StoryDoc, "form" | "kind" | "grownInto" | "savedCopy"> = {
+    form: mine.form,
+    kind: mine.kind,
+    grownInto: mine.grownInto,
+    savedCopy: mine.savedCopy,
+  };
+  let keepLineBreaks = mine.keepLineBreaks;
   let fromFile = 0;
+
+  // A piece and a book can't be merged part by part (a book's chapters taken
+  // into a piece would make a piece with N chapters). The dialog offers
+  // keep-one only in that case; this is the backstop.
+  if (diff.mergeBlocked) throw new Error(diff.mergeBlocked);
 
   for (const section of diff.sections) {
     for (const item of section.items) {
@@ -272,6 +292,17 @@ export function mergeDocs(
           for (const [id, draftId] of theirsBoards.activeDraftId) {
             boards.activeDraftId.set(id, draftId);
           }
+          break;
+        case "form":
+          form = {
+            form: theirs.form,
+            kind: theirs.kind,
+            grownInto: theirs.grownInto,
+            savedCopy: theirs.savedCopy,
+          };
+          break;
+        case "lineBreaks":
+          keepLineBreaks = theirs.keepLineBreaks;
           break;
       }
     }
@@ -358,9 +389,18 @@ export function mergeDocs(
     assets,
     books,
     bookLinks,
+    ...form,
+    keepLineBreaks,
   };
   if (!author) delete shell.author;
   if (!authorContact) delete shell.authorContact;
+  // Optional fields: absent on the chosen side means absent in the merge.
+  for (const k of ["form", "kind", "grownInto", "savedCopy", "keepLineBreaks"] as const) {
+    if (shell[k] === undefined) delete shell[k];
+  }
 
-  return { doc: normalizeDoc(recompose(shell, boards, activeBookId)), carried, fromFile };
+  return { doc: normalizeDoc(
+      // This copy's stash wins where both have one, like every other unit.
+      recompose(shell, boards, activeBookId, { ...theirs.bookData, ...mine.bookData })
+    ), carried, fromFile };
 }

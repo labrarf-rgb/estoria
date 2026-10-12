@@ -5864,3 +5864,21 @@ generated `.docx` parses; in the browser: the dialog, save as default, the
 details, Edit from the Manuscript tab, and the menu for a piece and a book.
 
 **Next:** merge the merge-rows branch; decide whether the phone's menu follows.
+
+### 2026-10-12 (b) — Merge rows land on main
+
+The **Form** (`doc:form`: form, kind, grownInto, savedCopy) and **Line
+breaks** (`doc:lineBreaks`) merge rows from branch
+`claude/recursing-bose-94c3e5` (d3bf777) are now on `main`, next to the
+**Author details** row. A piece against a book still offers keep-one only
+(`mergeBlocked`). `mergeDocs` carries `author` + `authorContact` and the form
+and line-break fields from whichever side each row takes; one conflict, in
+the field clean-up at the end of `mergeDocs`, kept both sides. SPECS §8's
+"Every project field has a row" note now names the author unit too. Story-wide
+total is 9 units.
+
+**Verified:** 161 tests (one new in `merge.test.ts` taking author details,
+Form and Line breaks from the file together) and the typecheck; the app loads
+with no console errors. Not pushed or deployed.
+
+**Next:** the branch and its worktree can be cleaned up.

@@ -1073,7 +1073,7 @@ web half shipped later the same day (Session 24). **The contract:**
   `lib/sync.ts`) and the dialog's second mode lets the user take each one from
   either side; `lib/merge.ts` builds the result. Nothing about
   `.estoria.json` changed, so **Android needs nothing** — it can keep offering
-  the whole-file choice indefinitely and both apps still reconcile. Four rules
+  the whole-file choice indefinitely and both apps still reconcile. The rules
   are worth mirroring if that side ever builds its own:
   - **The unit is the whole entity**, never a field. Fields are *shown* on both
     sides, but taking half a chapter can produce one neither device ever had
@@ -1090,6 +1090,22 @@ web half shipped later the same day (Session 24). **The contract:**
     character this copy has never seen; the record it points at is brought in
     too (reported to the user first) rather than written as a dangling id — the
     bug class §9 item 5 records.
+  - **Every project field has a row** (2026-10-11). `form`, `kind`,
+    `grownInto` and `savedCopy` are one unit, `doc:form` ("Form"), and
+    `keepLineBreaks` is `doc:lineBreaks` ("Line breaks") — the same keys the
+    Android app uses. Before this a merge always kept this copy's value for
+    them, even with "All from the file". The byline and contact block are
+    likewise one unit, `doc:author` ("Author details"), so a merge never pairs
+    one copy's name with the other's address. **When `form` itself differs** (a
+    piece on one side, a book on the other) the diff sets `mergeBlocked` and
+    the dialog hides Compare & merge, offering keep-one only: a book's
+    chapters taken into a piece would make a piece with N chapters.
+  - **Contract: a new field on `BookData` or `VersionData` needs a phone update
+    before it ships.** The phone can't tell an unknown board field from a
+    project-level one, so it would drop or misplace it in a merge. On the web,
+    `recompose` spreads the existing stashed board before the named fields, but
+    `normalizeDoc` still rebuilds each stashed board from named fields, so a
+    new board field also needs adding there.
 - **A merge preserves BOTH copies, not one.** There is no losing side to a
   merge, so `resolveConflict` writes `<slug>-conflict-<stamp>-local.estoria.json`
   *and* `…-file.estoria.json` before the merged doc becomes the canonical file.

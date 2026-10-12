@@ -584,7 +584,9 @@ export type DocUnit =
   | "connections"
   | "versions"
   | "seriesMap"
-  | "view";
+  | "view"
+  | "form"
+  | "lineBreaks";
 
 /**
  * Where a difference lives, structurally — everything a merge needs to apply a
@@ -645,6 +647,13 @@ export interface DocDiff {
   differing: number;
   total: number;
   magnitude: "small" | "moderate" | "large";
+  /**
+   * Set when the two copies can't be merged field by field, saying why; the
+   * dialog then offers keep-one only. Today that is a change of form (a piece
+   * on one side, a book on the other): taking a book's chapters into a piece
+   * would make a piece with N chapters.
+   */
+  mergeBlocked?: string;
 }
 
 function byId<T extends { id: string }>(items: T[]): Map<string, T> {
@@ -1193,8 +1202,46 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
     ])
   );
 
+  // What the project is (a piece or a book) and the labels that go with it.
+  // One unit, because a kind or a saved-copy note only means anything against
+  // the form it was set for. Same key as the Android app's row.
+  const formOf = (d: StoryDoc) => ({
+    form: d.form ?? null,
+    kind: d.kind ?? null,
+    grownInto: d.grownInto ?? null,
+    savedCopy: d.savedCopy ?? null,
+  });
+  const formName = (d: StoryDoc) =>
+    d.form === "piece" ? "single piece" : d.seriesMode ? "series" : "book";
+  const savedCopyLine = (d: StoryDoc) =>
+    d.savedCopy ? `saved before ${d.savedCopy.reason}` : "no";
+  storyWide.push(
+    docItem(
+      "form",
+      "Form",
+      formOf(mine),
+      formOf(theirs),
+      [
+        { label: "form", mine: formName(mine), theirs: formName(theirs) },
+        { label: "kind", mine: mine.kind ?? "story", theirs: theirs.kind ?? "story" },
+        { label: "grown into", mine: mine.grownInto ?? "not set", theirs: theirs.grownInto ?? "not set" },
+        { label: "saved copy", mine: savedCopyLine(mine), theirs: savedCopyLine(theirs) },
+      ],
+      "form, kind and saved-copy note, taken as one"
+    )
+  );
+  storyWide.push(
+    docItem("lineBreaks", "Line breaks", !!mine.keepLineBreaks, !!theirs.keepLineBreaks, [
+      {
+        label: "keep line breaks",
+        mine: mine.keepLineBreaks ? "on" : "off",
+        theirs: theirs.keepLineBreaks ? "on" : "off",
+      },
+    ])
+  );
+
   const storyItems = storyWide.filter((i): i is DiffItem => i !== null);
-  total += 7; // the seven story-wide units above, differing or not
+  total += 9; // the nine story-wide units above, differing or not
   if (storyItems.length) {
     sections.push({ label: "Story-wide", items: storyItems });
     for (const it of storyItems) {
@@ -1215,5 +1262,16 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
 
   const magnitude: DocDiff["magnitude"] =
     differing <= 2 ? "small" : differing >= 10 || differing / total >= 0.25 ? "large" : "moderate";
-  return { lines, sections, differing: Math.max(differing, 1), total: Math.max(total, 1), magnitude };
+  const mergeBlocked =
+    (mine.form ?? null) !== (theirs.form ?? null)
+      ? `One copy is a ${formName(mine)} and the other a ${formName(theirs)}, so they can't be merged part by part. Keep one; the other is saved as a conflict copy.`
+      : undefined;
+  return {
+    lines,
+    sections,
+    differing: Math.max(differing, 1),
+    total: Math.max(total, 1),
+    magnitude,
+    ...(mergeBlocked ? { mergeBlocked } : {}),
+  };
 }

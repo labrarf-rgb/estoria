@@ -321,13 +321,22 @@ export function SyncConflictModal({
                   >
                     {showReport ? "Hide report" : "See full report"}
                   </button>
-                  <button
-                    onClick={() => setMerging(true)}
-                    disabled={busy}
-                    className="rounded-md border border-rule bg-card px-[9px] py-[4px] text-[11.5px] font-semibold text-ink hover:border-faint disabled:opacity-60"
-                  >
-                    Compare &amp; merge…
-                  </button>
+                  {/* A piece against a book can't be merged part by part, so
+                      the route isn't offered at all rather than half-working. */}
+                  {!diff.mergeBlocked && (
+                    <button
+                      onClick={() => setMerging(true)}
+                      disabled={busy}
+                      className="rounded-md border border-rule bg-card px-[9px] py-[4px] text-[11.5px] font-semibold text-ink hover:border-faint disabled:opacity-60"
+                    >
+                      Compare &amp; merge…
+                    </button>
+                  )}
+                </div>
+              )}
+              {diff.mergeBlocked && (
+                <div className="mt-[8px] text-[12px] leading-[1.5] text-soft">
+                  {diff.mergeBlocked}
                 </div>
               )}
               {showReport && (
