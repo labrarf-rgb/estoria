@@ -214,8 +214,10 @@ through the Drive API from page JS, as the phone's app would.
   Drive); Reconnect in Safari ✓ (then Sync pulled the edits Chrome made
   meanwhile, as it should); both browsers still signed in after more than an
   hour ✓. The Disconnect fix is live. Still to do: still signed in after a day.
-  **Kill switch: the user chose not to test it live** (unit-tested). If it's
-  ever needed: set `DRIVE_STATUS=off` at the env vars link above, then
+  **Kill switch: skipped by the user** (unit-tested only). If Drive sync ever
+  breaks, the user's plan is Disconnect on the device and restore from a
+  backup copy; revisit the kill switch only if that happens. If it's ever
+  needed: set `DRIVE_STATUS=off` at the env vars link above, then
   **redeploy** (a saved value does nothing until then); open tabs pause at
   their next check (up to 30 minutes) or straight away on reload.
 - Scratch files to delete from Drive afterwards: `drive-test*`,

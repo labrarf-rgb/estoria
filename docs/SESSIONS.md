@@ -5795,3 +5795,20 @@ setup resumes at the folder question. 143 app tests.
 signed in after an hour / a day; the kill switch with the user; then move
 Chrome and the novel over, the iPad, a week of use, Deploy C. The user is
 deleting the scratch files.
+
+### 2026-10-11 — Drive checks on prod with the user (Session 68)
+
+**Passed:** Disconnect in Safari leaves Chrome signed in (Chrome reloaded and
+still backed up to Drive), so the broker fix (`047f45b`) is live; Reconnect in
+Safari, then Sync pulled the edits Chrome made meanwhile; both browsers still
+signed in after more than an hour. The background backup goes up about 2.5 s
+after a pause and at most every 30 s while typing, as designed.
+
+**Kill switch skipped (user decision).** It's unit-tested only. If Drive sync
+ever breaks, the user's plan is Disconnect on the device and restore from a
+backup copy; the kill switch is a topic for then. How to use it is in the
+handoff (set `DRIVE_STATUS=off`, then redeploy; open tabs pause within 30
+minutes). A per-person switch was discussed and not built: one user today.
+
+**Next:** still signed in after a day; move the novel over; the iPad; a week
+of use; Deploy C.
