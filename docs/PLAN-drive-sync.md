@@ -1,14 +1,13 @@
 # Plan: Back up and sync with Google Drive (revision 2)
 
 > **▶ Next session: start with [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md)**
-> (state, review findings to fix before Deploy B, and the B4 steps in order).
+> (where things stand and the prod test record).
 >
-> **Status (2026-10-11):** revised in Session 65, replacing the plan approved in
-> Session 64. Reviewed against the code in Session 66 (see "Review against the
-> code" below; its fixes are folded into the phases). **Phase A built in
-> Session 66 and shipped as Deploy A (build 198, `6e5af0c`, 2026-10-11).** Next: a few
-> days of normal folder use (the gate before Deploy S). Linked from SPECS §6 item 7
-> ("NEXT UP").
+> **Status (Session 68, 2026-10-11):** built and live on prod behind
+> `?drive=on` (Deploy B, v4). What was built is now described in SPECS §8
+> "Google Drive sync (as built)", which wins where this plan differs. Left:
+> a week of use, the iPad, then Deploy C. This plan stays as the design record:
+> the hazard register, the code review, the decisions.
 >
 > **What changed from revision 1, and why:**
 > - **A small login server (a "token broker") was added.** Without it, Google

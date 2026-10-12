@@ -5,8 +5,9 @@ canvas, map scenes with the **but / therefore** method, track characters and
 worldbuilding, and write the manuscript in the same place.
 
 End to end in one tool: no third-party integration, and none planned
-([SPECS §7](docs/SPECS.md)). The reach beyond the browser is the Android
-companion app, reading the same project file from your Google Drive folder
+([SPECS §7](docs/SPECS.md)). The reach beyond the browser is your own Google
+Drive, which every browser (including Safari and the iPad) can back up and sync
+to, and the Android companion app reading the same project file there
 ([SPECS §8](docs/SPECS.md)).
 
 ## Quick start
@@ -24,6 +25,8 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 
 - **Full spec, architecture & decisions:** [`docs/SPECS.md`](docs/SPECS.md) — read this first.
 - **Session history:** [`docs/SESSIONS.md`](docs/SESSIONS.md) — dated log of what changed when.
+- **Google Drive sync:** [SPECS §8 "Google Drive sync (as built)"](docs/SPECS.md); the plan and hazard register in [`docs/PLAN-drive-sync.md`](docs/PLAN-drive-sync.md), the test record in [`docs/HANDOFF-drive-sync.md`](docs/HANDOFF-drive-sync.md).
+- **Sign-in broker:** [`auth-server/`](auth-server/README.md) — the small server at `auth.labrarf.com` that keeps Drive signed in. Its own package and tests; deployed by Vercel, never by `npm run deploy`.
 - **Data model:** [`src/types.ts`](src/types.ts)
 - **State + actions:** [`src/store/useStore.ts`](src/store/useStore.ts)
 - **Design reference:** `Story Mapping WebApp Prototype/` (static mock, not the app)
@@ -35,7 +38,8 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 | `npm run dev` | Start the dev server |
 | `npm run build` | Typecheck + production build to `dist/` |
 | `npm run typecheck` | Types only |
-| `npm test` | Run the Sync test suite (vitest, dev-only) |
+| `npm test` | Run the app's test suite: Sync, Drive, backups (vitest, dev-only) |
+| `cd auth-server && npm test` | Run the sign-in broker's tests |
 | `npm run preview` | Serve the production build |
 | `npm run icons` | Regenerate the app icon PNGs from `public/*.svg` (needs ImageMagick + Chrome) |
 | `npm run deploy` | Build + publish to www.labrarf.com/estoria, then verify the deployed commit is live (refuses a dirty tree) |
@@ -48,3 +52,10 @@ the git commit and build time into the app (About dialog) and writes
 until `/estoria/version.json` reports the commit you deployed — so you get an
 explicit "✓ live" that the build you committed is what prod is serving. Dev
 builds show `dev` instead of a commit (a running dev server isn't a release).
+
+## Google Drive (until Deploy C)
+
+Drive sync is on prod but shows only on a device that has opened Estoria once
+with `?drive=on` (e.g. `https://www.labrarf.com/estoria/?drive=on`); the device
+remembers it, and `?drive=off` forgets it. Without it the app behaves as before
+Drive. Deploy C removes the switch.

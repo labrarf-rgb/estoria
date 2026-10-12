@@ -5813,5 +5813,14 @@ minutes). A per-person switch was discussed and not built: one user today.
 **Put off by the user:** moving the novel over to Drive (skipped for now);
 the iPad (Safari and the Home Screen app), to test at home.
 
+**Phase C docs written ahead of Deploy C:** SPECS §8 "Google Drive sync (as
+built)" (targets, the broker, what Estoria can see, file IDs, writing,
+backups, the status line, the kill switch, Android), the §4 Persist rows, §6
+item 7 marked built, §2/§3/§7 and the §8 contract brought up to date, the
+README (Drive, `auth-server`, `?drive=on`), and the plan's status header.
+Each "until Deploy C" note is marked so Deploy C only removes the switch
+and those notes. Privacy page: Disconnect now says it signs out that device
+only (ships with the next deploy).
+
 **Next:** still signed in after a day; the iPad at home; the novel when the
-user is ready; a week of use; Deploy C.
+user is ready; a week of use; Deploy C (around 2026-10-18).
