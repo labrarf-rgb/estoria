@@ -5879,6 +5879,16 @@ total is 9 units.
 
 **Verified:** 161 tests (one new in `merge.test.ts` taking author details,
 Form and Line breaks from the file together) and the typecheck; the app loads
-with no console errors. Not pushed or deployed.
+with no console errors.
 
-**Next:** the branch and its worktree can be cleaned up.
+**Shipped** (/ship): pushed to `origin/main` and deployed; prod reports v4 ·
+build 23 · `9daa8d8`.
+
+**Spec drift to settle:** SPECS §8 "Conflicts (v2)" still says Android needs
+nothing and can keep offering the whole-file choice, and the "Conflict compare
++ per-entity merge" feature row says web-only. The phone has since built its
+own Compare & merge with the same keys, and neither place mentions the
+keep-one-only case for a piece against a book.
+
+**Next:** the branch and its worktree can be cleaned up; bring those two SPECS
+passages up to date once the phone's merge is on its main.
