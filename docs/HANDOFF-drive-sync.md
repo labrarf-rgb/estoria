@@ -209,6 +209,12 @@ through the Drive API from page JS, as the phone's app would.
   Reconnect after removing access at Google (would sign out every device;
   retest with Disconnect once the fix is live), offline (unit-tested),
   another Google account, staying signed in after an hour / a day (time).
+- **Checked with the user later on 2026-10-11 (Session 68):** Disconnect in
+  Safari leaves Chrome signed in ✓ (Chrome reloaded and still backed up to
+  Drive); Reconnect in Safari ✓ (then Sync pulled the edits Chrome made
+  meanwhile, as it should); both browsers still signed in after more than an
+  hour ✓. The Disconnect fix is live. Still to do: still signed in after a day,
+  the kill switch.
 - Scratch files to delete from Drive afterwards: `drive-test*`,
   `big-drive-test*` (≈15 MB with its backups), `test-story-for-drive-sync*`,
   `test-story-for-drive-sync-test-1*`, the 4:28 PM `untitled-story.estoria.json`.
