@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { buildMarkdown } from "@/lib/markdown";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/manuscriptExport";
 import { downloadProjectFile, slugify } from "@/store/persistence";
 import { countParts, isPiece } from "@/lib/piece";
+import { authorOf, bylineOf, contactLines } from "@/lib/author";
 
 /**
  * Two exports, kept apart on purpose.
@@ -39,9 +40,14 @@ export function ExportModal() {
   const show = useStore((s) => s.showExport);
   const doc = useStore((s) => s.doc);
   const setPanel = useStore((s) => s.setPanel);
-  const setAuthor = useStore((s) => s.setAuthor);
+  const fillAuthorFromDefault = useStore((s) => s.fillAuthorFromDefault);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("map");
+  // The manuscript is where author details are used, so a project that has
+  // none picks up the saved default here, the same as opening Author details.
+  useEffect(() => {
+    if (show && tab === "manuscript") fillAuthorFromDefault();
+  }, [show, tab, fillAuthorFromDefault]);
   if (!show) return null;
   const close = () => setPanel("showExport", false);
 
@@ -49,6 +55,9 @@ export function ExportModal() {
   const written = writtenChapters(doc);
   const proseWords = manuscriptWordCount(doc);
   const slug = slugify(doc.projectTitle);
+  const author = authorOf(doc);
+  const byline = bylineOf(author);
+  const contactCount = contactLines(author).length - (author.legalName || author.byline ? 1 : 0);
 
   const copy = (text: string) => {
     navigator.clipboard?.writeText(text).catch(() => {});
@@ -108,17 +117,25 @@ export function ExportModal() {
         )}
 
         {tab === "manuscript" && (
-          <label className="flex items-center gap-[10px] border-t border-rule px-[24px] py-[10px]">
+          <div className="flex items-center gap-[10px] border-t border-rule px-[24px] py-[10px]">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">
               Author
             </span>
-            <input
-              value={doc.author ?? ""}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="For the title page and the running header"
-              className="flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-faint"
-            />
-          </label>
+            <span className={`min-w-0 flex-1 truncate text-[13px] ${byline ? "text-ink" : "text-faint"}`}>
+              {byline || "Not set. The title page will have no name on it."}
+              {byline && contactCount > 0 && (
+                <span className="text-faint">
+                  {" "}· {contactCount} contact {contactCount === 1 ? "line" : "lines"}
+                </span>
+              )}
+            </span>
+            <button
+              onClick={() => setPanel("showAuthor", true)}
+              className="rounded-lg border border-rule bg-card px-[11px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+            >
+              {byline ? "Edit" : "Add"}
+            </button>
+          </div>
         )}
 
         <div className="flex flex-wrap items-center gap-[10px] border-t border-rule px-[24px] py-4">
@@ -155,7 +172,7 @@ export function ExportModal() {
                 onClick={() =>
                   save(
                     `${slug}.docx`,
-                    buildDocx(doc, doc.author ?? ""),
+                    buildDocx(doc, author),
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   )
                 }

@@ -5824,3 +5824,43 @@ only (ships with the next deploy).
 
 **Next:** still signed in after a day; the iPad at home; the novel when the
 user is ready; a week of use; Deploy C (around 2026-10-18).
+
+### 2026-10-12 — Author details, File menu regrouped (Session 69)
+
+**Author details.** A project carries a byline (`author`, as before) and an
+optional title-page contact block, `authorContact` (legal name, address,
+phone, email, website). They're edited in the new **File → Author details**
+dialog, and the Manuscript export tab shows a one-line summary with an Edit
+button in place of its old name field. **Save as default** keeps them in this
+browser (`authorDefault`, never in the file). New projects copy the default
+in, and so does a project with no details when its details or the Manuscript
+tab are opened. It's a copy, never a live link, so each project's details go
+to Drive and Android with the file and can differ (a pen name for one series).
+The `.docx` title page: contact block single spaced at top left, with the word
+count on its first line (right tab stop); "by <byline>" under the title; the
+header uses the byline's surname. Contact lines are written as plain text, so
+an underscore in an email isn't read as markdown. Paragraph properties in the
+`.docx` are now in schema order (tabs, spacing, ind, jc), in the body and the
+header. Merge compares byline and contact as one `doc:author` row, "Author
+details". No schema bump. A whitespace-only `author` is now dropped on read,
+the same rule as the contact fields.
+
+**Android, coordinated with the session porting Compare & merge:** the phone
+built the same shape, dialog and default (its prefs, never the file) at
+commit 06a1d9a on its branch. Its merge rows `doc:form` and `doc:lineBreaks`
+were mirrored on web in a separate session (branch
+`claude/recursing-bose-94c3e5`, commit d3bf777, not merged yet).
+
+**File menu regrouped, with dividers between groups:** Open project, New
+project, the changes of form (Expand into a book / Turn into single piece /
+Make this a series), Use a template | Import markdown, Save to file, Backups
+& conflict copies, Google Drive | Author details | Contact, Install, About.
+It no longer copies the Android menu's order. The phone hasn't been asked to
+follow.
+
+**Verified:** 152 tests (8 new in `author.test.ts`) and the typecheck; a
+generated `.docx` parses; in the browser: the dialog, save as default, the
+"differs" state and Use saved default, a new project starting with the saved
+details, Edit from the Manuscript tab, and the menu for a piece and a book.
+
+**Next:** merge the merge-rows branch; decide whether the phone's menu follows.

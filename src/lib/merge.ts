@@ -204,6 +204,7 @@ export function mergeDocs(
   let books = mine.books;
   let projectTitle = mine.projectTitle;
   let author = mine.author;
+  let authorContact = mine.authorContact;
   let bookLinks = mine.bookLinks;
   let seriesMode = mine.seriesMode;
   let activeBookId = mine.activeBookId;
@@ -251,6 +252,7 @@ export function mergeDocs(
           break;
         case "author":
           author = theirs.author;
+          authorContact = theirs.authorContact;
           break;
         case "storyNotes":
           for (const [id, text] of theirsBoards.notes) boards.notes.set(id, text);
@@ -349,6 +351,7 @@ export function mergeDocs(
     ...mine,
     projectTitle,
     ...(author ? { author } : {}),
+    ...(authorContact ? { authorContact } : {}),
     seriesMode,
     characters,
     world,
@@ -357,6 +360,7 @@ export function mergeDocs(
     bookLinks,
   };
   if (!author) delete shell.author;
+  if (!authorContact) delete shell.authorContact;
 
   return { doc: normalizeDoc(recompose(shell, boards, activeBookId)), carried, fromFile };
 }

@@ -16,6 +16,7 @@ import {
   type WorldEntry,
 } from "@/types";
 import { resolveMainDraftId } from "@/lib/drafts";
+import { readContact } from "@/lib/author";
 import { syncChapterWords } from "@/lib/manuscript";
 import {
   payloadStoreAvailable,
@@ -1610,7 +1611,10 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     projectTitle: title,
     // Only the .docx export reads this, but it must survive a round trip
     // through a file like any other field the user set.
-    ...(typeof d.author === "string" && d.author ? { author: d.author } : {}),
+    // Kept as typed, but whitespace alone is no name (the same rule as
+    // `readContact`, and the one the Android app reads with).
+    ...(typeof d.author === "string" && d.author.trim() ? { author: d.author } : {}),
+    ...(readContact(d.authorContact) ? { authorContact: readContact(d.authorContact) } : {}),
     // Cross-app field stamped by whichever app last wrote the file — must
     // survive normalization or every open would look like a fresh write.
     ...(typeof d.modifiedAt === "string" && d.modifiedAt ? { modifiedAt: d.modifiedAt } : {}),

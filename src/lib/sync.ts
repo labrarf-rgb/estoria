@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
+import { AUTHOR_FIELDS, AUTHOR_LABELS, authorOf } from "@/lib/author";
 import { fileStamp, parseCopyName, writeRotatingBackup } from "@/lib/backup";
 import { getLastSynced, setLastSynced } from "@/lib/syncBaseline";
 import { DriveAccountChangedError } from "@/lib/driveErrors";
@@ -1085,10 +1086,22 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
       [{ label: "project title", mine: mine.projectTitle, theirs: theirs.projectTitle }]
     )
   );
+  // The byline and the contact block are one unit: they describe one person,
+  // and keeping one copy's name with the other's address describes nobody.
+  const mineAuthor = authorOf(mine);
+  const theirsAuthor = authorOf(theirs);
   storyWide.push(
-    docItem("author", "Author", mine.author ?? "", theirs.author ?? "", [
-      { label: "author", mine: mine.author || "not set", theirs: theirs.author || "not set" },
-    ])
+    docItem(
+      "author",
+      "Author details",
+      mineAuthor,
+      theirsAuthor,
+      AUTHOR_FIELDS.filter((k) => (mineAuthor[k] ?? "") !== (theirsAuthor[k] ?? "")).map((k) => ({
+        label: AUTHOR_LABELS[k],
+        mine: mineAuthor[k] || "not set",
+        theirs: theirsAuthor[k] || "not set",
+      }))
+    )
   );
 
   const mineNotes = notesByBook(mine);

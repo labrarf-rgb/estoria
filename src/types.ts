@@ -291,6 +291,29 @@ export interface Chapter {
   refs: PinnedRef[];
 }
 
+/**
+ * What standard manuscript format puts at the top left of a title page. Every
+ * field is optional; a missing one is simply left off the page.
+ */
+export interface AuthorContact {
+  /** The name contracts and cheques go to, when it differs from the byline. */
+  legalName?: string;
+  /** Postal address, one line per line. */
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+}
+
+/**
+ * The byline and the contact block together: the shape the author editor and
+ * the saved default both use. On a project it is split across `author` and
+ * `authorContact`, so `author` keeps meaning what it always has.
+ */
+export interface AuthorDetails extends AuthorContact {
+  byline?: string;
+}
+
 /** A connector between two chapters on the board. */
 export interface ChapterLink {
   fromId: string;
@@ -303,12 +326,22 @@ export interface StoryDoc {
   id: string;
   projectTitle: string;
   /**
-   * Who wrote it. Used only by the standard-manuscript-format export, which
-   * needs a name for the title block and the running header — nothing else in
-   * the app reads it, and no name is invented when it is absent. Optional, so
+   * Who wrote it: the name on the byline, a pen name if the writer uses one.
+   * Used by the standard-manuscript-format export for the byline and the
+   * running header, and no name is invented when it is absent. Optional, so
    * every existing document already has the shape; no `SCHEMA_VERSION` bump.
+   *
+   * Each project carries its own copy. New projects are seeded from the
+   * writer's saved default (`authorDefault` in the store, this browser only),
+   * which is what lets one project use a different pen name.
    */
   author?: string;
+  /**
+   * The contact block for the manuscript's title page. Optional and
+   * field-by-field optional, like `author`, and passed through untouched by the
+   * Android app's unknown-key handling, so no schema bump. See `lib/author.ts`.
+   */
+  authorContact?: AuthorContact;
   seriesMode: boolean;
 
   /**

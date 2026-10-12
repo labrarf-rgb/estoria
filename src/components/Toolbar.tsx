@@ -440,49 +440,16 @@ export function Toolbar() {
         >
           File <span className="opacity-70">▾</span>
         </button>
-        {/* Item names and order mirror the Android app's ⋮ menu (SPECS §8);
-            Android-only entries (Sync settings, Books/Series, Versions) are
-            simply absent here. */}
+        {/* Groups: projects and their shape; files in and out, and backups;
+            author details, on their own because they change least often; the
+            app itself. Android-only entries (Sync settings, Books/Series,
+            Versions) are simply absent here. */}
         <Popover anchorRef={fileBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={244}>
           <MenuItem
             title="Open project"
             sub="Switch between your projects"
             onClick={() => setPanel("showProjects", true)}
           />
-          <MenuItem
-            title="Save to file"
-            sub="Markdown vault or project file"
-            onClick={() => setPanel("showExport", true)}
-          />
-          <MenuItem
-            title="Import markdown"
-            sub="Bring an existing draft via AI"
-            onClick={() => setPanel("showImport", true)}
-          />
-          {/* Needs folder access (File System Access API) or Google Drive, like the footer Sync. */}
-          {(isBackupPickerSupported() || activeTarget() === "drive") && (
-            <MenuItem
-              title="Backups & conflict copies"
-              sub="Restore a copy from your Estoria folder"
-              onClick={() => setPanel("showBackups", true)}
-            />
-          )}
-          {/* Where this device backs up: connect Google Drive, or change or disconnect it. */}
-          {driveAvailableHere() && (
-            <MenuItem
-              title="Google Drive"
-              sub={
-                activeTarget() === "drive"
-                  ? `Backing up${driveAuth.connectedEmail() ? ` as ${driveAuth.connectedEmail()}` : " to your Drive"}`
-                  : "Back up and sync with your Google Drive"
-              }
-              onClick={() => {
-                closeNewMenu();
-                openDriveChooser();
-              }}
-            />
-          )}
-          <div className="mx-[6px] my-1 h-px bg-rule" />
           <MenuItem
             title="New project"
             sub="A single piece, a book, or a series"
@@ -518,6 +485,47 @@ export function Toolbar() {
               onClick={() => setPanel("showTemplates", true)}
             />
           )}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
+          <MenuItem
+            title="Import markdown"
+            sub="Bring an existing draft via AI"
+            onClick={() => setPanel("showImport", true)}
+          />
+          <MenuItem
+            title="Save to file"
+            sub="Markdown vault or project file"
+            onClick={() => setPanel("showExport", true)}
+          />
+          {/* Needs folder access (File System Access API) or Google Drive, like the footer Sync. */}
+          {(isBackupPickerSupported() || activeTarget() === "drive") && (
+            <MenuItem
+              title="Backups & conflict copies"
+              sub="Restore a copy from your Estoria folder"
+              onClick={() => setPanel("showBackups", true)}
+            />
+          )}
+          {/* Where this device backs up: connect Google Drive, or change or disconnect it. */}
+          {driveAvailableHere() && (
+            <MenuItem
+              title="Google Drive"
+              sub={
+                activeTarget() === "drive"
+                  ? `Backing up${driveAuth.connectedEmail() ? ` as ${driveAuth.connectedEmail()}` : " to your Drive"}`
+                  : "Back up and sync with your Google Drive"
+              }
+              onClick={() => {
+                closeNewMenu();
+                openDriveChooser();
+              }}
+            />
+          )}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
+          <MenuItem
+            title="Author details"
+            sub="Byline and contact for the title page"
+            onClick={() => setPanel("showAuthor", true)}
+          />
+
           <div className="mx-[6px] my-1 h-px bg-rule" />
           <a
             href="https://www.labrarf.com/contact"

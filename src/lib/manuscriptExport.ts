@@ -1,4 +1,5 @@
-import type { Chapter, StoryDoc } from "@/types";
+import type { AuthorDetails, Chapter, StoryDoc } from "@/types";
+import { bylineOf, contactLines } from "@/lib/author";
 import { countWords, parseBlocks, taskItem, type Block } from "@/lib/manuscript";
 import { inlineTokens } from "@/lib/inline";
 import { zipStore } from "@/lib/zip";
@@ -76,19 +77,33 @@ const esc = (s: string): string =>
 /** One `<w:p>`, with the paragraph properties standard format asks for. */
 function para(
   runs: string,
-  opts: { align?: "center" | "right"; indent?: boolean; pageBreakBefore?: boolean } = {}
+  opts: {
+    align?: "center" | "right";
+    indent?: boolean;
+    pageBreakBefore?: boolean;
+    /** Single spaced, for the title page's contact block. */
+    single?: boolean;
+    /** A right-aligned tab stop at the right margin (6.5" of text width). */
+    rightTab?: boolean;
+  } = {}
 ): string {
   const pPr =
     "<w:pPr>" +
     (opts.pageBreakBefore ? "<w:pageBreakBefore/>" : "") +
-    (opts.align ? `<w:jc w:val="${opts.align}"/>` : "") +
+    (opts.rightTab ? '<w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>' : "") +
+    (opts.single ? '<w:spacing w:line="240" w:lineRule="auto"/>' : "") +
     // Standard format indents every paragraph half an inch *except* the first
     // of a chapter or scene, which is exactly where a reader needs the break to
     // be visible rather than assumed.
     `<w:ind w:firstLine="${opts.indent ? 720 : 0}"/>` +
+    // After `ind`: the schema fixes the order of paragraph properties.
+    (opts.align ? `<w:jc w:val="${opts.align}"/>` : "") +
     "</w:pPr>";
   return `<w:p>${pPr}${runs}</w:p>`;
 }
+
+/** One run of literal text, with no markdown read into it. */
+const plainRun = (text: string): string => `<w:r><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
 
 const runsFor = (line: string): string =>
   inlineTokens(line)
@@ -195,7 +210,7 @@ function header(surname: string, title: string): string {
   const label = esc(`${surname ? `${surname} / ` : ""}${title} / `);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:line="240" w:lineRule="auto"/></w:pPr>
+<w:p><w:pPr><w:spacing w:line="240" w:lineRule="auto"/><w:jc w:val="right"/></w:pPr>
 <w:r><w:t xml:space="preserve">${label}</w:t></w:r>
 <w:r><w:fldChar w:fldCharType="begin"/></w:r>
 <w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>
@@ -211,9 +226,10 @@ function header(surname: string, title: string): string {
  * running header. This is the export agents and beta readers expect, and the
  * one thing an Obsidian vault cannot produce.
  */
-export function buildDocx(doc: StoryDoc, author: string): Uint8Array {
+export function buildDocx(doc: StoryDoc, author: AuthorDetails): Uint8Array {
   const title = doc.projectTitle || "Untitled";
-  const surname = author.trim().split(/\s+/).slice(-1)[0] ?? "";
+  const byline = bylineOf(author);
+  const surname = byline.split(/\s+/).slice(-1)[0] ?? "";
   const words = manuscriptWordCount(doc);
   // Submissions round the count; an exact figure reads as a word processor's
   // opinion rather than an author's.
@@ -221,13 +237,22 @@ export function buildDocx(doc: StoryDoc, author: string): Uint8Array {
 
   const body: string[] = [];
 
-  // Title page: contact block top left, word count top right, title a third of
-  // the way down. No author name is invented when none was given.
-  if (author.trim()) body.push(para(runsFor(author.trim())));
-  body.push(para(runsFor(`about ${rounded} words`), { align: "right" }));
+  // Title page: contact block top left, single spaced, with the word count
+  // level with its first line at the right margin (a right tab stop, which is
+  // how Word puts two things on one line); title a third of the way down. No
+  // author name is invented when none was given. Contact lines are written as
+  // plain text, so an underscore in an email address stays an underscore.
+  const count = `about ${rounded} words`;
+  const [first, ...rest] = contactLines(author);
+  if (first) {
+    body.push(para(plainRun(first) + "<w:r><w:tab/></w:r>" + plainRun(count), { single: true, rightTab: true }));
+    for (const line of rest) body.push(para(plainRun(line), { single: true }));
+  } else {
+    body.push(para(plainRun(count), { align: "right", single: true }));
+  }
   for (let i = 0; i < 6; i++) body.push(para(""));
   body.push(para(runsFor(title), { align: "center" }));
-  if (author.trim()) body.push(para(runsFor(`by ${author.trim()}`), { align: "center" }));
+  if (byline) body.push(para(plainRun(`by ${byline}`), { align: "center" }));
 
   const piece = isPiece(doc);
   for (const c of writtenChapters(doc)) {

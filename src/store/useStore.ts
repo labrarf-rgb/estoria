@@ -4,6 +4,7 @@ import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
   type Asset,
+  type AuthorDetails,
   type BookData,
   type Chapter,
   type Character,
@@ -36,6 +37,7 @@ import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
+import { authorOf, cleanAuthor, hasAuthor, withAuthor } from "@/lib/author";
 import {
   autoArrange,
   bestColumns,
@@ -136,6 +138,14 @@ interface UiState {
   showBackups: boolean;
   showAbout: boolean;
   showInstall: boolean;
+  showAuthor: boolean;
+  /**
+   * The writer's saved author details (persisted, global, this browser only).
+   * Copied into each new project, and into an existing project that has none
+   * the first time its details are looked at; never read live, so every
+   * project file carries its own copy to Drive and Android. See `lib/author.ts`.
+   */
+  authorDefault: AuthorDetails;
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
@@ -274,8 +284,12 @@ interface StoreState extends UiState {
 
   // ---- project ----
   setProjectTitle: (title: string) => void;
-  /** Author name, used only by the standard-manuscript-format export. */
-  setAuthor: (author: string) => void;
+  /** This project's byline and title-page contact block. */
+  setAuthorDetails: (details: AuthorDetails) => void;
+  /** Save details as the default every new project starts with. */
+  setAuthorDefault: (details: AuthorDetails) => void;
+  /** Give this project the saved default, but only if it has no details of its own. */
+  fillAuthorFromDefault: () => void;
   listProjects: () => ProjectMeta[];
   switchProject: (id: string) => void;
   /** `piece` starts a single piece of that kind instead of a book. */
@@ -491,7 +505,8 @@ export type PanelKey =
   | "showProjects"
   | "showBackups"
   | "showAbout"
-  | "showInstall";
+  | "showInstall"
+  | "showAuthor";
 
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
@@ -733,6 +748,8 @@ const initialUi: UiState = {
   showBackups: false,
   showAbout: false,
   showInstall: false,
+  showAuthor: false,
+  authorDefault: {},
   selChar: null,
   selWorld: null,
   selBook: null,
@@ -832,8 +849,16 @@ export const useStore = create<StoreState>()(
           };
         }),
 
-      setAuthor: (author) =>
-        set((s) => ({ doc: { ...s.doc, author: author.trim() ? author : undefined } })),
+      setAuthorDetails: (details) => set((s) => ({ doc: withAuthor(s.doc, details) })),
+
+      setAuthorDefault: (details) => set({ authorDefault: cleanAuthor(details) }),
+
+      fillAuthorFromDefault: () =>
+        set((s) =>
+          hasAuthor(authorOf(s.doc)) || !hasAuthor(s.authorDefault)
+            ? s
+            : { doc: withAuthor(s.doc, s.authorDefault) }
+        ),
 
       listProjects: () => {
         const s = get();
@@ -875,7 +900,7 @@ export const useStore = create<StoreState>()(
 
       newProject: ({ series, keepCurrent, piece }) =>
         set((s) => {
-          const fresh = piece ? newPiece(piece) : emptyStory();
+          const fresh = withAuthor(piece ? newPiece(piece) : emptyStory(), s.authorDefault);
           if (series && !piece) {
             fresh.seriesMode = true;
           }
@@ -2582,8 +2607,8 @@ export const useStore = create<StoreState>()(
         ),
       startFresh: () =>
         guardReplace(get, "Start a new, empty project?", () =>
-          set({
-            doc: emptyStory(),
+          set((s) => ({
+            doc: withAuthor(emptyStory(), s.authorDefault),
             onboarded: true,
             level: "book",
             view: "board",
@@ -2592,7 +2617,7 @@ export const useStore = create<StoreState>()(
             // book goes on to the templates from there.
             showNewBook: true,
             showTemplates: false,
-          })
+          }))
         ),
     }),
     {
@@ -2603,6 +2628,7 @@ export const useStore = create<StoreState>()(
         doc: s.doc,
         projectStash: s.projectStash,
         theme: s.theme,
+        authorDefault: s.authorDefault,
         view: s.view,
         timelineOrient: s.timelineOrient,
         timelinePane: s.timelinePane,
