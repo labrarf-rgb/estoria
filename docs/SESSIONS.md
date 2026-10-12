@@ -5810,5 +5810,8 @@ backup copy; the kill switch is a topic for then. How to use it is in the
 handoff (set `DRIVE_STATUS=off`, then redeploy; open tabs pause within 30
 minutes). A per-person switch was discussed and not built: one user today.
 
-**Next:** still signed in after a day; move the novel over; the iPad; a week
-of use; Deploy C.
+**Put off by the user:** moving the novel over to Drive (skipped for now);
+the iPad (Safari and the Home Screen app), to test at home.
+
+**Next:** still signed in after a day; the iPad at home; the novel when the
+user is ready; a week of use; Deploy C.
