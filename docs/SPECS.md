@@ -333,9 +333,11 @@ estoria/
    │                          #   (2048), JPEG unless the source carries alpha,
    │                          #   GIF/SVG untouched
    └─ components/
-      ├─ Toolbar.tsx          # identity/rename, File menu, view + version controls.
-      │                       #   File menu groups: projects and their shape; files in
-      │                       #   and out, and backups; Author details; the app
+      ├─ Toolbar.tsx          # identity/rename, File + Settings menus, view + version controls.
+      │                       #   File is the work: projects and their shape; files in
+      │                       #   and out, and backups; Author details. Settings is the
+      │                       #   app: zoom, theme, Google Drive; then Install (dot on the
+      │                       #   button until installed), Contact, About
       ├─ Board.tsx            # story map: pan/zoom/drag, cards, connectors
       ├─ Timeline.tsx         # chapter rail + scene-flow pane (scrolling, no camera)
       ├─ SeriesMap.tsx        # series-level board: book cards + links

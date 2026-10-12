@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
@@ -50,43 +50,13 @@ export function Toolbar() {
   const [versionMenu, setVersionMenu] = useState(false);
   // "+ Add version" expands into the prose question rather than acting at once.
   const [forkChoice, setForkChoice] = useState(false);
-  const [moreMenu, setMoreMenu] = useState(false);
-  const [compact, setCompact] = useState(false);
+  const [settingsMenu, setSettingsMenu] = useState(false);
   const versionBtnRef = useRef<HTMLButtonElement>(null);
   const fileBtnRef = useRef<HTMLButtonElement>(null);
-  const moreBtnRef = useRef<HTMLButtonElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
-
-  // Collapse the zoom + theme controls into a "more" menu only when the toolbar
-  // genuinely doesn't fit. We remember the width the bar needs while expanded
-  // (`fullWidth`) so that, once compacted, we know exactly when there's room to
-  // expand again — instead of guessing from the compacted layout's own width.
-  const compactRef = useRef(false);
-  compactRef.current = compact;
-  const fullWidth = useRef(0);
-  useLayoutEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const measure = () => {
-      if (!el.isConnected) return;
-      if (!compactRef.current) {
-        // Expanded: this is the true width everything needs.
-        fullWidth.current = el.scrollWidth;
-        if (el.scrollWidth > el.clientWidth + 2) setCompact(true);
-      } else {
-        // Compacted: expand once the viewport can hold the full bar again.
-        if (fullWidth.current && el.clientWidth >= fullWidth.current + 8) setCompact(false);
-      }
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  });
+  const settingsBtnRef = useRef<HTMLButtonElement>(null);
+  // Install is offered until Estoria runs in its own window; until then the
+  // Settings button carries a dot so the offer isn't buried in a menu.
+  const offerInstall = !isStandalone();
 
   const words = doc.chapters.reduce((a, c) => a + c.words, 0);
   const activeBook = doc.books.find((b) => b.id === doc.activeBookId);
@@ -141,7 +111,6 @@ export function Toolbar() {
 
   return (
     <div
-      ref={barRef}
       className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Brand wordmark */}
@@ -436,14 +405,15 @@ export function Toolbar() {
         <button
           ref={fileBtnRef}
           onClick={toggleNewMenu}
-          className="flex items-center gap-[6px] whitespace-nowrap rounded-lg bg-ink px-3 py-[7px] text-[12px] font-semibold text-bg"
+          className="flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-semibold text-ink hover:border-faint"
         >
           File <span className="opacity-70">▾</span>
         </button>
-        {/* Groups: projects and their shape; files in and out, and backups;
-            author details, on their own because they change least often; the
-            app itself. Android-only entries (Sync settings, Books/Series,
-            Versions) are simply absent here. */}
+        {/* Your work only; the app itself lives under Settings. Groups:
+            projects and their shape; files in and out, and backups; author
+            details, on their own because they change least often. Android-only
+            entries (Sync settings, Books/Series, Versions) are simply absent
+            here. */}
         <Popover anchorRef={fileBtnRef} open={newMenu} onClose={closeNewMenu} align="right" width={244}>
           <MenuItem
             title="Open project"
@@ -504,6 +474,62 @@ export function Toolbar() {
               onClick={() => setPanel("showBackups", true)}
             />
           )}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
+          <MenuItem
+            title="Author details"
+            sub="Byline and contact for the title page"
+            onClick={() => setPanel("showAuthor", true)}
+          />
+        </Popover>
+      </div>
+
+      {/* Settings: the app rather than the work. Display first, then where
+          this device backs up, then the "about this app" items last, the way
+          a Settings screen ends on iOS, Android and Windows. */}
+      <div className="shrink-0">
+        <button
+          ref={settingsBtnRef}
+          onClick={() => setSettingsMenu((v) => !v)}
+          className="relative flex items-center gap-[6px] whitespace-nowrap rounded-lg border border-rule bg-card px-3 py-[7px] text-[12px] font-semibold text-ink hover:border-faint"
+        >
+          Settings <span className="opacity-70">▾</span>
+          {offerInstall && (
+            <span
+              aria-label="Install available"
+              className="absolute -right-[3px] -top-[3px] h-[8px] w-[8px] rounded-full border-2 border-panel bg-but"
+            />
+          )}
+        </button>
+        <Popover
+          anchorRef={settingsBtnRef}
+          open={settingsMenu}
+          onClose={() => setSettingsMenu(false)}
+          align="right"
+          width={244}
+        >
+          {/* Stays open while stepping, so you can watch the board resize. */}
+          {showZoom && (
+            <div className="flex items-center justify-between px-[11px] py-[6px]">
+              <span className="text-[12.5px] font-semibold text-ink">Zoom</span>
+              <div className="flex items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
+                <button onClick={zoomOut} className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card">−</button>
+                <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button onClick={zoomIn} className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card">+</button>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-between rounded-lg px-[11px] py-[9px] text-left hover:bg-chip"
+          >
+            <span className="text-[12.5px] font-semibold text-ink">Theme</span>
+            <span className="flex items-center gap-[6px] text-[11px] font-medium text-soft">
+              <ThemeIcon theme={theme} />
+              {theme === "dark" ? "Dark" : "Light"}
+            </span>
+          </button>
           {/* Where this device backs up: connect Google Drive, or change or disconnect it. */}
           {driveAvailableHere() && (
             <MenuItem
@@ -514,105 +540,42 @@ export function Toolbar() {
                   : "Back up and sync with your Google Drive"
               }
               onClick={() => {
-                closeNewMenu();
+                setSettingsMenu(false);
                 openDriveChooser();
               }}
             />
           )}
           <div className="mx-[6px] my-1 h-px bg-rule" />
-          <MenuItem
-            title="Author details"
-            sub="Byline and contact for the title page"
-            onClick={() => setPanel("showAuthor", true)}
-          />
-
-          <div className="mx-[6px] my-1 h-px bg-rule" />
+          {/* Pointless once Estoria is already running in its own window. */}
+          {offerInstall && (
+            <MenuItem
+              title="Install Estoria"
+              sub="Own window and icon, works offline"
+              onClick={() => {
+                setSettingsMenu(false);
+                setPanel("showInstall", true);
+              }}
+            />
+          )}
           <a
             href="https://www.labrarf.com/contact"
             target="_blank"
             rel="noopener noreferrer"
-            onClick={closeNewMenu}
+            onClick={() => setSettingsMenu(false)}
             className="flex flex-col gap-[2px] rounded-lg px-[11px] py-[9px] text-left hover:bg-chip"
           >
             <span className="text-[12.5px] font-semibold text-ink">Contact</span>
             <span className="text-[11px] font-normal text-soft">Questions, feedback, or say hello</span>
           </a>
-          {/* Pointless once Estoria is already running in its own window. */}
-          {!isStandalone() && (
-            <MenuItem
-              title="Install Estoria"
-              sub="Own window and icon, works offline"
-              onClick={() => setPanel("showInstall", true)}
-            />
-          )}
-          <MenuItem title="About Estoria" onClick={() => setPanel("showAbout", true)} />
+          <MenuItem
+            title="About Estoria"
+            onClick={() => {
+              setSettingsMenu(false);
+              setPanel("showAbout", true);
+            }}
+          />
         </Popover>
       </div>
-
-      {/* Utility controls: inline when they fit, otherwise a "more" menu. */}
-      {compact ? (
-        <div className="shrink-0">
-          <button
-            ref={moreBtnRef}
-            onClick={() => setMoreMenu((v) => !v)}
-            title="More controls"
-            className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-rule bg-card text-[18px] leading-none text-ink hover:border-faint"
-          >
-            ⋯
-          </button>
-          <Popover anchorRef={moreBtnRef} open={moreMenu} onClose={() => setMoreMenu(false)} align="right" width={200}>
-            {showZoom && (
-              <div className="flex items-center justify-between px-[8px] py-[6px]">
-                <span className="text-[12px] font-medium text-soft">Zoom</span>
-                <div className="flex items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
-                  <button onClick={zoomOut} className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card">−</button>
-                  <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
-                    {Math.round(zoom * 100)}%
-                  </span>
-                  <button onClick={zoomIn} className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card">+</button>
-                </div>
-              </div>
-            )}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-between rounded-lg px-[8px] py-[8px] text-left text-[12.5px] font-medium text-ink hover:bg-chip"
-            >
-              Theme
-              <span className="text-soft">{theme === "dark" ? "Dark" : "Light"}</span>
-            </button>
-          </Popover>
-        </div>
-      ) : (
-        <>
-          {showZoom && (
-            <div className="flex shrink-0 items-center gap-[2px] rounded-[9px] bg-chip p-[3px]">
-              <button
-                onClick={zoomOut}
-                className="h-[24px] w-[26px] rounded-md text-[16px] font-semibold text-ink hover:bg-card"
-              >
-                −
-              </button>
-              <span className="min-w-[40px] text-center font-mono text-[11px] font-medium text-soft">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button
-                onClick={zoomIn}
-                className="h-[24px] w-[26px] rounded-md text-[15px] font-semibold text-ink hover:bg-card"
-              >
-                +
-              </button>
-            </div>
-          )}
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Toggle light mode" : "Toggle dark mode"}
-            title={theme === "dark" ? "Toggle light mode" : "Toggle dark mode"}
-            className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full border border-rule bg-transparent text-soft transition-colors duration-200 hover:border-soft hover:bg-card hover:text-ink"
-          >
-            <ThemeIcon theme={theme} />
-          </button>
-        </>
-      )}
     </div>
   );
 }
