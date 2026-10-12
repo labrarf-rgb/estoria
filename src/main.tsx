@@ -5,7 +5,6 @@ import "./index.css";
 // its listener has to be registered at startup (see lib/install.ts).
 import "@/lib/install";
 import { resetIfRequested } from "@/lib/sw";
-import { applyDriveSwitchFromUrl } from "@/lib/syncTarget";
 import { requestDurableStorage } from "@/lib/storageDurability";
 import { App } from "@/App";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -18,9 +17,6 @@ if (!resetIfRequested()) {
   // Ask the browser to stop treating this origin's storage as disposable.
   // Fire-and-forget: nothing waits on the answer, but About reports it.
   void requestDurableStorage();
-  // "?drive=on" / "?drive=off": the per-device Drive switch (Deploy B). Read
-  // before the first render so the footer starts on the right target.
-  applyDriveSwitchFromUrl();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       {/* Outermost, and therefore the one that catches what nothing else did.

@@ -19,7 +19,6 @@ import { activeTarget, chosenTarget, driveAvailableHere } from "@/lib/syncTarget
 /**
  * Where this device backs up: Google Drive, or (desktop Chrome) a folder on
  * this computer. Opened by Sync when nothing is chosen yet, and by "Change…".
- * Only exists on devices with Drive switched on (`?drive=on`).
  */
 export function DriveChooserModal() {
   const session = useDriveSession();

@@ -6,17 +6,12 @@ import type { SyncTarget } from "@/lib/syncFolder";
  * Which Estoria folder this device syncs with, and whether Drive may write
  * right now (docs/PLAN-drive-sync.md, Phase B and "Prod safety").
  *
- * - **Per-device switch (Deploy B):** Drive exists only on devices where
- *   `?drive=on` was opened once (remembered on that device; `?drive=off`
- *   forgets it). Everywhere else this module reports the folder target and
- *   the app behaves exactly as before.
  * - **Target:** chosen per device. Safari, Firefox and iPad can only use Drive;
  *   desktop Chrome can use either.
  * - **Kill switch:** the broker's `/status`. Until it has answered "on" (at
  *   startup, then every 30 minutes) Drive does no writes.
  */
 
-const SWITCH_KEY = "estoria:drive:enabled";
 const TARGET_KEY = "estoria:sync:target";
 const FOLDER_KEY = "estoria:drive:folder";
 const STATUS_EVERY_MS = 30 * 60 * 1000;
@@ -38,19 +33,9 @@ function write(key: string, value: string | null): void {
   }
 }
 
-/** Read `?drive=on|off` once at startup, remember it on this device, and tidy the address bar. */
-export function applyDriveSwitchFromUrl(): void {
-  const url = new URL(location.href);
-  const v = url.searchParams.get("drive");
-  if (v !== "on" && v !== "off") return;
-  write(SWITCH_KEY, v === "on" ? "1" : null);
-  url.searchParams.delete("drive");
-  history.replaceState(history.state, "", url.pathname + url.search + url.hash);
-}
-
 /** Drive is offered on this device. */
 export function driveAvailableHere(): boolean {
-  return driveConfigured() && read(SWITCH_KEY) === "1";
+  return driveConfigured();
 }
 
 export function chosenTarget(): SyncTarget | null {
@@ -62,7 +47,7 @@ export function setChosenTarget(target: SyncTarget | null): void {
   write(TARGET_KEY, target);
 }
 
-/** The target sync uses. Without the Drive switch, always the folder, exactly as before. */
+/** The target sync uses: the folder unless this device chose Drive. */
 export function activeTarget(): SyncTarget {
   return chosenTarget() === "drive" && driveAvailableHere() ? "drive" : "folder";
 }

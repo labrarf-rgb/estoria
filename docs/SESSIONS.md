@@ -5931,3 +5931,26 @@ not a parity gap. Recorded in SPECS (the "File and Settings menus" row) and in
 the Android SPECS §7.
 
 **Next:** none for this change.
+
+### 2026-10-12 (d) — Deploy C: Drive on every device
+
+Chrome on the iPad had no Google Drive row: the per-device `?drive=on` switch
+lives in each browser's own storage. Typing it in worked and sign-in held. The
+iPad's Home Screen app can't be given the switch at all (its own storage, no
+address bar, `start_url` is `./`), and with one user the switch protected no
+one, so **the user called Deploy C now** instead of after the week of use
+(planned around 2026-10-18).
+
+- `syncTarget.ts`: `applyDriveSwitchFromUrl` and `estoria:drive:enabled` are
+  gone; `driveAvailableHere()` is just `driveConfigured()`. Emptying
+  `clientId` in `driveConfig.ts` still takes Drive out entirely (added to the
+  SPECS §8 rollback line). An old `?drive=on` in a bookmark is now ignored.
+- Docs: README's "until Deploy C" section removed; SPECS §3 tree, §4 Persist
+  row, §6 item 7 status and the §8 note; the plan's status header.
+
+**Verified:** in the browser preview with the switch key cleared, Settings
+shows Google Drive and the footer shows Sync. 161 tests and the typecheck
+pass.
+
+**Still to check in real use:** the iPad (Safari, Chrome, the Home Screen
+app), still signed in after a day.

@@ -48,7 +48,7 @@ export function ProjectsModal() {
   const [mergeId, setMergeId] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
 
-  // Google Drive (behind ?drive=on, when it's this device's target).
+  // Google Drive, when it's this device's target.
   useDriveSession();
   const driveFolder = activeTarget() === "drive" ? driveSyncFolder() : null;
   /** "Open from Google Drive": the folder's projects, null while closed. */

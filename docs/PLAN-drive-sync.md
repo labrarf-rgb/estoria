@@ -3,10 +3,10 @@
 > **▶ Next session: start with [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md)**
 > (where things stand and the prod test record).
 >
-> **Status (Session 68, 2026-10-11):** built and live on prod behind
-> `?drive=on` (Deploy B, v4). What was built is now described in SPECS §8
-> "Google Drive sync (as built)", which wins where this plan differs. Left:
-> a week of use, the iPad, then Deploy C. This plan stays as the design record:
+> **Status (2026-10-12):** built and live on prod for every device (Deploy C,
+> v4; the week of use behind `?drive=on` was cut short by the user's call).
+> What was built is now described in SPECS §8 "Google Drive sync (as built)",
+> which wins where this plan differs. This plan stays as the design record:
 > the hazard register, the code review, the decisions.
 >
 > **What changed from revision 1, and why:**

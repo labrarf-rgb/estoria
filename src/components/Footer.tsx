@@ -70,7 +70,7 @@ export function Footer() {
   // app. Hidden entirely where folder access doesn't exist (Firefox/Safari,
   // cross-origin embeds) — those contexts keep local auto-save + export menus.
   const pickerSupported = isBackupPickerSupported();
-  // Google Drive (behind ?drive=on): re-render on any change to the target,
+  // Google Drive: re-render on any change to the target,
   // the sign-in, the kill switch or a notice.
   const session = useDriveSession();
   const driveHere = driveAvailableHere();

@@ -120,8 +120,8 @@ function clearWant(projectId: string): void {
 
 /**
  * After a new project is created: ask whether to back it up to Google Drive,
- * or, on a device not connected yet, whether to connect. Only on devices with
- * Drive switched on, and never on one that chose a folder on this computer.
+ * or, on a device not connected yet, whether to connect. Never on a device
+ * that chose a folder on this computer.
  */
 export function offerDriveBackup(): void {
   if (!driveAvailableHere() || chosenTarget() === "folder") return;

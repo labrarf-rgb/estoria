@@ -52,10 +52,3 @@ the git commit and build time into the app (About dialog) and writes
 until `/estoria/version.json` reports the commit you deployed — so you get an
 explicit "✓ live" that the build you committed is what prod is serving. Dev
 builds show `dev` instead of a commit (a running dev server isn't a release).
-
-## Google Drive (until Deploy C)
-
-Drive sync is on prod but shows only on a device that has opened Estoria once
-with `?drive=on` (e.g. `https://www.labrarf.com/estoria/?drive=on`); the device
-remembers it, and `?drive=off` forgets it. Without it the app behaves as before
-Drive. Deploy C removes the switch.

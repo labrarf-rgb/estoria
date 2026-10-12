@@ -298,7 +298,7 @@ estoria/
    │  ├─ syncFolder.ts        # SyncFolder: read/write/list/remove behind one interface
    │  │                       #   (LocalFolder; DriveFolder in driveFolder.ts)
    │  ├─ syncTarget.ts        # per-device target (folder / Drive / none), the
-   │  │                       #   `?drive=on` switch, the kill switch (§8 "Google Drive")
+   │  │                       #   kill switch (§8 "Google Drive")
    │  ├─ syncBaseline.ts      # forget a project's "last agreed" fingerprint on re-link
    │  ├─ drive.ts             # Drive REST v3 over fetch: backoff, resumable over 4 MB
    │  ├─ driveAuth.ts         # the broker client: in-memory token, quiet refresh
@@ -481,7 +481,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Onboarding | The chooser knows when it's wrong | ✅ | If it comes up over a document with work in it, "Keep working on this" leads and resolves the state without touching anything. The two replacing options go through a confirm that names the project and **carries a "Download a copy"** — the welcome screen is a full-screen overlay, so pointing at the File menu underneath it would be advice you cannot follow. Skipped entirely on a genuine first launch, where `doc` is still the untouched `sampleStory` object. |
 | Onboarding | The sample opens as a map | ✅ | Its authored coordinates run left to right across ~2100px, so `useSample` auto-arranges on load with `bestColumns` sized to the current window (2026-08-11). The "Alt ending" fork takes the same positions — it exists to compare two endings, and the map shouldn't move underneath that. |
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon. Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only), and saves the local state as a `-before-pull` backup before loading a newer file. Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Runs over either target (next row). Replaced the "Back up" button 2026-07-03; see §8. |
-| Persist | Two targets: a folder, or Google Drive | ✅ | Chosen per device under Settings → Google Drive ("Back up with…"). **A folder on this computer** (File System Access API, desktop Chrome/Edge only), or **Google Drive** through Drive's API on any browser, including Safari, Firefox and the iPad. Drive signs in once per device through the broker at `auth.labrarf.com` and stays signed in; files are addressed by Drive file ID, renamed in place, and never created without asking. A device with no target keeps local auto-save and the export menus. **Until Deploy C, Drive shows only on a device opened once with `?drive=on`.** Built Sessions 66-67, Deploy B 2026-10-11; see §8 "Google Drive sync (as built)". |
+| Persist | Two targets: a folder, or Google Drive | ✅ | Chosen per device under Settings → Google Drive ("Back up with…"). **A folder on this computer** (File System Access API, desktop Chrome/Edge only), or **Google Drive** through Drive's API on any browser, including Safari, Firefox and the iPad. Drive signs in once per device through the broker at `auth.labrarf.com` and stays signed in; files are addressed by Drive file ID, renamed in place, and never created without asking. A device with no target keeps local auto-save and the export menus. Built Sessions 66-67, Deploy B 2026-10-11 (behind a per-device switch), Deploy C 2026-10-12 (on every device); see §8 "Google Drive sync (as built)". |
 | Persist | Drive status, Open from Drive, Back up all | ✅ | Footer line says when Drive last got this project's work, or why it didn't (needs reconnecting, paused, offline, changed elsewhere, can't see the file, other account). The Projects window shows each project's Drive state, **Open from Google Drive…** (how a new device or a wiped iPad gets its projects) and **Back up all to Drive**. New projects ask whether to back up to Drive. §8 "Google Drive sync (as built)". |
 | Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
@@ -526,21 +526,22 @@ Node 20+ (developed on Node 24). VS Code: install the recommended extensions
 5. ~~**Markdown import parser**~~ — ✅ done (Session 9). `parseImportMarkdown`.
 6. ~~**Open a project file from disk**~~ — ✅ done (Session 9). "Open file..." in
    the Projects modal. (Drag-drop onto the board still a nice-to-have.)
-7. **Cloud backend = Google Drive + Google sign-in** — ✅ **built**, Deploy B
-   live 2026-10-11 (v4), described in §8 "Google Drive sync (as built)". It
+7. **Cloud backend = Google Drive + Google sign-in** — ✅ **built**, Deploy C
+   2026-10-12 (v4), described in §8 "Google Drive sync (as built)". It
    became Drive as a second Sync target (a `SyncFolder`) plus a small sign-in
    broker at `auth.labrarf.com`, not a `GoogleDriveStorageAdapter`; the app
    stays on labrarf.com. This is the **only** external surface Estoria is
    getting: third-party integrations are closed (§7).
 
-   > **Status (Session 68, 2026-10-11).** On prod behind the per-device
-   > `?drive=on` switch, and checked there end to end (connect, existing
-   > folder, mirror, changed elsewhere, conflict + merge, rotation, history +
-   > restore, Open from Drive, a 5 MB project, two tabs, Disconnect on one
-   > device, still signed in after an hour). **Left before Deploy C:** a week
-   > of real use, the iPad (Safari and the Home Screen app), still signed in
-   > after a day. **Deploy C** then removes the switch and the "Until Deploy
-   > C" notes in §4 and §8. The record is
+   > **Status (2026-10-12).** On prod for every device since Deploy C, which
+   > removed the per-device `?drive=on` switch Deploy B shipped behind. Checked
+   > on prod end to end before that (connect, existing folder, mirror, changed
+   > elsewhere, conflict + merge, rotation, history + restore, Open from
+   > Drive, a 5 MB project, two tabs, Disconnect on one device, still signed
+   > in after an hour). Deploy C came ahead of the planned week of use, by the
+   > user's call: one user, and the switch couldn't reach the iPad's Home
+   > Screen app. **Still to check in real use:** the iPad (Safari, Chrome and
+   > the Home Screen app), still signed in after a day. The record is
    > [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md); the design and its
    > hazard register are [`PLAN-drive-sync.md`](PLAN-drive-sync.md).
    > **Not part of it:** loading only the open project at startup (§10.7
@@ -839,12 +840,10 @@ with it, it wins (marked inline).
   immediately with no backend. Real collaboration (live cursors etc.) would be
   a new adapter added later — both can coexist.
 
-### Google Drive sync (as built, Deploy B 2026-10-11)
+### Google Drive sync (as built, Deploy C 2026-10-12)
 
-> **Until Deploy C** Drive appears only on a device that has opened Estoria
-> once with `?drive=on` (remembered in `estoria:drive:enabled`; `?drive=off`
-> forgets it). Without it the app behaves exactly as before Drive. Deploy C
-> removes the switch and this note. The design and its reasoning are in
+> Offered on every device since Deploy C (Deploy B, 2026-10-11, showed it only
+> on devices opened once with `?drive=on`). The design and its reasoning are in
 > [`PLAN-drive-sync.md`](PLAN-drive-sync.md) (the hazard register, H1-H17);
 > the prod test record is in [`HANDOFF-drive-sync.md`](HANDOFF-drive-sync.md).
 
@@ -985,7 +984,8 @@ the same file through Android's file picker. Its own Drive to-do list (including
 the backup-prune fix the web made) is in Estoria-aa `docs/SPECS.md` §7.
 
 **Rollback.** The app and the broker deploy separately. The app: redeploy an
-earlier commit. Drive writes only: the kill switch.
+earlier commit. Drive writes only: the kill switch. Drive out of the app
+entirely: empty `clientId` in `lib/driveConfig.ts` and deploy.
 
 ### Implementation notes (from the 2026-07-01 code review)
 
