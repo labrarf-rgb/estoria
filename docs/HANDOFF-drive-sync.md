@@ -27,7 +27,7 @@ every value and status). The history is the Session 66 entry in
 | Pushed | `feature/drive-sync` is on origin (B1-B3b and this handoff). Session 67's fixes are committed on top, not yet pushed. |
 | Local dev config | `.claude/launch.json` has an `estoria-auth-local` entry (runs `node auth-server/dev.mjs` on port 3000), committed with this handoff. |
 | Prod app | **Deploy B live 2026-10-11:** v4.0.0, build 217 (`a901e78`), `main` merged from `feature/drive-sync` (`0cfe0e8`). Drive hidden without `?drive=on` (checked on prod: no Drive or broker calls). Rollback: `git switch --detach 07b884b && FORCE=1 npm run deploy` (build 200), or broker `DRIVE_STATUS=off` + Vercel redeploy to stop Drive writes only. |
-| Broker | Live at `https://auth.labrarf.com` (Vercel project `estoria-auth-server`, root `auth-server`, Hobby). `/status` = on. Six env vars, Production only. Auto-redeploys when `main` is pushed with `auth-server/` changes. |
+| Broker | Live at `https://auth.labrarf.com` (Vercel project `estoria-auth-server`, root `auth-server`, Hobby; env vars at https://vercel.com/ray-labra-s-projects/estoria-auth-server/settings/environment-variables). `/status` = on. Six env vars, Production only. Auto-redeploys when `main` is pushed with `auth-server/` changes. |
 | DNS | `auth` CNAME → `f39fd1f062c3f808.vercel-dns-017.com` at whois.com. Before/after screenshots kept locally (not in git) in `Portfolio-Website/_private-dns-backup/`. |
 | Google Cloud | Project `Estoria` (`estoria-511314`, number `177782323056`); consent screen External + In production, no logo; client `Estoria web` (one secret, in Vercel); Picker key `Estoria Picker`. Values in the plan's Step 0 table. |
 | Real sign-in | Proven once end to end with raydaxn@gmail.com through the broker's redirect flow (Step 1, part). Not yet from inside the app. |
@@ -213,8 +213,11 @@ through the Drive API from page JS, as the phone's app would.
   Safari leaves Chrome signed in ✓ (Chrome reloaded and still backed up to
   Drive); Reconnect in Safari ✓ (then Sync pulled the edits Chrome made
   meanwhile, as it should); both browsers still signed in after more than an
-  hour ✓. The Disconnect fix is live. Still to do: still signed in after a day,
-  the kill switch.
+  hour ✓. The Disconnect fix is live. Still to do: still signed in after a day.
+  **Kill switch: the user chose not to test it live** (unit-tested). If it's
+  ever needed: set `DRIVE_STATUS=off` at the env vars link above, then
+  **redeploy** (a saved value does nothing until then); open tabs pause at
+  their next check (up to 30 minutes) or straight away on reload.
 - Scratch files to delete from Drive afterwards: `drive-test*`,
   `big-drive-test*` (≈15 MB with its backups), `test-story-for-drive-sync*`,
   `test-story-for-drive-sync-test-1*`, the 4:28 PM `untitled-story.estoria.json`.
