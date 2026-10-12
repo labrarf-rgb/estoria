@@ -5892,3 +5892,39 @@ keep-one-only case for a piece against a book.
 
 **Next:** the branch and its worktree can be cleaned up; bring those two SPECS
 passages up to date once the phone's merge is on its main.
+
+### 2026-10-12 (c) — File and Settings
+
+The File menu had grown to 14 entries, so on shorter windows About ran off the
+bottom of the screen. Chrome only escaped because Install was already hidden
+there. Two fixes:
+
+- **The toolbar split into File ▾ (the work) and Settings ▾ (the app).** File
+  keeps projects, changes of form, import/save, backups and Author details (9
+  at most). Settings has Zoom (the stepper, which keeps the menu open), Theme,
+  Google Drive, then Install, Contact and About last, the way a Settings screen
+  ends on iOS, Android and Windows. The name was the user's call ("Settings"
+  over "Estoria" / "View"), with About and Contact at the bottom following
+  that platform pattern.
+- **Install stays visible.** The Settings button carries a terracotta (`but`)
+  dot until Estoria runs standalone.
+- **Popovers cap at the room below their anchor and scroll past it**, 12px off
+  the window edge, so no menu can hide its last items again.
+- The toolbar's compact-mode measuring (zoom and theme folding into ⋯) is gone
+  with them. File lost its dark fill, a leftover from the scaffold's "+ New"
+  call to action, and is outlined like Settings.
+
+**Verified:** in the browser preview, Settings at 1280 wide, and at 1100×420
+File stops 12px above the edge and scrolls to Author details. No console
+errors, 161 tests and the typecheck pass.
+
+**Shipped** (/ship): pushed to `origin/main` and deployed; prod reports v4 ·
+build 26 · `dab34a4`. The same push carried the user's SPECS line noting
+single pieces at Android parity (Android Session 32).
+
+**SPECS drift fixed in this session:** the Light/dark theme row (it described
+the toolbar circle and the ⋯ fold), "File → Google Drive" (twice) and "File →
+Install Estoria" now say Settings.
+
+**Next:** none for this change. If the phone has a Settings screen, About and
+Contact sitting at its bottom would match.
