@@ -5952,5 +5952,9 @@ one, so **the user called Deploy C now** instead of after the week of use
 shows Google Drive and the footer shows Sync. 161 tests and the typecheck
 pass.
 
+**Shipped** (/ship): pushed to `origin/main` and deployed; prod reports v4 ·
+build 29 · `08bf6b4`, broker `/status` on. The handoff got a "superseded in
+part" note at its top; SPECS checked against the code, no other drift.
+
 **Still to check in real use:** the iPad (Safari, Chrome, the Home Screen
 app), still signed in after a day.

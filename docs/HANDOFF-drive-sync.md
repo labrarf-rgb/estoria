@@ -1,5 +1,9 @@
 # Handoff: Google Drive sync (end of Session 66, 2026-10-11)
 
+> **Superseded in part (2026-10-12):** Deploy C is live (build 29, `08bf6b4`).
+> The `?drive=on` switch described below is gone; Drive shows on every
+> device. This file stays as the prod test record.
+
 **Read this first in the next session.** It says exactly where things stand,
 what's wrong, and what to do next, in order. The full design is
 [`PLAN-drive-sync.md`](PLAN-drive-sync.md) (its "Step 0 progress" table has
