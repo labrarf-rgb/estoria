@@ -1358,7 +1358,11 @@ both producing an app that will not start — worse than one that will not start
   worker's own `?v=`. The new markup lands in the old build's cache, whose
   `/assets/` entries are the old hashes. Offline, that shell asks for scripts
   nothing has and the window comes up blank. The stamp Vite injects
-  (`__ESTORIA_BUILD__`) is read back out of the HTML and has to match `BUILD`.
+  (`__ESTORIA_BUILD__`) is read back out of the HTML as `<version>-<build>`
+  (`htmlBuild`) and has to match `BUILD`, which is the worker's `?v=` in that
+  same form. From 2026-10-11 to 10-13 it compared the bare build number
+  against `4-32`, never matched, and no shell was cached: the installed app
+  would not open offline. Change one side and the other has to follow.
 - **Not an app at all.** `cache.put` will happily store a 404 or a 502 — unlike
   `cache.add`, which is why precache never hit this. GitHub Pages serves both
   mid-deploy and `deploy.sh` rsyncs with `--delete`, so the window is real.

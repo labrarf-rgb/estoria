@@ -73,12 +73,21 @@ async function dropSupersededShells() {
 
 /**
  * Which build an index.html belongs to, read from the stamp Vite injects
- * (`window.__ESTORIA_BUILD__={...,"build":"161",...}`) — the same commit count
- * this worker was registered under. Null when there is no stamp to read.
+ * (`window.__ESTORIA_BUILD__={"version":"4","build":"32",...}`) and put in the
+ * same `<version>-<build>` form as this worker's `?v=` (see src/lib/sw.ts).
+ * Comparing the bare build number against `4-32` never matched, so no shell
+ * was ever cached and the app would not open offline. Null when there is no
+ * stamp to read.
  */
 function htmlBuild(html) {
-  const m = html.match(/__ESTORIA_BUILD__=\{[^}]*"build":"([^"]+)"/);
-  return m ? m[1] : null;
+  const m = html.match(/__ESTORIA_BUILD__=(\{[^}]*\})/);
+  if (!m) return null;
+  try {
+    const { version, build } = JSON.parse(m[1]);
+    return version && build ? `${version}-${build}` : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
