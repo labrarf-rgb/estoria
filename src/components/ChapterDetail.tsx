@@ -626,15 +626,18 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 
   return (
     <>
-    <Shell page={page} onClose={closeFromScrim}>
+    <Shell page={page} fill={expanded} onClose={closeFromScrim}>
       <div
         ref={modalRef}
         onMouseDown={stop}
+        // Expanded fills the window, as a piece fills the page: a column whose
+        // scene canvas takes the height left over (see the canvas below).
+        // Collapsed sizes to its content, as it always has.
         className={
           page
             ? "min-h-full bg-panel"
-            : `max-h-[92vh] overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-                expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+            : `overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+                expanded ? "flex min-w-0 flex-1 flex-col" : "max-h-[92vh] w-[min(980px,100%)]"
               }`
         }
       >
@@ -1021,13 +1024,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
           ) : (
             <div className="ml-auto flex items-center gap-[9px]">
               <button
-                onClick={() => setSceneFlowExpanded(!expanded)}
-                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
-              >
-                {expanded ? "Collapse" : "Expand"}
-              </button>
-              <button
                 onClick={onArrangeScenes}
                 className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
               >
@@ -1056,6 +1052,15 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 className="rounded-lg bg-ink px-3 py-[6px] text-[12px] font-semibold text-bg"
               >
                 + Add {nouns.one}
+              </button>
+              {/* Last, in both modals: the size control is always the right-most
+                  button on its row, so it is found in the same place. */}
+              <button
+                onClick={() => setSceneFlowExpanded(!expanded)}
+                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
+              >
+                {expanded ? "Collapse" : "Expand"}
               </button>
             </div>
           )}
@@ -1113,7 +1118,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
         <div
           ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
-            page ? "max-h-[70vh] min-h-[320px]" : expanded ? "max-h-[58vh]" : "max-h-[40vh]"
+            // Expanded: whatever height the modal has left, never under 320px;
+            // an open reference tab pushes it down, and past the floor the
+            // modal scrolls instead.
+            page ? "max-h-[70vh] min-h-[320px]" : expanded ? "min-h-[320px] flex-1" : "max-h-[40vh]"
           }`}
           style={{
             backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
@@ -1454,10 +1462,20 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 
 
 /** A modal over the board, or, for a single piece, the page itself. */
-function Shell({ page, onClose, children }: { page: boolean; onClose: () => void; children: ReactNode }) {
+function Shell({
+  page,
+  fill,
+  onClose,
+  children,
+}: {
+  page: boolean;
+  fill: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   if (page) return <div className="min-h-0 flex-1 overflow-auto bg-panel">{children}</div>;
   return (
-    <Scrim onClose={onClose} z={50} center>
+    <Scrim onClose={onClose} z={50} center fill={fill}>
       {children}
     </Scrim>
   );

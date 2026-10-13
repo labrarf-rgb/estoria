@@ -193,6 +193,12 @@ interface UiState {
    */
   manuscriptExpanded: boolean;
   /**
+   * The manuscript's beat rail folded to a slim strip, for more room to write.
+   * A view preference like the two above: global, remembered, never in the
+   * document, so the phone never sees it.
+   */
+  beatRailHidden: boolean;
+  /**
    * The prose as it was before the last reconciliation, for a single undo.
    * `previous` is `undefined` when the chapter had never been written in — that
    * is a real state to go back to, and pulling text in from another version is
@@ -479,6 +485,7 @@ interface StoreState extends UiState {
   toggleTextarea: (key: TextareaKey) => void;
   setSceneFlowExpanded: (expanded: boolean) => void;
   setManuscriptExpanded: (expanded: boolean) => void;
+  setBeatRailHidden: (hidden: boolean) => void;
   setPanelExpanded: (expanded: boolean) => void;
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
@@ -616,7 +623,9 @@ const emptyBookData = (): BookData => ({
  *  e.g. on open and for a scene-move destination. */
 const sceneBoxWidthEstimate = (expanded: boolean) => {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1500;
-  const modalW = expanded ? Math.min(1500, vw * 0.96) : Math.min(980, vw);
+  // Expanded fills the window less the scrim's 16px margin each side (`Scrim`'s
+  // `fill`, which both chapter modals use when expanded).
+  const modalW = expanded ? vw - 32 : Math.min(980, vw);
   return modalW - 44;
 };
 
@@ -764,6 +773,7 @@ const initialUi: UiState = {
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
   manuscriptExpanded: true,
+  beatRailHidden: false,
   manuscriptUndo: null,
   panelExpanded: false,
   savedNotice: null,
@@ -2548,6 +2558,7 @@ export const useStore = create<StoreState>()(
         })),
       setSceneFlowExpanded: (expanded) => set({ sceneFlowExpanded: expanded }),
       setManuscriptExpanded: (expanded) => set({ manuscriptExpanded: expanded }),
+      setBeatRailHidden: (hidden) => set({ beatRailHidden: hidden }),
       setPanelExpanded: (expanded) => set({ panelExpanded: expanded }),
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
@@ -2640,6 +2651,7 @@ export const useStore = create<StoreState>()(
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
         manuscriptExpanded: s.manuscriptExpanded,
+        beatRailHidden: s.beatRailHidden,
         panelExpanded: s.panelExpanded,
       }),
       // On a schema bump, convert the persisted document (and every stashed
