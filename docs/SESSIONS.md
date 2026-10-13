@@ -6004,3 +6004,35 @@ per canvas size". No other drift found.
 **Next:** none required. Open question left with the user: the story map
 keeps its mode tabs on the Scene flow row, so switching faces still moves
 them; offered to put them on the story map's meta line too.
+
+### 2026-10-13 — Offline launch fixed
+
+Reported: with no wifi at startup, the installed app showed Chrome's
+"may have moved" error page instead of opening.
+
+- **Cause:** not Drive. Since `3c85508` (2026-10-11) the worker is registered
+  as `sw.js?v=<version>-<build>` (`4-32`), but `htmlBuild` in `public/sw.js`
+  still read back only the bare build number (`32`). `cacheShell`'s
+  same-build check never passed, so `./` was never cached, and activation had
+  already dropped the older shell caches that had it. Offline navigations fell
+  through to `Response.error()`. Assets and fonts were cached; only the
+  page that starts the app was missing.
+- **Fix:** `htmlBuild` parses the `__ESTORIA_BUILD__` stamp and returns
+  `<version>-<build>`, the same form as the worker's `?v=`.
+- **Also answered:** Drive sync does not turn offline off. Local saving is
+  independent, and offline shows "Drive offline, will retry". Gap found and
+  **not fixed**: a failed Drive push is only retried on the next save, not
+  when the device comes back online (`Footer.tsx`, the `r === "unavailable"`
+  early return), so the last offline stretch reaches Drive only after another
+  edit or Sync.
+
+**Verified:** production preview: `/estoria/` now in `estoria-shell-4-33`;
+with the server stopped, a reload opened Estoria from cache. 161 tests pass.
+
+**Shipped** (/ship): pushed and deployed; prod reports v4 · build 34 ·
+`aef90b9`, and its `sw.js` carries the fix. Installed copies pick it up after
+one online launch and accepting the update prompt. SPECS: the "Only this
+build's shell" passage now names the `<version>-<build>` form both sides must
+share. No other drift.
+
+**Next:** offered: retry the Drive push on the `online` event.
