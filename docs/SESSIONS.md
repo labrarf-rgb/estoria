@@ -5958,3 +5958,49 @@ part" note at its top; SPECS checked against the code, no other drift.
 
 **Still to check in real use:** the iPad (Safari, Chrome, the Home Screen
 app), still signed in after a day.
+
+### 2026-10-12 (e) — Full-window chapters, hideable scenes
+
+Two asks: an expanded chapter should use all the room the way a single piece
+does, and the manuscript should be able to hide its scenes for more writing
+room. Mocked first (`docs/mockups/chapter-full-window.html`), then built on
+`feature/chapter-full-window`.
+
+- **Expand fills the window** on both faces, less a 16px margin so the board
+  still shows round the edge (`Scrim`'s new `fill`). The story map's scene
+  canvas takes the height left over (floor 320px); the manuscript is the
+  window's height. Collapse is unchanged. `sceneBoxWidthEstimate` now
+  estimates the expanded canvas as the window less 32px, so off-screen
+  layouts fit the wider canvas; layouts made before this sit to the left
+  until Auto-arrange.
+- **‹ Hide** folds the manuscript's beat rail to a 38px strip with **›** and
+  a vertical scene count (`beatRailHidden`, a persisted UI preference, not
+  document data).
+- **Manuscript header rearranged** so nothing moves when the rail folds: the
+  mode tabs left the head of the rail for the meta line, after the status;
+  Edit / View and Expand moved to that line's right end; the header became
+  a grid so the line runs under the buttons too (in the title's column it
+  wrapped early beside empty space). Top row is now number, title, ‹ › ✕.
+- **Expand / Collapse is the right-most button on its row in both modals**
+  (moved after + Add scene on the story map).
+- **Tried and dropped:** FLIP glide animations for the controls that moved
+  (tabs, fold button, count, then the Expand button). With some controls
+  animated and others not it read as inconsistent; once the tabs stayed in
+  one place nothing needed one. `ChapterModeTabs` lost its `full` option,
+  which only the rail head used.
+
+**Verified:** in the browser preview at 1400px and 820px, expanded and
+collapsed, rail shown and folded, on both faces; in the user's Chrome for the
+meta-line wrap. 161 tests, the typecheck and the build pass. Not checked by
+hand on a single piece (same components, page mode).
+
+**Shipped** (/ship): merged to `main`, pushed, and deployed; prod reports v4 ·
+build 32 · `c7b28ab`. SPECS: new rows "Expand fills the window" and
+"Manuscript: hide the scenes"; updated "Manuscript: its own modal" (it still
+described a destination-naming button on the meta line, drift that predates
+this session), "Why the manuscript is a modal", and "Scene layout remembered
+per canvas size". No other drift found.
+
+**Next:** none required. Open question left with the user: the story map
+keeps its mode tabs on the Scene flow row, so switching faces still moves
+them; offered to put them on the story map's meta line too.
