@@ -6,16 +6,22 @@ export function Scrim({
   z = 50,
   children,
   center = false,
+  fill = false,
 }: {
   onClose: () => void;
   z?: number;
   children: ReactNode;
   center?: boolean;
+  /** The child stretches to the whole window less a 16px margin, so the board
+   *  still shows round the edge (an expanded chapter). Wins over `center`. */
+  fill?: boolean;
 }) {
   return (
     <div
       onMouseDown={onClose}
-      className={`fixed inset-0 backdrop-blur-[2px] ${center ? "flex items-center justify-center p-[30px]" : ""}`}
+      className={`fixed inset-0 backdrop-blur-[2px] ${
+        fill ? "flex p-[16px]" : center ? "flex items-center justify-center p-[30px]" : ""
+      }`}
       style={{ background: "rgba(20,14,6,.46)", zIndex: z }}
     >
       {children}

@@ -18,10 +18,22 @@ const STATUSES: { value: ChapterStatus; label: string }[] = [
  * and this row is exactly where the two would drift: it is the one piece of
  * chrome both have to show identically.
  *
- * The switch between the two lives on the working area's section header, not
- * here — see `ChapterModeTabs`.
+ * The story map keeps the switch between the two on its working area's section
+ * header; the manuscript passes it in as `trail` — see `ChapterModeTabs`.
  */
-export function ChapterMetaRow({ ch, act, lead }: { ch: Chapter; act?: ReactNode; lead?: ReactNode }) {
+export function ChapterMetaRow({
+  ch,
+  act,
+  lead,
+  trail,
+}: {
+  ch: Chapter;
+  act?: ReactNode;
+  lead?: ReactNode;
+  /** Last on the line. The manuscript puts its mode tabs and its page controls
+   *  (Edit / View, the size) here. */
+  trail?: ReactNode;
+}) {
   const patchChapter = useStore((s) => s.patchChapter);
   const kind = useStore((s) => s.doc.kind);
   const nouns = partNouns({ kind });
@@ -103,10 +115,11 @@ export function ChapterMetaRow({ ch, act, lead }: { ch: Chapter; act?: ReactNode
       </div>
 
       {/* The act stepper is a planning control, so only the story map passes
-          one. The mode switch is not here: it is a tab on the section header
-          below, so the row that swaps the working area sits with that area. See
+          one. The manuscript's `trail` brings its mode tabs and page controls;
+          the story map keeps its tabs on the Scene flow row. See
           `ChapterModeTabs`. */}
       {act}
+      {trail}
     </div>
   );
 }
@@ -114,17 +127,18 @@ export function ChapterMetaRow({ ch, act, lead }: { ch: Chapter; act?: ReactNode
 /**
  * Scene flow / Manuscript — the switch between the chapter's two modals.
  *
- * A two-segment tab rather than a button naming its destination, and it sits on
- * the **section header** of the working area in each modal: the Scene flow row
- * in the story map, the head of the beat rail in the manuscript. That puts the
- * control that swaps the working area on the working area itself, so the header
- * above stays about the chapter and this stays about what you are doing to it.
+ * A two-segment tab rather than a button naming its destination. In the story
+ * map it sits on the **section header** of the working area, the Scene flow
+ * row, so the control that swaps the working area is on the working area. In
+ * the manuscript it sits on the meta line, after the status: it used to head
+ * the beat rail, and folding the rail moved it, so it went where folding
+ * cannot reach.
  *
  * Both segments are always shown and the current one is lit, which is what
  * makes it read as two views of one thing rather than a mode with an on and an
  * off. The same component in both modals, so the pair cannot drift apart.
  */
-export function ChapterModeTabs({ full = false }: { full?: boolean }) {
+export function ChapterModeTabs() {
   const mode = useStore((s) => s.chapterMode);
   const setMode = useStore((s) => s.setChapterMode);
   // Same control, same place; a single piece names its two faces in plainer
@@ -136,15 +150,15 @@ export function ChapterModeTabs({ full = false }: { full?: boolean }) {
       onClick={() => setMode(m)}
       title={hint}
       className={`rounded-md px-[10px] py-[4px] text-[11px] font-semibold uppercase tracking-wider ${
-        full ? "flex-1" : ""
-      } ${mode === m ? "bg-card text-ink" : "text-soft hover:bg-card"}`}
+        mode === m ? "bg-card text-ink" : "text-soft hover:bg-card"
+      }`}
     >
       {label}
     </button>
   );
 
   return (
-    <div className={`flex rounded-lg bg-chip p-[3px] ${full ? "w-full" : ""}`}>
+    <div className="flex rounded-lg bg-chip p-[3px]">
       {piece ? (
         <>
           {seg("map", "Map", "Map the parts")}

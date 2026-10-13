@@ -28,15 +28,18 @@ import type { ReactNode } from "react";
  * canvas and the prose feeling messy. Each was patched; the cause was not. The
  * shapes that fix it are here and are worth not undoing:
  *
- *  - **The modal is a fixed height** (`h-[92vh]`), not a maximum. An empty
- *    chapter and a finished one are the same size, so nothing reflows under you
- *    and there is no page scroll for a scrollbar to go missing from.
+ *  - **The modal is a fixed height** (`h-[92vh]`, or the whole window less a
+ *    margin when expanded), not a maximum. An empty chapter and a finished one
+ *    are the same size, so nothing reflows under you and there is no page
+ *    scroll for a scrollbar to go missing from.
  *  - **The rail and the prose scroll side by side**, not nested. Neither needs
  *    to be sticky, which is what removes all three sticky layers at once.
  *  - **The rail's cards may grow downwards.** The horizontal strip's could not:
  *    a card that grew down made the guide as tall as its wordiest beat and
  *    pushed the writing off the screen. A rail has the room, so a beat at the
  *    200-character cap shows whole rather than in one of three width steps.
+ *    It also folds to a slim strip (`beatRailHidden`) when the prose wants the
+ *    room, which is why the mode tabs are not on it.
  *
  * **The beats are a guide, not a structure the prose has to satisfy.** An
  * earlier version bound them together with `***` scene breaks, tracked which
@@ -72,6 +75,7 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
   const setManuscript = useStore((s) => s.setManuscript);
   const expanded = useStore((s) => s.manuscriptExpanded);
   const setExpanded = useStore((s) => s.setManuscriptExpanded);
+  const railHidden = useStore((s) => s.beatRailHidden);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -197,29 +201,40 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
 
   return (
-    <Shell page={page} onClose={closeFromScrim}>
+    <Shell page={page} fill={expanded} onClose={closeFromScrim}>
       <div
         onMouseDown={stop}
         // A fixed height, not a maximum. See the note at the top of the file:
         // sizing to the content is what made an empty chapter scroll. A piece
-        // takes the height the page gives it, for the same reason.
+        // takes the height the page gives it, for the same reason, and so does
+        // an expanded chapter, which fills the window as a piece fills the page.
         className={
           page
             ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-panel"
-            : `flex h-[92vh] flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-                expanded ? "w-[min(1500px,96vw)]" : "w-[min(980px,100%)]"
+            : `flex flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
+                expanded ? "min-w-0 flex-1" : "h-[92vh] w-[min(980px,100%)]"
               }`
         }
       >
         {/* Header. Not sticky, because nothing scrolls past it: the modal itself
-            does not scroll, only the two columns below do. */}
-        <div className="flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
+            does not scroll, only the two columns below do.
+            A grid so the meta line can run under the buttons as well as the
+            title: inside the title's column it stopped where the buttons began,
+            and the folded rail's tabs wrapped to a line of their own beside
+            plenty of empty header. */}
+        <div
+          className={`grid shrink-0 items-start gap-x-[14px] border-b border-rule bg-panel px-[26px] py-[22px] ${
+            page ? "grid-cols-[minmax(240px,1fr)_auto]" : "grid-cols-[auto_minmax(240px,1fr)_auto]"
+          }`}
+        >
           {!page && (
             <span className="mt-[6px] rounded-[7px] bg-ink px-[9px] py-[4px] font-mono text-[13px] font-semibold text-bg">
               {String(ch.num).padStart(2, "0")}
             </span>
           )}
-          <div className="min-w-0 flex-1">
+          {/* A floor under the title (the 240px in the grid), so a crowded
+              header wraps its buttons rather than clipping the chapter name. */}
+          <div className="min-w-0">
             <input
               value={page ? doc.projectTitle : ch.title}
               onChange={(e) =>
@@ -233,13 +248,9 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
                 Editing {draftName} · changes stay in this version
               </div>
             )}
-            {/* Drafting sheds the planning chrome: the summary and the act
-                stepper are things you set once, so neither is here. The words
-                chip and the status are the two you watch while writing, and
-                they come with the shared row. */}
-            <ChapterMetaRow ch={ch} />
           </div>
-          <div className="flex items-center gap-[6px]">
+          {/* Wraps rather than squeezing the title in a narrow window. */}
+          <div className="flex flex-wrap items-center justify-end gap-[6px]">
             {confirmed && (
               <span
                 className="mr-[2px] rounded-full px-[8px] py-[2px] text-[10px] font-semibold uppercase tracking-wide"
@@ -248,16 +259,10 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
                 Saved
               </span>
             )}
-            <SheetViewToggle view={view} onChange={setView} />
             {!page && (
             <>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-              title={expanded ? "Narrow the page" : "Widen the page"}
-            >
-              {expanded ? "Collapse" : "Expand"}
-            </button>
+            {/* One unit, so a wrapping header never splits the arrows apart. */}
+            <div className="flex items-center gap-[6px]">
             <button
               onClick={() => prevCh && openChapter(prevCh.id)}
               disabled={!prevCh}
@@ -275,15 +280,49 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
               ›
             </button>
             <CloseButton onClick={closeChapter} />
+            </div>
             </>
             )}
+          </div>
+          {/* Drafting sheds the planning chrome: the summary and the act
+              stepper are things you set once, so neither is here. The words
+              chip and the status are the two you watch while writing, and they
+              come with the shared row.
+              The row also carries the mode tabs, after the status, and the
+              controls for the page itself (Edit / View, the size) at its right
+              end, so the line above is only the chapter's name and the way
+              between chapters. The tabs live here rather than at the head of
+              the beat rail so they stay put when the rail is folded. */}
+          <div className={page ? "col-span-2" : "col-span-2 col-start-2"}>
+            <ChapterMetaRow
+              ch={ch}
+              trail={
+                <>
+                  <ChapterModeTabs />
+                  <div className="ml-auto flex items-center gap-[6px]">
+                    <SheetViewToggle view={view} onChange={setView} />
+                    {/* Last, in both modals: the size control is always the
+                        right-most button on its row. */}
+                    {!page && (
+                      <button
+                        onClick={() => setExpanded(!expanded)}
+                        className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                        title={expanded ? "Narrow the page" : "Widen the page"}
+                      >
+                        {expanded ? "Collapse" : "Expand"}
+                      </button>
+                    )}
+                  </div>
+                </>
+              }
+            />
           </div>
         </div>
 
         {/* Rail beside prose, each scrolling on its own. `min-h-0` on both is
             what lets a flex child scroll rather than grow the row. */}
         <div className="flex min-h-0 flex-1">
-          <BeatRail ch={ch} page={page} />
+          {railHidden ? <FoldedRail count={ch.scenes.length} /> : <BeatRail ch={ch} page={page} />}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {view === "read" ? (
               <div
@@ -360,10 +399,20 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
 }
 
 /** A modal over the board, or, for a single piece, the page itself. */
-function Shell({ page, onClose, children }: { page: boolean; onClose: () => void; children: ReactNode }) {
+function Shell({
+  page,
+  fill,
+  onClose,
+  children,
+}: {
+  page: boolean;
+  fill: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   if (page) return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
   return (
-    <Scrim onClose={onClose} z={50} center>
+    <Scrim onClose={onClose} z={50} center fill={fill}>
       {children}
     </Scrim>
   );
@@ -385,19 +434,26 @@ function Shell({ page, onClose, children }: { page: boolean; onClose: () => void
  */
 function BeatRail({ ch, page }: { ch: Chapter; page: boolean }) {
   const openAtScene = useStore((s) => s.openChapterAtScene);
+  const setRailHidden = useStore((s) => s.setBeatRailHidden);
   const kind = useStore((s) => s.doc.kind);
   const nouns = partNouns({ kind });
 
   return (
     <aside className="flex shrink-0 flex-col border-r border-rule bg-bg" style={{ width: RAIL_W }}>
-      {/* The rail's header is this modal's section header, so it carries the
-          mode tabs — the same control, in the same relative place, as the story
-          map's Scene flow row. Full width because the rail is narrow and two
-          segments sharing it read better than two segments and a gap. */}
+      {/* The count and the fold. The mode tabs that used to head the rail are
+          on the meta line, where folding the rail cannot move them. */}
       <div className="shrink-0 px-[16px] pb-[8px] pt-[14px]">
-        <ChapterModeTabs full />
-        <div className="mt-[8px] font-mono text-[10.5px] font-medium text-faint">
-          {ch.scenes.length} {ch.scenes.length === 1 ? nouns.one : nouns.many}
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[10.5px] font-medium text-faint">
+            {ch.scenes.length} {ch.scenes.length === 1 ? nouns.one : nouns.many}
+          </span>
+          <button
+            onClick={() => setRailHidden(true)}
+            title={`Hide the ${nouns.many} for more room to write`}
+            className="rounded-md border border-rule bg-card px-[7px] py-[2px] text-[11px] font-semibold text-soft hover:border-faint hover:text-ink"
+          >
+            ‹ Hide
+          </button>
         </div>
       </div>
 
@@ -428,6 +484,30 @@ function BeatRail({ ch, page }: { ch: Chapter; page: boolean }) {
       {/* Pinned below the beats rather than inside their scroll: it is an action
           on the chapter, not one of them, and it must not be scrolled past. */}
       <PullFromVersion ch={ch} />
+    </aside>
+  );
+}
+
+/**
+ * The rail, folded: a strip that keeps its place on the left, so the prose does
+ * not jump sideways when it comes back, and says how many beats are behind it.
+ */
+function FoldedRail({ count }: { count: number }) {
+  const setRailHidden = useStore((s) => s.setBeatRailHidden);
+  const kind = useStore((s) => s.doc.kind);
+  const nouns = partNouns({ kind });
+  return (
+    <aside className="flex w-[38px] shrink-0 flex-col items-center gap-[12px] border-r border-rule bg-bg pt-[14px]">
+      <button
+        onClick={() => setRailHidden(false)}
+        title={`Show the ${nouns.many}`}
+        className="flex h-[24px] w-[24px] items-center justify-center rounded-md border border-rule bg-card text-[14px] font-semibold text-ink hover:border-faint"
+      >
+        ›
+      </button>
+      <span className="rotate-180 font-mono text-[10.5px] font-medium tracking-wide text-faint [writing-mode:vertical-rl]">
+        {count} {count === 1 ? nouns.one : nouns.many}
+      </span>
     </aside>
   );
 }
