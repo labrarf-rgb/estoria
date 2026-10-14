@@ -6058,3 +6058,25 @@ The user asked to drop them there.
 **Shipped** (/ship): pushed and deployed; prod reports `6cc9e9f`. SPECS:
 Single pieces and "Reference material is tabbed" updated in the same commit.
 No other drift.
+
+### 2026-10-13 (c) — A piece has no Expand / Collapse on Map
+
+Reported: Expand / Collapse on a piece's Map does nothing.
+
+- **Found:** the piece fills the page, so its size never changed, but the
+  button flipped `sceneFlowExpanded`, which picks the saved layout
+  (`scenePos` wide / `scenePosCompact` compact). On a piece it swapped
+  arrangements without changing size, and since books share the flag,
+  collapsing a book's chapter did the same to pieces. Write already hid it.
+- **Change:** the button is hidden in page mode, and every store layout read
+  and write goes through `wideScenes`, always wide for a piece. The modal reads
+  the same (`expanded || page`). A piece arranged under compact shows its wide
+  layout once; Auto-arrange tidies it. The user only has a test piece.
+
+**Verified:** typecheck, 161 tests pass; dev preview: Map row ends at + Add
+scene, new scenes lay out on the wide canvas.
+
+**Shipped** (/ship): pushed and deployed after the cache window; prod reports
+v4 · build 38 · `c0dc9b3`. SPECS: "Expand fills the window" says a piece has
+neither size button and always uses the wide layout, in the same commit. No
+other drift.
