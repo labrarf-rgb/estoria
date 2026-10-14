@@ -5,6 +5,7 @@ import { RefList, todoProgress } from "@/components/ui/RefList";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { countAllAssetLinks, findAssetPins, type AssetPin } from "@/lib/refs";
+import { isPiece } from "@/lib/piece";
 import type { Asset } from "@/types";
 
 export function NotesPanel() {
@@ -13,6 +14,7 @@ export function NotesPanel() {
   const notes = useStore((s) => s.doc.storyNotes);
   const activeBook = useStore((s) => s.doc.books.find((b) => b.id === s.doc.activeBookId));
   const setNotes = useStore((s) => s.setStoryNotes);
+  const patchChapter = useStore((s) => s.patchChapter);
   const setPanel = useStore((s) => s.setPanel);
   const addAsset = useStore((s) => s.addAsset);
   const updateAsset = useStore((s) => s.updateAsset);
@@ -26,6 +28,7 @@ export function NotesPanel() {
   const libView = useStore((s) => s.refView);
   const setLibView = useStore((s) => s.setRefView);
   const notesExpanded = useStore((s) => s.textareaExpanded.storyNotes);
+  const pieceNotesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
   const panelExpanded = useStore((s) => s.panelExpanded);
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
@@ -38,6 +41,10 @@ export function NotesPanel() {
   // library list and the link picker, so nothing new can be pinned to them.
   const assets = doc.assets.filter((a) => !a.archived);
   const archived = doc.assets.filter((a) => a.archived);
+  // A piece has no notes tab of its own any more (it repeated this panel), but
+  // its one chapter still carries notes: typed there before, or joined from the
+  // chapters when a book became a piece. They show here while there are any.
+  const piece = isPiece(doc) ? doc.chapters[0] : undefined;
 
   // Chips read like a character's "Appears in": the chapter number, not the
   // whole title. The title attribute carries the name (and the book/version,
@@ -114,10 +121,27 @@ export function NotesPanel() {
           className="rounded-xl border border-rule bg-card p-4 font-serif text-[13.5px] leading-[1.65] text-ink outline-none"
         />
 
+        {piece?.notes && (
+          <div>
+            <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-wide text-faint">
+              Earlier notes on this piece
+            </div>
+            <ExpandableTextarea
+              value={piece.notes}
+              onChange={(v) => patchChapter(piece.id, { notes: v })}
+              collapsedRows={4}
+              expandedHeight="52vh"
+              expanded={pieceNotesExpanded}
+              onToggleExpanded={() => toggleTextarea("chapterNotes")}
+              className="rounded-xl border border-rule bg-card p-[12px] pr-[80px] text-[13px] leading-[1.55] text-ink outline-none"
+            />
+          </div>
+        )}
+
         <div>
           <div className="mb-[8px] flex items-center gap-[10px]">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">
-              Shared library · link these into any chapter
+              {piece ? "Library" : "Shared library · link these into any chapter"}
             </div>
             <div className="flex-1" />
             <ViewToggle view={libView} onChange={setLibView} />

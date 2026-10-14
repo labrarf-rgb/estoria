@@ -743,23 +743,26 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             these stopped being four stacked collapsible sections. Only the story
             map has this: the manuscript modal shows the beats and nothing else,
             because reference material beside a writing surface is the crowding
-            this branch spent its time removing. */}
+            this branch spent its time removing.
+            A piece has none of it: the piece is the whole project, so casting
+            it, linking world entries to it or pinning notes to it would only
+            repeat Characters, World and Notes in the toolbar above. */}
+        {!page && (
         <div className="border-b border-rule">
           <div className="flex flex-wrap items-center gap-[6px] px-[26px] pb-[12px] pt-[14px]">
             {TABS.map((t) => {
               const n = tabCount[t.key];
-              const label = page && t.key === "notes" ? "Notes" : t.label;
               const on = tab === t.key;
               return (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  title={on ? `Hide ${label.toLowerCase()}` : t.hint.replace("chapter", unit)}
+                  title={on ? `Hide ${t.label.toLowerCase()}` : t.hint}
                   className={`flex items-center gap-[7px] rounded-lg px-[11px] py-[6px] text-[12px] font-medium ${
                     on ? "bg-ink text-bg" : "bg-chip text-soft hover:text-ink"
                   }`}
                 >
-                  {label}
+                  {t.label}
                   {n !== undefined && (
                     <span
                       className={`font-mono text-[10.5px] font-semibold ${on ? "opacity-70" : "text-faint"}`}
@@ -960,6 +963,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             </div>
           )}
         </div>
+        )}
 
         {/* Scene flow. Its header carries the mode tabs, so the control that
             swaps the working area sits on the working area. The chevron keeps
