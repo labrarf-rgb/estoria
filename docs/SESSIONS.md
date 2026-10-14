@@ -6036,3 +6036,25 @@ build's shell" passage now names the `<version>-<build>` form both sides must
 share. No other drift.
 
 **Next:** offered: retry the Drive push on the `online` event.
+
+### 2026-10-13 (b) — A single piece drops the reference tabs
+
+On a single piece, Characters / World details / Notes / Pinned references sat
+above Map / Write and repeated Characters, World and Notes in the toolbar.
+The user asked to drop them there.
+
+- **Change:** `ChapterDetail` renders the reference strip and its panel only
+  when not in page mode. Books are unchanged.
+- **Kept reachable:** a piece's chapter notes (`ch.notes`) are a separate field
+  from story notes, filled by the old tab and by Turn into single piece. The
+  Notes panel shows them as **Earlier notes on this piece**, editable, while
+  they hold anything. Pins need nothing: every pinned asset is in the library,
+  labelled just "Library" on a piece. Cast and world links stay in the data.
+- **Not seen on screen:** the Earlier notes box needs a piece that already has
+  notes; a fresh short story was checked (strip gone, Notes panel fine).
+
+**Verified:** typecheck, 161 tests pass; dev preview with a new short story.
+
+**Shipped** (/ship): pushed and deployed; prod reports `6cc9e9f`. SPECS:
+Single pieces and "Reference material is tabbed" updated in the same commit.
+No other drift.
