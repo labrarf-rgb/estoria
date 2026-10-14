@@ -6080,3 +6080,51 @@ scene, new scenes lay out on the wide canvas.
 v4 · build 38 · `c0dc9b3`. SPECS: "Expand fills the window" says a piece has
 neither size button and always uses the wide layout, in the same commit. No
 other drift.
+
+### 2026-10-13 (d) — Scene map fills the window; connector labels dropped
+
+**Fill the width.** Reported (screenshots of a piece and a book chapter): the
+scene map left most of a column empty on the right. Cards were a fixed 208px
+on a stored grid, and the window was a few pixels short of another column.
+The user chose "cards widen to fill" over spreading the gaps or shrinking cards.
+
+- `sceneFit` (lib/layout.ts): as many columns as fit at 208px, then every card
+  widens (to 340px) so a full row reaches the right margin. Card width follows
+  the canvas width, not the scene count, so adding a scene never resizes others.
+- `ChapterDetail` draws that grid live instead of the stored `scenePos`, with a
+  `ResizeObserver` on the canvas (re-flows on resize) and `scrollbar-gutter:
+  stable`. Drop slots (`sceneSlotAt`) and the drag preview use the same grid.
+- Every edit is a reorder into the grid, so **Auto-arrange left the map**, and
+  `arrangeScenes` / `sceneSlotFromPoint` went with it. The store still writes
+  `scenePos` / `scenePosCompact` for the file and the phone.
+- An intermediate step gave pieces a 48px gap; superseded by the next item.
+
+**Therefore / But / And dropped.** The user found the method complicated the
+map more than it helped; they can type "but" in the card.
+
+- Plain lines everywhere: no pills on the scene map, beat rail or timeline
+  scene pane; board and timeline chapter links in the neutral line colour.
+  `cycleSceneLink` and `inheritedLink` removed; every new seam is `"none"`.
+- With no pill to clear, `SCENE_GAP_X` is 48px (was 88) for the chapter map and
+  the timeline (`TL_GAP_X_STACKED` removed). A book chapter at 1440px now
+  shows five columns where it showed four.
+- Markdown export writes no tags; the AI import prompt no longer asks for
+  them; `parseImportMarkdown` strips a trailing tag and records `"none"`.
+  Chapter links still default to `"therefore"` in data (never user-set).
+- **Data kept:** `sceneLinks` and link `type` stay in the document, so
+  existing labels survive and Android, which still draws them, is unaffected.
+  Android has not dropped the feature yet.
+- Form-change dialog copy no longer mentions labels.
+
+**Verified:** typecheck; 167 tests (7 new in `layout.test.ts` for the grid);
+dev preview at 1440 and 1100, expanded and collapsed: rows end at the right
+margin with no sideways scroll, drops land in the slot shown, plain
+connectors on map, rail and timeline. The user checked on localhost.
+
+**Shipped** (/ship): one commit `a5ff646`, pushed and deployed; prod reports
+it live. SPECS: new "Scene map fits the window" (replacing "Scene layout
+remembered per canvas size") and "Connector labels dropped" (replacing "A seam
+can be left unlabeled"); glossary, Board connectors, Scene flow canvas, Act on
+several scenes, Single pieces and Markdown export rows updated. No other drift.
+
+**Next:** offered: drop the labels in the Android app too.
