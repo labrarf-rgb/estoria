@@ -13,14 +13,6 @@ import { displaySummary } from "@/lib/drafts";
 import { countWords, withManuscript } from "@/lib/manuscript";
 import { CARD_W, CARD_H } from "@/lib/layout";
 
-const CONN_LABEL: Record<ConnType, string> = {
-  therefore: "Therefore",
-  but: "But",
-  and: "And",
-  /** Unused: a `"none"` seam is written as the absence of a tag, not a word. */
-  none: "",
-};
-
 const ROMAN_UNITS: [number, string][] = [
   [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
   [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
@@ -61,7 +53,7 @@ function takeArchived(line: string): { line: string; archived: boolean } {
 
 /**
  * Build Obsidian-vault-ready markdown: characters become [[wikilinks]],
- * chapters are grouped under Act headings, scenes carry their but/therefore tags.
+ * chapters are grouped under Act headings, scenes are a numbered list.
  * Renders the active version's board (`doc.chapters` — versions are standalone
  * forks, and only the active one is loaded at the top level).
  */
@@ -116,15 +108,7 @@ export function buildMarkdown(doc: StoryDoc): string {
       .forEach((c) => {
         md += `\n### ${c.num}. ${c.title}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c)}\n\n**Scenes**\n`;
         c.scenes.forEach((s, j) => {
-          // An unlabeled seam writes no tag at all — which is exactly what
-          // `parseImportMarkdown` reads back as `"none"`, so the round trip
-          // holds without putting a `_(none)_` marker in the vault.
-          const link = c.sceneLinks[j];
-          const conn =
-            j < c.scenes.length - 1 && link && link !== "none"
-              ? `  _(${CONN_LABEL[link].toLowerCase()})_`
-              : "";
-          md += `${j + 1}. ${s}${conn}\n`;
+          md += `${j + 1}. ${s}\n`;
         });
         // Refs are pure links since v5 — resolve each label through the shared
         // asset pool, skipping any that no longer resolve.
@@ -198,7 +182,7 @@ export function importPrompt(prose = false): string {
     "OUTPUT FORMAT:",
     "- Output ONE Markdown file and nothing else: no preamble, no explanation, no code fences around it.",
     "- Provide it as a DOWNLOADABLE .md file. Name the file exactly: \"<My Novel's Title> - estoria download.md\" (replace with the real title). If you cannot attach a file, put the filename on its own first line as `FILENAME: <My Novel's Title> - estoria download.md` and then the markdown.",
-    "- Follow this schema EXACTLY (headings, punctuation, and the `·`, `>`, and `(therefore)` markers matter — Estoria parses them literally):",
+    "- Follow this schema EXACTLY (headings, punctuation, and the `·` and `>` markers matter — Estoria parses them literally):",
     "",
     "# <Story Title>",
     "<one-paragraph premise, drawn only from the draft>",
@@ -218,8 +202,8 @@ export function importPrompt(prose = false): string {
     "### 1. <Chapter Title> · <approx word count> words",
     "> <one-line chapter summary>",
     "Scenes:",
-    "1. <scene> (therefore)",
-    "2. <scene> (but)",
+    "1. <scene>",
+    "2. <scene>",
     "3. <scene>",
     "Characters: <names in this chapter>",
     ...(prose
@@ -230,7 +214,7 @@ export function importPrompt(prose = false): string {
         ]
       : []),
     "",
-    "RULES: Number chapters sequentially across acts. After each scene except the last, tag the link to the NEXT scene as (therefore) for causal, (but) for conflict/reversal, or (and) for parallel/addition — and leave the tag OFF entirely when the two scenes merely follow one another, or when the draft does not make the relationship clear. An untagged link is a real, valid answer: it means \"these are in this order and the draft has not said why\". Do not label every link just to have labelled it. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
+    "RULES: Number chapters sequentially across acts. Group chapters under ## Act 1 / ## Act 2 / … headings (use as many acts as the draft supports). If the draft has no obvious word counts, estimate from scene length or omit the `· <n> words` part.",
     ...(prose
       ? [
           "",
@@ -504,9 +488,8 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       // A *numbered* marker alone on its line is an **empty beat**, not a stray
       // number. `buildMarkdown` writes a blank scene as `2. ` and the line
       // arrives here trimmed to `2.`, so without this the scene vanishes and
-      // every later link shifts up one seam. Since v9 that is common rather
-      // than rare: an unlabeled seam writes no `_(therefore)_`, and it was
-      // only ever the tag that kept a blank scene's line matchable.
+      // every later seam shifts up one. Scenes carry no tag any more, so
+      // nothing else keeps a blank scene's line matchable.
       //
       // Deliberately **not** `\s*` on the rule above, which would let the
       // bullet branch match a lone `*`, an emphasised line (`*She lies here*`
@@ -516,20 +499,14 @@ function parseActChapters(act: number, body: string[]): ParsedChapter[] {
       const emptyScene = !sceneM && /^\d+[.)]\s*$/.test(t);
       if (sceneM || emptyScene) {
         let text = sceneM ? sceneM[1].trim() : "";
-        // Untagged means unlabeled, not causal. `buildMarkdown` writes no tag
-        // for a `"none"` seam, so this is what makes an export → import round
-        // trip lossless. It does mean markdown from before v9 — or an AI file
-        // that skipped some tags — imports those seams unlabeled where it used
-        // to import them as "therefore".
-        let link: ConnType = "none";
-        // The tag may be wrapped in emphasis: `(but)`, `_(but)_`, `**(but)**`.
+        // Seams are no longer labeled, but markdown exported before that (or an
+        // AI that kept the habit) can still end a scene in a Therefore / But /
+        // And tag, possibly wrapped in emphasis: `(but)`, `_(but)_`,
+        // `**(but)**`. It is dropped rather than left in the scene's text.
         const tag = text.match(/[_*]{0,2}\((therefore|but|and|none)\)[_*]{0,2}\s*$/i);
-        if (tag) {
-          link = tag[1].toLowerCase() as ConnType;
-          text = text.slice(0, tag.index).trim();
-        }
+        if (tag) text = text.slice(0, tag.index).trim();
         scenes.push(clean(text));
-        sceneTags.push(link);
+        sceneTags.push("none");
       }
     }
     out.push({

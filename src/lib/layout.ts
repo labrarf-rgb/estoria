@@ -228,9 +228,9 @@ function sceneCols(n: number): number {
   return n <= 1 ? 1 : n <= 4 ? 2 : 3;
 }
 
-// Horizontal gap must clear the connector pill (~79px for "Therefore") so the
-// pill sits in the gap between cards instead of over their text.
-export const SCENE_GAP_X = 88;
+// Connectors are plain lines (the Therefore / But / And pills they once carried
+// needed an 88px gap to sit in), so columns sit as close as rows do.
+export const SCENE_GAP_X = 48;
 export const SCENE_GAP_Y = 48;
 export const SCENE_MARGIN = 18;
 
@@ -247,6 +247,44 @@ export function sceneColumnsForWidth(n: number, visW: number): number {
   return Math.max(1, Math.min(n, fit));
 }
 
+/** The widest a chapter-map card grows to fill its row. */
+export const SCENE_W_MAX = 340;
+
+/** The chapter map's grid at one canvas width: its columns and card width. */
+export interface SceneFit {
+  cols: number;
+  w: number;
+}
+
+/**
+ * The chapter map's grid for the canvas on screen. As many columns as fit with
+ * cards at `SCENE_W`, then every card widens (up to `SCENE_W_MAX`) so the row
+ * spans the canvas: no leftover strip on the right, and a column is added the
+ * moment the width allows one. Worked out from the width, not the scene count,
+ * so adding a scene never changes the cards' width. Before the canvas has been
+ * measured, falls back to the count heuristic at the base width.
+ */
+export function sceneFit(n: number, visW: number): SceneFit {
+  if (visW <= 0) return { cols: sceneCols(n), w: SCENE_W };
+  const usable = visW - SCENE_MARGIN * 2;
+  const cols = Math.max(1, Math.floor((usable + SCENE_GAP_X) / (SCENE_W + SCENE_GAP_X)));
+  const w = Math.floor((usable - (cols - 1) * SCENE_GAP_X) / cols);
+  return { cols, w: Math.max(SCENE_W, Math.min(SCENE_W_MAX, w)) };
+}
+
+/** Where slot `i` sits in a fitted grid (row by row). */
+export const sceneSlotPos = (i: number, f: SceneFit): Vec2 => ({
+  x: SCENE_MARGIN + (i % f.cols) * (f.w + SCENE_GAP_X),
+  y: SCENE_MARGIN + Math.floor(i / f.cols) * (SCENE_H + SCENE_GAP_Y),
+});
+
+/** The fitted grid slot nearest a canvas point. */
+export function sceneSlotAt(x: number, y: number, f: SceneFit): number {
+  const col = Math.max(0, Math.min(f.cols - 1, Math.round((x - SCENE_MARGIN - f.w / 2) / (f.w + SCENE_GAP_X))));
+  const row = Math.max(0, Math.round((y - SCENE_MARGIN - SCENE_H / 2) / (SCENE_H + SCENE_GAP_Y)));
+  return row * f.cols + col;
+}
+
 /**
  * Lay scene nodes for a chapter's detail canvas, with decaying jitter. `cols`
  * defaults to a count-based heuristic; pass a width-derived value
@@ -257,7 +295,7 @@ export function sceneAutoArrange(scenes: string[], _arrangeN: number, cols?: num
   const gy = SCENE_GAP_Y;
   const m = SCENE_MARGIN;
   const c0 = Math.max(1, cols ?? sceneCols(scenes.length));
-  // Even grid (no jitter): equal gaps keep the connector pills clear of text.
+  // Even grid (no jitter).
   return scenes.map((_, i) => {
     const col = i % c0;
     const row = Math.floor(i / c0);
@@ -302,12 +340,6 @@ export const TL_NODE_MAX_H = 208;
  * overflow resolves without touching `sceneSpan`.
  */
 export const TL_NODE_H = SCENE_H + 4;
-/**
- * Column gap when scenes stack (`column` fill). Consecutive beats are then
- * vertically adjacent, so their connector pill sits in the *row* gap and the
- * columns no longer need the full `SCENE_GAP_X` pill clearance.
- */
-export const TL_GAP_X_STACKED = 64;
 
 /** A placed scene node. `w` varies: a long scene takes more than one column. */
 export interface SceneBox {
@@ -370,7 +402,7 @@ export function sceneMetrics(
 ): SceneMetrics {
   const n = Math.max(0, count);
   const row = fill === "row";
-  const gapX = row ? SCENE_GAP_X : TL_GAP_X_STACKED;
+  const gapX = SCENE_GAP_X;
   const gapY = SCENE_GAP_Y;
   const tracks = row
     ? fitTracks(n, availW, TL_NODE_MIN_W, gapX)
@@ -459,17 +491,3 @@ export function sceneGrid(m: SceneMetrics, spans: number[]): SceneGrid {
   };
 }
 
-/**
- * Row-major grid slot nearest a point inside the scene canvas (in the same
- * local coordinate space as `sceneAutoArrange`'s output). Used while dragging
- * a scene card to preview which slot it will land in on release.
- */
-export function sceneSlotFromPoint(x: number, y: number, cols: number): number {
-  const c0 = Math.max(1, cols);
-  const col = Math.max(
-    0,
-    Math.min(c0 - 1, Math.round((x - SCENE_MARGIN - SCENE_W / 2) / (SCENE_W + SCENE_GAP_X)))
-  );
-  const row = Math.max(0, Math.round((y - SCENE_MARGIN - SCENE_H / 2) / (SCENE_H + SCENE_GAP_Y)));
-  return row * c0 + col;
-}

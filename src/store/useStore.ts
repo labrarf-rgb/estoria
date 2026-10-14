@@ -359,8 +359,6 @@ interface StoreState extends UiState {
   /** Reorder the given scene indices as a block within one chapter. `atIdx`
    *  counts against the scenes *remaining* once the selection is lifted out. */
   moveScenesWithin: (chId: string, indices: number[], atIdx?: number, cols?: number) => void;
-  cycleSceneLink: (chId: string, idx: number) => void;
-  arrangeScenes: (chId: string, reset?: boolean, cols?: number) => void;
 
   // ---- manuscript (chapter prose) ----
   /** Write a chapter's prose. The writer's own keystrokes go through here. */
@@ -661,10 +659,6 @@ const scenePosBoth = (
 const wideScenes = (s: { sceneFlowExpanded: boolean; doc: StoryDoc }): boolean =>
   s.sceneFlowExpanded || isPiece(s.doc);
 
-/** The positions field the given canvas size reads and writes. */
-const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
-  expanded ? "scenePos" : "scenePosCompact";
-
 /**
  * Take an ordered subset of a chapter's scenes, keeping each link that joined
  * two scenes still adjacent after the subset.
@@ -692,18 +686,6 @@ const sceneSubset = (scenes: string[], links: ConnType[], keep: number[]) => {
   }
   return { scenes: sorted.map((i) => scenes[i]), sceneLinks: outLinks };
 };
-
-/**
- * What a seam the *writer* just opened starts as: the type of the seam
- * immediately before it, or `"therefore"` when it is the chapter's first.
- *
- * Adding a scene is deliberate, so unlike the churn seams above it is worth
- * guessing at — and writers work in runs. A chapter carried on a chain of
- * "therefore" gets another one; a stretch deliberately left unlabeled stays
- * unlabeled instead of sprouting a causal claim at every new scene. `at` is the
- * index the new link will occupy once spliced in.
- */
-const inheritedLink = (links: ConnType[], at: number): ConnType => links[at - 1] ?? "therefore";
 
 /**
  * Splice a block of scenes into a list at `p`, re-joining whatever the
@@ -1375,9 +1357,7 @@ export const useStore = create<StoreState>()(
               const scenes = c.scenes.concat("");
               const sceneLinks =
                 c.scenes.length > 0
-                  ? c.sceneLinks.concat(
-                      isPiece(s.doc) ? "none" : inheritedLink(c.sceneLinks, c.sceneLinks.length)
-                    )
+                  ? c.sceneLinks.concat("none")
                   : c.sceneLinks;
               return {
                 ...c,
@@ -1404,7 +1384,7 @@ export const useStore = create<StoreState>()(
                 // on the left half; the right half is the new seam, and takes
                 // its type from the seam it split.
                 const at = Math.min(idx, sceneLinks.length);
-                sceneLinks.splice(at, 0, isPiece(s.doc) ? "none" : inheritedLink(sceneLinks, at));
+                sceneLinks.splice(at, 0, "none");
               }
               return {
                 ...c,
@@ -1650,49 +1630,6 @@ export const useStore = create<StoreState>()(
                       ...scenePosBoth(next.scenes, wideScenes(s), cols),
                     }
                   : c
-              ),
-            },
-          };
-        }),
-
-      // Therefore → But → And → none → Therefore. `"none"` sits at the end so
-      // the three method values stay adjacent: cycling past "And" clears the
-      // seam, and one more click starts the method over.
-      //
-      // A missing entry is `"none"` (`indexOf` returns -1, so the next value is
-      // "therefore"), which is also what a first click on an unlabeled seam
-      // should do.
-      cycleSceneLink: (chId, idx) =>
-        set((s) => {
-          // A piece's connectors are plain lines and say nothing.
-          if (isPiece(s.doc)) return s;
-          const order: ConnType[] = ["therefore", "but", "and", "none"];
-          return {
-            doc: {
-              ...s.doc,
-              chapters: s.doc.chapters.map((c) => {
-                if (c.id !== chId) return c;
-                const links = c.sceneLinks.slice();
-                links[idx] = order[(order.indexOf(links[idx]) + 1) % order.length];
-                return { ...c, sceneLinks: links };
-              }),
-            },
-          };
-        }),
-
-      // Auto-arrange tidies the size you're looking at. The other size keeps its
-      // own layout, so arranging the collapsed canvas can't disturb how the
-      // expanded one was laid out (and vice versa).
-      arrangeScenes: (chId, reset = false, cols) =>
-        set((s) => {
-          const n = reset ? 0 : s.sceneArrangeN;
-          const key = scenePosKey(wideScenes(s));
-          return {
-            sceneArrangeN: n + 1,
-            doc: {
-              ...s.doc,
-              chapters: s.doc.chapters.map((c) =>
-                c.id === chId ? { ...c, [key]: sceneAutoArrange(c.scenes, n, cols) } : c
               ),
             },
           };

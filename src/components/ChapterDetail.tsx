@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
@@ -7,22 +7,13 @@ import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { resolveRefs } from "@/lib/refs";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
-import { SCENE_W, SCENE_H, sceneColumnsForWidth, sceneAutoArrange, sceneSlotFromPoint } from "@/lib/layout";
+import { SCENE_H, SCENE_MARGIN, sceneColumnsForWidth, sceneFit, sceneSlotAt, sceneSlotPos } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { type ChapterTab } from "@/store/useStore";
-import { type ConnType, type Vec2 } from "@/types";
+import { type Vec2 } from "@/types";
 import { KINDS, partNouns } from "@/lib/piece";
 import type { ReactNode } from "react";
-
-const CONN: Record<ConnType, { label: string; color: string }> = {
-  therefore: { label: "Therefore", color: "var(--therefore)" },
-  but: { label: "But", color: "var(--but)" },
-  and: { label: "And", color: "var(--and)" },
-  // An unlabeled seam has no word to show; it renders as the quiet dot below
-  // rather than a pill, so `label` is never read for it.
-  none: { label: "", color: "var(--line)" },
-};
 
 /** The reference tabs, in order. See `ChapterTab` in the store. */
 const TABS: { key: ChapterTab; label: string; hint: string }[] = [
@@ -37,8 +28,7 @@ const TABS: { key: ChapterTab; label: string; hint: string }[] = [
  * toolbar instead of floating over a board. A piece is one chapter underneath
  * (see `lib/piece.ts`), so everything here works on it unchanged; page mode
  * only drops what a piece has no use for (the chapter number, act, the
- * previous/next arrows, Delete chapter) and draws its connectors as plain
- * lines, because a piece's seams make no causal claim.
+ * previous/next arrows, Delete chapter).
  */
 export function ChapterDetail({ page = false }: { page?: boolean }) {
   const openCh = useStore((s) => s.openCh);
@@ -65,8 +55,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const reorderScene = useStore((s) => s.reorderScene);
   const moveScenesToChapter = useStore((s) => s.moveScenesToChapter);
   const moveScenesWithin = useStore((s) => s.moveScenesWithin);
-  const cycleSceneLink = useStore((s) => s.cycleSceneLink);
-  const arrangeScenes = useStore((s) => s.arrangeScenes);
   const addChapterRef = useStore((s) => s.addChapterRef);
   const deleteChapterRef = useStore((s) => s.deleteChapterRef);
   const reorderChapterRef = useStore((s) => s.reorderChapterRef);
@@ -111,12 +99,16 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const [moveDest, setMoveDest] = useState<{ id: string; num: number; title: string } | null>(null);
   const [movePos, setMovePos] = useState<"beginning" | "middle" | "end">("end");
   const sceneBoxRef = useRef<HTMLDivElement>(null);
+  // The canvas's width, kept current as the window resizes, so the grid
+  // re-flows to it (see `sceneFit`). Measured before paint so the first frame
+  // is already laid out at the real width.
+  const [boxW, setBoxW] = useState(0);
 
   // Scene drag-to-reorder: an existing card ("move"), the ghost from a
   // long-pressed Add-scene button ("new"), or the whole checked selection in
   // select mode ("block"). Coordinates are canvas-local (relative to
   // sceneBoxRef's content, including its scroll offset) so they line up
-  // directly with scenePos / sceneAutoArrange output.
+  // directly with the fitted grid's positions (`sceneSlotPos`).
   type SceneDrag =
     | {
         kind: "move";
@@ -293,8 +285,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
           : d.kind === "block"
             ? c.scenes.length - d.idxs.length + 1
             : c.scenes.length + 1;
-      const cols = sceneColumnsForWidth(total, box.clientWidth);
-      const overIdx = Math.max(0, Math.min(sceneSlotFromPoint(pt.x, pt.y, cols), total - 1));
+      const overIdx = Math.max(
+        0,
+        Math.min(sceneSlotAt(pt.x, pt.y, sceneFit(total, box.clientWidth)), total - 1)
+      );
       setDrag({ ...d, cx: pt.x, cy: pt.y, clientY: e.clientY, overIdx });
     };
     const onUp = () => {
@@ -369,11 +363,17 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!drag]);
 
-  // Each canvas size keeps its own layout (`scenePos` expanded /
-  // `scenePosCompact` collapsed), so toggling just swaps to the other one —
-  // it no longer re-arranges, which is what used to throw away the arrangement
-  // you'd made. A size is only auto-arranged when it has no layout yet, which
-  // `openChapter` handles on the way in.
+  // Track the canvas width. The box only exists while the scenes are shown, so
+  // re-attach when they come back.
+  useLayoutEffect(() => {
+    const el = sceneBoxRef.current;
+    if (!el) return;
+    const measure = () => setBoxW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scenesCollapsed]);
 
   // Leaving a chapter (prev/next nav or close) cancels an in-progress move.
   useEffect(() => {
@@ -419,10 +419,13 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
     refs: ch.refs.length ? String(ch.refs.length) : undefined,
   };
 
-  // The layout belonging to the size on screen. Falling back to the other one
-  // covers the frame between a size toggle and the store catching up.
-  const positions = (expanded ? ch.scenePos : ch.scenePosCompact) ?? ch.scenePos ?? [];
-  const boxW = sceneBoxRef.current?.clientWidth ?? 0;
+  // The grid is worked out from the canvas width on every render rather than
+  // read from the stored `scenePos`, so it always fills the width on screen and
+  // re-flows on resize. Every edit is a reorder into this grid, so the stored
+  // positions only ever described one of these grids at an older width; the
+  // store still writes them, for the file and the phone.
+  const fit = sceneFit(ch.scenes.length, boxW);
+  const positions = ch.scenes.map((_, i) => sceneSlotPos(i, fit));
 
   // While dragging, build a preview layout: the moved (or not-yet-created)
   // scene occupies a "gap" slot that follows the pointer, and every other
@@ -449,17 +452,16 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
           ? ch.scenes.map((_, i) => i).filter((i) => !blockSet.has(i))
           : ch.scenes.map((_, i) => i);
     const at = Math.max(0, Math.min(drag.overIdx, others.length));
-    const previewCols = sceneColumnsForWidth(others.length + 1, boxW);
-    const previewPos = sceneAutoArrange(new Array(others.length + 1).fill(""), 0, previewCols);
+    const previewPos = (k: number) => sceneSlotPos(k, fit);
     // A block takes as many numbers as it has scenes, so everything after the
     // drop point shifts by that much rather than by one.
     const span = blockSet ? blockSet.size : 1;
     cardSlots = others.map((origIdx, i) => ({
       idx: origIdx,
-      pos: previewPos[i < at ? i : i + 1],
+      pos: previewPos(i < at ? i : i + 1),
       num: i < at ? i + 1 : i + span + 1,
     }));
-    gapPos = previewPos[at];
+    gapPos = previewPos(at);
     ghostNum = at + 1;
     ghostText =
       drag.kind === "move"
@@ -470,18 +472,14 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
     ghostPos =
       drag.kind === "move"
         ? { x: drag.cx - drag.offX, y: drag.cy - drag.offY }
-        : { x: drag.cx - SCENE_W / 2, y: drag.cy - SCENE_H / 2 };
+        : { x: drag.cx - fit.w / 2, y: drag.cy - SCENE_H / 2 };
   }
 
   const extent = [...cardSlots.map((s) => s.pos), ...(gapPos ? [gapPos] : []), ...(ghostPos ? [ghostPos] : [])];
-  const canvasW = Math.max(640, ...extent.map((p) => p.x + SCENE_W)) + 24;
+  // The right margin matches the left, so a full row exactly fits the canvas
+  // and never adds a sideways scroll.
+  const canvasW = Math.max(640, ...extent.map((p) => p.x + fit.w + SCENE_MARGIN));
   const canvasH = Math.max(260, ...extent.map((p) => p.y + SCENE_H)) + 24;
-
-  // Auto-arrange scenes to fill the *visible* canvas (collapsed vs expanded use
-  // different widths, so each mode arranges into a different column count).
-  const onArrangeScenes = () => {
-    arrangeScenes(ch.id, false, sceneColumnsForWidth(ch.scenes.length, boxW));
-  };
 
   const onSceneDown = (e: React.MouseEvent, idx: number) => {
     if (selectMode) {
@@ -524,8 +522,8 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
       const box = sceneBoxRef.current;
       const cx = box ? box.scrollLeft + box.clientWidth / 2 : 0;
       const cy = box ? box.scrollTop + box.clientHeight / 2 : 0;
-      const cols = sceneColumnsForWidth(ch.scenes.length + 1, box?.clientWidth ?? 0);
-      const overIdx = Math.max(0, Math.min(sceneSlotFromPoint(cx, cy, cols), ch.scenes.length));
+      const f = sceneFit(ch.scenes.length + 1, box?.clientWidth ?? 0);
+      const overIdx = Math.max(0, Math.min(sceneSlotAt(cx, cy, f), ch.scenes.length));
       setDrag({ kind: "new", cx, cy, clientY: startClientY, overIdx });
     }, 220);
     const cancel = () => window.clearTimeout(timer);
@@ -542,7 +540,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 
   const sceneCenter = (idx: number) => {
     const p = positions[idx] ?? { x: 0, y: 0 };
-    return { x: p.x + SCENE_W / 2, y: p.y + SCENE_H / 2 };
+    return { x: p.x + fit.w / 2, y: p.y + SCENE_H / 2 };
   };
 
   // Column count used when inserting a scene via the hover +buttons — sized for
@@ -1030,12 +1028,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             </div>
           ) : (
             <div className="ml-auto flex items-center gap-[9px]">
-              <button
-                onClick={onArrangeScenes}
-                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-              >
-                Auto-arrange
-              </button>
               {/* Two scenes here is enough on its own now: the destination
                   picker offers this chapter, so a book with one chapter can
                   still reorder a block within it. */}
@@ -1127,7 +1119,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
         <>
         <div
           ref={sceneBoxRef}
-          className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg ${
+          className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg [scrollbar-gutter:stable] ${
             // Expanded: whatever height the modal has left, never under 320px;
             // an open reference tab pushes it down, and past the floor the
             // modal scrolls instead.
@@ -1155,54 +1147,11 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
               </svg>
             )}
 
-            {!drag &&
-              !page &&
-              ch.scenes.slice(0, -1).map((_, i) => {
-                const a = sceneCenter(i);
-                const b = sceneCenter(i + 1);
-                const type = ch.sceneLinks[i] ?? "none";
-                // An unlabeled seam still needs somewhere to click, or there
-                // would be no way back into the method once you cycled past it.
-                // It keeps the same hit box as a pill but shows only a hairline
-                // dot, which fills in on hover to say it can be clicked.
-                if (type === "none") {
-                  return (
-                    <button
-                      key={i}
-                      disabled={selectMode}
-                      onClick={() => cycleSceneLink(ch.id, i)}
-                      className="group/conn absolute z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full disabled:pointer-events-none"
-                      style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2 }}
-                      title={selectMode ? undefined : "Unlabeled — click to set Therefore / But / And"}
-                      aria-label="Unlabeled connector"
-                    >
-                      <span className="h-[7px] w-[7px] rounded-full border border-line bg-bg transition-colors group-hover/conn:border-faint group-hover/conn:bg-faint" />
-                    </button>
-                  );
-                }
-                return (
-                  <button
-                    key={i}
-                    disabled={selectMode} // Visible for context while selecting, but inert.
-                    onClick={() => cycleSceneLink(ch.id, i)}
-                    className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide disabled:pointer-events-none"
-                    style={{
-                      left: (a.x + b.x) / 2,
-                      top: (a.y + b.y) / 2,
-                      color: CONN[type].color,
-                      borderColor: CONN[type].color,
-                    }}
-                    title={selectMode ? undefined : "Click to cycle Therefore / But / And / unlabeled"}
-                  >
-                    {CONN[type].label}
-                  </button>
-                );
-              })}
 
             {gapPos && (
               <div
                 className="pointer-events-none absolute z-0 rounded-[11px] border-2 border-dashed border-faint/60 bg-faint/5"
-                style={{ left: gapPos.x, top: gapPos.y, width: SCENE_W, minHeight: SCENE_H }}
+                style={{ left: gapPos.x, top: gapPos.y, width: fit.w, minHeight: SCENE_H }}
               />
             )}
 
@@ -1231,7 +1180,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
                     selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
                   }`}
-                  style={{ left: slot.pos.x, top: slot.pos.y, width: SCENE_W, minHeight: SCENE_H }}
+                  style={{ left: slot.pos.x, top: slot.pos.y, width: fit.w, minHeight: SCENE_H }}
                 >
                   {/* Hover the left/right edge of a card to drop a new scene in
                       before or after it, without leaving the scene canvas. */}
@@ -1348,7 +1297,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             {ghostPos && (
               <div
                 className="pointer-events-none absolute z-20 rotate-1 scale-[1.03] cursor-grabbing opacity-90"
-                style={{ left: ghostPos.x, top: ghostPos.y, width: SCENE_W, minHeight: SCENE_H }}
+                style={{ left: ghostPos.x, top: ghostPos.y, width: fit.w, minHeight: SCENE_H }}
               >
                 <div className="flex h-full flex-col gap-[7px] rounded-[11px] border border-faint bg-card p-[12px_13px] shadow-[0_18px_38px_rgba(0,0,0,0.35)]">
                   <span className="font-mono text-[10px] font-semibold tracking-wide text-faint">
@@ -1365,9 +1314,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             ? // Names the two buttons rather than paraphrasing them, so the
               // hint and the controls it explains use the same words.
               `Click ${nouns.many} to select them · drag any selected ${nouns.one} to reorder them all together · then Move them${page ? "" : " to a chapter"}, or Delete them`
-            : page
-              ? `Drag ${nouns.many} to reorder · press and hold Add ${nouns.one} to drop it in place · connectors show order only`
-              : `Drag ${nouns.many} to reorder · press and hold Add ${nouns.one} to drop it in place · click a connector to cycle Therefore / But / And, or past it to leave the seam unlabeled`}
+            : `Drag ${nouns.many} to reorder · press and hold Add ${nouns.one} to drop it in place · connectors show order only`}
         </div>
         </>
         )}

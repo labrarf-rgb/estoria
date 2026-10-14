@@ -10,15 +10,7 @@ import { wordsMeta } from "@/lib/manuscript";
 import { countParts } from "@/lib/piece";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { ProseChapter } from "@/components/ProsePane";
-import type { Chapter, ConnType, Vec2 } from "@/types";
-
-const CONN: Record<ConnType, { label: string; color: string }> = {
-  therefore: { label: "Therefore", color: "var(--therefore)" },
-  but: { label: "But", color: "var(--but)" },
-  and: { label: "And", color: "var(--and)" },
-  /** Never rendered — an unlabeled seam draws no pill here. */
-  none: { label: "", color: "var(--line)" },
-};
+import type { Chapter, Vec2 } from "@/types";
 
 const statusColor = (s: Chapter["status"]) =>
   s === "done" ? "var(--therefore)" : s === "draft" ? "var(--but)" : "var(--faint)";
@@ -71,12 +63,6 @@ function sceneConnector(a: SceneBox, b: SceneBox, fill: SceneFill) {
   const wrapped = b.x !== a.x;
   return wrapped ? horizontal(20) : vertical(24);
 }
-
-/** Point at t=0.5 on a cubic — where the connector's pill sits. */
-const curveMid = (c: Vec2[]) => ({
-  x: (c[0].x + 3 * c[1].x + 3 * c[2].x + c[3].x) / 8,
-  y: (c[0].y + 3 * c[1].y + 3 * c[2].y + c[3].y) / 8,
-});
 
 interface Box {
   x: number;
@@ -428,7 +414,7 @@ export function Timeline() {
                   key={i}
                   d={railConnector(a, b, vertical)}
                   fill="none"
-                  stroke={CONN[l.type].color}
+                  stroke="var(--line)"
                   strokeWidth={2}
                   strokeLinecap="round"
                 />
@@ -710,23 +696,6 @@ export function Timeline() {
                         </div>
                       ))}
 
-                      {c.scenes.slice(0, -1).map((_, i) => {
-                        const type = c.sceneLinks[i] ?? "none";
-                        // Read-only here, so an unlabeled seam shows nothing at
-                        // all — the connector curve already says the scenes are
-                        // in order. It is labeled from the chapter's scene flow.
-                        if (type === "none") return null;
-                        const m = curveMid(sceneConnector(g.nodes[i], g.nodes[i + 1], fill).c);
-                        return (
-                          <span
-                            key={i}
-                            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border bg-bg px-[10px] py-[2px] text-[10px] font-semibold uppercase tracking-wide"
-                            style={{ left: m.x, top: m.y, color: CONN[type].color, borderColor: CONN[type].color }}
-                          >
-                            {CONN[type].label}
-                          </span>
-                        );
-                      })}
                     </>
                   )}
                 </div>

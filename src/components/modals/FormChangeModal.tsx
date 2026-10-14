@@ -67,7 +67,7 @@ function ExpandDialog({ close }: { close: () => void }) {
         Everything comes along: the writing, all {parts} {parts === 1 ? nouns.one : nouns.many} and their
         layout, characters, world, notes, pins, and every version. Parts are still called {nouns.many}
         {doc.keepLineBreaks ? ", and line breaks are still kept" : ""}. You can add chapters, acts and the
-        Timeline, and label connectors with Therefore / But / And.
+        Timeline.
       </p>
       <CopyNote />
     </Dialog>
@@ -132,9 +132,6 @@ function CollapseDialog({ close }: { close: () => void }) {
           </li>
           <li>
             <b className="text-ink">{nouns.Many}:</b> {parts} in one flow, laid out fresh
-          </li>
-          <li>
-            <b className="text-ink">Connectors:</b> become plain lines; Therefore / But / And labels are dropped
           </li>
           <li>
             <b className="text-ink">Cast, world, pins:</b> everything any chapter used

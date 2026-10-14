@@ -6,19 +6,7 @@ import { CARD_W, CARD_H, GRID_GAP_X, fitToContent, type Camera } from "@/lib/lay
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
-import type { Chapter, ConnType } from "@/types";
-
-const CONN_COLOR: Record<ConnType, string> = {
-  therefore: "var(--therefore)",
-  but: "var(--but)",
-  and: "var(--and)",
-  /**
-   * Chapter links can hold `"none"` (they share `ConnType` with scene links),
-   * but nothing on the board sets one — the board has no cycle control. It gets
-   * the neutral line colour so a doc that arrives carrying one still draws.
-   */
-  none: "var(--line)",
-};
+import type { Chapter } from "@/types";
 
 const statusColor = (s: Chapter["status"]) =>
   s === "done" ? "var(--therefore)" : s === "draft" ? "var(--but)" : "var(--faint)";
@@ -448,13 +436,12 @@ export function Board() {
             const a = posById[l.fromId];
             const b = posById[l.toId];
             if (!a || !b) return null;
-            const type = l.type;
             return (
               <path
                 key={i}
                 d={connectorPath(a, b)}
                 fill="none"
-                stroke={CONN_COLOR[type]}
+                stroke="var(--line)"
                 strokeWidth={2}
                 strokeLinecap="round"
               />

@@ -5,7 +5,7 @@ import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { ProseChapter } from "@/components/ProsePane";
-import type { Chapter, ConnType } from "@/types";
+import type { Chapter } from "@/types";
 import { partNouns } from "@/lib/piece";
 import type { ReactNode } from "react";
 
@@ -47,14 +47,6 @@ import type { ReactNode } from "react";
  * was dropped: see the note at the top of `lib/manuscript.ts` for why, and what
  * went with it.
  */
-
-const CONN: Record<ConnType, { label: string; color: string }> = {
-  therefore: { label: "Therefore", color: "var(--therefore)" },
-  but: { label: "But", color: "var(--but)" },
-  and: { label: "And", color: "var(--and)" },
-  /** Never rendered — `Pill` draws nothing for an unlabeled seam. */
-  none: { label: "", color: "var(--line)" },
-};
 
 /** The rail's width. Enough for a beat at the 200-character cap in a few lines. */
 const RAIL_W = 284;
@@ -322,7 +314,7 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
         {/* Rail beside prose, each scrolling on its own. `min-h-0` on both is
             what lets a flex child scroll rather than grow the row. */}
         <div className="flex min-h-0 flex-1">
-          {railHidden ? <FoldedRail count={ch.scenes.length} /> : <BeatRail ch={ch} page={page} />}
+          {railHidden ? <FoldedRail count={ch.scenes.length} /> : <BeatRail ch={ch} />}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {view === "read" ? (
               <div
@@ -432,7 +424,7 @@ function Shell({
  * Left, not right, because the timeline's vertical rail is on the left and the
  * beats should not change sides depending on where you are in the app.
  */
-function BeatRail({ ch, page }: { ch: Chapter; page: boolean }) {
+function BeatRail({ ch }: { ch: Chapter }) {
   const openAtScene = useStore((s) => s.openChapterAtScene);
   const setRailHidden = useStore((s) => s.setBeatRailHidden);
   const kind = useStore((s) => s.doc.kind);
@@ -466,13 +458,9 @@ function BeatRail({ ch, page }: { ch: Chapter; page: boolean }) {
           ch.scenes.map((s, i) => (
             <div key={i}>
               {i > 0 && (
+                // Seams are plain lines: order, and nothing more.
                 <div className="flex justify-center py-[6px]">
-                  {page ? (
-                    // A piece's seams are plain lines: order, and nothing more.
-                    <span className="block h-[10px] w-px bg-line" />
-                  ) : (
-                    <Pill type={ch.sceneLinks[i - 1] ?? "none"} />
-                  )}
+                  <span className="block h-[10px] w-px bg-line" />
                 </div>
               )}
               <BeatCard num={i + 1} text={s} noun={nouns.one} onOpen={() => openAtScene(ch.id, i)} />
@@ -534,20 +522,6 @@ function BeatCard({ num, text, noun, onOpen }: { num: number; text: string; noun
         {text || <span className="text-faint">New {noun}</span>}
       </div>
     </button>
-  );
-}
-
-function Pill({ type }: { type: ConnType }) {
-  // An unlabeled seam says nothing, so it shows nothing. The gap between the
-  // two beat cards is left in place: they are still separate beats.
-  if (type === "none") return null;
-  return (
-    <span
-      className="whitespace-nowrap rounded-full border bg-bg px-[8px] py-[2px] text-[9.5px] font-semibold uppercase tracking-wide"
-      style={{ color: CONN[type].color, borderColor: CONN[type].color }}
-    >
-      {CONN[type].label}
-    </span>
   );
 }
 

@@ -21,9 +21,10 @@ export const SCHEMA_VERSION = 9;
  * seam the *app* opened (a reorder, a scene pulled out of a run) had to invent
  * a "therefore" the writer never chose. `"none"` is what those seams get now.
  *
- * It renders as a plain line with no pill, and exports with no `(therefore)`
- * tag — so an untagged scene in markdown reads back as `"none"`, not as a
- * causal link (see `parseImportMarkdown`).
+ * **The web app no longer shows or sets these (2026-10-13).** Every seam draws
+ * as a plain line, new seams are `"none"`, and markdown neither writes nor
+ * reads the tags. The field stays in the document, so labels already in a file
+ * survive and the phone, which still reads them, is not broken.
  */
 export type ConnType = "therefore" | "but" | "and" | "none";
 
