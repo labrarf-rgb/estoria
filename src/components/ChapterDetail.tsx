@@ -81,7 +81,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const setTab = useStore((s) => s.setChapterTab);
   const refView = useStore((s) => s.refView);
   const setRefView = useStore((s) => s.setRefView);
-  const expanded = useStore((s) => s.sceneFlowExpanded);
+  // A piece's canvas fills the page, so it is always the wide one and has no
+  // size control. Keeps the layout read here in step with `wideScenes` in the
+  // store, which every write uses.
+  const expanded = useStore((s) => s.sceneFlowExpanded) || page;
   const setSceneFlowExpanded = useStore((s) => s.setSceneFlowExpanded);
   const notesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
@@ -1058,14 +1061,17 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 + Add {nouns.one}
               </button>
               {/* Last, in both modals: the size control is always the right-most
-                  button on its row, so it is found in the same place. */}
-              <button
-                onClick={() => setSceneFlowExpanded(!expanded)}
-                className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
-              >
-                {expanded ? "Collapse" : "Expand"}
-              </button>
+                  button on its row, so it is found in the same place. A piece
+                  already fills the page, so it has none. */}
+              {!page && (
+                <button
+                  onClick={() => setSceneFlowExpanded(!expanded)}
+                  className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
+                  title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
+                >
+                  {expanded ? "Collapse" : "Expand"}
+                </button>
+              )}
             </div>
           )}
         </div>

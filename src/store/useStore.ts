@@ -652,6 +652,15 @@ const scenePosBoth = (
     : { scenePos: other, scenePosCompact: active };
 };
 
+/**
+ * Whether the scene canvas on screen is the wide one. A piece's canvas fills
+ * the page and has no size control, so it is always wide; otherwise the flag
+ * says. Every layout read and write goes through this, so a piece never
+ * switches to its compact layout because a book's chapter was collapsed.
+ */
+const wideScenes = (s: { sceneFlowExpanded: boolean; doc: StoryDoc }): boolean =>
+  s.sceneFlowExpanded || isPiece(s.doc);
+
 /** The positions field the given canvas size reads and writes. */
 const scenePosKey = (expanded: boolean): "scenePos" | "scenePosCompact" =>
   expanded ? "scenePos" : "scenePosCompact";
@@ -1374,7 +1383,7 @@ export const useStore = create<StoreState>()(
                 ...c,
                 scenes,
                 sceneLinks,
-                ...scenePosBoth(scenes, s.sceneFlowExpanded, cols),
+                ...scenePosBoth(scenes, wideScenes(s), cols),
               };
             }),
           },
@@ -1401,7 +1410,7 @@ export const useStore = create<StoreState>()(
                 ...c,
                 scenes,
                 sceneLinks,
-                ...scenePosBoth(scenes, s.sceneFlowExpanded, cols),
+                ...scenePosBoth(scenes, wideScenes(s), cols),
               };
             }),
           },
@@ -1485,7 +1494,7 @@ export const useStore = create<StoreState>()(
                       ...c,
                       scenes: [""],
                       sceneLinks: [],
-                      ...scenePosBoth([""], s.sceneFlowExpanded, cols),
+                      ...scenePosBoth([""], wideScenes(s), cols),
                     }
                   : {
                       ...c,
@@ -1520,7 +1529,7 @@ export const useStore = create<StoreState>()(
               if (sceneLinks.length) sceneLinks.splice(Math.min(fromIdx, sceneLinks.length - 1), 1);
               if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "none");
 
-              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, s.sceneFlowExpanded, cols) };
+              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, wideScenes(s), cols) };
             }),
           },
         })),
@@ -1565,7 +1574,7 @@ export const useStore = create<StoreState>()(
                     ...c,
                     scenes: srcScenes,
                     sceneLinks: srcLinks,
-                    ...scenePosBoth(srcScenes, s.sceneFlowExpanded, cols),
+                    ...scenePosBoth(srcScenes, wideScenes(s), cols),
                   };
                 if (c.id === toChId)
                   return {
@@ -1576,8 +1585,8 @@ export const useStore = create<StoreState>()(
                     // keep a cramped count-heuristic grid when later opened.
                     ...scenePosBoth(
                       toScenes,
-                      s.sceneFlowExpanded,
-                      sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(s.sceneFlowExpanded))
+                      wideScenes(s),
+                      sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(wideScenes(s)))
                     ),
                   };
                 return c;
@@ -1638,7 +1647,7 @@ export const useStore = create<StoreState>()(
                       ...c,
                       scenes: next.scenes,
                       sceneLinks: next.sceneLinks,
-                      ...scenePosBoth(next.scenes, s.sceneFlowExpanded, cols),
+                      ...scenePosBoth(next.scenes, wideScenes(s), cols),
                     }
                   : c
               ),
@@ -1677,7 +1686,7 @@ export const useStore = create<StoreState>()(
       arrangeScenes: (chId, reset = false, cols) =>
         set((s) => {
           const n = reset ? 0 : s.sceneArrangeN;
-          const key = scenePosKey(s.sceneFlowExpanded);
+          const key = scenePosKey(wideScenes(s));
           return {
             sceneArrangeN: n + 1,
             doc: {
