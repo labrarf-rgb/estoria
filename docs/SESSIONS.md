@@ -6128,3 +6128,33 @@ can be left unlabeled"); glossary, Board connectors, Scene flow canvas, Act on
 several scenes, Single pieces and Markdown export rows updated. No other drift.
 
 **Next:** offered: drop the labels in the Android app too.
+
+### 2026-10-18 — Drive no longer stays paused after a restart
+
+**Reported:** after restarting the computer, the installed app showed Drive
+sync paused until Estoria was quit and reopened.
+
+**Cause:** the kill switch (`/status`) is read once at launch. An app that
+opens with the computer reads it before Wi-Fi is up, gets "unreachable", and
+counts that as paused. The only ways back were the 30-minute check or the
+browser's `online` event, which doesn't fire when the browser already thought
+it was online.
+
+- `startDriveStatusChecks` (`syncTarget.ts`) now retries on its own while the
+  broker can't be reached: 10 s, doubling up to 5 min, reset once it answers.
+- While paused it also checks when the window regains focus or comes back
+  into view, as well as on `online`. Once `on`, nothing extra runs.
+- Edits made while paused still go to Drive with the next save, as before.
+
+**Verified:** typecheck, build; 169 tests (2 new in `driveStatus.test.ts`:
+retry with backoff and no `online` event; re-check on focus). Dev preview with
+the broker down: `/status` retried on its own without a reload (background-pane
+throttling stretched the gaps). The local broker can't answer `on` without its
+Google secret, so the recovery to "on" is covered by the unit tests only.
+
+**Shipped** (/ship): commit `bfb93e3`, pushed and deployed; prod reports
+build 43 `bfb93e3` live. SPECS: "Kill switch" paragraph updated in the same
+commit to describe the retries and the focus check. No other drift.
+
+**Next:** confirm on the next real restart that the footer clears "Drive
+backup paused" within a minute without reopening Estoria.
