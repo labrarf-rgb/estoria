@@ -971,10 +971,13 @@ pruned by it.
 - **iPad Safari** shows a one-time tip to add Estoria to the Home Screen,
   because Safari clears a website's data after 7 days without a visit.
 
-**Kill switch.** The app reads the broker's `/status` at startup, every 30
-minutes, and when it comes back online while paused. Until it has answered
-`on`, Drive does no writes ("Drive backup paused"); local saving is
-unaffected. To use it: set `DRIVE_STATUS=off` in the Vercel project's
+**Kill switch.** The app reads the broker's `/status` at startup and every 30
+minutes. While paused it also reads it when the device comes back online or
+the window comes back into view, and while the broker can't be reached it
+retries on its own (10 s, doubling up to 5 min), so an app that opens with
+the computer, before Wi-Fi is up, picks Drive back up without a restart.
+Until it has answered `on`, Drive does no writes ("Drive backup paused");
+local saving is unaffected. To use it: set `DRIVE_STATUS=off` in the Vercel project's
 environment variables, then **redeploy** (a saved value does nothing until
 then). Open tabs pause at their next check, or straight away on reload. It
 stops Estoria's writes; it doesn't cut the broker off from Google. Unit-tested;

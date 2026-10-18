@@ -15,6 +15,8 @@ import type { SyncTarget } from "@/lib/syncFolder";
 const TARGET_KEY = "estoria:sync:target";
 const FOLDER_KEY = "estoria:drive:folder";
 const STATUS_EVERY_MS = 30 * 60 * 1000;
+const RETRY_FIRST_MS = 10 * 1000;
+const RETRY_MAX_MS = 5 * 60 * 1000;
 
 function read(key: string): string | null {
   try {
@@ -103,20 +105,46 @@ export async function refreshDriveStatus(auth: Pick<DriveAuth, "fetchDriveStatus
 }
 
 /**
- * Check now and every 30 minutes, and again when the device comes back
- * online while Drive isn't confirmed on, so a page opened offline doesn't stay
- * paused until the next half-hour check. Returns a stop function.
+ * Check now and every 30 minutes. While the broker can't be reached, keep
+ * retrying (10 s, doubling up to 5 min), and check again when the device comes
+ * back online or the window comes back into view. An app that opens with the
+ * computer starts before Wi-Fi is up, often with no "online" event to follow,
+ * and shouldn't stay paused until the next half-hour check. Returns a stop
+ * function.
  */
 export function startDriveStatusChecks(auth: Pick<DriveAuth, "fetchDriveStatus">): () => void {
-  void refreshDriveStatus(auth);
-  const timer = setInterval(() => void refreshDriveStatus(auth), STATUS_EVERY_MS);
-  const onOnline = () => {
-    if (driveStatus !== "on") void refreshDriveStatus(auth);
+  let stopped = false;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  let retryIn = RETRY_FIRST_MS;
+  const check = () => {
+    if (retry) clearTimeout(retry);
+    retry = null;
+    void refreshDriveStatus(auth).then((s) => {
+      if (stopped) return;
+      if (s !== "unreachable") {
+        retryIn = RETRY_FIRST_MS;
+        return;
+      }
+      if (retry) return;
+      retry = setTimeout(check, retryIn);
+      retryIn = Math.min(retryIn * 2, RETRY_MAX_MS);
+    });
   };
-  window.addEventListener("online", onOnline);
+  const checkIfPaused = () => {
+    if (driveStatus !== "on" && document.visibilityState !== "hidden") check();
+  };
+  check();
+  const timer = setInterval(check, STATUS_EVERY_MS);
+  window.addEventListener("online", checkIfPaused);
+  window.addEventListener("focus", checkIfPaused);
+  document.addEventListener("visibilitychange", checkIfPaused);
   return () => {
+    stopped = true;
     clearInterval(timer);
-    window.removeEventListener("online", onOnline);
+    if (retry) clearTimeout(retry);
+    window.removeEventListener("online", checkIfPaused);
+    window.removeEventListener("focus", checkIfPaused);
+    document.removeEventListener("visibilitychange", checkIfPaused);
   };
 }
 
