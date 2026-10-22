@@ -6158,3 +6158,28 @@ commit to describe the retries and the focus check. No other drift.
 
 **Next:** confirm on the next real restart that the footer clears "Drive
 backup paused" within a minute without reopening Estoria.
+
+### 2026-10-21 — Dependency security fixes (Vite, Vitest)
+
+**Asked:** does the site or Estoria use PHP, and is it exposed to the recent
+PHP flaws? No: the portfolio is static files on GitHub Pages, Estoria builds
+to static files, and the auth broker is dependency-free Node on Vercel. No
+`.php`, `composer.json` or `.htaccess` anywhere in the home folder.
+
+`npm audit` then showed 9 advisories (2 critical, 5 high, 2 moderate), all in
+dev-only tooling; `npm audit --omit=dev` was already clean, so nothing that
+ships to visitors was affected.
+
+- `7b9143a`: Vite 6.4.3 → 6.4.5 (`npm audit fix`; dev-server advisories,
+  launch-editor).
+- `1c069c7`: Vitest 3 → 5.0.5 (`^5` in `package.json`), which drops
+  tinypool's two critical prototype-pollution advisories. No test or config
+  changes needed; Vitest 5 runs on Vite 6.4.5 (one deduped copy).
+
+**Verified:** `npm audit` reports 0; typecheck, build; 169 tests pass on
+Vitest 5.
+
+**Shipped** (/ship): both commits pushed; deployed as build 46 `1c069c7`,
+prod reports it live and its assets load. The shipped bundle is unchanged
+apart from the version stamp. SPECS: no drift (§2 still says Vite 6, §5
+still says vitest; neither pins a version).
