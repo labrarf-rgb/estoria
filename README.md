@@ -27,7 +27,6 @@ Vite · React 19 · TypeScript · Zustand · Tailwind v4
 - **Session history:** [`docs/SESSIONS.md`](docs/SESSIONS.md) — dated log of what changed when.
 - **Google Drive sync:** [SPECS §8 "Google Drive sync (as built)"](docs/SPECS.md); the plan and hazard register in [`docs/PLAN-drive-sync.md`](docs/PLAN-drive-sync.md), the test record in [`docs/HANDOFF-drive-sync.md`](docs/HANDOFF-drive-sync.md).
 - **Sign-in broker:** [`auth-server/`](auth-server/README.md) — the small server at `auth.labrarf.com` that keeps Drive signed in. Its own package and tests; deployed by Vercel, never by `npm run deploy`.
-- **Daily word log for Pace:** [`src/lib/wordLog.ts`](src/lib/wordLog.ts) records the net words typed per project per day, which the sibling [Pace](https://www.labrarf.com/pace-calculator/) calculator reads to fill its log. Browser-only, never in the project file; see the SPECS §4 row "Daily word log (for Pace)".
 - **Data model:** [`src/types.ts`](src/types.ts)
 - **State + actions:** [`src/store/useStore.ts`](src/store/useStore.ts)
 - **Design reference:** `Story Mapping WebApp Prototype/` (static mock, not the app)
