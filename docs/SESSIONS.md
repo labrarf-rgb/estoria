@@ -6253,5 +6253,9 @@ bottom-right corner (`HintCorner` in `Footer.tsx`), taking turns with the
 view's hint about every 8 s with a short fade (none under reduced motion);
 clicking it opens Pace, and with no words today and no pace set only the hint
 shows. The stat line is back to words and chapters. Tried locally and
-approved by Ray; committed, not pushed or deployed. Still md and up only, like
-the hint, so a narrow window shows no readout.
+approved by Ray. Still md and up only, like the hint, so a narrow window shows
+no readout.
+
+**Shipped** (/ship): commit `6758030` on `main`, pushed, deployed as build
+55; prod reports it live and its assets load. SPECS: §4 "Pace" row and the
+`Footer.tsx` tree note updated in the same commit. No other drift found.
