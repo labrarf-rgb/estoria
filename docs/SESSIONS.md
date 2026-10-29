@@ -6259,3 +6259,8 @@ no readout.
 **Shipped** (/ship): commit `6758030` on `main`, pushed, deployed as build
 55; prod reports it live and its assets load. SPECS: §4 "Pace" row and the
 `Footer.tsx` tree note updated in the same commit. No other drift found.
+Doc pass after: the SPECS tree note for the File menu now lists Pace (missed
+in build 53), and the §4 row says hover or focus holds the turn.
+
+**Next:** reload the installed app (accept the Reload prompt) and check the
+footer readout; this replaces the earlier "check the toolbar shows Pace".
