@@ -35,6 +35,7 @@ import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
+import { dropTyping, noteTyping, refreshProject, settleTyping } from "@/lib/wordLog";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import { authorOf, cleanAuthor, hasAuthor, withAuthor } from "@/lib/author";
@@ -994,6 +995,7 @@ export const useStore = create<StoreState>()(
 
       openDoc: (incoming) =>
         set((s) => {
+          dropTyping();
           // Stash the current project, then make the incoming one active.
           // Give it a fresh id if it would collide with an existing project.
           const stash = { ...s.projectStash, [s.doc.id]: s.doc };
@@ -1642,13 +1644,24 @@ export const useStore = create<StoreState>()(
       // a fork deep-copies the prose exactly as it deep-copies the scenes.
       // `withManuscript` because the first keystroke is the one moment a planned
       // count can be told apart from a written one.
-      setManuscript: (chId, text) =>
+      setManuscript: (chId, text) => {
+        // The daily word log's baseline: the prose as it stood before this
+        // burst (see `lib/wordLog.ts`). Read off `words` rather than counted,
+        // because this runs inside a keystroke: a burst only opens once the last
+        // one settled, so with a manuscript `words` is already its count, and
+        // without one it is a plan and the prose starts from zero.
+        const before = get().doc;
+        noteTyping(before, chId, () => {
+          const c = before.chapters.find((x) => x.id === chId);
+          return c?.manuscript === undefined ? 0 : c.words;
+        });
         set((s) => ({
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => (c.id === chId ? withManuscript(c, text) : c)),
           },
-        })),
+        }));
+      },
 
       /**
        * `words` as a cache of the manuscript, for the chapter being typed in.
@@ -1656,7 +1669,7 @@ export const useStore = create<StoreState>()(
        * every other path that can change prose calls the same function, so no
        * two of them can drift apart.
        */
-      recomputeWords: (chId) =>
+      recomputeWords: (chId) => {
         set((s) => {
           const c = s.doc.chapters.find((x) => x.id === chId);
           if (!c) return {};
@@ -1665,10 +1678,17 @@ export const useStore = create<StoreState>()(
           return {
             doc: { ...s.doc, chapters: s.doc.chapters.map((x) => (x.id === chId ? next : x)) },
           };
-        }),
+        });
+        // Typing settled: book the burst to today's word log. A recompute that
+        // no keystroke opened finds no baseline and books nothing.
+        const doc = get().doc;
+        const c = doc.chapters.find((x) => x.id === chId);
+        if (c?.manuscript !== undefined) settleTyping(doc, chId, c.words);
+      },
 
       pullManuscriptFrom: (chId, fromDraftId) =>
         set((s) => {
+          dropTyping();
           // Chapter ids survive a fork, so the same chapter is findable in every
           // version without any matching heuristic.
           const src = s.doc.draftData[fromDraftId]?.chapters.find((c) => c.id === chId);
@@ -1698,6 +1718,7 @@ export const useStore = create<StoreState>()(
 
       undoManuscript: () =>
         set((s) => {
+          dropTyping();
           const u = s.manuscriptUndo;
           if (!u) return {};
           return {
@@ -1853,7 +1874,8 @@ export const useStore = create<StoreState>()(
       // Sync pulls and backup restores land here. `reconcileWords` because the
       // file's counts were written by whatever wrote the file — another device,
       // the Android app, a hand edit — against prose this app is about to show.
-      replaceDoc: (doc) =>
+      replaceDoc: (doc) => {
+        dropTyping();
         set({
           doc: reconcileWords(withMainDraft({ ...doc, schemaVersion: SCHEMA_VERSION })),
           view: "board",
@@ -1861,7 +1883,8 @@ export const useStore = create<StoreState>()(
           openCh: null,
           showImport: false,
           showSeries: false,
-        }),
+        });
+      },
 
       // ---- books / series ----
       toggleSeriesMode: () => set((s) => ({ doc: { ...s.doc, seriesMode: !s.doc.seriesMode } })),
@@ -2634,3 +2657,13 @@ export const useStore = create<StoreState>()(
 // race where hydration finished before this module got here.
 useStore.persist.onFinishHydration(() => markHydrated());
 if (useStore.persist.hasHydrated()) markHydrated();
+
+// The daily word log's name and total follow the document on every path, typed
+// or not (a Sync pull bringing the phone's words moves the total too), so Pace's
+// progress figure matches the board. Settled after a pause, never per keystroke.
+let wordLogTimer: ReturnType<typeof setTimeout> | undefined;
+useStore.subscribe((s, prev) => {
+  if (s.doc === prev.doc) return;
+  clearTimeout(wordLogTimer);
+  wordLogTimer = setTimeout(() => refreshProject(useStore.getState().doc), 1000);
+});

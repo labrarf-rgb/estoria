@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { Popover } from "@/components/ui/Popover";
@@ -7,6 +7,7 @@ import { activeTarget, driveAvailableHere } from "@/lib/syncTarget";
 import { driveAuth } from "@/lib/driveAuth";
 import { openDriveChooser } from "@/lib/driveSession";
 import { isStandalone } from "@/lib/install";
+import { subscribeWordLog, wordsToday } from "@/lib/wordLog";
 import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
 
 export function Toolbar() {
@@ -99,6 +100,10 @@ export function Toolbar() {
   // there would report a number that controls nothing.
   const showZoom = !piece && !onSeriesMap && view !== "timeline";
   const wordStat = words >= 1000 ? `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words` : `${words} words`;
+  // Net words typed in this project today, from the daily word log Pace reads
+  // (`lib/wordLog.ts`). Shown only once there is a day to show.
+  const today = useSyncExternalStore(subscribeWordLog, () => wordsToday(doc.id));
+  const todayStat = today === 0 ? "" : ` · ${today > 0 ? "+" : "−"}${Math.abs(today).toLocaleString()} today`;
   const bookStat = piece
     ? `${formLabel(doc)} · ${wordStat} · ${countParts(doc, doc.chapters[0]?.scenes.length ?? 0)}`
     : `${formLabel(doc) ? `${formLabel(doc)} · ` : ""}${wordStat} · ${doc.chapters.length} chapters`;
@@ -150,7 +155,10 @@ export function Toolbar() {
               />
             )}
           </div>
-          <span className="text-[10.5px] font-medium tracking-wide text-soft">{bookStat}</span>
+          <span className="text-[10.5px] font-medium tracking-wide text-soft">
+            {bookStat}
+            {todayStat}
+          </span>
         </div>
 
         {/* Version / draft dropdown — versions are per book, so hide on the
