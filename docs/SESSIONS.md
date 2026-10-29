@@ -6183,3 +6183,28 @@ Vitest 5.
 prod reports it live and its assets load. The shipped bundle is unchanged
 apart from the version stamp. SPECS: no drift (§2 still says Vite 6, §5
 still says vitest; neither pins a version).
+
+### 2026-10-29 — Daily word log for Pace
+
+**Asked:** stop copying the day's word count into Pace by hand. Decided with
+Ray: Estoria records, Pace reads; **net** words (a revision day can go
+negative); a Pace project tracks a **whole** Estoria project. Android typing
+is Phase 2 (it needs the log inside the synced file, a cross-app change).
+
+- `lib/wordLog.ts`: `estoria.wordLog.v1` in localStorage, per project
+  `{ name, total, updatedAt, days }`. Booked only on the typing path
+  (`setManuscript` opens a burst, `recomputeWords` settles it); pulls, undo,
+  `openDoc` and `replaceDoc` drop open bursts. Total refreshed off a 1s
+  store subscription. See the SPECS §4 row "Daily word log (for Pace)".
+- The total counts **prose only** (decided with Ray): a chapter's planned
+  count stays out until it has a manuscript, so Pace's progress never shows
+  plans as written. The toolbar still shows plans + prose.
+- Toolbar stat line: `· +412 today`.
+- `lib/wordLog.test.ts`: 12 tests (bursts, first prose against a plan,
+  swapped prose, version switch, totals).
+
+**Verified:** typecheck, build, full suite (181). In the browser, both prod
+builds served from one local origin: first prose in a chapter planned at 3,200
+booked +15 (not −3,185); deleting text netted the day down to 6, including a
+close inside the 700ms debounce; the toolbar read `+6 today`; and Pace, linked,
+updated live from another tab's typing (+6 → +15) through the `storage` event.
