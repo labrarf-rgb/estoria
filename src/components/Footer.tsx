@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { partNouns } from "@/lib/piece";
+import { projectTarget, projectWords, toPaceProject, wordsToday } from "@/lib/paceLog";
+import { outlook } from "@/lib/pace/pace";
+import { formatDate } from "@/lib/pace/format";
 import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistence";
 import { chooseBackupFolder, getBackupDirName, isBackupPickerSupported } from "@/lib/backup";
 import {
@@ -46,6 +49,85 @@ const AUTO_PUSH_DEBOUNCE_MS = 2500;
 const DRIVE_PUSH_EVERY_MS = 30_000;
 /** Warn when edits haven't reached Drive for this long (H9). */
 const DRIVE_STALE_MS = 30 * 60 * 1000;
+/** How long the hint and the Pace readout each hold the footer's corner. */
+const HINT_TURN_MS = 8000;
+
+/**
+ * The footer's bottom-right corner: the view's hint, taking turns with the
+ * Pace readout ("+412 today · finishing Mar 20, 2027") whenever there is one.
+ * Its own component so Pace's numbers moving doesn't re-render the footer.
+ */
+function HintCorner({ hint }: { hint: string }) {
+  const setPanel = useStore((s) => s.setPanel);
+  // Today's net words in this project, every device included, from the word
+  // log in the file (lib/paceLog.ts). Numbers rather than the doc, so this
+  // re-renders only when one moves.
+  const today = useStore((s) => wordsToday(s.doc));
+  const proseWords = useStore((s) => projectWords(s.doc));
+  const paceTarget = useStore((s) => projectTarget(s.doc));
+  const pace = useStore((s) => s.doc.pace);
+  // Once a goal is set, the finish date the log implies. Worked out only when
+  // the log, the prose total or the chapters' targets move, never per
+  // keystroke (`pace` and `words` change when typing settles).
+  const finish = useMemo(() => {
+    if (!pace?.settings) return null;
+    const now = new Date();
+    const v = outlook(toPaceProject(useStore.getState().doc, now), now);
+    return v.complete ? "target reached" : `finishing ${formatDate(v.actual.date)}`;
+  }, [pace, proseWords, paceTarget]);
+  const readout = [today === 0 ? "" : `${today > 0 ? "+" : "−"}${Math.abs(today).toLocaleString()} today`, finish]
+    .filter(Boolean)
+    .join(" · ");
+
+  // Take turns every HINT_TURN_MS. Keyed on whether there is a readout, not on
+  // its text, so a settle while writing doesn't restart the turn. Held while
+  // the pointer or focus is on the corner, so nothing fades out from under it.
+  const hasReadout = readout !== "";
+  const [paceTurn, setPaceTurn] = useState(false);
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!hasReadout || held) return;
+    const t = setInterval(() => setPaceTurn((v) => !v), HINT_TURN_MS);
+    return () => clearInterval(t);
+  }, [hasReadout, held]);
+  const showPace = hasReadout && paceTurn;
+
+  // Both layers share one grid cell and cross-fade; reduced motion swaps them.
+  // The faded-out one ignores the pointer: at opacity 0 it paints above the
+  // other, so it would swallow the click.
+  const layer =
+    "col-start-1 row-start-1 min-w-0 truncate text-right motion-safe:transition-opacity motion-safe:duration-500";
+  return (
+    <span
+      className="hidden max-w-[46vw] shrink-0 grid-cols-[minmax(0,1fr)] md:grid"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+    >
+      <span
+        className={`${layer} ${showPace ? "pointer-events-none" : ""}`}
+        style={{ opacity: showPace ? 0 : 1 }}
+        aria-hidden={showPace}
+      >
+        {hint}
+      </span>
+      {hasReadout && (
+        <button
+          type="button"
+          onClick={() => setPanel("showPace", true)}
+          tabIndex={showPace ? 0 : -1}
+          aria-hidden={!showPace}
+          title="Pace: today's words, your finish date and every day you wrote"
+          className={`${layer} hover:text-ink ${showPace ? "" : "pointer-events-none"} ${today ? "text-therefore" : ""}`}
+          style={{ opacity: showPace ? 1 : 0 }}
+        >
+          {readout}
+        </button>
+      )}
+    </span>
+  );
+}
 
 /** Bottom bar: autosave/mirror status + cross-app Sync + canvas hint + attribution. */
 export function Footer() {
@@ -516,7 +598,7 @@ export function Footer() {
       )}
 
       <div className="flex-1" />
-      <span className="hidden shrink-0 max-w-[46vw] truncate text-right md:block">{hint}</span>
+      <HintCorner hint={hint} />
 
       {(driveMode || dirName) && (
         <SyncHistoryPopover

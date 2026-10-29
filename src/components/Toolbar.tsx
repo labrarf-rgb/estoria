@@ -1,9 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { countWords, shortCount } from "@/lib/manuscript";
-import { projectTarget, projectWords, toPaceProject, wordsToday } from "@/lib/paceLog";
-import { outlook } from "@/lib/pace/pace";
-import { formatDate } from "@/lib/pace/format";
 import { Popover } from "@/components/ui/Popover";
 import { isBackupPickerSupported } from "@/lib/backup";
 import { activeTarget, driveAvailableHere } from "@/lib/syncTarget";
@@ -102,22 +99,6 @@ export function Toolbar() {
   // there would report a number that controls nothing.
   const showZoom = !piece && !onSeriesMap && view !== "timeline";
   const wordStat = words >= 1000 ? `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words` : `${words} words`;
-  // Pace readout: today's net words, and once a goal is set, the finish date
-  // the log implies. The date is worked out only when the log, the prose total
-  // or the chapters' targets move, never per keystroke (`pace` changes when typing settles).
-  const today = wordsToday(doc);
-  const proseWords = projectWords(doc);
-  const paceTarget = projectTarget(doc);
-  const finish = useMemo(() => {
-    if (!doc.pace?.settings) return null;
-    const now = new Date();
-    const v = outlook(toPaceProject(doc, now), now);
-    return v.complete ? "target reached" : `finishing ${formatDate(v.actual.date)}`;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc.pace, proseWords, paceTarget]);
-  const paceStat = [today === 0 ? (finish ? "" : "Pace") : `${today > 0 ? "+" : "−"}${Math.abs(today).toLocaleString()} today`, finish]
-    .filter(Boolean)
-    .join(" · ");
   const bookStat = piece
     ? `${formLabel(doc)} · ${wordStat} · ${countParts(doc, doc.chapters[0]?.scenes.length ?? 0)}`
     : `${formLabel(doc) ? `${formLabel(doc)} · ` : ""}${wordStat} · ${doc.chapters.length} chapters`;
@@ -169,20 +150,7 @@ export function Toolbar() {
               />
             )}
           </div>
-          <span className="flex items-center gap-[5px] text-[10.5px] font-medium tracking-wide text-soft">
-            {bookStat}
-            {/* Pace: net words written today in this project, every device
-                included, from the word log in the file (lib/paceLog.ts). */}
-            <span className="text-faint">·</span>
-            <button
-              type="button"
-              onClick={() => setPanel("showPace", true)}
-              title="Pace: today's words, your finish date and every day you wrote"
-              className={`rounded-[4px] px-[3px] hover:bg-chip hover:text-ink ${today ? "text-therefore" : ""}`}
-            >
-              {paceStat}
-            </button>
-          </span>
+          <span className="text-[10.5px] font-medium tracking-wide text-soft">{bookStat}</span>
         </div>
 
         {/* Version / draft dropdown — versions are per book, so hide on the

@@ -6244,3 +6244,14 @@ No other drift found.
 toolbar shows "Pace"; import the real Pace backup; Android session
 (`android-pace-log`) confirms round-trip and adds phone words.
 
+
+### 2026-10-29 — Pace readout moves from the top bar to the footer
+
+Ray found that "+N today · finishing <date>" in the top bar's stat line pushed
+the version dropdown far to the right. The readout now sits in the footer's
+bottom-right corner (`HintCorner` in `Footer.tsx`), taking turns with the
+view's hint about every 8 s with a short fade (none under reduced motion);
+clicking it opens Pace, and with no words today and no pace set only the hint
+shows. The stat line is back to words and chapters. Tried locally and
+approved by Ray; committed, not pushed or deployed. Still md and up only, like
+the hint, so a narrow window shows no readout.
