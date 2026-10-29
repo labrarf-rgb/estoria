@@ -393,6 +393,14 @@ export interface StoryDoc {
    */
   modifiedAt?: string;
 
+  /**
+   * The Pace word log and its settings (`lib/paceLog.ts`). Optional, so a file
+   * without it is a project nobody has written in since it arrived. Lives in the
+   * file so the history travels wherever the project does: Drive, every
+   * browser, the phone. **Grow-only**: see `PaceLog`.
+   */
+  pace?: PaceLog;
+
   // Drafts / versions (per book; these describe the active book, like
   // `chapters` below). Each version is a standalone fork of the board.
   drafts: DraftVersion[];
@@ -421,6 +429,52 @@ export interface StoryDoc {
 
   // Stashed boards for inactive books, keyed by book id.
   bookData: Record<string, BookData>;
+}
+
+/**
+ * One device's net words on one day, and when it last changed (epoch ms).
+ * `at` is what lets two copies of the file be merged without asking: the newer
+ * cell wins. It is never used to order anything else.
+ */
+export interface PaceCell {
+  n: number;
+  at: number;
+}
+
+/**
+ * How the writer means to get there. The target is not stored: it is the sum
+ * of the chapters' targets (`projectTarget` in `lib/paceLog.ts`), so changing
+ * a chapter's target moves the dates.
+ */
+export interface PaceSettings {
+  /** `YYYY-MM-DD`, local. Tracking since, the start of the measured window. */
+  startDate: string;
+  /** `YYYY-MM-DD`, local. Optional due date. */
+  deadline?: string;
+  goal: { sessionsPerWeek: number; perSession: number };
+  /** Where the what-if lever is parked, in days a week. */
+  whatIf?: number;
+  /** Last change, epoch ms. The newer settings win a merge. */
+  at: number;
+}
+
+/**
+ * The Pace word log, stored in the project file (`StoryDoc.pace`).
+ *
+ * `days[day][device]`: each device writes only its own cell for a day, so two
+ * devices writing on the same day never touch the same cell, and a day's words
+ * are the sum of its cells. Device keys are `web-…` and `android-…` (one per
+ * browser or phone), and `pace` for days brought in from a Pace backup.
+ *
+ * **Grow-only.** Every document that arrives (a pull, a conflict choice, a
+ * restore, opening from Drive) is merged cell by cell with the one already here,
+ * newer `at` winning, and a cell missing from one side is never a deletion. So
+ * an older app that drops this field, or an old backup, can never erase history.
+ * A correction is a newer cell, never a removal.
+ */
+export interface PaceLog {
+  settings?: PaceSettings;
+  days: Record<string, Record<string, PaceCell>>;
 }
 
 /**

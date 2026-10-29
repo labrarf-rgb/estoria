@@ -290,6 +290,10 @@ estoria/
    │  ├─ manuscriptExport.ts  # *prose* export: .md / .txt / standard-format .docx
    │  ├─ author.ts            # author details: byline + title-page contact block,
    │  │                       #   read/write on a doc, the title page's line order
+   │  ├─ paceLog.ts           # Pace word log in the file: record, read, grow-only merge,
+   │  │                       #   progress (projectWords) and target (projectTarget)
+   │  ├─ paceImport.ts        # read a Pace calculator backup into the log
+   │  ├─ pace/                # Pace's projection maths, copied from the Pace calculator
    │  ├─ inline.ts            # inline-markdown tokenizer, shared by the reading
    │  │                       #   view and the .docx runs so they cannot drift
    │  ├─ zip.ts               # minimal store-only ZIP writer (a .docx is a ZIP)
@@ -379,7 +383,8 @@ estoria/
                               #   notice), Backups, SyncConflict (summary +
                               #   compare/merge), DriveChooser ("Back up with…"),
                               #   DriveLink ("Which file is this project?"),
-                              #   Author (byline, contact, saved default), About, Install
+                              #   Author (byline, contact, saved default), Pace (dates,
+                              #   calendar, day log, import from Pace), About, Install
 ```
 
 ### Conventions
@@ -486,6 +491,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Persist | Cross-app Sync + rotating backups | ✅ | Footer "Sync" + folder icon. Reconciles with `<slug>.estoria.json` in the Estoria folder (shared with the Android app), writes a timestamped backup on every sync (newest 5 kept), auto-mirrors auto-saves into the file (fast-forward only), and saves the local state as a `-before-pull` backup before loading a newer file. Folder icon opens the file history popover (live/backup/conflict badges) with undoable per-file Restore. Runs over either target (next row). Replaced the "Back up" button 2026-07-03; see §8. |
 | Persist | Two targets: a folder, or Google Drive | ✅ | Chosen per device under Settings → Google Drive ("Back up with…"). **A folder on this computer** (File System Access API, desktop Chrome/Edge only), or **Google Drive** through Drive's API on any browser, including Safari, Firefox and the iPad. Drive signs in once per device through the broker at `auth.labrarf.com` and stays signed in; files are addressed by Drive file ID, renamed in place, and never created without asking. A device with no target keeps local auto-save and the export menus. Built Sessions 66-67, Deploy B 2026-10-11 (behind a per-device switch), Deploy C 2026-10-12 (on every device); see §8 "Google Drive sync (as built)". |
 | Persist | Drive status, Open from Drive, Back up all | ✅ | Footer line says when Drive last got this project's work, or why it didn't (needs reconnecting, paused, offline, changed elsewhere, can't see the file, other account). The Projects window shows each project's Drive state, **Open from Google Drive…** (how a new device or a wiped iPad gets its projects) and **Back up all to Drive**. New projects ask whether to back up to Drive. §8 "Google Drive sync (as built)". |
+| Pace | Word log + Pace panel | ✅ | **2026-10-29.** Net words written per day are recorded as you type and stored **in the project file** (`StoryDoc.pace`, `lib/paceLog.ts`), so the history travels with Drive sync to every browser and the phone. **File → Pace** (and the toolbar readout, "+412 today · finishing Mar 20, 2027") opens `PaceModal`: the date you're aiming at vs the date your log implies, progress, the habit calendar, streaks and every recorded day with where it was written. Pace's maths is copied into `lib/pace/` from the Pace calculator (commit `308ca01`, one change: the head start may be negative, see `headStart`). **Progress** = prose written (chapters with a manuscript, every book's active version); **target** = every chapter's target added up, or its planned count where it has none (`projectTarget`), never stored. A cut-only day is listed but not a day worked (Pace's rule). **Import from Pace Calculator…** reads Pace's backup file: its days become `pace` cells, its pace settings come over, its target and total do not; a day Estoria already recorded keeps Estoria's count. Grow-only merge on every arriving document: see §8 "The Pace word log". Not yet: cost ledger, what-if slider, burn-up chart, editing a day; Android records nothing yet (its own session). Replaces the rolled-back per-browser `estoria.wordLog.v1`. |
 | Persist | Conflict compare + per-entity merge | ✅ | The conflict dialog's second mode: every difference is one row you take from either side, with both sides' field values on demand, bulk controls and a live tally. Whole-entity granularity; connections/versions/view stay whole-side; references a kept row needs are brought in and named first. A merge preserves *both* copies as conflict files. `lib/merge.ts` + `DiffAddress` in `lib/sync.ts`; web-only and no schema change (2026-08-08); see §8 "Conflicts (v2)". |
 | Persist | Project / book renaming | ✅ | `EditableName` in the toolbar identity line — series ▸ book breadcrumb, both editable. |
 | App | A crash you can get out of | ✅ | **2026-09-07.** React's answer to a component that throws mid-render is to unmount the whole tree, which is a white page — and in the installed app there is no address bar to reload from, so the only move left was quit and restart. Two `ErrorBoundary`s now stand between that and the writer. **Around the chapter modal**, keyed on `openCh` + `chapterMode`: a chapter that will not draw costs you the chapter, not the session, so the board, the toolbar and everything unsaved stay live behind a card offering *Close the chapter* / *Try again* / *Download a copy*, and the key re-arms the boundary as you navigate — without it one bad chapter would poison every chapter opened after it. **At the root**, in `main.tsx`: everything else lands on a full page saying the writing is saved, with *Reload Estoria* as the way out. Both write the error and its component stack to the console, and both put a whole-project `.estoria.json` one click away (`downloadProjectFile` straight off `useStore.getState()`), the same instinct as `Recovery`'s rescued copy — say nothing is lost, put a copy within reach, then offer the way on. Honest limits: **render errors only** (handlers, timers and promises never pass through render, so React never routes them here), and the theme comes from the `data-theme` the app already wrote on the document element, falling back to the OS preference for the one case that has neither — a crash on the very first render, where no effect has run and the store has not finished rehydrating. |
@@ -1070,6 +1076,22 @@ web half shipped later the same day (Session 24). **The contract:**
   for conflict logic (clock skew). The Android model declares it;
   **`normalizeDoc` here must preserve it** (and ideally stamp it in the
   save-to-file/backup paths).
+- **The Pace word log, `pace` (optional top-level field, added 2026-10-29, no
+  schema bump).** `{ settings?: { startDate, deadline?, goal: { sessionsPerWeek,
+  perSession }, whatIf?, at }, days: { "YYYY-MM-DD": { "<device>": { n, at } } } }`.
+  `n` is the net words one device wrote that day, `at` is epoch ms of its last
+  change; a day is the sum of its cells. Device keys: `web-xxxxxx` (one per
+  browser, `estoria:device:v1`), `android-xxxxxx`, and `pace` for days imported
+  from the Pace calculator. The target is **not** stored (chapter targets add
+  up to it). **Grow-only:** every arriving document (pull, each conflict
+  choice, restore) is merged cell by cell with the local one, newer `at`
+  winning, and a missing cell or settings block is never a deletion
+  (`keepPaceHistory`, `unionPace`). So an app that drops the field cannot erase
+  history, and a restore keeps every recorded day. Two copies that differ
+  **only** in `pace` merge without a conflict dialog (`syncProject`). Reading
+  never throws: a malformed log is dropped cell by cell (`readPaceLog`) and the
+  project opens. The Android app keeps the field through its extras today and
+  records nothing yet.
 - **Conflicts (v1): whole-file choice + diff summary, loser preserved.**
   Show what differs (entities matched by stable ids, neutral phrasing),
   user picks keep-mine/keep-theirs; the copy NOT kept is written as
@@ -1984,6 +2006,11 @@ data is an append-only log of `(date, amount)`, and **every projection is derive
 at read time, never stored.** Its README states the rule that makes it work —
 *progress* is a total, *pace* is measured only over logged days, and the atomic
 unit is the day, not the sitting.
+
+*Built 2026-10-29 in a different shape from this note: the day log lives in the
+project file as `StoryDoc.pace` so it reaches every device through sync (§4
+"Pace", §8 "The Pace word log"). The rule below still holds: the stats are
+derived at read time and never stored.*
 
 For Estoria that means: a day log is numeric, append-heavy, tabular data ⇒ JSON,
 or better, per-day IndexedDB records. It is the clearest "must not be markdown"

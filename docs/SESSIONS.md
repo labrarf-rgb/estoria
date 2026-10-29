@@ -6191,3 +6191,45 @@ Built and shipped a per-day word log for the Pace calculator to read
 did not like the change. Reverted on `main`; the work is kept on the branch
 `feature/daily-word-log`. Browsers that ran build 49 may still hold an unused
 `estoria.wordLog.v1` key in localStorage; nothing reads it.
+
+### 2026-10-29 — Pace inside Estoria, word log in the project file
+
+Second attempt, after the rolled-back per-browser log above. Ray's complaints
+with that one: it only worked in one browser, the workflow was unclear, and
+the rollout was confusing (the installed app kept the old build). Decided with
+Ray: Pace's views live **inside Estoria**, the day log lives **in the project
+file** so it goes wherever the project goes, and words written on the phone
+should count (Android is its own session).
+
+- `StoryDoc.pace` (`types.ts`): per day, per device `{ n, at }` cells plus pace
+  settings. Recorded on the typing path only (`setManuscript` notes a baseline,
+  `recomputeWords` books the net change), so pulls, version switches and
+  restores never count as writing. Grow-only merge on every arriving document,
+  in `replaceDoc`, the `pulled` result, `resolveConflict` (keep mine merges via
+  the new `mergePace`, without reloading the board) and a new no-dialog path
+  for copies that differ only in `pace`. §8 "The Pace word log" has the
+  contract.
+- `PaceModal` (File → Pace, and the toolbar readout "+N today · finishing
+  <date>"): the two dates, progress, calendar, streaks, day log, Edit pace,
+  Import from Pace Calculator. Pace's maths copied into `lib/pace/` with its 73
+  tests; one change, a head start may be negative so progress always equals
+  the prose written.
+- Ray's calls during testing: the target is **every chapter's target added
+  up** (planned count where there is none), never typed in; Pace gets its own
+  section in the File menu above Author details; copy is "Your writing pace
+  against your goals" and "Import from Pace Calculator…".
+
+**Verified:** typecheck, build, 259 tests (new: `paceLog.test.ts` for reading,
+merging, progress and target; `paceSync.test.ts` for pace-only merges,
+a stripped file not erasing history, and both conflict choices keeping both
+sides' days). In the browser on localhost: typing books net words, a planned
+count is not counted, import preview and import, reload keeps it all.
+
+**Not yet:** cost ledger, what-if slider, burn-up chart, editing a day.
+Android records nothing yet; it keeps `pace` through its extras (to be
+confirmed by a round-trip test in the Android session).
+
+**Rollout note:** devices still running an older build drop `pace` when they
+save; the grow-only merge restores it on the next pull by a new build, but
+reload the installed app after deploying (accept the Reload prompt).
+

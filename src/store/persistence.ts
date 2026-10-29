@@ -1,3 +1,4 @@
+import { readPaceLog } from "@/lib/paceLog";
 import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
@@ -1618,6 +1619,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     // Cross-app field stamped by whichever app last wrote the file — must
     // survive normalization or every open would look like a fresh write.
     ...(typeof d.modifiedAt === "string" && d.modifiedAt ? { modifiedAt: d.modifiedAt } : {}),
+    // The Pace word log (`lib/paceLog.ts`). Read cell by cell and never throws:
+    // a damaged log costs some history, never the project.
+    ...(readPaceLog(d.pace) ? { pace: readPaceLog(d.pace) } : {}),
     seriesMode: !!d.seriesMode,
     // Single pieces (see `lib/piece.ts`). All optional, so a file without them
     // is a book exactly as before; each is checked rather than copied, because a

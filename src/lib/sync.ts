@@ -7,6 +7,8 @@ import type {
   StoryDoc,
   TodoItem,
 } from "@/types";
+import { keepPaceHistory, withoutPace } from "@/lib/paceLog";
+import type { PaceLog } from "@/types";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
 import { AUTHOR_FIELDS, AUTHOR_LABELS, authorOf } from "@/lib/author";
@@ -299,9 +301,26 @@ export function syncProject(doc: StoryDoc): Promise<SyncOutcome> {
       return {
         kind: "pulled",
         fileName,
-        doc: remote,
+        // The pull can add Pace history, never remove it (`PaceLog`): a file an
+        // older app wrote without the log keeps this copy's days, and the next
+        // push puts them back in the file.
+        doc: keepPaceHistory(remote, doc),
         backup: await writeRotatingBackup(folder, remote),
       };
+    }
+
+    // Both changed, but only in the Pace log or its settings: there is nothing
+    // to choose between, because the log merges cell by cell (`PaceLog`). Merge
+    // it, write it, and carry on as if one side had simply moved ahead.
+    if ((await fingerprint(withoutPace(doc))) === (await fingerprint(withoutPace(remote)))) {
+      const merged = keepPaceHistory(remote, doc);
+      const mergedHash = await fingerprint(merged);
+      if (mergedHash !== remoteHash) await writeLiveDoc(folder, doc.id, fileName, merged, read.rev);
+      setLastSynced(folder.target, merged.id, mergedHash);
+      const backup = await writeRotatingBackup(folder, merged);
+      return mergedHash === localHash
+        ? { kind: "pushed", fileName, backup }
+        : { kind: "pulled", fileName, doc: merged, backup };
     }
 
     const localEditedAt = getLocalEditedAt(doc.id);
@@ -329,6 +348,8 @@ export interface ResolveReceipt {
   conflictFileNames: string[];
   /** The doc to load locally, or null when local state already is the winner. */
   applied: StoryDoc | null;
+  /** Both sides' Pace logs merged, to fold into local state when `applied` is null. */
+  pace?: PaceLog;
   backup: BackupReceipt;
 }
 
@@ -377,6 +398,12 @@ export function resolveConflict(
       await preserve(keep === "mine" ? remote : local, "");
       applied = keep === "theirs" ? remote : null;
     }
+    // Whichever side won, the Pace log keeps both sides' days (`PaceLog` is
+    // grow-only): words written on the copy that lost were still written.
+    // `applied` stays as it was: keeping this copy must not reload the board,
+    // so the caller merges `pace` in instead (`mergePace`).
+    winner = keepPaceHistory(keepPaceHistory(winner, local), remote);
+    if (applied) applied = winner;
 
     // Drive follows the file by ID and names it after what it holds, so the
     // winner's title names it (no rename now and back on the next Sync). A
@@ -386,7 +413,12 @@ export function resolveConflict(
     setLastSynced(folder.target, winner.id, await fingerprint(winner));
     if (winner.id !== local.id) folder.moveProject?.(local.id, winner.id);
 
-    return { conflictFileNames, applied, backup: await writeRotatingBackup(folder, winner) };
+    return {
+      conflictFileNames,
+      applied,
+      ...(winner.pace ? { pace: winner.pace } : {}),
+      backup: await writeRotatingBackup(folder, winner),
+    };
   });
 }
 

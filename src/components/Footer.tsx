@@ -51,6 +51,7 @@ const DRIVE_STALE_MS = 30 * 60 * 1000;
 export function Footer() {
   const view = useStore((s) => s.view);
   const replaceDoc = useStore((s) => s.replaceDoc);
+  const mergePace = useStore((s) => s.mergePace);
   // Real persistence status from the storage layer — not a guess from state
   // changes, so a failed write (e.g. storage quota full) is actually visible.
   const [status, setStatus] = useState<SaveStatus>(getSaveStatus());
@@ -260,6 +261,7 @@ export function Footer() {
     try {
       const res = await resolveConflict(useStore.getState().doc, conflict.remote, keep, conflict.rev);
       if (res.applied) replaceDoc(res.applied);
+      else if (res.pace) mergePace(res.pace);
       setConflict(null);
       const copies = res.conflictFileNames.join(" and ");
       // syncDone marks Drive as holding the result.

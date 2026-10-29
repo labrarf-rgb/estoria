@@ -26,6 +26,7 @@ import { DriveChooserModal } from "@/components/modals/DriveChooserModal";
 import { startDriveRuntime } from "@/lib/driveSession";
 import { AboutModal } from "@/components/modals/AboutModal";
 import { AuthorModal } from "@/components/modals/AuthorModal";
+import { PaceModal } from "@/components/modals/PaceModal";
 import { InstallModal } from "@/components/modals/InstallModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { UpdateToast } from "@/components/UpdateToast";
@@ -91,6 +92,7 @@ export function App() {
       <DriveChooserModal />
       <AboutModal />
       <AuthorModal />
+      <PaceModal />
       <InstallModal />
       <ConfirmDialog />
       <Lightbox />

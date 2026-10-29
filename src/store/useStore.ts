@@ -10,6 +10,8 @@ import {
   type Character,
   type ConnType,
   type GrownInto,
+  type PaceLog,
+  type PaceSettings,
   type PieceKind,
   type RefKind,
   type SavedCopyInfo,
@@ -35,6 +37,18 @@ import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
+import {
+  addWords,
+  deviceId,
+  dropTyping,
+  keepPaceHistory,
+  noteTyping,
+  samePace,
+  settleTyping,
+  unionPace,
+  withSettings,
+} from "@/lib/paceLog";
+import { toDayKey } from "@/lib/pace/dates";
 import { sampleStory } from "@/data/sampleStory";
 import { emptyStory } from "@/data/emptyStory";
 import { authorOf, cleanAuthor, hasAuthor, withAuthor } from "@/lib/author";
@@ -139,6 +153,8 @@ interface UiState {
   showAbout: boolean;
   showInstall: boolean;
   showAuthor: boolean;
+  /** The Pace panel (`PaceModal`): dates, calendar and day log from the word log. */
+  showPace: boolean;
   /**
    * The writer's saved author details (persisted, global, this browser only).
    * Copied into each new project, and into an existing project that has none
@@ -383,6 +399,11 @@ interface StoreState extends UiState {
   applyTemplate: (tplId: string, mode: "insert" | "replace") => void;
   replaceDoc: (doc: StoryDoc) => void;
 
+  // ---- Pace (lib/paceLog.ts) ----
+  /** Fold another copy's Pace log into this project's, cell by cell, without reloading anything. */
+  mergePace: (pace: PaceLog | undefined) => void;
+  setPaceSettings: (settings: Omit<PaceSettings, "at">) => void;
+
   // ---- books / series ----
   toggleSeriesMode: () => void;
   makeSeries: () => void;
@@ -511,7 +532,8 @@ export type PanelKey =
   | "showBackups"
   | "showAbout"
   | "showInstall"
-  | "showAuthor";
+  | "showAuthor"
+  | "showPace";
 
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
@@ -749,6 +771,7 @@ const initialUi: UiState = {
   showAbout: false,
   showInstall: false,
   showAuthor: false,
+  showPace: false,
   authorDefault: {},
   selChar: null,
   selWorld: null,
@@ -994,6 +1017,7 @@ export const useStore = create<StoreState>()(
 
       openDoc: (incoming) =>
         set((s) => {
+          dropTyping();
           // Stash the current project, then make the incoming one active.
           // Give it a fresh id if it would collide with an existing project.
           const stash = { ...s.projectStash, [s.doc.id]: s.doc };
@@ -1642,13 +1666,24 @@ export const useStore = create<StoreState>()(
       // a fork deep-copies the prose exactly as it deep-copies the scenes.
       // `withManuscript` because the first keystroke is the one moment a planned
       // count can be told apart from a written one.
-      setManuscript: (chId, text) =>
+      setManuscript: (chId, text) => {
+        // The Pace word log's baseline: the prose as it stood before this
+        // burst (see `lib/paceLog.ts`). Read off `words` rather than counted,
+        // because this runs inside a keystroke: a burst only opens once the last
+        // one settled, so with a manuscript `words` is already its count, and
+        // without one it is a plan and the prose starts from zero.
+        const before = get().doc;
+        noteTyping(before, chId, () => {
+          const c = before.chapters.find((x) => x.id === chId);
+          return c?.manuscript === undefined ? 0 : c.words;
+        });
         set((s) => ({
           doc: {
             ...s.doc,
             chapters: s.doc.chapters.map((c) => (c.id === chId ? withManuscript(c, text) : c)),
           },
-        })),
+        }));
+      },
 
       /**
        * `words` as a cache of the manuscript, for the chapter being typed in.
@@ -1661,14 +1696,24 @@ export const useStore = create<StoreState>()(
           const c = s.doc.chapters.find((x) => x.id === chId);
           if (!c) return {};
           const next = syncChapterWords(c);
-          if (next === c) return {};
+          // Typing settled: book the burst's net change to today in the Pace
+          // log, in the same write as the count. A recompute that no keystroke
+          // opened finds no baseline and books nothing.
+          const delta = next.manuscript !== undefined ? settleTyping(s.doc, chId, next.words) : null;
+          if (next === c && !delta) return {};
+          const now = new Date();
           return {
-            doc: { ...s.doc, chapters: s.doc.chapters.map((x) => (x.id === chId ? next : x)) },
+            doc: {
+              ...s.doc,
+              chapters: next === c ? s.doc.chapters : s.doc.chapters.map((x) => (x.id === chId ? next : x)),
+              ...(delta ? { pace: addWords(s.doc.pace, deviceId(), toDayKey(now), delta, now.getTime()) } : {}),
+            },
           };
         }),
 
       pullManuscriptFrom: (chId, fromDraftId) =>
         set((s) => {
+          dropTyping();
           // Chapter ids survive a fork, so the same chapter is findable in every
           // version without any matching heuristic.
           const src = s.doc.draftData[fromDraftId]?.chapters.find((c) => c.id === chId);
@@ -1698,6 +1743,7 @@ export const useStore = create<StoreState>()(
 
       undoManuscript: () =>
         set((s) => {
+          dropTyping();
           const u = s.manuscriptUndo;
           if (!u) return {};
           return {
@@ -1853,15 +1899,30 @@ export const useStore = create<StoreState>()(
       // Sync pulls and backup restores land here. `reconcileWords` because the
       // file's counts were written by whatever wrote the file — another device,
       // the Android app, a hand edit — against prose this app is about to show.
-      replaceDoc: (doc) =>
-        set({
-          doc: reconcileWords(withMainDraft({ ...doc, schemaVersion: SCHEMA_VERSION })),
+      //
+      // `keepPaceHistory`: whatever arrives can add Pace history but never take
+      // it away (`PaceLog` is grow-only), so an older app that dropped the log,
+      // or a backup from before some days, cannot erase them.
+      mergePace: (pace) =>
+        set((s) => {
+          const merged = unionPace(s.doc.pace, pace);
+          return merged === s.doc.pace || samePace(merged, s.doc.pace) ? {} : { doc: { ...s.doc, pace: merged } };
+        }),
+
+      setPaceSettings: (settings) =>
+        set((s) => ({ doc: { ...s.doc, pace: withSettings(s.doc.pace, settings, Date.now()) } })),
+
+      replaceDoc: (doc) => {
+        dropTyping();
+        set((s) => ({
+          doc: reconcileWords(withMainDraft({ ...keepPaceHistory(doc, s.doc), schemaVersion: SCHEMA_VERSION })),
           view: "board",
           arrangeN: 0,
           openCh: null,
           showImport: false,
           showSeries: false,
-        }),
+        }));
+      },
 
       // ---- books / series ----
       toggleSeriesMode: () => set((s) => ({ doc: { ...s.doc, seriesMode: !s.doc.seriesMode } })),
