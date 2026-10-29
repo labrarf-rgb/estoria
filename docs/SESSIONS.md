@@ -6208,3 +6208,10 @@ builds served from one local origin: first prose in a chapter planned at 3,200
 booked +15 (not −3,185); deleting text netted the day down to 6, including a
 close inside the 700ms debounce; the toolbar read `+6 today`; and Pace, linked,
 updated live from another tab's typing (+6 → +15) through the `storage` event.
+
+**Shipped** (/ship): merged to `main` (fast-forward), pushed, deployed as
+`7288408`; prod reports it live and its assets load. Pace shipped the same
+day as `9447136` (its reader of this key). SPECS: the §2 at-rest key table was
+missing `estoria.wordLog.v1` and now lists it; the §4 row and the §3 layout
+entry were written with the change. No other drift found in the sections this
+diff touched (toolbar stat, typing recount, persistence).

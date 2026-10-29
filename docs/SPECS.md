@@ -152,6 +152,7 @@ a Drive adapter implements — one file per project.
 | localStorage | `estoria:map-pad:v1` | crash pad: maps with a write in flight (`beforeunload` is sync, IndexedDB is not) |
 | localStorage | `estoria:prose-pad:v1` | the same, for prose |
 | localStorage | `estoria:store:v1` | after migration, a non-JSON tombstone; before it (or with no IndexedDB), the old single blob |
+| localStorage | `estoria.wordLog.v1` | daily net words typed per project, for Pace to read (§4, "Daily word log"); never in a document, file or Drive |
 | IndexedDB `estoria` v3 | `projects` | one map per project (prose and pictures lifted out), plus `__legacy-backup:<ms>` from the migration and `__unreadable:<id>:<ms>` copies |
 | IndexedDB `estoria` | `manuscripts`, `images` | unchanged |
 
