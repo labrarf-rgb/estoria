@@ -6233,3 +6233,14 @@ confirmed by a round-trip test in the Android session).
 save; the grow-only merge restores it on the next pull by a new build, but
 reload the installed app after deploying (accept the Reload prompt).
 
+**Shipped** (/ship): commit `3639860` (merged to `main` from
+`feature/pace-in-estoria`, both pushed), deployed as build 53; prod reports
+it live, its assets load, and the bundle carries the Pace panel. SPECS: §4
+"Pace" row, §8 "The Pace word log" contract, §3 layout and §10.6 updated in
+the same commit; the at-rest key table gained `estoria:device:v1` after.
+No other drift found.
+
+**Next:** reload the installed app (accept the Reload prompt) and check the
+toolbar shows "Pace"; import the real Pace backup; Android session
+(`android-pace-log`) confirms round-trip and adds phone words.
+

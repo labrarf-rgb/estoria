@@ -152,6 +152,7 @@ a Drive adapter implements — one file per project.
 | localStorage | `estoria:map-pad:v1` | crash pad: maps with a write in flight (`beforeunload` is sync, IndexedDB is not) |
 | localStorage | `estoria:prose-pad:v1` | the same, for prose |
 | localStorage | `estoria:store:v1` | after migration, a non-JSON tombstone; before it (or with no IndexedDB), the old single blob |
+| localStorage | `estoria:device:v1` | this browser's Pace word-log key, `web-xxxxxx` (2026-10-29). The log itself is in the document (`StoryDoc.pace`); losing this key only starts a new cell, old cells still count |
 | IndexedDB `estoria` v3 | `projects` | one map per project (prose and pictures lifted out), plus `__legacy-backup:<ms>` from the migration and `__unreadable:<id>:<ms>` copies |
 | IndexedDB `estoria` | `manuscripts`, `images` | unchanged |
 
