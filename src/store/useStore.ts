@@ -40,9 +40,12 @@ import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript
 import {
   addWords,
   deviceId,
+  draftDoneOn,
   dropTyping,
   keepPaceHistory,
+  markDraftDone,
   noteTyping,
+  reopenDraft,
   samePace,
   settleTyping,
   unionPace,
@@ -403,6 +406,10 @@ interface StoreState extends UiState {
   /** Fold another copy's Pace log into this project's, cell by cell, without reloading anything. */
   mergePace: (pace: PaceLog | undefined) => void;
   setPaceSettings: (settings: Omit<PaceSettings, "at">) => void;
+  /** Declare the draft finished today: typing stops booking and Pace shows the run. */
+  markDraftDone: () => void;
+  /** Undo "draft done": a newer "open" block, so tracking and the outlook carry on. */
+  reopenDraft: () => void;
 
   // ---- books / series ----
   toggleSeriesMode: () => void;
@@ -1698,8 +1705,11 @@ export const useStore = create<StoreState>()(
           const next = syncChapterWords(c);
           // Typing settled: book the burst's net change to today in the Pace
           // log, in the same write as the count. A recompute that no keystroke
-          // opened finds no baseline and books nothing.
-          const delta = next.manuscript !== undefined ? settleTyping(s.doc, chId, next.words) : null;
+          // opened finds no baseline and books nothing. While the draft is
+          // marked done the burst is still settled (so its baseline goes) but
+          // not booked: Ray chose to pause the log until the draft is reopened.
+          const settled = next.manuscript !== undefined ? settleTyping(s.doc, chId, next.words) : null;
+          const delta = draftDoneOn(s.doc.pace) ? null : settled;
           if (next === c && !delta) return {};
           const now = new Date();
           return {
@@ -1911,6 +1921,14 @@ export const useStore = create<StoreState>()(
 
       setPaceSettings: (settings) =>
         set((s) => ({ doc: { ...s.doc, pace: withSettings(s.doc.pace, settings, Date.now()) } })),
+
+      markDraftDone: () =>
+        set((s) => {
+          const now = new Date();
+          return { doc: { ...s.doc, pace: markDraftDone(s.doc, toDayKey(now), now.getTime()) } };
+        }),
+
+      reopenDraft: () => set((s) => ({ doc: { ...s.doc, pace: reopenDraft(s.doc.pace, Date.now()) } })),
 
       replaceDoc: (doc) => {
         dropTyping();

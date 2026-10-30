@@ -475,6 +475,26 @@ export interface PaceSettings {
 export interface PaceLog {
   settings?: PaceSettings;
   days: Record<string, Record<string, PaceCell>>;
+  draft?: PaceDraft;
+}
+
+/**
+ * Whether the writer has declared the draft finished (`lib/paceLog.ts`). The
+ * block is replaced whole and the newer `at` wins a merge, like settings. It is
+ * never removed: reopening writes a newer block without `doneOn`, because a
+ * removal would be undone by any older copy that still had "done".
+ */
+export interface PaceDraft {
+  /** `YYYY-MM-DD`, local. The day the draft was marked done; absent means open. */
+  doneOn?: string;
+  /**
+   * `YYYY-MM-DD`, local. When the goal pace would have reached the target,
+   * counted from the start date, frozen at done because revisions afterwards
+   * move both the book's total and its target.
+   */
+  goalOn?: string;
+  /** Last change, epoch ms. The newer block wins a merge. */
+  at: number;
 }
 
 /**

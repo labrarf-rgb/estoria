@@ -6272,3 +6272,16 @@ The footer's "+N today · finishing <date>" now follows the calendar day (`onDay
 **Shipped** (/ship): commit `9378e2a` on `main`, pushed, deployed as build
 58; prod reports it live and its assets load. SPECS: no drift (the §4 "Pace"
 row doesn't say when the readout refreshes).
+
+### 2026-10-29 — Pace: "Draft done", its report, and reopening
+
+Ray treats the chapter targets and the goal as estimates, so he wants to call the draft finished himself and see how it went, and to undo that if he adds a chapter. Asked first; his calls: the report is about the drafting run (how long, how often, the pace, against the goal and due date), **not** the word count, which revisions will keep changing; typing **pauses** while the draft is done; the footer says "draft done".
+
+- **State:** `pace.draft = { doneOn?, goalOn?, at }` in the project file (`PaceDraft` in `types.ts`; contract and key order in SPECS §8). It merges like settings, newer `at` wins. Reopening writes a newer `{ at }`, never a removal, so a stale copy can't bring "done" back. `readPaceLog` drops a block without `at`, reads a bad `doneOn` as open, and keeps a log holding only a draft block. Every log writer (`addWords`, `withSettings`, `unionPace`) goes through `logOf`, which carries the block in key order. The import result is only ever unioned in, so it needed no change.
+- **Report:** `draftReport` is worked out from the log, cut off at the done day (`observe` and `habitStats` with the done day as "now"), plus `goalOn`, the goal pace's finish date frozen when the draft was marked done. It shows the dates, how long it took, days written of the run, days a week and words a writing day (each beside the goal), the best streak, and the gaps to the goal pace and the due date.
+- **UI** (`PaceModal`): a "Draft done…" button, and "Reopen draft…" once done, both through the app's confirm dialog. While done, the panel shows the report, a calendar that stops at the done day, the day list, and Reopen. The outlook, progress bar, goal form and import are hidden. The store's `recomputeWords` settles the burst without booking it while done. The footer's "finishing <date>" becomes "draft done".
+- **Android:** build 73 (`63c34b4`) rebuilds `pace` from `settings` and `days`, so a phone save drops `draft`. The web restores it on the next sync with no dialog (tested in `paceSync.test.ts`). The phone port (carry the block, pause while done) was handed to the coordinating session as its own Android session, at Ray's request. The phone keeps logging while done until then.
+- **Tests:** draft cases in `paceLog.test.ts` (reader, key order, union both ways, reopen against a stale copy, an old client stripping the field, writers carrying the block, frozen goal date, the report window); two in `paceSync.test.ts`; the new `paceDraft.test.ts` drives the store (books nothing while done, books again after reopening). 275 tests pass, and the build passes.
+- **Checked in the dev server** (the browser pane's scratch copy of the sample, with a test log injected): confirm, report, footer, typing paused, reopen, and the outlook back.
+
+Tried locally and approved by Ray. The phone port is finished in the Estoria-aa working tree but not committed or on the phone, so the web ships first.

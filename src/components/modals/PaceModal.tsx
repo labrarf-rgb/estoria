@@ -3,9 +3,18 @@ import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import type { PaceSettings, StoryDoc } from "@/types";
 import { clampDaysPerWeek, habitGrid, habitStats, outlook, resolveTarget } from "@/lib/pace/pace";
-import { fromDayKey, toDayKey } from "@/lib/pace/dates";
+import { daysBetween, fromDayKey, toDayKey } from "@/lib/pace/dates";
 import { formatAmount, formatDate, formatDays, formatSpan } from "@/lib/pace/format";
-import { dayTotals, defaultSettings, deviceId, projectTarget, projectWords, toPaceProject } from "@/lib/paceLog";
+import {
+  dayTotals,
+  defaultSettings,
+  deviceId,
+  draftReport,
+  projectTarget,
+  projectWords,
+  toPaceProject,
+  type DraftReport,
+} from "@/lib/paceLog";
 import { importPaceProject, PACE_DEVICE, readPaceBackup, type PaceImport } from "@/lib/paceImport";
 import type { Project } from "@/lib/pace/types";
 
@@ -14,6 +23,10 @@ import type { Project } from "@/lib/pace/types";
  * shows, for this project, read from the word log in the project file
  * (`lib/paceLog.ts`). Nothing here is typed in by hand except the goal: every
  * day's words were recorded as they were written, on whichever device.
+ *
+ * Once the draft is marked done the panel looks back instead of forward: the
+ * run's report replaces the dates, the calendar stops at the done day, and the
+ * only action left is reopening the draft.
  */
 
 const inputClass =
@@ -35,12 +48,118 @@ export function PaceModal() {
 function PaceBody({ doc, close }: { doc: StoryDoc; close: () => void }) {
   const setPaceSettings = useStore((s) => s.setPaceSettings);
   const mergePace = useStore((s) => s.mergePace);
+  const markDraftDone = useStore((s) => s.markDraftDone);
+  const reopenDraft = useStore((s) => s.reopenDraft);
+  const askConfirm = useStore((s) => s.askConfirm);
   const now = new Date();
   const project = toPaceProject(doc, now);
   const view = outlook(project, now);
   const hasSettings = !!doc.pace?.settings;
   const [editing, setEditing] = useState(!hasSettings);
+  const report = draftReport(doc);
 
+  const confirmDone = () =>
+    askConfirm({
+      message: "Mark the draft done?",
+      detail:
+        "Pace stops counting words and shows how the draft went: how long it took, how often you wrote and how that compares with your goal. You can reopen it any time.",
+      confirmLabel: "Draft done",
+      onConfirm: markDraftDone,
+    });
+  const confirmReopen = () =>
+    askConfirm({
+      message: "Reopen the draft?",
+      detail:
+        "Pace starts counting your writing again and the finish dates come back. Words written while it was done are not counted.",
+      confirmLabel: "Reopen draft",
+      onConfirm: reopenDraft,
+    });
+
+  if (report) {
+    return (
+      // Keyed apart from the open panel, so switching opens at the top, on the report.
+      <PaceFrame
+        key="done"
+        doc={doc}
+        close={close}
+        note="The draft is done, so writing is not being counted. Reopen it to carry on."
+      >
+        <Report report={report} />
+        <Calendar project={project} now={fromDayKey(report.doneOn)} done />
+        <DayList doc={doc} startDate={project.startDate} now={now} />
+        <section className="flex flex-wrap items-center gap-[10px] px-[24px] py-5">
+          <button type="button" className={ghostBtn} onClick={confirmReopen}>
+            Reopen draft…
+          </button>
+          <span className="text-[11.5px] text-faint">For another chapter, or if you change your mind.</span>
+        </section>
+      </PaceFrame>
+    );
+  }
+
+  return (
+    <PaceFrame key="open" doc={doc} close={close}>
+      {hasSettings && !editing ? (
+        <Hero project={project} view={view} />
+      ) : (
+        <section className={sectionClass}>
+          <div className={eyebrow}>{hasSettings ? "Your pace" : "Set your pace"}</div>
+          <p className="mt-1 mb-4 text-[12.5px] text-soft">
+            {hasSettings
+              ? "Change any of these and every date moves."
+              : "How often you mean to write and how much, or bring your history over from the Pace calculator."}
+          </p>
+          <GoalForm
+            doc={doc}
+            initial={doc.pace?.settings ?? { ...defaultSettings(doc, now), at: 0 }}
+            onSave={(s) => {
+              setPaceSettings(s);
+              setEditing(false);
+            }}
+            onCancel={hasSettings ? () => setEditing(false) : undefined}
+          />
+        </section>
+      )}
+
+      <Progress project={project} view={view} />
+      <Calendar project={project} now={now} />
+      <DayList doc={doc} startDate={project.startDate} now={now} />
+
+      <section className="flex flex-wrap items-center gap-[10px] px-[24px] py-5">
+        {hasSettings && !editing && (
+          <button type="button" className={ghostBtn} onClick={() => setEditing(true)}>
+            Edit pace
+          </button>
+        )}
+        <ImportFromPace
+          doc={doc}
+          onImport={(imp) => {
+            mergePace(imp.log);
+            setEditing(false);
+          }}
+        />
+        {hasSettings && !editing && (
+          <button type="button" className={`${solidBtn} ml-auto`} onClick={confirmDone}>
+            Draft done…
+          </button>
+        )}
+      </section>
+    </PaceFrame>
+  );
+}
+
+/** The panel's shell: title, close, and the scrolling body. `note` replaces the line under the title. */
+function PaceFrame({
+  doc,
+  close,
+  note,
+  children,
+}: {
+  doc: StoryDoc;
+  close: () => void;
+  note?: string;
+  children: React.ReactNode;
+}) {
   return (
     <Scrim onClose={close} z={70} center>
       <div
@@ -51,57 +170,100 @@ function PaceBody({ doc, close }: { doc: StoryDoc; close: () => void }) {
           <div className="flex-1">
             <div className="font-serif text-[18px] font-semibold text-ink">Pace</div>
             <div className="mt-[3px] text-[12px] font-medium text-soft">
-              Words are counted as you write in {doc.projectTitle}, on every device, and saved in the project
-              file.
+              {note ??
+                `Words are counted as you write in ${doc.projectTitle}, on every device, and saved in the project file.`}
             </div>
           </div>
           <CloseButton onClick={close} />
         </div>
-
-        <div className="flex-1 overflow-auto">
-          {hasSettings && !editing ? (
-            <Hero project={project} view={view} />
-          ) : (
-            <section className={sectionClass}>
-              <div className={eyebrow}>{hasSettings ? "Your pace" : "Set your pace"}</div>
-              <p className="mt-1 mb-4 text-[12.5px] text-soft">
-                {hasSettings
-                  ? "Change any of these and every date moves."
-                  : "How often you mean to write and how much, or bring your history over from the Pace calculator."}
-              </p>
-              <GoalForm
-                doc={doc}
-                initial={doc.pace?.settings ?? { ...defaultSettings(doc, now), at: 0 }}
-                onSave={(s) => {
-                  setPaceSettings(s);
-                  setEditing(false);
-                }}
-                onCancel={hasSettings ? () => setEditing(false) : undefined}
-              />
-            </section>
-          )}
-
-          <Progress project={project} view={view} />
-          <Calendar project={project} now={now} />
-          <DayList doc={doc} startDate={project.startDate} now={now} />
-
-          <section className="flex flex-wrap items-center gap-[10px] px-[24px] py-5">
-            {hasSettings && !editing && (
-              <button type="button" className={ghostBtn} onClick={() => setEditing(true)}>
-                Edit pace
-              </button>
-            )}
-            <ImportFromPace
-              doc={doc}
-              onImport={(imp) => {
-                mergePace(imp.log);
-                setEditing(false);
-              }}
-            />
-          </section>
-        </div>
+        <div className="flex-1 overflow-auto">{children}</div>
       </div>
     </Scrim>
+  );
+}
+
+// ---- the finished draft ----------------------------------------------------------
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** How long the run took: days, and weeks once it is long enough for weeks to help. */
+function runLength(days: number): string {
+  if (days < 14) return plural(days, "day");
+  return `${plural(days, "day")}, about ${Math.round((days / 7) * 10) / 10} weeks`;
+}
+
+function Report({ report: r }: { report: DraftReport }) {
+  const end = fromDayKey(r.doneOn);
+  // Positive: finished after the goal pace's date, or after the due date.
+  const goalGap = r.goalOn ? daysBetween(fromDayKey(r.goalOn), end) : null;
+  const dueGap = r.deadline ? daysBetween(fromDayKey(r.deadline), end) : null;
+  const stat = (label: string, value: string, sub?: string) => (
+    <div>
+      <dt className={eyebrow}>{label}</dt>
+      <dd className="mt-1 text-ink">
+        {value}
+        {sub && <div className="text-[11px] text-faint">{sub}</div>}
+      </dd>
+    </div>
+  );
+  // One comparison: the gap in serif, then what it was measured against.
+  const gap = (n: number, onTheDay: string, early: string, late: string) => (
+    <div>
+      <span className={`font-serif text-[17px] font-semibold ${n <= 0 ? "text-therefore" : "text-but"}`}>
+        {n === 0 ? "On the day" : formatSpan(n)}
+      </span>{" "}
+      {n === 0 ? onTheDay : n < 0 ? early : late}
+    </div>
+  );
+
+  return (
+    <section className={sectionClass}>
+      <div className={eyebrow}>Draft done</div>
+      <div className="mt-1 font-serif text-[26px] font-semibold text-ink">{formatDate(end)}</div>
+      <div className="text-[12.5px] text-soft">
+        Started {formatDate(fromDayKey(r.startDate))}. The draft took {runLength(r.days)}.
+      </div>
+
+      {r.daysWritten > 0 ? (
+        <dl className="mt-4 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+          {stat(
+            "Days written",
+            `${r.daysWritten} of ${r.days}`,
+            `${Math.round((r.daysWritten / Math.max(r.days, 1)) * 100)}% of the run`
+          )}
+          {stat(
+            "Days a week",
+            formatDays(r.daysPerWeek),
+            `goal was ${formatDays(clampDaysPerWeek(r.goal.sessionsPerWeek))}`
+          )}
+          {stat("Words a writing day", formatAmount(r.perDay), `goal was ${formatAmount(r.goal.perSession)}`)}
+          {stat("Best streak", plural(r.longestStreak, "day"))}
+        </dl>
+      ) : (
+        <p className="mt-3 text-[12.5px] text-soft">
+          No writing was recorded between the start and the done day, so there is no pace to show.
+        </p>
+      )}
+
+      {(goalGap !== null || dueGap !== null) && (
+        <div className="mt-4 flex flex-col gap-[6px] text-[13px] text-soft">
+          {goalGap !== null &&
+            gap(
+              goalGap,
+              `your goal pace would have finished, ${formatDate(fromDayKey(r.goalOn!))}.`,
+              `ahead of your goal pace, which would have finished ${formatDate(fromDayKey(r.goalOn!))}.`,
+              `behind your goal pace, which would have finished ${formatDate(fromDayKey(r.goalOn!))}.`
+            )}
+          {dueGap !== null &&
+            gap(
+              dueGap,
+              `it was due, ${formatDate(fromDayKey(r.deadline!))}.`,
+              `to spare before the due date, ${formatDate(fromDayKey(r.deadline!))}.`,
+              `past the due date, ${formatDate(fromDayKey(r.deadline!))}.`
+            )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -208,7 +370,11 @@ const LEVEL_BG = [
   "var(--therefore)",
 ];
 
-function Calendar({ project, now }: { project: Project; now: Date }) {
+/**
+ * `done`: the draft is finished and `now` is its done day, so the grid stops
+ * there and the streak row, which the report already covers, is left out.
+ */
+function Calendar({ project, now, done = false }: { project: Project; now: Date; done?: boolean }) {
   const grid = habitGrid(project, now);
   const stats = habitStats(project, now);
   const todayKey = toDayKey(now);
@@ -221,7 +387,7 @@ function Calendar({ project, now }: { project: Project; now: Date }) {
 
   return (
     <section className={sectionClass}>
-      <div className={eyebrow}>Every day since you started</div>
+      <div className={eyebrow}>{done ? "Every day of the draft" : "Every day since you started"}</div>
       <div ref={scroller} className="mt-3 overflow-x-auto pb-1">
         <div className="flex w-max gap-[6px]">
           <div className="grid grid-rows-[14px_repeat(7,13px)] gap-[3px] text-[9.5px] text-faint">
@@ -266,35 +432,37 @@ function Calendar({ project, now }: { project: Project; now: Date }) {
           </div>
         </div>
       </div>
-      <dl className="mt-4 grid grid-cols-3 gap-3 text-[12px]">
-        <div>
-          <dt className={eyebrow}>Showed up</dt>
-          <dd className="mt-1 text-ink">
-            {stats.daysWorked} of {stats.totalDays} days
-            <div className="text-[11px] text-faint">{Math.round(stats.showUpRate * 100)}% of the run</div>
-          </dd>
-        </div>
-        <div>
-          <dt className={eyebrow}>Current streak</dt>
-          <dd className="mt-1 text-ink">
-            {stats.currentStreak} {stats.currentStreak === 1 ? "day" : "days"}
-            <div className="text-[11px] text-faint">
-              {stats.daysSinceLast === null
-                ? "nothing recorded yet"
-                : stats.daysSinceLast === 0
-                  ? "including today"
-                  : `last wrote ${stats.daysSinceLast} ${stats.daysSinceLast === 1 ? "day" : "days"} ago`}
-            </div>
-          </dd>
-        </div>
-        <div>
-          <dt className={eyebrow}>Best streak</dt>
-          <dd className="mt-1 text-ink">
-            {stats.longestStreak} {stats.longestStreak === 1 ? "day" : "days"}
-            <div className="text-[11px] text-faint">longest gap was {stats.longestGap}</div>
-          </dd>
-        </div>
-      </dl>
+      {!done && (
+        <dl className="mt-4 grid grid-cols-3 gap-3 text-[12px]">
+          <div>
+            <dt className={eyebrow}>Showed up</dt>
+            <dd className="mt-1 text-ink">
+              {stats.daysWorked} of {stats.totalDays} days
+              <div className="text-[11px] text-faint">{Math.round(stats.showUpRate * 100)}% of the run</div>
+            </dd>
+          </div>
+          <div>
+            <dt className={eyebrow}>Current streak</dt>
+            <dd className="mt-1 text-ink">
+              {stats.currentStreak} {stats.currentStreak === 1 ? "day" : "days"}
+              <div className="text-[11px] text-faint">
+                {stats.daysSinceLast === null
+                  ? "nothing recorded yet"
+                  : stats.daysSinceLast === 0
+                    ? "including today"
+                    : `last wrote ${stats.daysSinceLast} ${stats.daysSinceLast === 1 ? "day" : "days"} ago`}
+              </div>
+            </dd>
+          </div>
+          <div>
+            <dt className={eyebrow}>Best streak</dt>
+            <dd className="mt-1 text-ink">
+              {stats.longestStreak} {stats.longestStreak === 1 ? "day" : "days"}
+              <div className="text-[11px] text-faint">longest gap was {stats.longestGap}</div>
+            </dd>
+          </div>
+        </dl>
+      )}
     </section>
   );
 }

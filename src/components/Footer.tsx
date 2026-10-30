@@ -55,7 +55,8 @@ const HINT_TURN_MS = 8000;
 
 /**
  * The footer's bottom-right corner: the view's hint, taking turns with the
- * Pace readout ("+412 today · finishing Mar 20, 2027") whenever there is one.
+ * Pace readout ("+412 today · finishing Mar 20, 2027", or "draft done" once the
+ * draft is marked done) whenever there is one.
  * Its own component so Pace's numbers moving doesn't re-render the footer.
  */
 function HintCorner({ hint }: { hint: string }) {
@@ -75,6 +76,7 @@ function HintCorner({ hint }: { hint: string }) {
   // the log, the prose total, the chapters' targets or the day move, never per
   // keystroke (`pace` and `words` change when typing settles).
   const finish = useMemo(() => {
+    if (pace?.draft?.doneOn) return "draft done";
     if (!pace?.settings) return null;
     const now = new Date();
     const v = outlook(toPaceProject(useStore.getState().doc, now), now);

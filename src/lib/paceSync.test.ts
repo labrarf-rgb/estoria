@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaceLog, StoryDoc } from "@/types";
 import { normalizeDoc } from "@/store/persistence";
 import { MemoryDir, memoryStorage } from "@/test/memoryDir";
-import { addWords, dayTotals } from "@/lib/paceLog";
+import { addWords, dayTotals, draftDoneOn, reopenDraft } from "@/lib/paceLog";
 
 /**
  * Sync and the Pace word log (`PaceLog`, grow-only). Same in-memory folder as
@@ -106,6 +106,37 @@ describe("a difference that is only the Pace log", () => {
     tick();
     expect((await syncProject(res.doc)).kind).toBe("pushed");
     expect(today(fileDoc().pace)).toBe(400);
+  });
+});
+
+describe("draft done through sync", () => {
+  it("a phone that strips the draft block can't undo it, and the next sync puts it back", async () => {
+    const mine = withWords(makeDoc(), "web-a", 400, 3);
+    const done: StoryDoc = { ...mine, pace: { ...mine.pace!, draft: { doneOn: "2026-10-11", at: 5 } } };
+    await syncProject(done);
+    tick();
+    // Android 73 rebuilds `pace` from settings and days only, then saves.
+    const { draft: _dropped, ...stripped } = done.pace!;
+    dir().put(LIVE, JSON.stringify(withWords({ ...done, pace: stripped }, "android-b", 90, 6)));
+
+    const res = await syncProject(done);
+    expect(res.kind).toBe("pulled");
+    if (res.kind !== "pulled") return;
+    expect(draftDoneOn(res.doc.pace)).toBe("2026-10-11");
+    expect(today(res.doc.pace)).toBe(490);
+    tick();
+    expect((await syncProject(res.doc)).kind).toBe("pushed");
+    expect(draftDoneOn(fileDoc().pace)).toBe("2026-10-11");
+  });
+
+  it("reopening on one browser wins over a file that still says done", async () => {
+    const done: StoryDoc = { ...makeDoc(), pace: { days: {}, draft: { doneOn: "2026-10-11", at: 5 } } };
+    await syncProject(done);
+    tick();
+    const reopened: StoryDoc = { ...done, pace: reopenDraft(done.pace, 6) };
+    const res = await syncProject(reopened);
+    expect(res.kind).toBe("pushed");
+    expect(draftDoneOn(fileDoc().pace)).toBeNull();
   });
 });
 

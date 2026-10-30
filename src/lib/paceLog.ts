@@ -1,6 +1,7 @@
-import type { PaceCell, PaceLog, PaceSettings, StoryDoc } from "@/types";
+import type { PaceCell, PaceDraft, PaceLog, PaceSettings, StoryDoc } from "@/types";
 import type { Project } from "@/lib/pace/types";
-import { toDayKey } from "@/lib/pace/dates";
+import { fromDayKey, toDayKey } from "@/lib/pace/dates";
+import { clampDaysPerWeek, habitStats, headStart, observe, projectAt, resolveTarget } from "@/lib/pace/pace";
 
 /**
  * The Pace word log: how many words a project gained or lost each day, kept in
@@ -22,7 +23,16 @@ import { toDayKey } from "@/lib/pace/dates";
  * arrived is never booked as written.
  *
  * **Net, not gross.** Cutting 500 words on a revision day books −500.
+ *
+ * **Draft done.** The writer can declare the draft finished (`pace.draft`, see
+ * `PaceDraft`). While it is done typing books nothing, and the Pace panel shows
+ * how the drafting run went (`draftReport`) instead of where it is heading.
  */
+
+/** A log in the file's key order: `settings`, `days`, `draft`. Android matches it for the fingerprint. */
+function logOf(settings: PaceSettings | undefined, days: PaceLog["days"], draft: PaceDraft | undefined): PaceLog {
+  return { ...(settings ? { settings } : {}), days, ...(draft ? { draft } : {}) };
+}
 
 // ---- reading -------------------------------------------------------------------
 
@@ -49,13 +59,23 @@ function readSettings(v: unknown): PaceSettings | undefined {
   };
 }
 
+function readDraft(v: unknown): PaceDraft | undefined {
+  const d = v as Partial<PaceDraft> | null;
+  if (!d || typeof d !== "object" || !num(d.at)) return undefined;
+  // A done day that is not a day is dropped, which reads as open; the frozen
+  // goal day only means something beside a done day.
+  const done = typeof d.doneOn === "string" && DAY.test(d.doneOn) ? d.doneOn : undefined;
+  const goal = done && typeof d.goalOn === "string" && DAY.test(d.goalOn) ? d.goalOn : undefined;
+  return { ...(done ? { doneOn: done } : {}), ...(goal ? { goalOn: goal } : {}), at: d.at };
+}
+
 /**
  * Read `pace` from a file, keeping every well-formed cell and dropping the
  * rest. **Never throws**: a damaged log costs some history, never the project.
  */
 export function readPaceLog(raw: unknown): PaceLog | undefined {
   try {
-    const r = raw as { settings?: unknown; days?: unknown } | null;
+    const r = raw as { settings?: unknown; days?: unknown; draft?: unknown } | null;
     if (!r || typeof r !== "object") return undefined;
     const days: PaceLog["days"] = {};
     if (r.days && typeof r.days === "object") {
@@ -70,8 +90,9 @@ export function readPaceLog(raw: unknown): PaceLog | undefined {
       }
     }
     const settings = readSettings(r.settings);
-    if (!settings && !Object.keys(days).length) return undefined;
-    return { ...(settings ? { settings } : {}), days };
+    const draft = readDraft(r.draft);
+    if (!settings && !draft && !Object.keys(days).length) return undefined;
+    return logOf(settings, days, draft);
   } catch {
     return undefined;
   }
@@ -80,8 +101,8 @@ export function readPaceLog(raw: unknown): PaceLog | undefined {
 // ---- merging -------------------------------------------------------------------
 
 /**
- * Cell-by-cell union, newer `at` winning. A cell or settings block missing from
- * one side is never a deletion (see `PaceLog`). On a tie the first side wins,
+ * Cell-by-cell union, newer `at` winning. A cell, settings or draft block
+ * missing from one side is never a deletion (see `PaceLog`). On a tie the first side wins,
  * so `unionPace(a, a)` is `a`.
  */
 export function unionPace(a: PaceLog | undefined, b: PaceLog | undefined): PaceLog | undefined {
@@ -102,9 +123,9 @@ export function unionPace(a: PaceLog | undefined, b: PaceLog | undefined): PaceL
     }
     if (merged) days[day] = merged;
   }
-  const settings =
-    a.settings && b.settings ? (b.settings.at > a.settings.at ? b.settings : a.settings) : (a.settings ?? b.settings);
-  return { ...(settings ? { settings } : {}), days };
+  const newer = <T extends { at: number }>(x: T | undefined, y: T | undefined) =>
+    x && y ? (y.at > x.at ? y : x) : (x ?? y);
+  return logOf(newer(a.settings, b.settings), days, newer(a.draft, b.draft));
 }
 
 /** Whether two logs hold the same cells and settings (the merge changed nothing). */
@@ -145,11 +166,95 @@ export function addWords(
   const cells = { ...(days[day] ?? {}) };
   cells[device] = { n: (cells[device]?.n ?? 0) + Math.round(delta), at };
   days[day] = cells;
-  return { ...(log?.settings ? { settings: log.settings } : {}), days };
+  return logOf(log?.settings, days, log?.draft);
 }
 
 export function withSettings(log: PaceLog | undefined, settings: Omit<PaceSettings, "at">, at: number): PaceLog {
-  return { settings: { ...settings, at }, days: log?.days ?? {} };
+  return logOf({ ...settings, at }, log?.days ?? {}, log?.draft);
+}
+
+// ---- draft done ------------------------------------------------------------------
+
+/** The day the draft was marked done, or null while it is open. */
+export function draftDoneOn(log: PaceLog | undefined): string | null {
+  return log?.draft?.doneOn ?? null;
+}
+
+/** Mark the draft done on `day`, freezing the goal pace's finish date beside it. */
+export function markDraftDone(doc: StoryDoc, day: string, at: number): PaceLog {
+  const goalOn = goalFinish(doc, fromDayKey(day));
+  return logOf(doc.pace?.settings, doc.pace?.days ?? {}, { doneOn: day, ...(goalOn ? { goalOn } : {}), at });
+}
+
+/**
+ * Reopen the draft: a newer block that says "open", never a removal, so an
+ * older copy that still says "done" loses the merge instead of winning it back.
+ */
+export function reopenDraft(log: PaceLog | undefined, at: number): PaceLog {
+  return logOf(log?.settings, log?.days ?? {}, { at });
+}
+
+/**
+ * When the goal pace, from the start date, would have reached the target the
+ * project has at `now`. The head start (words before tracking) is credited, as
+ * in every Pace figure. Null when the goal can never get there.
+ */
+function goalFinish(doc: StoryDoc, now: Date): string | null {
+  const p = toPaceProject(doc, now);
+  const left = Math.max(resolveTarget(p) - headStart(p), 0);
+  const at = projectAt(left, clampDaysPerWeek(p.goal.sessionsPerWeek), p.goal.perSession, fromDayKey(p.startDate));
+  return at.date ? toDayKey(at.date) : null;
+}
+
+/** How the drafting run went, start to done. Every figure stops at the done day. */
+export interface DraftReport {
+  startDate: string;
+  doneOn: string;
+  /** Calendar days from the start through the done day, both counted. */
+  days: number;
+  /** Days that gained words (Pace's rule: a cut-only day is not a day worked). */
+  daysWritten: number;
+  /** Days written per elapsed week, zeros included; Pace's measured frequency. */
+  daysPerWeek: number;
+  /** Average words on a writing day. */
+  perDay: number;
+  longestStreak: number;
+  /** The goal pace, from the setting it had when the draft was marked done. */
+  goal: { sessionsPerWeek: number; perSession: number };
+  goalOn?: string;
+  deadline?: string;
+}
+
+/**
+ * The drafting run as the log tells it, or null while the draft is open. Read
+ * live from the log, cut off at the done day: a phone's day from before "done"
+ * that syncs in late still corrects it, and nothing after the done day can move
+ * it. The word count and target are deliberately absent: revisions after the
+ * draft change them, and this report is about the run, not the book's size.
+ * The goal's finish date was frozen when the draft was marked done for the
+ * same reason.
+ */
+export function draftReport(doc: StoryDoc): DraftReport | null {
+  const doneOn = draftDoneOn(doc.pace);
+  if (!doneOn) return null;
+  const end = fromDayKey(doneOn);
+  const all = toPaceProject(doc, end);
+  const p = { ...all, sessions: all.sessions.filter((s) => s.date <= doneOn) };
+  const seen = observe(p, end);
+  const habit = habitStats(p, end);
+  const s = doc.pace?.settings;
+  return {
+    startDate: p.startDate,
+    doneOn,
+    days: habit.totalDays,
+    daysWritten: habit.daysWorked,
+    daysPerWeek: seen.measured ? seen.sessionsPerWeek : 0,
+    perDay: seen.measured ? seen.perSession : 0,
+    longestStreak: habit.longestStreak,
+    goal: p.goal,
+    ...(doc.pace?.draft?.goalOn ? { goalOn: doc.pace.draft.goalOn } : {}),
+    ...(s?.deadline ? { deadline: s.deadline } : {}),
+  };
 }
 
 /** Net words per day, summed over every device. Days that net to zero are left out. */
