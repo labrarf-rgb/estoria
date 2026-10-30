@@ -6285,3 +6285,11 @@ Ray treats the chapter targets and the goal as estimates, so he wants to call th
 - **Checked in the dev server** (the browser pane's scratch copy of the sample, with a test log injected): confirm, report, footer, typing paused, reopen, and the outlook back.
 
 Tried locally and approved by Ray. The phone port is finished in the Estoria-aa working tree but not committed or on the phone, so the web ships first.
+
+**Shipped** (/ship): commit `5791dc2` on `main`, pushed, deployed as build 60;
+prod reports it live and its assets load. SPECS: the `paceLog.ts` tree note
+now lists the draft state; §4 and §8 were updated with the feature. One
+follow-up: once the phone build with the port ships (Estoria-aa, uncommitted),
+the Android sentence in §8 should say the phone keeps the block and pauses
+booking while done. **Next:** reload the installed app (accept the Reload
+prompt), and try Draft done on a copy of a book first.

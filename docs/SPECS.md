@@ -292,7 +292,8 @@ estoria/
    │  ├─ author.ts            # author details: byline + title-page contact block,
    │  │                       #   read/write on a doc, the title page's line order
    │  ├─ paceLog.ts           # Pace word log in the file: record, read, grow-only merge,
-   │  │                       #   progress (projectWords) and target (projectTarget)
+   │  │                       #   progress (projectWords) and target (projectTarget),
+   │  │                       #   draft done state and its report (draftReport)
    │  ├─ paceImport.ts        # read a Pace calculator backup into the log
    │  ├─ pace/                # Pace's projection maths, copied from the Pace calculator
    │  ├─ inline.ts            # inline-markdown tokenizer, shared by the reading
