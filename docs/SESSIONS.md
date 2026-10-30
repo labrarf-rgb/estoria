@@ -6267,4 +6267,8 @@ footer readout; this replaces the earlier "check the toolbar shows Pace".
 
 ### 2026-10-29 — Footer Pace readout rolls over at midnight
 
-The footer's "+N today · finishing <date>" now follows the calendar day (`onDayChange` in `lib/paceLog.ts`: a timer to local midnight plus a recheck on focus/visibility after sleep) instead of waiting for a store change; tests pass, alternation checked in the dev server, not yet tried by Ray, not committed or deployed.
+The footer's "+N today · finishing <date>" now follows the calendar day (`onDayChange` in `lib/paceLog.ts`: a timer to local midnight plus a recheck on focus/visibility after sleep) instead of waiting for a store change; tests pass, alternation checked in the dev server, approved by Ray.
+
+**Shipped** (/ship): commit `9378e2a` on `main`, pushed, deployed as build
+58; prod reports it live and its assets load. SPECS: no drift (the §4 "Pace"
+row doesn't say when the readout refreshes).
