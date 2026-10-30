@@ -6264,3 +6264,7 @@ in build 53), and the §4 row says hover or focus holds the turn.
 
 **Next:** reload the installed app (accept the Reload prompt) and check the
 footer readout; this replaces the earlier "check the toolbar shows Pace".
+
+### 2026-10-29 — Footer Pace readout rolls over at midnight
+
+The footer's "+N today · finishing <date>" now follows the calendar day (`onDayChange` in `lib/paceLog.ts`: a timer to local midnight plus a recheck on focus/visibility after sleep) instead of waiting for a store change; tests pass, alternation checked in the dev server, not yet tried by Ray, not committed or deployed.

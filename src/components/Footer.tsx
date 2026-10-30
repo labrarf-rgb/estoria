@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { partNouns } from "@/lib/piece";
-import { projectTarget, projectWords, toPaceProject, wordsToday } from "@/lib/paceLog";
+import { onDayChange, projectTarget, projectWords, toPaceProject, wordsToday } from "@/lib/paceLog";
 import { outlook } from "@/lib/pace/pace";
+import { fromDayKey, toDayKey } from "@/lib/pace/dates";
 import { formatDate } from "@/lib/pace/format";
 import { getSaveStatus, onSaveStatus, type SaveStatus } from "@/store/persistence";
 import { chooseBackupFolder, getBackupDirName, isBackupPickerSupported } from "@/lib/backup";
@@ -59,22 +60,26 @@ const HINT_TURN_MS = 8000;
  */
 function HintCorner({ hint }: { hint: string }) {
   const setPanel = useStore((s) => s.setPanel);
+  // The local calendar day, bumped at midnight (and on coming back to the tab)
+  // so "today" and the finish date roll over without typing.
+  const [day, setDay] = useState(() => toDayKey(new Date()));
+  useEffect(() => onDayChange(setDay), []);
   // Today's net words in this project, every device included, from the word
   // log in the file (lib/paceLog.ts). Numbers rather than the doc, so this
   // re-renders only when one moves.
-  const today = useStore((s) => wordsToday(s.doc));
+  const today = useStore((s) => wordsToday(s.doc, fromDayKey(day)));
   const proseWords = useStore((s) => projectWords(s.doc));
   const paceTarget = useStore((s) => projectTarget(s.doc));
   const pace = useStore((s) => s.doc.pace);
   // Once a goal is set, the finish date the log implies. Worked out only when
-  // the log, the prose total or the chapters' targets move, never per
+  // the log, the prose total, the chapters' targets or the day move, never per
   // keystroke (`pace` and `words` change when typing settles).
   const finish = useMemo(() => {
     if (!pace?.settings) return null;
     const now = new Date();
     const v = outlook(toPaceProject(useStore.getState().doc, now), now);
     return v.complete ? "target reached" : `finishing ${formatDate(v.actual.date)}`;
-  }, [pace, proseWords, paceTarget]);
+  }, [pace, proseWords, paceTarget, day]);
   const readout = [today === 0 ? "" : `${today > 0 ? "+" : "−"}${Math.abs(today).toLocaleString()} today`, finish]
     .filter(Boolean)
     .join(" · ");

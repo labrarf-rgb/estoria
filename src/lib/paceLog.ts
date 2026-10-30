@@ -164,11 +164,53 @@ export function dayTotals(log: PaceLog | undefined): Map<string, number> {
 
 /**
  * Net words today in this project, every device included. Reads today's cells
- * only: the toolbar calls this on every keystroke's render.
+ * only: the footer calls this on every keystroke's render.
  */
 export function wordsToday(doc: StoryDoc, now = new Date()): number {
   const cells = doc.pace?.days[toDayKey(now)];
   return cells ? Object.values(cells).reduce((a, c) => a + c.n, 0) : 0;
+}
+
+/**
+ * Calls `onDay` with the new local day key whenever the calendar day changes,
+ * so "+N today" and the finish date roll over without typing. A timer aims at
+ * the next local midnight, and coming back to the tab (visibility or focus)
+ * checks again, because timers pause or drift while the laptop sleeps. Every
+ * check re-aims the timer. Returns the unsubscribe.
+ */
+export function onDayChange(
+  onDay: (day: string) => void,
+  targets: EventTarget[] = [
+    ...(typeof document !== "undefined" ? [document] : []),
+    ...(typeof window !== "undefined" ? [window] : []),
+  ]
+): () => void {
+  let day = toDayKey(new Date());
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const check = () => {
+    const now = new Date();
+    const next = toDayKey(now);
+    if (next !== day) {
+      day = next;
+      onDay(next);
+    }
+    clearTimeout(timer);
+    // A moment past midnight, so the key has surely changed when it fires.
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    timer = setTimeout(check, midnight.getTime() - now.getTime() + 500);
+  };
+  check();
+  for (const t of targets) {
+    t.addEventListener("visibilitychange", check);
+    t.addEventListener("focus", check);
+  }
+  return () => {
+    clearTimeout(timer);
+    for (const t of targets) {
+      t.removeEventListener("visibilitychange", check);
+      t.removeEventListener("focus", check);
+    }
+  };
 }
 
 // ---- this browser --------------------------------------------------------------

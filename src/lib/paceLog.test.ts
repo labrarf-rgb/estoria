@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PaceLog, StoryDoc } from "@/types";
 import { normalizeDoc } from "@/store/persistence";
 import { outlook } from "@/lib/pace/pace";
@@ -6,6 +6,7 @@ import {
   addWords,
   dayTotals,
   keepPaceHistory,
+  onDayChange,
   projectTarget,
   projectWords,
   readPaceLog,
@@ -175,5 +176,52 @@ describe("progress is the book's real total", () => {
     const o = outlook(toPaceProject(doc, now), now).observation;
     expect(o.sessionCount).toBe(1);
     expect(o.perSession).toBe(600);
+  });
+});
+
+describe("the day rolling over", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls back once at local midnight, not before", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 29, 23, 59, 50));
+    const days: string[] = [];
+    const stop = onDayChange((d) => days.push(d), []);
+    vi.advanceTimersByTime(5_000);
+    expect(days).toEqual([]);
+    vi.advanceTimersByTime(10_000);
+    expect(days).toEqual(["2026-10-30"]);
+    vi.advanceTimersByTime(60 * 60_000);
+    expect(days).toEqual(["2026-10-30"]);
+    stop();
+  });
+
+  it("notices a day missed while asleep when the tab comes back", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 29, 22, 0));
+    const tab = new EventTarget();
+    const days: string[] = [];
+    const stop = onDayChange((d) => days.push(d), [tab]);
+    // The clock jumps but no timer runs, as when the laptop slept.
+    vi.setSystemTime(new Date(2026, 9, 31, 8, 0));
+    tab.dispatchEvent(new Event("focus"));
+    expect(days).toEqual(["2026-10-31"]);
+    tab.dispatchEvent(new Event("visibilitychange"));
+    expect(days).toEqual(["2026-10-31"]);
+    stop();
+  });
+
+  it("stops after unsubscribing", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 29, 23, 59, 50));
+    const tab = new EventTarget();
+    const days: string[] = [];
+    onDayChange((d) => days.push(d), [tab])();
+    vi.advanceTimersByTime(60_000);
+    vi.setSystemTime(new Date(2026, 10, 2, 9, 0));
+    tab.dispatchEvent(new Event("focus"));
+    expect(days).toEqual([]);
   });
 });
