@@ -1,3 +1,4 @@
+import { isAnthology } from "@/lib/anthology";
 import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
@@ -66,7 +67,12 @@ export function buildMarkdown(doc: StoryDoc): string {
   const activeBook = doc.seriesMode ? doc.books.find((b) => b.id === doc.activeBookId) : undefined;
   const bookTitle = activeBook ? activeBook.title : title;
 
-  let md = `# ${bookTitle}\n\nMapped in Estoria. ${total.toLocaleString()} words across ${doc.chapters.length} chapters.\n`;
+  // An anthology counts pieces. The rest of the layout stays the book's (Act
+  // headings, numbered `###` entries), because that is all parseImportMarkdown
+  // reads back: section headings in their place would drop every piece.
+  const n = doc.chapters.length;
+  const units = isAnthology(doc) ? (n === 1 ? "piece" : "pieces") : "chapters";
+  let md = `# ${bookTitle}\n\nMapped in Estoria. ${total.toLocaleString()} words across ${n} ${units}.\n`;
 
   if (doc.seriesMode) {
     md += `\n## Series: ${title}\n\n`;

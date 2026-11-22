@@ -3,6 +3,7 @@ import type { Chapter, StoryDoc } from "@/types";
 import { normalizeDoc } from "@/store/persistence";
 import { expandToBook, formLabel, newPiece } from "@/lib/piece";
 import { buildManuscriptMarkdown, buildManuscriptText } from "@/lib/manuscriptExport";
+import { buildMarkdown, parseImportMarkdown } from "@/lib/markdown";
 import {
   addPace,
   bands,
@@ -219,6 +220,14 @@ describe("export", () => {
     expect(txt).toContain("LOW TIDE");
     expect(txt).toContain("line one\nline two");
     expect(txt).toContain("One sentence.");
+  });
+
+  it("the story map export counts pieces, and still re-imports every piece", () => {
+    const md = buildMarkdown(d);
+    expect(md).toContain("words across 2 pieces.");
+    expect(md).not.toContain("chapters.");
+    expect(parseImportMarkdown(md).doc.chapters.map((c) => c.title)).toEqual(["Low Tide", "Nell"]);
+    expect(buildMarkdown(fromAnthology(d))).toContain("words across 2 chapters.");
   });
 
   it("a regular book still exports chapter headings", () => {

@@ -1,7 +1,7 @@
 # Anthology: plan (NOT BUILT)
 
 > Status: **built and shipped 2026-11-21** after Ray's local test in Chrome.
-> Build notes and the changes from that test: §9. The phone update is still to do (§6).
+> Build notes and the changes from that test: §9. The phone followed on 2026-11-22 (§6, Android Session 38).
 > Branch `claude/anthology-f37dea`. Mockup: [`mockups/anthology.html`](mockups/anthology.html)
 > (private artifact: https://claude.ai/artifact/UUT7734mz17ke7Y2CBwbFo).
 >
@@ -247,9 +247,14 @@ label-only book (`grownInto: "collection"`, no `form`), which the web then
 shows as a book waiting for *Make this an anthology*. All three are reasons to
 keep the gap short.
 
-**Phone update, later:** read `form: "anthology"`, per-chapter kind and line
-breaks, a contents screen, the piece page with back / next, and the new export
-headings. Recorded for the Android SPECS §7 when the web lands.
+**Phone update: built 2026-11-22** (Android Session 38, Android SPECS §7
+"Anthologies", branch `feature/anthology-phone`). The Story tab shows section
+bands with each piece's kind; a piece opens without number or act, with its
+own kind picker, line breaks and part names, ‹ › by title, and Move to section;
++ adds a piece of any kind; Make this an anthology / Make this a book; Expand →
+An anthology makes a real one. Turn into single piece, Make this a series, New
+book and templates are blocked. Not on the phone: bring in, make its own
+project, and renaming / reordering / removing sections.
 
 ## 7. Overlap with the three sibling plans
 
@@ -306,8 +311,11 @@ with these calls made during the build:
 - **Pace add-merge** (`addPace`) sums a day's cells and stamps them now.
 - **Compare & merge**: an anthology vs a book or piece is still merge-blocked
   (keep one), now named "anthology" in the message.
-- **Not built:** the map export (`markdown.ts`) still says chapters; drag on
-  touch screens (mouse drag only, like the board); the phone update.
+- **Not built:** drag on touch screens (mouse drag only, like the board).
+- **Map export (2026-11-22):** the summary line counts pieces ("across 4
+  pieces"). Section headings and kinds were left out on purpose:
+  `parseImportMarkdown` reads only `## Act` sections and `### N.` entries, so
+  they would drop every piece on re-import. The phone's `Markdown.kt` matches.
 - **After Ray's first test (2026-11-21):** the way back from a piece is a
   **Board** button in the toolbar, where a book's Board / Timeline switch is
   (the ‹ Board link under the toolbar is gone); and on a piece's page a
