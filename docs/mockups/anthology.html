@@ -285,11 +285,12 @@ function screenExpand() {
   const body = S.expand === "collection"
     ? `<p><b>"Low Tide"</b> becomes the first piece. It stays a poem: its stanzas, its line breaks, its own page with Map and Write. Add more pieces of any kind, new or brought in from your other projects.</p>
        <p>No chapter numbers, acts or chapter links. Pieces can be grouped into sections.</p>`
-    : `<p><b>"Low Tide"</b> becomes Chapter 1 of a book. Parts are still called stanzas, and line breaks are still kept. You can add chapters, acts and the Timeline.</p>`;
+    : `<p><b>"Low Tide"</b> becomes the opening of one long poem, the way the Inferno opens the Divine Comedy. It is Chapter 1 (a canto, a book); you add the rest as Chapter 2, 3 and on. Parts are still called stanzas, line breaks are still kept, and you get acts and the Timeline.</p>
+       <p>Your project list tags it <b>Epic</b>.</p>`;
   return `<div class="frame"><div class="scrim"><div class="dlg">
     <div class="dlg-h"><div style="flex:1"><div class="t">Expand into a book?</div><div class="s">"Low Tide" grows into something longer.</div></div><span class="btn">✕</span></div>
     <div class="dlg-b"><div><div class="eyebrow" style="margin-bottom:8px">Growing it into</div>
-      <div class="choices" style="grid-template-columns:1fr 1fr">${opt("work", "One longer work", "A long poem")}${opt("collection", 'An anthology <span class="newf">new</span>', "A collection of pieces, each kept as it is")}</div></div>
+      <div class="choices" style="grid-template-columns:1fr 1fr">${opt("work", 'An epic <span class="newf">renamed</span>', "Or any book-length poem, in cantos or parts")}${opt("collection", 'An anthology <span class="newf">new</span>', "A collection of pieces, each kept as it is")}</div></div>
       ${body}
       <div class="note">A copy of "Low Tide" is saved first, under Projects › Saved copies.</div></div>
     <div class="dlg-f"><span class="btn">Cancel</span><button class="btn dark" data-go="2">${S.expand === "collection" ? "Make an anthology" : "Expand into a book"}</button></div>
@@ -477,7 +478,7 @@ function screenPhone() {
 }
 
 const CAPTIONS = {
-  1: `<b>The Expand dialog you have today</b>, with "A collection" made real. Pick it and the piece becomes the first piece of an anthology, still a poem. "One longer work" is unchanged. Click <b>Make an anthology</b> to see the result.`,
+  1: `<b>The Expand dialog you have today</b>, with "A collection" made real. Pick it and the piece becomes the first piece of an anthology, still a poem. The other choice, one poem that keeps growing (like the Divine Comedy), is renamed for poems from "One longer work / A long poem" to <b>An epic</b>, tagged "Epic" in your project list; stories and essays keep "One longer work". Click either choice to compare, then <b>Make an anthology</b> to see the result.`,
   2: `<b>The anthology's home.</b> Two options to choose between: a <b>contents list</b> (reads like the book's table of contents; drag the ⋮⋮ grip to reorder) or a <b>board of cards</b> (today's board, with kind tags in place of chapter numbers and sections as bands). Either way, no acts, no chapter links, no Timeline, and clicking a piece opens it as its own page. Try both, then click a piece.<span class="q">Question 1: contents list or board of cards?</span>`,
   3: `<b>A piece opens exactly as a single piece does today</b>, plus a way back to the contents and ‹ › to the next piece. Step through them: the poems keep their line breaks, the stories and the essay read as paragraphs, and each counts its own parts (stanzas, scenes, sections). The kind and the Line breaks toggle belong to this piece only. Open <b>⋯</b> for Move to section and Make its own project.`,
   4: `<b>+ Add piece</b> has two halves: a new blank piece (the same kind cards as New project) or <b>Bring in a project</b>, which lists only your single pieces. Pick one and click Bring in to see what moves. Your choice: it moves in, and a saved copy is kept first.`,

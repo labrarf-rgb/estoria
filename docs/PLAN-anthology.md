@@ -44,6 +44,12 @@ poems and stories. That is the gap.
 6. **Export:** each piece under its own title (no "Chapter 3"), each on a new
    page, its own line breaks kept, a contents page, section headings.
 7. **Web first, phone follows.** See §6 for what the phone shows meanwhile.
+   **"Epic" for a poem's longer-work choice.** The other Expand choice, one poem
+   that keeps growing (the Divine Comedy, the Aeneid), was "One longer work · A
+   long poem", tagged "Long poem". For a poem it becomes **An epic**, hint *"Or
+   any book-length poem, in cantos or parts"*, tag **Epic** (`KINDS` poem
+   `grow.work` in `lib/piece.ts`, and the phone's `Piece.kt` to match). Stories
+   and essays keep "One longer work". Behaviour unchanged: an ordinary book.
 8. **Still to choose, from the mockup:** the anthology's home screen (contents
    list vs. board of cards) and how taking a piece out looks. §8 lists the rest.
 
