@@ -282,6 +282,8 @@
   .dlg .ft { display: flex; align-items: center; gap: 10px; padding: 18px 24px; flex-wrap: wrap; }
   .dlg .ft .first { margin-right: auto; }
   .dlg .ft .first.help { flex: 1 1 220px; }
+  .dlg .kft { border-top: 1px solid var(--rule); gap: 10px; }
+  .dlg .kft .kconfirm { font-size: 12px; color: var(--but); line-height: 1.4; }
   .inp, .area, .sel {
     width: 100%; border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 7px 9px;
     font: inherit; font-size: 12.5px; color: var(--ink); outline: none; transition: border-color .2s;
@@ -374,7 +376,7 @@
       <ul>
         <li><b>No saved layout.</b> Everyone sits on a ring in roster order, clockwise from the top (Wren, Bram, Ione, Sela, Pip, the same order as the tiles). Clicking a character moves them to the middle with their ties around them. There are no positions to store or sync. If cards become rearrangeable, moving a card moves its place on the ring.</li>
         <li><b>Kind filters</b> in the side panel hide whole kinds of tie. Archived characters are off by default (screen 4).</li>
-        <li><b>Kinds are yours.</b> "Edit kinds" (side panel, or in the editor) opens the project's list: rename, recolor, add or remove. The six here are only the starter set. Try renaming Rival, or adding "Debt".</li>
+        <li><b>Kinds are yours.</b> "Edit kinds" (side panel, or in the editor) opens the project's list: rename, recolor, add or remove. The six here are only the starter set. Try renaming Rival, or adding "Debt". "Save as default" keeps your list for new projects, the way Author details does.</li>
         <li><b>The side panel</b> shows the selected pair or character. Each pair has a line for how each one sees the other, because feelings are rarely mutual.</li>
       </ul>
     </div>
@@ -954,10 +956,34 @@ interface Relationship {
   const kindsScrim = document.getElementById("kindsScrim");
   const ks = { palette: null, confirm: null };
   const usedBy = (id) => RELS.filter((r) => r.kind === id).length;
+  // Your saved default: this browser only, never in the project file (like Author details' saved default).
+  // New projects start from it; without one they start from the starter six.
+  let SAVED = null;
+  const clone = (list) => list.map((k) => ({ ...k }));
+  const sameKinds = (x, y) => x.length === y.length && x.every((k, i) => k.id === y[i].id && k.name === y[i].name && k.sw === y[i].sw);
+  const orphansIfSaved = () => RELS.filter((r) => kindOf(r.kind) && !SAVED.some((k) => k.id === r.kind)).length;
+  function defaultFooter() {
+    const matches = SAVED && sameKinds(KINDS, SAVED);
+    const status = !SAVED
+      ? "Save these as your default and every new project starts with them."
+      : matches
+        ? "Same as your saved default. New projects start with these."
+        : "Different from your saved default. Only this project changes.";
+    if (ks.useConfirm) {
+      const n = orphansIfSaved();
+      return `<span class="kconfirm" style="flex-basis:100%">${n} ${n === 1 ? "relationship uses a kind" : "relationships use kinds"} your default doesn't have. They'll stay, shown as No kind.</span>
+        <span class="first"></span><button type="button" class="btn big" data-kuse-no>Cancel</button><button type="button" class="btn big danger" data-kuse-yes>Use saved default</button>`;
+    }
+    return `<span class="help" style="margin:0;flex-basis:100%">${status}</span><span class="first"></span>
+      ${SAVED && !matches ? '<button type="button" class="btn big" data-kuse>Use saved default</button>' : ""}
+      ${!matches ? '<button type="button" class="btn big" data-ksave>Save as default</button>' : ""}
+      <button type="button" class="btn primary" data-kdone>Done</button>`;
+  }
+  function applySaved() { RELS.forEach((r) => { if (kindOf(r.kind) && !SAVED.some((k) => k.id === r.kind)) r.kind = ""; }); KINDS.splice(0, KINDS.length, ...clone(SAVED)); ks.useConfirm = false; drawKinds(); }
   function kindsHTML() {
     return `<div class="dlg" role="dialog" aria-modal="true" aria-label="Relationship kinds">
       <div class="hd"><div class="eyebrow">Relationship kinds</div><div class="t">Kinds in Untitled Voyage</div>
-        <div class="help" style="margin:0">Every project starts with these six. Rename them, change their color, add your own or remove any you don't use.</div></div>
+        <div class="help" style="margin:0">Rename them, change their color, add your own or remove any you don't use. Saved in this project, so the phone and your other devices get the same list.</div></div>
       <div class="bd" style="gap:8px">
         ${KINDS.map((k) => {
           const n = usedBy(k.id);
@@ -974,20 +1000,28 @@ interface Relationship {
         }).join("") || '<div class="help">No kinds. Relationships will all show as No kind.</div>'}
         <button type="button" class="dashed" data-kadd style="margin-top:4px">+ Add kind</button>
       </div>
-      <div class="ft"><span class="first help" style="margin:0">Saved in this project, so the phone and your other devices get the same list.</span><button type="button" class="btn primary" data-kdone>Done</button></div>
+      <div class="ft kft">${defaultFooter()}</div>
     </div>`;
   }
   function drawKinds(focusId) {
     kindsScrim.innerHTML = kindsHTML();
     if (focusId) { const f = kindsScrim.querySelector(`[data-kname="${focusId}"]`); if (f) { f.focus(); f.select(); } }
   }
-  function openKinds() { ks.palette = null; ks.confirm = null; drawKinds(); kindsScrim.hidden = false; }
+  function openKinds() { ks.palette = null; ks.confirm = null; ks.useConfirm = false; drawKinds(); kindsScrim.hidden = false; }
   function closeKinds() { kindsScrim.hidden = true; kindsScrim.innerHTML = ""; refresh(); keepDialog(); }
-  kindsScrim.addEventListener("input", (e) => { const id = e.target.dataset.kname; if (id) kindOf(id).name = e.target.value; });
+  kindsScrim.addEventListener("input", (e) => {
+    const id = e.target.dataset.kname; if (!id) return;
+    kindOf(id).name = e.target.value;
+    kindsScrim.querySelector(".kft").innerHTML = defaultFooter(); // keep the status line honest while typing
+  });
   kindsScrim.addEventListener("click", (e) => {
     if (e.target === kindsScrim) return closeKinds();
     const t = e.target.closest("button"); if (!t) return;
     if ("kdone" in t.dataset) closeKinds();
+    else if ("ksave" in t.dataset) { SAVED = clone(KINDS); drawKinds(); }
+    else if ("kuse" in t.dataset) { if (orphansIfSaved()) { ks.useConfirm = true; drawKinds(); } else applySaved(); }
+    else if ("kuseYes" in t.dataset) applySaved();
+    else if ("kuseNo" in t.dataset) { ks.useConfirm = false; drawKinds(); }
     else if (t.dataset.kpal) { ks.palette = ks.palette === t.dataset.kpal ? null : t.dataset.kpal; ks.confirm = null; drawKinds(); }
     else if (t.dataset.ksw) { const [id, n] = t.dataset.ksw.split(":"); kindOf(id).sw = Number(n); ks.palette = null; drawKinds(); }
     else if (t.dataset.kdel) { const id = t.dataset.kdel; if (usedBy(id)) { ks.confirm = id; ks.palette = null; drawKinds(); } else { KINDS.splice(KINDS.findIndex((k) => k.id === id), 1); drawKinds(); } }

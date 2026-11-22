@@ -63,6 +63,29 @@ Why this shape:
   they stay, shown as "No kind" (their `kind` is cleared). Nothing is deleted.
 - **Kinds are per project,** stored in the file, so they travel to Drive, other
   browsers and the phone. They are series-wide like characters.
+- **Plus a saved default for new projects** (Ray, 2026-11-21), built exactly
+  like Author details' saved default (`authorDefault`):
+  - `relationshipKindsDefault` in the store, persisted by `partialize` in this
+    browser only, **never in the project file**. Another browser or the phone
+    has its own (or none).
+  - **New projects copy it in** as their stored `relationshipKinds`, at the
+    same places `withAuthor(..., s.authorDefault)` runs today (new project, new
+    piece, Start fresh). Without a saved default, new projects get the starter
+    six as now.
+  - **An existing project with no stored list and no relationships yet** takes
+    the default the first time the chart or Edit kinds opens (mirrors
+    `fillAuthorFromDefault`). A project that already has relationships is never
+    changed silently.
+  - The Edit kinds footer copies Author details' footer: one status line
+    ("Save these as your default and every new project starts with them." /
+    "Same as your saved default. New projects start with these." / "Different
+    from your saved default. Only this project changes."), then **Use saved
+    default** (only when one exists and differs), **Save as default** (only
+    when different), **Done**.
+  - **Use saved default replaces this project's list.** Relationships whose kind
+    isn't in the default stay, shown as "No kind"; if any would, it asks first
+    and says how many. Kind ids carry over from the default, so projects started
+    from the same default share ids.
 - **No schema bump.** Optional field, same precedent as `manuscript`, `author`,
   `pace`.
 
@@ -148,7 +171,10 @@ Ray chose option B, everywhere):
    empty. Kinds: drop entries without an id, dedupe ids, clamp `color` to 1-10,
    keep a blank name (shown as "Unnamed kind"). An empty list `[]` is kept and
    means "no kinds", which is different from absent (the starters).
-3. `useStore.ts`: `addRelationship`, `updateRelationship`, `removeRelationship`;
+3. `useStore.ts`: `relationshipKindsDefault` (+ `partialize`),
+   `setRelationshipKindsDefault`, `fillKindsFromDefault`, and the default copied
+   in wherever `authorDefault` is; `addRelationship`, `updateRelationship`,
+   `removeRelationship`;
    `addKind`, `updateKind`, `removeKind` (the first kind edit writes the
    starters out as the stored list; `removeKind` clears `kind` on the
    relationships that used it).
@@ -189,10 +215,9 @@ See the report in the session; repeated here so they stay with the plan.
 1. Static map, or track change over the story ("rival from Ch 3")? Changes would
    tie relationships to chapters, which fork per version: a much bigger change.
    Proposal: static first.
-2. Kinds are now editable per project, starting from Family, Friend, Romance,
-   Mentor, Rival, Other. Is that the right starter set? And should there also
-   be a personal default for new projects (like Author details' saved
-   default), or is per project enough?
+2. Kinds are editable per project, with a saved default for new projects
+   (decided). Is Family, Friend, Romance, Mentor, Rival, Other the right
+   starter set for when no default is saved?
 3. Chart in the drawer (proposed), or a third main view beside Board / Timeline?
 4. Ring in roster order with no saved layout (proposed; rearranging cards then
    arranges the ring), or drag characters on the chart and remember where?
