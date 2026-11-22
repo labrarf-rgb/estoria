@@ -194,6 +194,22 @@ where it was written, because the log is grow-only).
 - `.txt`: the same, upper-cased headings.
 - The map export (`markdown.ts`) names pieces and kinds instead of chapters.
 
+### 4.8 Regular books: unchanged
+
+Everything above applies only when `form` is `"anthology"`. An ordinary book
+(standalone or in a series) keeps its board, numbered chapters, acts, chapter
+links, Timeline, chapter modal, templates and its "Chapter N. Title" export,
+with no setting or layout change. The per-chapter lookups fall back to the
+book's own `kind` and `keepLineBreaks`, and a book's chapters never carry the
+new fields, so they read exactly as today. The only things a book user can see:
+
+- **File menu:** one new entry on a standalone book, *Make this an anthology…*
+  (opt-in, saves a copy first).
+- **Books expanded from a poem as "one longer work"** show the tag **Epic**
+  where they showed "Long poem". Wording only.
+- **Old "collection" books** (expanded before this) stay ordinary books until
+  you choose *Make this an anthology…*. Nothing converts on its own.
+
 ## 5. Touch points (for the build)
 
 | Area | Change |
