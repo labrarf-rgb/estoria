@@ -1,7 +1,9 @@
 # Plan: every detail card looks and opens like a chapter card
 
-Status: **PLAN ONLY.** Ray chose option B and "everywhere" on 2026-11-21 and is
-confirming against the mockup. No feature code yet.
+Status: **BUILT 2026-11-22** on this branch, waiting for Ray's local test.
+Ray chose option B, everywhere, and confirmed the mockup and both defaults
+(window centred over everything; List / Cards switch removed everywhere).
+See SPECS §4 "Detail cards look and open like chapter cards".
 Branch: `claude/detail-cards-style-5424f7` (worktree), not pushed.
 Mockup: [`docs/mockups/detail-cards.html`](mockups/detail-cards.html) (option B
 everywhere, both drawer sizes, each with a card opened).
@@ -24,6 +26,7 @@ Rejected: option A (chapter look, but still expanding in place).
 | Notes library (`NotesPanel.tsx` via `RefList`) | list or cards (switch), expand in list | tiles, open in a window; no switch |
 | World entry references (`RefList` in the world window) | list or cards (switch) | tiles inside the entry's window |
 | Chapter pinned references (`RefList` in `ChapterDetail.tsx`) | list or cards (switch) | tiles, open in a window over the chapter |
+| Anthology piece's Pinned tab (same `ChapterDetail`) | list or cards (switch) | tiles, as a chapter |
 | Story notes box, chapter cast and world chips | | unchanged |
 
 ## The card face (one shared component)

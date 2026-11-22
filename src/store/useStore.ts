@@ -88,7 +88,6 @@ import {
 import { TEMPLATES } from "@/lib/templates";
 import { downloadProjectFile, normalizeDoc, reconcileWords, zustandStorage } from "@/store/persistence";
 import { markHydrated } from "@/store/hydration";
-import type { RefView } from "@/components/ui/ViewToggle";
 
 export type View = "board" | "timeline";
 export type Theme = "light" | "dark";
@@ -204,8 +203,6 @@ interface UiState {
   chapterTab: ChapterTab | null;
   /** Which of the chapter's two modals opens (persisted, global). See `ChapterMode`. */
   chapterMode: ChapterMode;
-  /** Card-vs-list view for reference lists (persisted, global across surfaces). */
-  refView: RefView;
   /** Tall/short state per expandable-textarea surface (persisted, global). */
   textareaExpanded: Record<TextareaKey, boolean>;
   /**
@@ -560,7 +557,6 @@ interface StoreState extends UiState {
   setChapterTab: (tab: ChapterTab | null) => void;
   /** Swap the open chapter between its story map and its manuscript. */
   setChapterMode: (mode: ChapterMode) => void;
-  setRefView: (view: RefView) => void;
   toggleTextarea: (key: TextareaKey) => void;
   setSceneFlowExpanded: (expanded: boolean) => void;
   setManuscriptExpanded: (expanded: boolean) => void;
@@ -844,7 +840,6 @@ const initialUi: UiState = {
   scenesCollapsed: false,
   chapterTab: null,
   chapterMode: "map",
-  refView: "list",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
   sceneFlowExpanded: true,
   manuscriptExpanded: true,
@@ -2796,7 +2791,6 @@ export const useStore = create<StoreState>()(
       // shows and hides — the behaviour the collapsible sections had.
       setChapterTab: (tab) => set((s) => ({ chapterTab: s.chapterTab === tab ? null : tab })),
       setChapterMode: (mode) => set({ chapterMode: mode }),
-      setRefView: (view) => set({ refView: view }),
       toggleTextarea: (key) =>
         set((s) => ({
           textareaExpanded: { ...s.textareaExpanded, [key]: !s.textareaExpanded[key] },
@@ -2892,7 +2886,6 @@ export const useStore = create<StoreState>()(
         scenesCollapsed: s.scenesCollapsed,
         chapterTab: s.chapterTab,
         chapterMode: s.chapterMode,
-        refView: s.refView,
         textareaExpanded: s.textareaExpanded,
         sceneFlowExpanded: s.sceneFlowExpanded,
         manuscriptExpanded: s.manuscriptExpanded,

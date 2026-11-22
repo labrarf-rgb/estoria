@@ -5,7 +5,6 @@ import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { resolveRefs } from "@/lib/refs";
-import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_H, SCENE_MARGIN, sceneColumnsForWidth, sceneFit, sceneSlotAt, sceneSlotPos } from "@/lib/layout";
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
@@ -74,8 +73,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const toggleScenesCollapsed = useStore((s) => s.toggleScenesCollapsed);
   const tab = useStore((s) => s.chapterTab);
   const setTab = useStore((s) => s.setChapterTab);
-  const refView = useStore((s) => s.refView);
-  const setRefView = useStore((s) => s.setRefView);
   // A piece's canvas fills the page, so it is always the wide one and has no
   // size control. Keeps the layout read here in step with `wideScenes` in the
   // store, which every write uses.
@@ -787,10 +784,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 </button>
               );
             })}
-            <div className="flex-1" />
-            {/* The refs list's card/list control. It belongs to one tab, so it
-                only appears with that tab open. */}
-            {tab === "refs" && <ViewToggle view={refView} onChange={setRefView} />}
           </div>
 
           {tab === "chars" && (() => {
@@ -944,6 +937,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             <div className="px-[26px] pb-[16px]">
               <RefList
                 refs={resolveRefs(ch.refs, doc.assets)}
+                tileMin={200}
                 onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
                 // Content edits write through to the shared asset this ref links.
                 // The store resolves ref → asset, so a burst of typing right after
@@ -959,9 +953,9 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   // Not a delete — the button must not say one.
                   confirmLabel: "Remove",
                 })}
+                removeLabel={`Remove from this ${unit}`}
                 onLink={() => setLinkOpen((v) => !v)}
                 linkLabel="Link book asset"
-                view={refView}
               />
               {linkOpen && (
                 <AssetLinkPicker

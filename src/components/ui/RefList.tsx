@@ -3,10 +3,10 @@ import { useStore, type ConfirmRequest } from "@/store/useStore";
 import { readImageForStorage } from "@/lib/files";
 import { isAssetEmpty } from "@/lib/prune";
 import { uid } from "@/lib/ids";
-import { ARCHIVED_DIM } from "@/components/ui/ArchiveShelf";
 import type { RefKind, TodoItem } from "@/types";
 import type { ResolvedRef } from "@/lib/refs";
-import type { RefView } from "@/components/ui/ViewToggle";
+import { DetailCard, EmptyBody, InkBadge, TileGrid } from "@/components/ui/DetailCard";
+import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
 
 /**
  * Editable collection of pinned references — notes, uploadable images, and (since
@@ -36,38 +36,24 @@ import type { RefView } from "@/components/ui/ViewToggle";
  * written to the document, and the commit doesn't remount the field being typed
  * into.
  *
- * `onReorder` turns on ordering: a grip to drag rows into place in list view, and
- * a typed position number in both views. Both live at the head of the row/cell,
- * so the two ways to move something sit together. Each surface owns its own order
- * (a chapter's pin order is not the library's), so the caller decides what moving
- * means — see `reorderAsset` / `reorderChapterRef` / `reorderWorldRef`.
+ * `onReorder` turns on ordering: a grip to drag tiles into place, and a typed
+ * position number that is the tile's badge (the library and every pin list
+ * already have an order, so the position takes the chapter number's place).
+ * Each surface owns its own order (a chapter's pin order is not the library's),
+ * so the caller decides what moving means: see `reorderAsset` /
+ * `reorderChapterRef` / `reorderWorldRef`.
  *
- * Two layouts, chosen by `view`:
- *  - "card": a wrap grid of fixed-size cells (default).
- *  - "list": compact rows you click to expand into an inline detail editor.
- * Images open in the lightbox.
+ * Layout (since the detail-card restyle, 2026-11-22): every item is a
+ * chapter-style `DetailCard` tile, one column where it's narrow or a grid of
+ * tiles at least `tileMin` px wide where there's room. A tile never edits:
+ * clicking it opens the item in a `DetailWindow`, which holds the title, the
+ * note / checklist / picture, the caller's `extra` (the library's "Pinned in")
+ * and the remove controls. The old list / card switch is gone.
  */
-const DISCARD_BTN =
-  "self-start rounded-lg border border-rule px-[10px] py-[5px] text-[11.5px] font-medium text-soft hover:border-faint hover:text-but";
-
-/** Compact variant — a card cell is only 150px tall, so no border/padding. */
-const DISCARD_LINK = "self-start shrink-0 text-[10.5px] font-medium text-faint hover:text-but";
-
-const DESTROY_BTN =
-  "self-start rounded-lg border border-rule px-[10px] py-[5px] text-[11.5px] font-medium text-soft hover:border-faint hover:text-but";
-
-/**
- * Card cells are a fixed 164x150, so the destroy controls take over the caption's
- * line on hover rather than adding one: words, but only on the card you're
- * pointing at — 13 permanent "Delete" labels in a grid is just noise.
- */
-const DESTROY_ROW = "hidden shrink-0 items-center gap-[8px] group-hover:flex";
-const DESTROY_WORD = "text-[10.5px] font-medium text-faint hover:text-but";
-
 const ADD_BTN =
   "rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-faint";
 
-const ICON: Record<RefKind, string> = { IMAGE: "🖼", NOTE: "📝", TODO: "☑" };
+const KIND_WORD: Record<RefKind, string> = { IMAGE: "Image", NOTE: "Note", TODO: "To-do" };
 
 const untitled = (kind: RefKind) =>
   kind === "IMAGE" ? "Untitled image" : kind === "TODO" ? "Untitled list" : "Untitled note";
@@ -94,9 +80,10 @@ export function RefList({
   archivePrompt,
   caption,
   extra,
-  view = "list",
+  tileMin,
   idPrefix = "r",
   removeMode = "detach",
+  removeLabel = "Remove from here",
   onReorder,
 }: {
   refs: ResolvedRef[];
@@ -127,10 +114,13 @@ export function RefList({
   archivePrompt?: (r: ResolvedRef) => Omit<ConfirmRequest, "onConfirm">;
   /** Optional small muted line under each item (e.g. "Linked in 3 places"). */
   caption?: (r: ResolvedRef) => string | undefined;
-  /** Optional extra content inside an expanded row (e.g. the pin list). */
+  /** Optional extra content inside an item's window (e.g. the pin list). */
   extra?: (r: ResolvedRef) => React.ReactNode;
-  view?: RefView;
-  /** Enables ordering — grip-drag (list view) and a typed position (both views). */
+  /** Lay tiles out in a grid of at least this many px each; omitted, one column. */
+  tileMin?: number;
+  /** The detach button's words in the window (e.g. "Remove from this chapter"). */
+  removeLabel?: string;
+  /** Enables ordering: grip-drag and a typed position (the tile's badge). */
   onReorder?: (id: string, toIdx: number) => void;
 }) {
   const openLightbox = useStore((s) => s.openLightbox);
@@ -183,11 +173,11 @@ export function RefList({
    * inside a single frame would finish before anything was listening.
    */
   const startGripDrag = (id: string) => {
-    /** The row whose box the pointer is inside, if any. */
-    const rowAt = (y: number) => {
+    /** The tile whose box the pointer is inside, if any (tiles may be a grid). */
+    const rowAt = (x: number, y: number) => {
       for (const [rid, el] of rowEls.current) {
         const box = el.getBoundingClientRect();
-        if (y >= box.top && y <= box.bottom) return rid;
+        if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) return rid;
       }
       return null;
     };
@@ -197,11 +187,11 @@ export function RefList({
       endGripDrag.current = null;
     };
     const onMove = (e: MouseEvent) => {
-      const over = rowAt(e.clientY);
+      const over = rowAt(e.clientX, e.clientY);
       setOverId(over && over !== id ? over : null);
     };
     const onUp = (e: MouseEvent) => {
-      const targetId = rowAt(e.clientY);
+      const targetId = rowAt(e.clientX, e.clientY);
       detach();
       setDragId(null);
       setOverId(null);
@@ -340,18 +330,19 @@ export function RefList({
     </>
   );
 
-  /** Typed ordering: shows this item's 1-based position, commits on Enter/blur. */
-  const position = (r: ResolvedRef, compact = false) => {
-    if (!onReorder || r.id === draft?.id) return null;
+  /**
+   * The tile's badge: its 1-based position, as an input you can type a new
+   * position into when the surface is ordered (commits on Enter or blur), or
+   * plain ink otherwise. The draft has no position yet.
+   */
+  const badgeOf = (r: ResolvedRef) => {
+    if (r.id === draft?.id) return <InkBadge>New</InkBadge>;
     const idx = refs.findIndex((x) => x.id === r.id);
-    if (idx === -1) return null;
+    if (!onReorder || idx === -1) return <InkBadge>{String(idx + 1).padStart(2, "0")}</InkBadge>;
     return (
-      <PositionInput
-        index={idx}
-        total={refs.length}
-        compact={compact}
-        onCommit={(to) => onReorder(r.id, to)}
-      />
+      <span data-no-open className="shrink-0">
+        <PositionInput index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />
+      </span>
     );
   };
 
@@ -419,311 +410,195 @@ export function RefList({
     );
   };
 
-  // ── List view ──────────────────────────────────────────────────────────────
-  if (view === "list") {
-    return (
-      <div className="flex flex-col gap-[7px]">
-        {items.length === 0 && (
-          <div className="px-[2px] text-[12px] text-faint">No references yet.</div>
-        )}
-        {items.map((r) => {
-          const open = openId === r.id;
-          const isDraft = r.id === draft?.id;
-          const snippet = isDraft
-            ? "Nothing saved yet, type anything to add it"
-            : r.kind === "IMAGE"
-              ? "Image"
-              : r.kind === "TODO"
-                ? todoProgress(r.items)
-                : (r.body ?? "").trim() || "Empty note";
-          const cap = capOf(r);
-          return (
-            <div
-              key={r.id}
-              ref={(el) => {
-                // Live registry of row boxes, so a drag can hit-test rows by
-                // pointer position without measuring the whole list each move.
-                if (el) rowEls.current.set(r.id, el);
-                else rowEls.current.delete(r.id);
-              }}
-              className={`rounded-[10px] border bg-card ${
-                overId === r.id ? "border-faint" : "border-rule"
-              } ${dragId === r.id ? "opacity-50" : ""}`}
-            >
-              {/* Dim the identity line only: an archived note is still fully
-                  editable, so the expanded body below stays at full contrast. */}
-              <div
-                className={`group flex items-center gap-[10px] px-[12px] py-[9px] ${r.archived ? ARCHIVED_DIM : ""}`}
-              >
-                {onReorder && !isDraft && (
-                  <span
-                    // The grip is the only drag handle: text selection inside an
-                    // expanded row can never turn into a reorder.
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      startGripDrag(r.id);
-                    }}
-                    // Padded well past the glyph — a bare 8px dot-grid is a
-                    // fiddly thing to catch with a pointer.
-                    className={`-my-[6px] -ml-[4px] flex h-[28px] w-[20px] shrink-0 select-none items-center justify-center text-[12px] leading-none text-faint hover:text-soft ${
-                      dragId === r.id ? "cursor-grabbing" : "cursor-grab"
-                    }`}
-                    title="Drag to reorder"
-                  >
-                    ⠿
-                  </span>
-                )}
-                {/* The number sits with the grip, left of the icon: both views
-                    now lead with position, and the two ordering controls read as
-                    one pair instead of sitting at opposite ends of the row. */}
-                {position(r)}
-                {/* The draft row has neither grip nor number — without this it
-                    would hang left of every saved row above it. */}
-                {onReorder && isDraft && <span className="w-[56px] shrink-0" />}
-                <span className="text-[13px]">{ICON[r.kind]}</span>
-                <button
-                  onClick={() => setOpenId(open ? null : r.id)}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div
-                    className={`truncate text-[12.5px] font-semibold ${isDraft ? "text-faint" : "text-ink"}`}
-                  >
-                    {r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind))}
-                  </div>
-                  <div className="truncate text-[11.5px] text-soft">{snippet}</div>
-                  {cap && <div className="truncate text-[10.5px] text-faint">{cap}</div>}
-                </button>
-                <button
-                  onClick={() => setOpenId(open ? null : r.id)}
-                  className="text-[12px] font-medium text-faint"
-                  title={open ? "Collapse" : "Expand"}
-                >
-                  {open ? "▴" : "▾"}
-                </button>
-              </div>
-              {open && (
-                <div className="flex flex-col gap-[9px] border-t border-rule px-[12px] py-[11px]">
-                  <div className="flex items-center gap-[8px]">
-                    <input
-                      value={r.label}
-                      onChange={(e) => update(r.id, { label: e.target.value })}
-                      placeholder={
-                        r.kind === "IMAGE"
-                          ? "Image title"
-                          : r.kind === "TODO"
-                            ? "List title"
-                            : "Note title"
-                      }
-                      className="min-w-0 flex-1 rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] font-semibold text-ink outline-none focus:border-faint"
-                    />
-                    {(isDraft || removeMode === "detach") && (
-                      <button
-                        onClick={() => confirmDelete(r)}
-                        className="shrink-0 text-[12px] text-faint hover:text-but"
-                        title={isDraft ? "Discard" : "Remove from here"}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                  {r.kind === "IMAGE" ? (
-                    r.src ? (
-                      <button
-                        onClick={() => openLightbox(r.src!)}
-                        className="block max-h-[220px] overflow-hidden rounded-[10px] border border-rule"
-                        title="Click to view"
-                      >
-                        <img src={r.src} alt={r.label} className="max-h-[220px] w-full object-cover" />
-                      </button>
-                    ) : (
-                      <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-[1.5px] border-dashed border-line py-[18px] text-center text-[11px] font-medium text-faint hover:border-faint hover:text-ink">
-                        Upload image
-                        <span className="text-[10px]">click to browse</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => upload(r.id, e.target.files?.[0])}
-                        />
-                      </label>
-                    )
-                  ) : r.kind === "TODO" ? (
-                    checklist(r)
-                  ) : (
-                    <textarea
-                      value={r.body ?? ""}
-                      onChange={(e) => update(r.id, { body: e.target.value })}
-                      placeholder="Note..."
-                      rows={4}
-                      className="w-full resize-y rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.55] text-ink outline-none focus:border-faint"
-                    />
-                  )}
-                  {!isDraft && extra?.(r)}
-                  {/* Same escape hatch the draft character/world cards offer. */}
-                  {isDraft && (
-                    <button onClick={() => setDraft(null)} className={DISCARD_BTN}>
-                      Discard
-                    </button>
-                  )}
-                  {/* Irreversible, so it gets a word — like "Delete character". */}
-                  {!isDraft && removeMode === "destroy" && (
-                    <div className="flex items-center gap-[8px]">
-                      {onArchive && (
-                        <button onClick={() => confirmArchive(r)} className={DESTROY_BTN}>
-                          Archive
-                        </button>
-                      )}
-                      <button onClick={() => confirmDelete(r)} className={DESTROY_BTN}>
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <div className="mt-[2px] grid grid-cols-2 gap-[7px] sm:grid-cols-4">{addButtons()}</div>
-      </div>
-    );
-  }
+  const openItem = items.find((r) => r.id === openId) ?? null;
+  const openIsDraft = !!openItem && openItem.id === draft?.id;
+  /** Closing an untouched draft drops it: there was nothing to keep. */
+  const closeWindow = () => {
+    if (openIsDraft) setDraft(null);
+    setOpenId(null);
+  };
 
-  // ── Card view ────────────────────────────────────────────────────────────────
-  const CELL = "w-[164px] h-[150px]";
+  /** What the tile shows under the title: the note, the open tasks, the picture. */
+  const bodyOf = (r: ResolvedRef) => {
+    if (r.id === draft?.id) return <EmptyBody>Nothing saved yet, type anything to add it</EmptyBody>;
+    if (r.kind === "IMAGE")
+      return r.src ? (
+        <img src={r.src} alt={r.label} className="h-[64px] w-full rounded-lg border border-rule object-cover" />
+      ) : (
+        <EmptyBody>No image yet</EmptyBody>
+      );
+    if (r.kind === "TODO") {
+      const list = itemsOf(r);
+      const open = list.filter((i) => !i.done && i.text.trim());
+      if (open.length) return open.map((i) => i.text.trim()).join(" · ");
+      return <EmptyBody>{list.length ? "All done" : "No tasks yet"}</EmptyBody>;
+    }
+    return (r.body ?? "").trim() || <EmptyBody>Empty note</EmptyBody>;
+  };
 
   return (
-    <div className="flex flex-wrap gap-3">
-      {items.map((r) =>
-        r.kind === "IMAGE" ? (
-          <div key={r.id} className={`group relative flex flex-col ${CELL}`}>
-            {r.src ? (
-              <button
-                onClick={() => openLightbox(r.src!)}
-                className="block w-full flex-1 overflow-hidden rounded-[11px] border border-rule"
-                title="Click to view"
-              >
-                <img src={r.src} alt={r.label} className="h-full w-full object-cover" />
-              </button>
-            ) : (
-              <label className="flex w-full flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-[11px] border-[1.5px] border-dashed border-line text-center text-[11px] font-medium text-faint hover:border-faint hover:text-ink">
-                Upload image
-                <span className="text-[10px]">click to browse</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => upload(r.id, e.target.files?.[0])}
-                />
-              </label>
-            )}
-            <div className="mt-[5px] flex shrink-0 items-center gap-[5px]">
-              {position(r, true)}
-              <input
-                value={r.label}
-                onChange={(e) => update(r.id, { label: e.target.value })}
-                className="h-[20px] min-w-0 flex-1 bg-transparent text-[11.5px] font-medium text-ink outline-none"
-              />
-            </div>
-            {capOf(r) && (
+    <div className="flex flex-col gap-[9px]">
+      {items.length === 0 && <div className="px-[2px] text-[12px] text-faint">No references yet.</div>}
+      {items.length > 0 && (
+        <TileGrid min={tileMin}>
+          {items.map((r) => {
+            const isDraft = r.id === draft?.id;
+            return (
               <div
-                className={`shrink-0 truncate text-[10.5px] text-faint ${
-                  removeMode === "destroy" ? "group-hover:hidden" : ""
-                }`}
+                key={r.id}
+                ref={(el) => {
+                  // Live registry of tile boxes, so a drag can hit-test tiles by
+                  // pointer position without measuring the whole list each move.
+                  if (el) rowEls.current.set(r.id, el);
+                  else rowEls.current.delete(r.id);
+                }}
+                className="flex"
               >
-                {capOf(r)}
+                <div className="min-w-0 flex-1">
+                  <DetailCard
+                    onOpen={() => setOpenId(r.id)}
+                    minHeight={tileMin ? (tileMin < 200 ? 120 : 142) : 0}
+                    grip={
+                      onReorder && !isDraft ? (
+                        <span
+                          data-no-open
+                          // The grip is the only drag handle, so a click anywhere
+                          // else on the tile always opens it.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            startGripDrag(r.id);
+                          }}
+                          // Padded well past the glyph: a bare 8px dot-grid is a
+                          // fiddly thing to catch with a pointer.
+                          className={`-my-[4px] -ml-[4px] flex h-[26px] w-[18px] shrink-0 select-none items-center justify-center text-[12px] leading-none text-faint hover:text-soft ${
+                            dragId === r.id ? "cursor-grabbing" : "cursor-grab"
+                          }`}
+                          title="Drag to reorder"
+                        >
+                          ⠿
+                        </span>
+                      ) : undefined
+                    }
+                    badge={badgeOf(r)}
+                    tag={KIND_WORD[r.kind]}
+                    title={r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind))}
+                    untitled={!r.label}
+                    body={bodyOf(r)}
+                    meta={[r.kind === "TODO" && !isDraft ? todoProgress(r.items) : null, capOf(r)]}
+                    dim={r.archived}
+                    highlight={overId === r.id}
+                    faded={dragId === r.id || isDraft}
+                  />
+                </div>
               </div>
-            )}
-            {r.id === draft?.id && (
-              <button onClick={() => setDraft(null)} className={DISCARD_LINK}>
-                Discard
-              </button>
-            )}
-            {r.id !== draft?.id && removeMode === "destroy" && (
-              <div className={DESTROY_ROW}>
-                {onArchive && (
-                  <button onClick={() => confirmArchive(r)} className={DESTROY_WORD}>
-                    Archive
-                  </button>
-                )}
-                <button onClick={() => confirmDelete(r)} className={DESTROY_WORD}>
-                  Delete
-                </button>
-              </div>
-            )}
-            {(r.id === draft?.id || removeMode === "detach") && (
-              <button
-                onClick={() => confirmDelete(r)}
-                className="absolute right-[5px] top-[5px] hidden h-[20px] w-[20px] items-center justify-center rounded-md bg-black/45 text-[11px] text-white group-hover:flex"
-                title={r.id === draft?.id ? "Discard" : "Remove from here"}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ) : (
-          <div
-            key={r.id}
-            className={`group relative flex flex-col gap-[6px] rounded-[11px] border border-rule bg-card p-[11px] shadow-[var(--shadow)] ${CELL}`}
-          >
-            <div className="flex shrink-0 items-center gap-[5px]">
-              {position(r, true)}
-              <input
-                value={r.label}
-                onChange={(e) => update(r.id, { label: e.target.value })}
-                placeholder={r.kind === "TODO" ? "List title" : "Note title"}
-                className="min-w-0 flex-1 bg-transparent text-[12.5px] font-semibold text-ink outline-none placeholder:text-faint"
-              />
-            </div>
-            {r.kind === "TODO" ? (
-              <div className="min-h-0 flex-1 overflow-auto">{checklist(r, true)}</div>
-            ) : (
-              <textarea
-                value={r.body ?? ""}
-                onChange={(e) => update(r.id, { body: e.target.value })}
-                placeholder="Note..."
-                className="flex-1 resize-none bg-transparent text-[12px] leading-[1.45] text-soft outline-none placeholder:text-faint"
-              />
-            )}
-            {capOf(r) && (
-              <div
-                className={`shrink-0 truncate text-[10.5px] text-faint ${
-                  removeMode === "destroy" ? "group-hover:hidden" : ""
-                }`}
-              >
-                {capOf(r)}
-              </div>
-            )}
-            {r.id === draft?.id && (
-              <button onClick={() => setDraft(null)} className={DISCARD_LINK}>
-                Discard
-              </button>
-            )}
-            {r.id !== draft?.id && removeMode === "destroy" && (
-              <div className={DESTROY_ROW}>
-                {onArchive && (
-                  <button onClick={() => confirmArchive(r)} className={DESTROY_WORD}>
-                    Archive
-                  </button>
-                )}
-                <button onClick={() => confirmDelete(r)} className={DESTROY_WORD}>
-                  Delete
-                </button>
-              </div>
-            )}
-            {(r.id === draft?.id || removeMode === "detach") && (
-              <button
-                onClick={() => confirmDelete(r)}
-                className="absolute right-[7px] top-[7px] hidden text-[12px] text-faint hover:text-but group-hover:block"
-                title={r.id === draft?.id ? "Discard" : "Remove from here"}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )
+            );
+          })}
+        </TileGrid>
       )}
+      <div className="grid grid-cols-2 gap-[7px] sm:grid-cols-4">{addButtons()}</div>
 
-      <div className={`flex flex-col justify-center gap-[6px] ${CELL}`}>{addButtons()}</div>
+      {openItem && (
+        <DetailWindow
+          onClose={closeWindow}
+          badge={
+            <>
+              {openIsDraft ? (
+                <InkBadge>New</InkBadge>
+              ) : (
+                <InkBadge>{String(refs.findIndex((x) => x.id === openItem.id) + 1).padStart(2, "0")}</InkBadge>
+              )}
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
+                {KIND_WORD[openItem.kind]}
+              </span>
+            </>
+          }
+          title={openItem.label || (openIsDraft ? newLabel(openItem.kind) : untitled(openItem.kind))}
+          untitled={!openItem.label}
+          footer={
+            openIsDraft ? (
+              // Same escape hatch the draft character and world windows offer.
+              <>
+                <WindowButton onClick={() => confirmDelete(openItem)} danger>
+                  Discard
+                </WindowButton>
+                <span className="text-[11.5px] text-faint">Nothing saved yet, type anything to add it</span>
+              </>
+            ) : removeMode === "destroy" ? (
+              // Irreversible, so it gets a word, like "Delete character".
+              <>
+                {onArchive && <WindowButton onClick={() => confirmArchive(openItem)}>Archive</WindowButton>}
+                <WindowButton onClick={() => confirmDelete(openItem)} danger>
+                  Delete
+                </WindowButton>
+                {openItem.archived && <span className="text-[11.5px] text-faint">Archived</span>}
+              </>
+            ) : (
+              // Detach: takes it off this surface only.
+              <>
+                <WindowButton onClick={() => confirmDelete(openItem)}>{removeLabel}</WindowButton>
+                <span className="text-[11.5px] text-faint">
+                  {openItem.archived ? "Archived · " : ""}It stays in the shared library.
+                </span>
+              </>
+            )
+          }
+        >
+          <div className="flex flex-col gap-[12px]">
+            <div>
+              <div className="mb-[5px] text-[10px] font-semibold uppercase tracking-wide text-faint">Title</div>
+              <input
+                autoFocus={openIsDraft && openItem.kind !== "IMAGE"}
+                value={openItem.label}
+                onChange={(e) => update(openItem.id, { label: e.target.value })}
+                placeholder={
+                  openItem.kind === "IMAGE" ? "Image title" : openItem.kind === "TODO" ? "List title" : "Note title"
+                }
+                className="w-full rounded-lg border border-rule bg-card px-[9px] py-[6px] text-[12.5px] font-semibold text-ink outline-none placeholder:text-faint focus:border-faint"
+              />
+            </div>
+            {openItem.kind === "IMAGE" ? (
+              openItem.src ? (
+                <button
+                  onClick={() => openLightbox(openItem.src!)}
+                  className="block overflow-hidden rounded-[10px] border border-rule"
+                  title="Click to view"
+                >
+                  <img src={openItem.src} alt={openItem.label} className="max-h-[360px] w-full object-contain" />
+                </button>
+              ) : (
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-[1.5px] border-dashed border-line py-[28px] text-center text-[11.5px] font-medium text-faint hover:border-faint hover:text-ink">
+                  Upload image
+                  <span className="text-[10.5px]">click to browse</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => upload(openItem.id, e.target.files?.[0])}
+                  />
+                </label>
+              )
+            ) : openItem.kind === "TODO" ? (
+              <div>
+                <div className="mb-[6px] text-[10px] font-semibold uppercase tracking-wide text-faint">Tasks</div>
+                {checklist(openItem)}
+              </div>
+            ) : (
+              <div>
+                <div className="mb-[5px] text-[10px] font-semibold uppercase tracking-wide text-faint">Note</div>
+                <textarea
+                  value={openItem.body ?? ""}
+                  onChange={(e) => update(openItem.id, { body: e.target.value })}
+                  placeholder="Note..."
+                  rows={8}
+                  className="w-full resize-y rounded-lg border border-rule bg-card px-[9px] py-[6px] text-[12.5px] leading-[1.55] text-ink outline-none placeholder:text-faint focus:border-faint"
+                />
+              </div>
+            )}
+            {!openIsDraft && extra?.(openItem)}
+          </div>
+        </DetailWindow>
+      )}
     </div>
   );
 }
@@ -736,16 +611,15 @@ export function RefList({
 function PositionInput({
   index,
   total,
-  compact,
   onCommit,
 }: {
   index: number;
   total: number;
-  compact?: boolean;
   onCommit: (toIdx: number) => void;
 }) {
   const [typed, setTyped] = useState<string | null>(null);
-  const shown = typed ?? String(index + 1);
+  // Shown like a chapter number ("03") at rest; editing shows what's typed.
+  const shown = typed ?? String(index + 1).padStart(2, "0");
   const commit = () => {
     if (typed === null) return;
     const n = parseInt(typed, 10);
@@ -765,11 +639,12 @@ function PositionInput({
         }
         if (e.key === "Escape") setTyped(null);
       }}
+      onFocus={(e) => e.target.select()}
       onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
       title={`Position ${index + 1} of ${total}, type a number to move it`}
-      className={`shrink-0 rounded-md border border-rule bg-panel text-center font-mono font-medium text-soft outline-none focus:border-faint focus:text-ink ${
-        compact ? "h-[18px] w-[24px] text-[10px]" : "h-[22px] w-[30px] text-[11px]"
-      }`}
+      aria-label={`Position ${index + 1} of ${total}`}
+      className="h-[20px] w-[32px] shrink-0 rounded-md border border-transparent bg-ink text-center font-mono text-[11px] font-semibold text-bg outline-none hover:border-faint focus:border-ink focus:bg-card focus:text-ink"
     />
   );
 }

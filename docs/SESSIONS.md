@@ -6360,3 +6360,34 @@ prompt), and try Draft done on a copy of a book first.
 - **Verified:** typecheck, 294 tests. Built on `feature/anthology-map-export`
   (worktree), merged into main on Ray's OK, pushed, then shipped with
   `npm run deploy`.
+
+
+### 2026-11-22 — Detail cards look and open like chapter cards
+
+- **What Ray chose** (planned in this branch's earlier commits; mockup
+  `docs/mockups/detail-cards.html`, plan `docs/PLAN-detail-cards.md`):
+  option B, everywhere. Every record is a tile with the board chapter card's
+  face, and a click opens it in a window instead of expanding it in the list.
+  Covers Characters, World, the Notes library, a world entry's References and
+  a chapter's (and an anthology piece's) Pinned references. The window opens
+  centred over everything, and the List / Cards switch is removed everywhere.
+- **New:** `ui/DetailCard.tsx` (the tile, plus `TileGrid`, `AddTile` and the
+  badges) and `ui/DetailWindow.tsx` (the portalled window: z 65, stacking,
+  Escape closes the top one only). `CharactersPanel` and `WorldPanel` render
+  tiles (one column collapsed, a 230px grid expanded) and move their field
+  blocks, unchanged, into `CharacterWindow` / `WorldWindow`. `RefList` lost its
+  list and card views for tiles plus a window; its grip drag now hit-tests in
+  x and y (tiles can be a grid) and its typed position is the tile's badge.
+  `ViewToggle.tsx` and the `refView` preference are deleted. Library tiles say
+  "N pins" (the window lists where).
+- **Room for what's next:** the tile's `grip` and `position` slots for the
+  rearranging plan, and a marked spot in the character window for the
+  relationship chart's field (under Appears in).
+- **Verified** in the in-app browser on the sample, both drawer sizes: tiles,
+  open / close (✕, backdrop, Escape), new-draft focus and commit, closing an
+  untouched draft, stacked windows (a world reference over its entry),
+  grip drag and typed position on tiles, Notes at both sizes, a chapter's
+  pins with "Remove from this chapter", "+ Create new character" from inside a
+  chapter, and an anthology piece's Pinned tab. Typecheck, 294 tests,
+  production build. Not pushed or deployed; Ray tests locally first.
+

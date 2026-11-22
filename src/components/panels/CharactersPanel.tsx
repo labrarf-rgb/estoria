@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
+import { DetailCard, EmptyBody, InitialsBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
+import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
 import { countCharacterCastings } from "@/lib/entities";
 import type { Character } from "@/types";
 
@@ -16,7 +17,7 @@ export function CharactersPanel() {
   const archiveCharacter = useStore((s) => s.archiveCharacter);
   const unarchiveCharacter = useStore((s) => s.unarchiveCharacter);
   const askConfirm = useStore((s) => s.askConfirm);
-  // The blank card from "+ Add character" — not a character yet (see the store).
+  // The blank card from "+ Add character": not a character yet (see the store).
   const draft = useStore((s) => s.charDraft);
   const startDraft = useStore((s) => s.startCharDraft);
   const updateDraft = useStore((s) => s.updateCharDraft);
@@ -24,21 +25,6 @@ export function CharactersPanel() {
   const panelExpanded = useStore((s) => s.panelExpanded);
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
-
-  // Scroll the selected character's card into view whenever the selection
-  // changes — e.g. after "+ Create new character" from the chapter modal, which
-  // opens this panel and selects the (last-in-list) new character; without this
-  // its input fields sit below the fold on a long roster.
-  const selCardRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    // `nearest` so we only scroll when the selected card isn't already fully in
-    // view: after "+ Add character" the new (expanded, taller-than-panel) card
-    // is off-screen, so its top edge aligns just under the sticky header
-    // (`scroll-mt` clears the bar). But manually expanding an already-visible
-    // card — or reopening the panel onto one — leaves the scroll untouched,
-    // instead of yanking every selection to the top as `start` would.
-    if (show && sel) selCardRef.current?.scrollIntoView({ block: "nearest" });
-  }, [show, sel]);
 
   if (!show) return null;
   const close = () => setPanel("showChars", false);
@@ -48,14 +34,23 @@ export function CharactersPanel() {
   // place they're listed until restored.
   const roster = doc.characters.filter((c) => !c.archived);
   const archived = doc.characters.filter((c) => c.archived);
+  // The draft tile sits last, exactly where it lands once committed, so the
+  // window open on it keeps the same id and never remounts mid-typing.
+  const tiles = draft ? roster.concat(draft) : roster;
+  const open = tiles.find((c) => c.id === sel) ?? null;
+  const openIsDraft = !!open && open.id === draft?.id;
 
   const chapterCount = (id: string) => doc.chapters.filter((c) => c.chars.includes(id)).length;
-  /** Chapters of the loaded board this character is cast in — same scope as the
-   *  "in N chapters" line above it. */
+  /** Chapters of the loaded board this character is cast in: same scope as the
+   *  "in N chapters" line on the tile. */
   const appearsIn = (id: string) => doc.chapters.filter((c) => c.chars.includes(id));
-  /** Leave for a chapter: the panel closes on the way (see `jumpToChapter`). */
-  const jumpTo = (chapterId: string) =>
+  /** Closing the window on an untouched draft drops it: there's nothing to keep. */
+  const closeWindow = () => (openIsDraft ? discardDraft() : sel && selectChar(sel));
+  /** Leave for a chapter: the window and the panel close on the way. */
+  const jumpTo = (chapterId: string) => {
+    closeWindow();
     jumpToChapter(doc.activeBookId, doc.activeDraftId, chapterId);
+  };
 
   return (
     <Drawer
@@ -72,213 +67,241 @@ export function CharactersPanel() {
         </div>
       }
     >
-      <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
-          {/* The draft renders last, exactly where it will land once committed —
-              same id, same position, so typing doesn't remount the card. */}
-          {(draft ? roster.concat(draft) : roster).map((p) => {
-            const open = sel === p.id;
+      <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
+        <TileGrid min={panelExpanded ? 230 : undefined}>
+          {tiles.map((p) => {
             const isDraft = p.id === draft?.id;
-            const set = (patch: Partial<Character>) =>
-              isDraft ? updateDraft(patch) : updateCharacter(p.id, patch);
+            const n = chapterCount(p.id);
             return (
-              <div
+              <DetailCard
                 key={p.id}
-                ref={open ? selCardRef : undefined}
-                className="scroll-mt-[76px] rounded-[13px] border border-rule bg-card p-[14px]"
-              >
-                <div className="flex items-center gap-[11px]">
-                  <span
-                    className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"
-                    style={{ background: p.color }}
-                  >
-                    {p.initials || "?"}
-                  </span>
-                  <button onClick={() => selectChar(p.id)} className="min-w-0 flex-1 text-left">
-                    <div
-                      className={`font-serif text-[15px] font-semibold ${isDraft ? "text-faint" : "text-ink"}`}
-                    >
-                      {p.name || (isDraft ? "New character" : "Unnamed character")}
-                    </div>
-                    <div className="text-[11.5px] font-medium text-soft">
-                      {isDraft
-                        ? "Nothing saved yet, type anything to add them"
-                        : `${p.role || "No role"} · in ${chapterCount(p.id)} chapters`}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => selectChar(p.id)}
-                    className="text-[13px] font-medium text-faint"
-                  >
-                    {open ? "▴" : "▾"}
-                  </button>
-                </div>
-
-                {open && (
-                  <div className="mt-[13px] flex flex-col gap-[12px] border-t border-rule pt-[13px]">
-                    <Row>
-                      <Field label="Name" className="flex-1">
-                        <Input value={p.name} onChange={(v) => set({ name: v })} placeholder="Character name" />
-                      </Field>
-                      <Field label="Initials" className="w-[70px]">
-                        <Input value={p.initials} onChange={(v) => set({ initials: v })} placeholder="AB" />
-                      </Field>
-                    </Row>
-                    <Row>
-                      <Field label="Role" className="flex-1">
-                        <Input value={p.role} onChange={(v) => set({ role: v })} placeholder="e.g. Protagonist" />
-                      </Field>
-                      <Field label="Archetype" className="flex-1">
-                        <Input value={p.type} onChange={(v) => set({ type: v })} placeholder="e.g. Mentor" />
-                      </Field>
-                    </Row>
-                    <Field label="Description">
-                      <Area value={p.desc} onChange={(v) => set({ desc: v })} rows={2} placeholder="A one-line description of this character" />
-                    </Field>
-                    <Field label="Bio">
-                      <Area value={p.bio} onChange={(v) => set({ bio: v })} rows={2} placeholder="Backstory and background" />
-                    </Field>
-                    <Field label="Traits (comma separated)">
-                      <Input
-                        value={p.traits.join(", ")}
-                        onChange={(v) => set({ traits: splitList(v) })}
-                        placeholder="brave, guarded, curious"
-                      />
-                    </Field>
-                    <Field label="Goals (comma separated)">
-                      <Input
-                        value={p.goals.join(", ")}
-                        onChange={(v) => set({ goals: splitList(v) })}
-                        placeholder="What they're trying to achieve"
-                      />
-                    </Field>
-                    <Field label="Motivations">
-                      <Area value={p.motivations} onChange={(v) => set({ motivations: v })} rows={2} placeholder="What drives them beneath the surface" />
-                    </Field>
-                    <Row>
-                      <Field label="Wants" className="flex-1">
-                        <Area value={p.want} onChange={(v) => set({ want: v })} rows={2} placeholder="What they want" />
-                      </Field>
-                      <Field label="Needs" className="flex-1">
-                        <Area value={p.need} onChange={(v) => set({ need: v })} rows={2} placeholder="What they need" />
-                      </Field>
-                    </Row>
-                    <Field label="Notes">
-                      <Area value={p.notes} onChange={(v) => set({ notes: v })} rows={2} placeholder="Other notes about this character" />
-                    </Field>
-                    {appearsIn(p.id).length > 0 && (
-                      <Field label="Appears in">
-                        <div className="flex flex-wrap gap-[5px]">
-                          {/* Each chapter is a way in, not just a label: clicking
-                              closes this panel and opens that chapter — the same
-                              move as a note's "Pinned in" list. */}
-                          {appearsIn(p.id).map((c) => (
-                            <button
-                              key={c.id}
-                              onClick={() => jumpTo(c.id)}
-                              title={`Open ${c.title || "this chapter"}`}
-                              className="flex items-center gap-[5px] rounded-md border border-rule px-[8px] py-[2px] font-mono text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
-                            >
-                              Ch {c.num}
-                              <span className="text-[10px] text-faint">↗</span>
-                            </button>
-                          ))}
-                        </div>
-                      </Field>
-                    )}
-                    {/* Archive before Delete, matching the shared library's
-                        destroy row: the reversible action reads first. */}
-                    <div className="flex items-center gap-[8px]">
-                      {/* A draft isn't saved yet, so there's nothing to retire. */}
-                      {!isDraft && (
-                        <button
-                          onClick={() => {
-                            const n = countCharacterCastings(doc, p.id);
-                            askConfirm({
-                              message: `Archive ${p.name || "this character"}?`,
-                              // Archiving keeps everything, so this reassures
-                              // rather than warns. It says what stays, because
-                              // "archive" is the word people expect to mean loss.
-                              // The count spans versions and books, so it says
-                              // so: the card above counts the loaded board only,
-                              // and the two numbers differ often enough that an
-                              // unexplained jump reads like a bug.
-                              detail:
-                                n > 0
-                                  ? `They leave the roster but stay in the ${n} chapter${n === 1 ? "" : "s"} they appear in across your versions and books, shown dimmed. Restoring brings them back unchanged.`
-                                  : "They leave the roster and move to the archive, where you can restore them any time.",
-                              confirmLabel: "Archive",
-                              onConfirm: () => archiveCharacter(p.id),
-                            });
-                          }}
-                          className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-ink"
-                        >
-                          Archive
-                        </button>
-                      )}
-                      <button
-                        onClick={() =>
-                          // Nothing to confirm on a draft — there's nothing saved to lose.
-                          isDraft
-                            ? discardDraft()
-                            : askConfirm({
-                                message: `Delete ${p.name || "this character"}?`,
-                                detail: "They will be removed from every chapter they appear in.",
-                                danger: true,
-                                onConfirm: () => deleteCharacter(p.id),
-                              })
-                        }
-                        className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
-                      >
-                        {isDraft ? "Discard" : "Delete character"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                onOpen={() => selectChar(p.id)}
+                badge={<InitialsBadge initials={p.initials} color={p.color} />}
+                tag={isDraft ? undefined : p.role || "No role"}
+                title={p.name || (isDraft ? "New character" : "Unnamed character")}
+                untitled={!p.name}
+                faded={isDraft}
+                body={
+                  isDraft ? (
+                    <EmptyBody>Nothing saved yet, type anything to add them</EmptyBody>
+                  ) : p.desc ? (
+                    p.desc
+                  ) : (
+                    <EmptyBody>No description yet</EmptyBody>
+                  )
+                }
+                meta={isDraft ? [] : [p.type, `in ${n} chapter${n === 1 ? "" : "s"}`]}
+              />
             );
           })}
-          <button
-            onClick={startDraft}
-            disabled={!!draft}
-            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft"
-          >
+          <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
             + Add character
-          </button>
+          </AddTile>
+        </TileGrid>
 
-          <ArchiveShelf
-            blurb="Archived characters stay in the chapters they appear in, shown dimmed, but can't be cast into new ones. Restoring puts them back on the roster unchanged."
-            items={archived.map((c) => {
-              const n = countCharacterCastings(doc, c.id);
-              return {
-                id: c.id,
-                icon: (
-                  <span
-                    className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9px] font-semibold text-white"
-                    style={{ background: c.color }}
-                  >
-                    {c.initials || "?"}
-                  </span>
-                ),
-                title: c.name || "Unnamed character",
-                caption: `${c.role || "No role"} · in ${n} chapter${n === 1 ? "" : "s"}`,
-              };
-            })}
-            onRestore={(id) => unarchiveCharacter(id)}
-            onDelete={(it) => {
-              const n = countCharacterCastings(doc, it.id);
-              askConfirm({
-                message: `Delete ${it.title} for good?`,
-                detail:
-                  n > 0
-                    ? `They will be removed from the ${n} chapter${n === 1 ? "" : "s"} they still appear in, across your versions and books.`
-                    : "They aren't in any chapters.",
-                danger: true,
-                onConfirm: () => deleteCharacter(it.id),
-              });
-            }}
-          />
+        <ArchiveShelf
+          blurb="Archived characters stay in the chapters they appear in, shown dimmed, but can't be cast into new ones. Restoring puts them back on the roster unchanged."
+          items={archived.map((c) => {
+            const n = countCharacterCastings(doc, c.id);
+            return {
+              id: c.id,
+              icon: (
+                <span
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9px] font-semibold text-white"
+                  style={{ background: c.color }}
+                >
+                  {c.initials || "?"}
+                </span>
+              ),
+              title: c.name || "Unnamed character",
+              caption: `${c.role || "No role"} · in ${n} chapter${n === 1 ? "" : "s"}`,
+            };
+          })}
+          onRestore={(id) => unarchiveCharacter(id)}
+          onDelete={(it) => {
+            const n = countCharacterCastings(doc, it.id);
+            askConfirm({
+              message: `Delete ${it.title} for good?`,
+              detail:
+                n > 0
+                  ? `They will be removed from the ${n} chapter${n === 1 ? "" : "s"} they still appear in, across your versions and books.`
+                  : "They aren't in any chapters.",
+              danger: true,
+              onConfirm: () => deleteCharacter(it.id),
+            });
+          }}
+        />
       </div>
+
+      {open && (
+        <CharacterWindow
+          p={open}
+          isDraft={openIsDraft}
+          set={(patch) => (openIsDraft ? updateDraft(patch) : updateCharacter(open.id, patch))}
+          appearsIn={appearsIn(open.id)}
+          onJump={jumpTo}
+          onClose={closeWindow}
+          onArchive={() => {
+            const n = countCharacterCastings(doc, open.id);
+            askConfirm({
+              message: `Archive ${open.name || "this character"}?`,
+              // Archiving keeps everything, so this reassures rather than warns.
+              // It says what stays, because "archive" is the word people expect
+              // to mean loss. The count spans versions and books, so it says so:
+              // the tile counts the loaded board only, and the two numbers
+              // differ often enough that an unexplained jump reads like a bug.
+              detail:
+                n > 0
+                  ? `They leave the roster but stay in the ${n} chapter${n === 1 ? "" : "s"} they appear in across your versions and books, shown dimmed. Restoring brings them back unchanged.`
+                  : "They leave the roster and move to the archive, where you can restore them any time.",
+              confirmLabel: "Archive",
+              onConfirm: () => archiveCharacter(open.id),
+            });
+          }}
+          onDelete={() =>
+            // Nothing to confirm on a draft: there's nothing saved to lose.
+            openIsDraft
+              ? discardDraft()
+              : askConfirm({
+                  message: `Delete ${open.name || "this character"}?`,
+                  detail: "They will be removed from every chapter they appear in.",
+                  danger: true,
+                  onConfirm: () => deleteCharacter(open.id),
+                })
+          }
+        />
+      )}
     </Drawer>
+  );
+}
+
+/**
+ * One character, open. The fields are the ones the expanded card had, in the
+ * same order; only where they live changed (a window, not the list).
+ */
+function CharacterWindow({
+  p,
+  isDraft,
+  set,
+  appearsIn,
+  onJump,
+  onClose,
+  onArchive,
+  onDelete,
+}: {
+  p: Character;
+  isDraft: boolean;
+  set: (patch: Partial<Character>) => void;
+  appearsIn: { id: string; num: number; title: string }[];
+  onJump: (chapterId: string) => void;
+  onClose: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <DetailWindow
+      onClose={onClose}
+      badge={
+        <>
+          <InitialsBadge initials={p.initials} color={p.color} />
+          {!isDraft && p.role && (
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
+              {p.role}
+            </span>
+          )}
+        </>
+      }
+      title={p.name || (isDraft ? "New character" : "Unnamed character")}
+      untitled={!p.name}
+      footer={
+        // Archive before Delete, matching the shared library's destroy row:
+        // the reversible action reads first. A draft has nothing to retire.
+        <>
+          {!isDraft && <WindowButton onClick={onArchive}>Archive</WindowButton>}
+          <WindowButton onClick={onDelete} danger>
+            {isDraft ? "Discard" : "Delete character"}
+          </WindowButton>
+          {isDraft && (
+            <span className="text-[11.5px] text-faint">Nothing saved yet, type anything to add them</span>
+          )}
+        </>
+      }
+    >
+      <div className="flex flex-col gap-[12px]">
+        <Row>
+          <Field label="Name" className="flex-1">
+            <Input value={p.name} onChange={(v) => set({ name: v })} placeholder="Character name" autoFocus={isDraft} />
+          </Field>
+          <Field label="Initials" className="w-[70px]">
+            <Input value={p.initials} onChange={(v) => set({ initials: v })} placeholder="AB" />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Role" className="flex-1">
+            <Input value={p.role} onChange={(v) => set({ role: v })} placeholder="e.g. Protagonist" />
+          </Field>
+          <Field label="Archetype" className="flex-1">
+            <Input value={p.type} onChange={(v) => set({ type: v })} placeholder="e.g. Mentor" />
+          </Field>
+        </Row>
+        <Field label="Description">
+          <Area value={p.desc} onChange={(v) => set({ desc: v })} rows={2} placeholder="A one-line description of this character" />
+        </Field>
+        <Field label="Bio">
+          <Area value={p.bio} onChange={(v) => set({ bio: v })} rows={3} placeholder="Backstory and background" />
+        </Field>
+        <Field label="Traits (comma separated)">
+          <Input
+            value={p.traits.join(", ")}
+            onChange={(v) => set({ traits: splitList(v) })}
+            placeholder="brave, guarded, curious"
+          />
+        </Field>
+        <Field label="Goals (comma separated)">
+          <Input
+            value={p.goals.join(", ")}
+            onChange={(v) => set({ goals: splitList(v) })}
+            placeholder="What they're trying to achieve"
+          />
+        </Field>
+        <Field label="Motivations">
+          <Area value={p.motivations} onChange={(v) => set({ motivations: v })} rows={2} placeholder="What drives them beneath the surface" />
+        </Field>
+        <Row>
+          <Field label="Wants" className="flex-1">
+            <Area value={p.want} onChange={(v) => set({ want: v })} rows={2} placeholder="What they want" />
+          </Field>
+          <Field label="Needs" className="flex-1">
+            <Area value={p.need} onChange={(v) => set({ need: v })} rows={2} placeholder="What they need" />
+          </Field>
+        </Row>
+        <Field label="Notes">
+          <Area value={p.notes} onChange={(v) => set({ notes: v })} rows={2} placeholder="Other notes about this character" />
+        </Field>
+        {appearsIn.length > 0 && (
+          <Field label="Appears in">
+            <div className="flex flex-wrap gap-[5px]">
+              {/* Each chapter is a way in, not just a label: clicking closes
+                  the window and the panel and opens that chapter, the same
+                  move as a note's "Pinned in" list. */}
+              {appearsIn.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => onJump(c.id)}
+                  title={`Open ${c.title || "this chapter"}`}
+                  className="flex items-center gap-[5px] rounded-md border border-rule px-[8px] py-[2px] font-mono text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
+                >
+                  Ch {c.num}
+                  <span className="text-[10px] text-faint">↗</span>
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+        {/* The relationship chart's "Relationships" field goes here, under
+            "Appears in" (docs/PLAN-relationships.md). */}
+      </div>
+    </DetailWindow>
   );
 }
 
@@ -316,17 +339,20 @@ function Input({
   value,
   onChange,
   placeholder,
+  autoFocus,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  autoFocus?: boolean;
 }) {
   return (
     <input
+      autoFocus={autoFocus}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
+      className="w-full rounded-lg border border-rule bg-card px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
     />
   );
 }
@@ -348,7 +374,7 @@ function Area({
       onChange={(e) => onChange(e.target.value)}
       rows={rows}
       placeholder={placeholder}
-      className="w-full resize-none rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
+      className="w-full resize-y rounded-lg border border-rule bg-card px-[9px] py-[6px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
     />
   );
 }

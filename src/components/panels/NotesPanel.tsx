@@ -2,7 +2,6 @@ import { useStore } from "@/store/useStore";
 import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { RefList, todoProgress } from "@/components/ui/RefList";
-import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { countAllAssetLinks, findAssetPins, type AssetPin } from "@/lib/refs";
 import { isPiece } from "@/lib/piece";
@@ -25,8 +24,6 @@ export function NotesPanel() {
   const askConfirm = useStore((s) => s.askConfirm);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
   const jumpToWorldEntry = useStore((s) => s.jumpToWorldEntry);
-  const libView = useStore((s) => s.refView);
-  const setLibView = useStore((s) => s.setRefView);
   const notesExpanded = useStore((s) => s.textareaExpanded.storyNotes);
   const pieceNotesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
@@ -143,11 +140,11 @@ export function NotesPanel() {
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">
               {piece ? "Library" : "Shared library · link these into any chapter"}
             </div>
-            <div className="flex-1" />
-            <ViewToggle view={libView} onChange={setLibView} />
           </div>
           <RefList
             refs={assets}
+            // One column in the side panel, a grid of tiles at full screen.
+            tileMin={panelExpanded ? 230 : undefined}
             onAdd={(kind, id) => addAsset(kind, id)}
             idPrefix="a"
             onUpdate={(id, patch) => updateAsset(id, patch)}
@@ -185,9 +182,11 @@ export function NotesPanel() {
             }}
             caption={(r) => {
               const n = linkCounts.get(r.id) ?? 0;
-              return n > 0 ? `${n} pin${n === 1 ? "" : "s"} across versions & books` : "Not pinned yet";
+              // Short, because it sits in the tile's mono count line; the
+              // window's "Pinned in" list says where (books and versions too).
+              return n > 0 ? `${n} pin${n === 1 ? "" : "s"}` : "Not pinned yet";
             }}
-            // Expanding an item lists exactly where it's pinned — each one a
+            // An item's window lists exactly where it's pinned, each one a
             // button that takes you there, switching book/version if it has to.
             extra={(r) => {
               const pins = findAssetPins(doc, r.id);
@@ -229,7 +228,6 @@ export function NotesPanel() {
                 </div>
               );
             }}
-            view={libView}
           />
         </div>
 

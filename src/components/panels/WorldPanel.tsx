@@ -3,14 +3,18 @@ import { useStore } from "@/store/useStore";
 import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
-import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
+import { DetailCard, EmptyBody, InkBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
+import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
 import { resolveRefs } from "@/lib/refs";
 import { countWorldReferences } from "@/lib/entities";
 import type { WorldCategory, WorldEntry } from "@/types";
 
 const CATEGORIES: WorldCategory[] = ["Place", "Faction", "Lore", "Event"];
+
+const FIELD =
+  "w-full rounded-lg border border-rule bg-card px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint";
 
 export function WorldPanel() {
   const show = useStore((s) => s.showWorld);
@@ -18,11 +22,10 @@ export function WorldPanel() {
   // not just the world list (same reason NotesPanel takes the whole doc).
   const doc = useStore((s) => s.doc);
   const world = useStore((s) => s.doc.world);
-  const assets = useStore((s) => s.doc.assets);
   const sel = useStore((s) => s.selWorld);
   const setPanel = useStore((s) => s.setPanel);
   const selectWorld = useStore((s) => s.selectWorld);
-  // The blank card from "+ Add world entry" — not an entry yet (see the store).
+  // The blank card from "+ Add world entry": not an entry yet (see the store).
   const draft = useStore((s) => s.worldDraft);
   const startDraft = useStore((s) => s.startWorldDraft);
   const updateDraft = useStore((s) => s.updateWorldDraft);
@@ -31,19 +34,7 @@ export function WorldPanel() {
   const deleteWorldEntry = useStore((s) => s.deleteWorldEntry);
   const archiveWorldEntry = useStore((s) => s.archiveWorldEntry);
   const unarchiveWorldEntry = useStore((s) => s.unarchiveWorldEntry);
-  const addWorldRef = useStore((s) => s.addWorldRef);
-  const deleteWorldRef = useStore((s) => s.deleteWorldRef);
-  const reorderWorldRef = useStore((s) => s.reorderWorldRef);
-  const linkAssetToWorld = useStore((s) => s.linkAssetToWorld);
-  const updateWorldRefAsset = useStore((s) => s.updateWorldRefAsset);
   const askConfirm = useStore((s) => s.askConfirm);
-  // Which world entry currently has the "link book asset" picker open.
-  const [linkFor, setLinkFor] = useState<string | null>(null);
-  const refView = useStore((s) => s.refView);
-  const setRefView = useStore((s) => s.setRefView);
-  const descExpanded = useStore((s) => s.textareaExpanded.worldDesc);
-  const notesExpanded = useStore((s) => s.textareaExpanded.worldNotes);
-  const toggleTextarea = useStore((s) => s.toggleTextarea);
   const panelExpanded = useStore((s) => s.panelExpanded);
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
@@ -52,15 +43,21 @@ export function WorldPanel() {
   const activeDraftId = useStore((s) => s.doc.activeDraftId);
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
-  // Archived assets are retired from the library — never offered for linking,
-  // though the ones already pinned here stay pinned (dimmed by RefList).
-  const linkable = assets.filter((a) => !a.archived);
   // Archived entries keep their chapter references but leave this list.
   const entries = world.filter((w) => !w.archived);
   const archived = world.filter((w) => w.archived);
+  // The draft tile sits last, where it lands once committed (same id), so the
+  // window open on it never remounts mid-typing.
+  const tiles = draft ? entries.concat(draft) : entries;
+  const open = tiles.find((w) => w.id === sel) ?? null;
+  const openIsDraft = !!open && open.id === draft?.id;
   /** Chapters of the loaded board that reference this entry. */
   const appearsIn = (id: string) => chapters.filter((c) => (c.worldRefs ?? []).includes(id));
-  const jumpTo = (chapterId: string) => jumpToChapter(activeBookId, activeDraftId, chapterId);
+  const closeWindow = () => (openIsDraft ? discardDraft() : sel && selectWorld(sel));
+  const jumpTo = (chapterId: string) => {
+    closeWindow();
+    jumpToChapter(activeBookId, activeDraftId, chapterId);
+  };
 
   return (
     <Drawer
@@ -82,225 +79,271 @@ export function WorldPanel() {
         </div>
       }
     >
-      <div className="flex flex-col gap-[11px] px-[18px] py-[14px]">
-          {/* The draft renders last, exactly where it will land once committed —
-              same id, same position, so typing doesn't remount the card. */}
-          {(draft ? entries.concat(draft) : entries).map((w) => {
-            const open = sel === w.id;
+      <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
+        <TileGrid min={panelExpanded ? 230 : undefined}>
+          {tiles.map((w) => {
             const isDraft = w.id === draft?.id;
-            const set = (patch: Partial<WorldEntry>) =>
-              isDraft ? updateDraft(patch) : updateWorldEntry(w.id, patch);
+            const n = appearsIn(w.id).length;
+            const refs = w.refs.length;
             return (
-              <div key={w.id} className="rounded-[13px] border border-rule bg-card p-[14px]">
-                <div className="flex items-center gap-[11px]">
-                  <span className="h-[10px] w-[10px] flex-shrink-0 rounded-full bg-soft" />
-                  <button onClick={() => selectWorld(w.id)} className="min-w-0 flex-1 text-left">
-                    <div
-                      className={`font-serif text-[15px] font-semibold ${isDraft ? "text-faint" : "text-ink"}`}
-                    >
-                      {w.name || (isDraft ? "New entry" : "Untitled entry")}
-                    </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-                      {isDraft ? "Nothing saved yet, type anything to add it" : w.cat}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => selectWorld(w.id)}
-                    className="text-[13px] font-medium text-faint"
-                  >
-                    {open ? "▴" : "▾"}
-                  </button>
-                </div>
-                {open && (
-                  <div className="mt-[13px] flex flex-col gap-[12px] border-t border-rule pt-[13px]">
-                    <div className="flex gap-[12px]">
-                      <div className="flex-1">
-                        <Label>Name</Label>
-                        <input
-                          value={w.name}
-                          onChange={(e) => set({ name: e.target.value })}
-                          placeholder="e.g. The Drowned City"
-                          className="w-full rounded-lg border border-rule bg-panel px-[9px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-faint"
-                        />
-                      </div>
-                      <div className="w-[120px]">
-                        <Label>Category</Label>
-                        <select
-                          value={w.cat}
-                          onChange={(e) => set({ cat: e.target.value as WorldCategory })}
-                          className="w-full rounded-lg border border-rule bg-panel px-[8px] py-[6px] text-[12.5px] text-ink outline-none focus:border-faint"
-                        >
-                          {CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Description</Label>
-                      <ExpandableTextarea
-                        value={w.desc}
-                        onChange={(v) => set({ desc: v })}
-                        placeholder="Describe this piece of the world"
-                        expandedHeight="40vh"
-                        expanded={descExpanded}
-                        onToggleExpanded={() => toggleTextarea("worldDesc")}
-                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
-                      />
-                    </div>
-                    <div>
-                      <Label>Notes</Label>
-                      <ExpandableTextarea
-                        value={w.notes}
-                        onChange={(v) => set({ notes: v })}
-                        placeholder="Extra notes, connections, open questions"
-                        expandedHeight="40vh"
-                        expanded={notesExpanded}
-                        onToggleExpanded={() => toggleTextarea("worldNotes")}
-                        className="rounded-lg border border-rule bg-panel px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
-                      />
-                    </div>
-                    {/* Where this entry is referenced — each chapter a way in,
-                        like a character's "Appears in" and a note's pin list. */}
-                    {appearsIn(w.id).length > 0 && (
-                      <div>
-                        <Label>Appears in</Label>
-                        <div className="flex flex-wrap gap-[5px]">
-                          {appearsIn(w.id).map((c) => (
-                            <button
-                              key={c.id}
-                              onClick={() => jumpTo(c.id)}
-                              title={`Open ${c.title || "this chapter"}`}
-                              className="flex items-center gap-[5px] rounded-md border border-rule px-[8px] py-[2px] font-mono text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
-                            >
-                              Ch {c.num}
-                              <span className="text-[10px] text-faint">↗</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* A reference has to hang off a saved entry, so this appears
-                        once the draft has content and becomes one. */}
-                    <div className={isDraft ? "hidden" : undefined}>
-                      <div className="mb-[5px] flex items-center gap-[10px]">
-                        <Label>References</Label>
-                        <div className="flex-1" />
-                        <ViewToggle view={refView} onChange={setRefView} />
-                      </div>
-                      <RefList
-                        refs={resolveRefs(w.refs, assets)}
-                        onAdd={(kind, id) => addWorldRef(w.id, kind, id)}
-                        // Content edits write through to the shared asset; the
-                        // store resolves ref → asset against current state.
-                        onUpdate={(refId, patch) => updateWorldRefAsset(w.id, refId, patch)}
-                        onDelete={(refId) => deleteWorldRef(w.id, refId)}
-                        // This entry's own pin order, independent of the library's.
-                        onReorder={(refId, toIdx) => reorderWorldRef(w.id, refId, toIdx)}
-                        deletePrompt={() => ({
-                          message: "Remove from this world entry?",
-                          detail: "It stays in the shared library.",
-                          // Not a delete — the button must not say one.
-                          confirmLabel: "Remove",
-                        })}
-                        onLink={() => setLinkFor((v) => (v === w.id ? null : w.id))}
-                        linkLabel="Link book asset"
-                        view={refView}
-                      />
-                      {linkFor === w.id && (
-                        <AssetLinkPicker
-                          assets={linkable}
-                          linkedAssetIds={new Set(w.refs.map((r) => r.assetId))}
-                          onPick={(assetId) => {
-                            linkAssetToWorld(w.id, assetId);
-                            setLinkFor(null);
-                          }}
-                        />
-                      )}
-                    </div>
-                    {/* Archive before Delete, matching the shared library's
-                        destroy row: the reversible action reads first. */}
-                    <div className="flex items-center gap-[8px]">
-                      {/* A draft isn't saved yet, so there's nothing to retire. */}
-                      {!isDraft && (
-                        <button
-                          onClick={() => {
-                            const n = countWorldReferences(doc, w.id);
-                            askConfirm({
-                              message: `Archive "${w.name || "this entry"}"?`,
-                              // Counted across versions and books, like the
-                              // character archive confirm, and says so.
-                              detail:
-                                n > 0
-                                  ? `It leaves the world list but stays on the ${n} chapter${n === 1 ? "" : "s"} that reference it across your versions and books, shown dimmed. Restoring brings it back unchanged.`
-                                  : "It leaves the world list and moves to the archive, where you can restore it any time.",
-                              confirmLabel: "Archive",
-                              onConfirm: () => archiveWorldEntry(w.id),
-                            });
-                          }}
-                          className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-ink"
-                        >
-                          Archive
-                        </button>
-                      )}
-                      <button
-                        onClick={() =>
-                          // Nothing to confirm on a draft — there's nothing saved to lose.
-                          isDraft
-                            ? discardDraft()
-                            : askConfirm({
-                                message: `Delete "${w.name || "this entry"}"?`,
-                                danger: true,
-                                onConfirm: () => deleteWorldEntry(w.id),
-                              })
-                        }
-                        className="self-start rounded-lg border border-rule px-[12px] py-[6px] text-[12px] font-medium text-soft hover:border-faint hover:text-but"
-                      >
-                        {isDraft ? "Discard" : "Delete entry"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <DetailCard
+                key={w.id}
+                onOpen={() => selectWorld(w.id)}
+                badge={<InkBadge>{w.cat}</InkBadge>}
+                title={w.name || (isDraft ? "New entry" : "Untitled entry")}
+                untitled={!w.name}
+                faded={isDraft}
+                body={
+                  isDraft ? (
+                    <EmptyBody>Nothing saved yet, type anything to add it</EmptyBody>
+                  ) : w.desc ? (
+                    w.desc
+                  ) : (
+                    <EmptyBody>No description yet</EmptyBody>
+                  )
+                }
+                meta={
+                  isDraft
+                    ? []
+                    : [`on ${n} chapter${n === 1 ? "" : "s"}`, refs > 0 && `${refs} ref${refs === 1 ? "" : "s"}`]
+                }
+              />
             );
           })}
-          <button
-            onClick={startDraft}
-            disabled={!!draft}
-            className="flex w-full items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-dashed border-line py-[13px] text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft"
-          >
+          <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
             + Add world entry
-          </button>
+          </AddTile>
+        </TileGrid>
 
-          <ArchiveShelf
-            blurb="Archived entries stay on the chapters that reference them, shown dimmed, but can't be added to new ones. Restoring puts them back in the world list unchanged."
-            items={archived.map((w) => {
-              const n = countWorldReferences(doc, w.id);
-              return {
-                id: w.id,
-                icon: <span className="block h-[10px] w-[10px] rounded-full bg-soft" />,
-                title: w.name || "Untitled entry",
-                caption: `${w.cat} · on ${n} chapter${n === 1 ? "" : "s"}`,
-              };
-            })}
-            onRestore={(id) => unarchiveWorldEntry(id)}
-            onDelete={(it) => {
-              const n = countWorldReferences(doc, it.id);
-              askConfirm({
-                message: `Delete "${it.title}" for good?`,
-                detail:
-                  n > 0
-                    ? `It will be removed from the ${n} chapter${n === 1 ? "" : "s"} that still reference it, across your versions and books.`
-                    : "No chapters reference it.",
-                danger: true,
-                onConfirm: () => deleteWorldEntry(it.id),
-              });
-            }}
-          />
+        <ArchiveShelf
+          blurb="Archived entries stay on the chapters that reference them, shown dimmed, but can't be added to new ones. Restoring puts them back in the world list unchanged."
+          items={archived.map((w) => {
+            const n = countWorldReferences(doc, w.id);
+            return {
+              id: w.id,
+              icon: <span className="block h-[10px] w-[10px] rounded-full bg-soft" />,
+              title: w.name || "Untitled entry",
+              caption: `${w.cat} · on ${n} chapter${n === 1 ? "" : "s"}`,
+            };
+          })}
+          onRestore={(id) => unarchiveWorldEntry(id)}
+          onDelete={(it) => {
+            const n = countWorldReferences(doc, it.id);
+            askConfirm({
+              message: `Delete "${it.title}" for good?`,
+              detail:
+                n > 0
+                  ? `It will be removed from the ${n} chapter${n === 1 ? "" : "s"} that still reference it, across your versions and books.`
+                  : "No chapters reference it.",
+              danger: true,
+              onConfirm: () => deleteWorldEntry(it.id),
+            });
+          }}
+        />
       </div>
+
+      {open && (
+        <WorldWindow
+          w={open}
+          isDraft={openIsDraft}
+          set={(patch) => (openIsDraft ? updateDraft(patch) : updateWorldEntry(open.id, patch))}
+          appearsIn={appearsIn(open.id)}
+          onJump={jumpTo}
+          onClose={closeWindow}
+          onArchive={() => {
+            const n = countWorldReferences(doc, open.id);
+            askConfirm({
+              message: `Archive "${open.name || "this entry"}"?`,
+              // Counted across versions and books, like the character archive
+              // confirm, and says so.
+              detail:
+                n > 0
+                  ? `It leaves the world list but stays on the ${n} chapter${n === 1 ? "" : "s"} that reference it across your versions and books, shown dimmed. Restoring brings it back unchanged.`
+                  : "It leaves the world list and moves to the archive, where you can restore it any time.",
+              confirmLabel: "Archive",
+              onConfirm: () => archiveWorldEntry(open.id),
+            });
+          }}
+          onDelete={() =>
+            // Nothing to confirm on a draft: there's nothing saved to lose.
+            openIsDraft
+              ? discardDraft()
+              : askConfirm({
+                  message: `Delete "${open.name || "this entry"}"?`,
+                  danger: true,
+                  onConfirm: () => deleteWorldEntry(open.id),
+                })
+          }
+        />
+      )}
     </Drawer>
+  );
+}
+
+/** One world entry, open: the expanded card's fields, in the same order. */
+function WorldWindow({
+  w,
+  isDraft,
+  set,
+  appearsIn,
+  onJump,
+  onClose,
+  onArchive,
+  onDelete,
+}: {
+  w: WorldEntry;
+  isDraft: boolean;
+  set: (patch: Partial<WorldEntry>) => void;
+  appearsIn: { id: string; num: number; title: string }[];
+  onJump: (chapterId: string) => void;
+  onClose: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const assets = useStore((s) => s.doc.assets);
+  const addWorldRef = useStore((s) => s.addWorldRef);
+  const deleteWorldRef = useStore((s) => s.deleteWorldRef);
+  const reorderWorldRef = useStore((s) => s.reorderWorldRef);
+  const linkAssetToWorld = useStore((s) => s.linkAssetToWorld);
+  const updateWorldRefAsset = useStore((s) => s.updateWorldRefAsset);
+  const descExpanded = useStore((s) => s.textareaExpanded.worldDesc);
+  const notesExpanded = useStore((s) => s.textareaExpanded.worldNotes);
+  const toggleTextarea = useStore((s) => s.toggleTextarea);
+  // Whether the "link book asset" picker is open.
+  const [linking, setLinking] = useState(false);
+  // Archived assets are retired from the library: never offered for linking,
+  // though the ones already pinned here stay pinned (dimmed on their tiles).
+  const linkable = assets.filter((a) => !a.archived);
+
+  return (
+    <DetailWindow
+      onClose={onClose}
+      badge={<InkBadge>{w.cat}</InkBadge>}
+      title={w.name || (isDraft ? "New entry" : "Untitled entry")}
+      untitled={!w.name}
+      footer={
+        // Archive before Delete: the reversible action reads first.
+        <>
+          {!isDraft && <WindowButton onClick={onArchive}>Archive</WindowButton>}
+          <WindowButton onClick={onDelete} danger>
+            {isDraft ? "Discard" : "Delete entry"}
+          </WindowButton>
+          {isDraft && (
+            <span className="text-[11.5px] text-faint">Nothing saved yet, type anything to add it</span>
+          )}
+        </>
+      }
+    >
+      <div className="flex flex-col gap-[12px]">
+        <div className="flex gap-[12px]">
+          <div className="flex-1">
+            <Label>Name</Label>
+            <input
+              autoFocus={isDraft}
+              value={w.name}
+              onChange={(e) => set({ name: e.target.value })}
+              placeholder="e.g. The Drowned City"
+              className={FIELD}
+            />
+          </div>
+          <div className="w-[120px]">
+            <Label>Category</Label>
+            <select
+              value={w.cat}
+              onChange={(e) => set({ cat: e.target.value as WorldCategory })}
+              className={FIELD}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <Label>Description</Label>
+          <ExpandableTextarea
+            value={w.desc}
+            onChange={(v) => set({ desc: v })}
+            placeholder="Describe this piece of the world"
+            expandedHeight="40vh"
+            expanded={descExpanded}
+            onToggleExpanded={() => toggleTextarea("worldDesc")}
+            className="rounded-lg border border-rule bg-card px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
+          />
+        </div>
+        <div>
+          <Label>Notes</Label>
+          <ExpandableTextarea
+            value={w.notes}
+            onChange={(v) => set({ notes: v })}
+            placeholder="Extra notes, connections, open questions"
+            expandedHeight="40vh"
+            expanded={notesExpanded}
+            onToggleExpanded={() => toggleTextarea("worldNotes")}
+            className="rounded-lg border border-rule bg-card px-[9px] py-[6px] pr-[70px] text-[12.5px] leading-[1.5] text-ink outline-none placeholder:text-faint focus:border-faint"
+          />
+        </div>
+        {/* Where this entry is referenced: each chapter a way in, like a
+            character's "Appears in" and a note's pin list. */}
+        {appearsIn.length > 0 && (
+          <div>
+            <Label>Appears in</Label>
+            <div className="flex flex-wrap gap-[5px]">
+              {appearsIn.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => onJump(c.id)}
+                  title={`Open ${c.title || "this chapter"}`}
+                  className="flex items-center gap-[5px] rounded-md border border-rule px-[8px] py-[2px] font-mono text-[11px] font-medium text-soft hover:border-faint hover:text-ink"
+                >
+                  Ch {c.num}
+                  <span className="text-[10px] text-faint">↗</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* A reference has to hang off a saved entry, so this appears once the
+            draft has content and becomes one. */}
+        {!isDraft && (
+          <div>
+            <Label>References</Label>
+            <RefList
+              refs={resolveRefs(w.refs, assets)}
+              tileMin={170}
+              onAdd={(kind, id) => addWorldRef(w.id, kind, id)}
+              // Content edits write through to the shared asset; the store
+              // resolves ref → asset against current state.
+              onUpdate={(refId, patch) => updateWorldRefAsset(w.id, refId, patch)}
+              onDelete={(refId) => deleteWorldRef(w.id, refId)}
+              // This entry's own pin order, independent of the library's.
+              onReorder={(refId, toIdx) => reorderWorldRef(w.id, refId, toIdx)}
+              deletePrompt={() => ({
+                message: "Remove from this world entry?",
+                detail: "It stays in the shared library.",
+                // Not a delete: the button must not say one.
+                confirmLabel: "Remove",
+              })}
+              removeLabel="Remove from this entry"
+              onLink={() => setLinking((v) => !v)}
+              linkLabel="Link book asset"
+            />
+            {linking && (
+              <AssetLinkPicker
+                assets={linkable}
+                linkedAssetIds={new Set(w.refs.map((r) => r.assetId))}
+                onPick={(assetId) => {
+                  linkAssetToWorld(w.id, assetId);
+                  setLinking(false);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </DetailWindow>
   );
 }
 
