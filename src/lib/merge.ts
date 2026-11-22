@@ -176,6 +176,19 @@ function upsert<T extends { id: string }>(list: T[], rec: T): T[] {
   return out;
 }
 
+/**
+ * Put the records `ref` also has into `ref`'s order. They fill the slots they
+ * already hold, so a record only this list has stays exactly where it is.
+ * Returns the same array when nothing moves.
+ */
+export function followOrder<T extends { id: string }>(list: T[], ref: Array<{ id: string }>): T[] {
+  const rank = new Map(ref.map((x, i) => [x.id, i]));
+  const shared = list.filter((x) => rank.has(x.id)).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+  let k = 0;
+  const next = list.map((x) => (rank.has(x.id) ? shared[k++] : x));
+  return next.every((x, i) => x === list[i]) ? list : next;
+}
+
 const removeById = <T extends { id: string }>(list: T[], id: string): T[] =>
   list.filter((x) => x.id !== id);
 
@@ -223,6 +236,9 @@ export function mergeDocs(
     savedCopy: mine.savedCopy,
   };
   let keepLineBreaks = mine.keepLineBreaks;
+  // Order units are applied last, once every record taken or carried in is in
+  // the lists, so the file's order can place those too.
+  const takeOrder = { characters: false, world: false, assets: false };
   let fromFile = 0;
 
   // A piece and a book can't be merged part by part (a book's chapters taken
@@ -304,6 +320,15 @@ export function mergeDocs(
         case "lineBreaks":
           keepLineBreaks = theirs.keepLineBreaks;
           break;
+        case "charOrder":
+          takeOrder.characters = true;
+          break;
+        case "worldOrder":
+          takeOrder.world = true;
+          break;
+        case "libraryOrder":
+          takeOrder.assets = true;
+          break;
       }
     }
   }
@@ -377,6 +402,10 @@ export function mergeDocs(
     assets = [...assets, rec];
     carried.push({ kind: "shared asset", name: rec.label || "Untitled" });
   }
+
+  if (takeOrder.characters) characters = followOrder(characters, theirs.characters);
+  if (takeOrder.world) world = followOrder(world, theirs.world);
+  if (takeOrder.assets) assets = followOrder(assets, theirs.assets);
 
   const shell: StoryDoc = {
     ...mine,

@@ -7,6 +7,8 @@ import type { RefKind, TodoItem } from "@/types";
 import type { ResolvedRef } from "@/lib/refs";
 import { DetailCard, EmptyBody, InkBadge, TileGrid } from "@/components/ui/DetailCard";
 import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
+import { PositionInput } from "@/components/ui/PositionInput";
+import { Grip, ReorderItem, ReorderLive, useTileReorder } from "@/components/ui/useTileReorder";
 
 /**
  * Editable collection of pinned references — notes, uploadable images, and (since
@@ -141,15 +143,6 @@ export function RefList({
   // The blank row from "+ Note" / "+ Image" / "+ To-do": rendered like any other
   // item, but it exists only here until it has content.
   const [draft, setDraft] = useState<ResolvedRef | null>(null);
-  // Grip-drag ordering. Pointer-based (mousedown + window listeners), the same
-  // mechanic the board and the scene canvas use — not HTML5 drag-and-drop, so
-  // dragging behaves identically to every other drag in the app.
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const rowEls = useRef(new Map<string, HTMLElement>());
-  // Detach fn for an in-flight grip drag, so an unmount mid-drag can't leak
-  // window listeners.
-  const endGripDrag = useRef<(() => void) | null>(null);
   // Live registry of the task <input>s, so the task Enter creates (or the one
   // Backspace falls back into) can be focused once the render settles. Keyed by
   // task id, not index: inserting or removing shifts every index below it, and
@@ -157,8 +150,16 @@ export function RefList({
   const taskEls = useRef(new Map<string, HTMLInputElement>());
   const pendingFocus = useRef<string | null>(null);
   const items = draft ? refs.concat(draft) : refs;
-
-  useEffect(() => () => endGripDrag.current?.(), []);
+  // Grip-drag ordering, shared with the Characters and World tiles.
+  const reorder = useTileReorder({
+    ids: refs.map((r) => r.id),
+    onMove: onReorder,
+    mode: layout === "chips" || tileMin ? "grid" : "column",
+    nameOf: (id) => {
+      const r = refs.find((x) => x.id === id);
+      return r ? r.label || untitled(r.kind) : "Item";
+    },
+  });
 
   /**
    * Move the caret into the task the last edit pointed at. Deliberately runs
@@ -178,53 +179,6 @@ export function RefList({
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   });
-
-  /**
-   * Start a grip drag. Listeners are attached here rather than from an effect on
-   * `dragId`: an effect only runs after the next render, so a drag completed
-   * inside a single frame would finish before anything was listening.
-   */
-  const startGripDrag = (id: string) => {
-    /** The tile whose box the pointer is inside, if any (tiles may be a grid). */
-    const rowAt = (x: number, y: number) => {
-      for (const [rid, el] of rowEls.current) {
-        const box = el.getBoundingClientRect();
-        if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) return rid;
-      }
-      return null;
-    };
-    const detach = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      endGripDrag.current = null;
-    };
-    const onMove = (e: MouseEvent) => {
-      const over = rowAt(e.clientX, e.clientY);
-      setOverId(over && over !== id ? over : null);
-    };
-    const onUp = (e: MouseEvent) => {
-      const targetId = rowAt(e.clientX, e.clientY);
-      detach();
-      // The whole tile opens on click, and a press on the grip released
-      // anywhere on the same tile fires a click on the tile (the common
-      // ancestor of the two targets). Swallow that one click.
-      const swallow = (ev: MouseEvent) => {
-        ev.stopPropagation();
-        ev.preventDefault();
-      };
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-      setDragId(null);
-      setOverId(null);
-      if (!onReorder || !targetId || targetId === id) return;
-      const to = refs.findIndex((r) => r.id === targetId);
-      if (to !== -1) onReorder(id, to);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    endGripDrag.current = detach;
-    setDragId(id);
-  };
 
   const startDraft = (kind: RefKind) => {
     const d: ResolvedRef = {
@@ -351,20 +305,24 @@ export function RefList({
     </>
   );
 
+  /** Draw order: the preview while a card is carried, then the draft last. */
+  const drawn = (): ResolvedRef[] => {
+    const byId = new Map(refs.map((r) => [r.id, r]));
+    const ordered = reorder.order.map((id) => byId.get(id)!).filter(Boolean);
+    return draft ? ordered.concat(draft) : ordered;
+  };
+
   /**
    * The tile's badge: its 1-based position, as an input you can type a new
    * position into when the surface is ordered (commits on Enter or blur), or
-   * plain ink otherwise. The draft has no position yet.
+   * plain ink otherwise. The draft has no position yet. While a card is
+   * carried the numbers follow the preview, so every tile shows where it will be.
    */
   const badgeOf = (r: ResolvedRef) => {
     if (r.id === draft?.id) return <InkBadge>New</InkBadge>;
-    const idx = refs.findIndex((x) => x.id === r.id);
+    const idx = reorder.indexOf(r.id);
     if (!onReorder || idx === -1) return <InkBadge>{String(idx + 1).padStart(2, "0")}</InkBadge>;
-    return (
-      <span data-no-open className="shrink-0">
-        <PositionInput index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />
-      </span>
-    );
+    return <PositionInput index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />;
   };
 
   /** The checklist editor, shared by both views. */
@@ -457,135 +415,113 @@ export function RefList({
     return (r.body ?? "").trim() || <EmptyBody>Empty note</EmptyBody>;
   };
 
+  /** A pinned-reference chip: grip, position, title, kind. Clicking it opens the window. */
+  const chipOf = (r: ResolvedRef) => {
+    const isDraft = r.id === draft?.id;
+    const idx = reorder.indexOf(r.id);
+    const name = r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind));
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${name}`}
+        title={r.archived ? `${name} (archived)` : `Open ${name}`}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("[data-no-open]")) return;
+          setOpenId(r.id);
+        }}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            setOpenId(r.id);
+          }
+        }}
+        className={`flex max-w-full cursor-pointer items-center gap-[6px] rounded-full border border-rule bg-card py-[4px] pl-[5px] pr-[10px] text-[12px] font-medium shadow-[var(--shadow)] outline-none hover:border-faint focus-visible:border-faint ${
+          isDraft || r.archived ? "opacity-50" : ""
+        }`}
+      >
+        {!isDraft && <Grip r={reorder} id={r.id} name={name} chip />}
+        {isDraft || idx === -1 ? (
+          <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
+            {isDraft ? "New" : "?"}
+          </span>
+        ) : onReorder ? (
+          <PositionInput look="chip" index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />
+        ) : (
+          <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
+            {String(idx + 1).padStart(2, "0")}
+          </span>
+        )}
+        <span className={`truncate ${r.label ? "text-ink" : "text-faint"}`}>{name}</span>
+        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-faint">
+          {KIND_WORD[r.kind]}
+        </span>
+      </div>
+    );
+  };
+
+  /** A library or reference tile. The grip is the only drag handle, so a click
+   *  anywhere else on the tile always opens it. */
+  const tileOf = (r: ResolvedRef) => {
+    const isDraft = r.id === draft?.id;
+    const name = r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind));
+    return (
+      <div className="min-w-0 flex-1">
+        <DetailCard
+          onOpen={() => setOpenId(r.id)}
+          minHeight={tileMin ? (tileMin < 200 ? 120 : 142) : 0}
+          grip={isDraft ? undefined : <Grip r={reorder} id={r.id} name={name} />}
+          badge={badgeOf(r)}
+          tag={KIND_WORD[r.kind]}
+          title={name}
+          untitled={!r.label}
+          body={bodyOf(r)}
+          meta={[r.kind === "TODO" && !isDraft ? todoProgress(r.items) : null, capOf(r)]}
+          dim={r.archived}
+          faded={isDraft}
+        />
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-[9px]">
       {items.length === 0 && <div className="px-[2px] text-[12px] text-faint">No references yet.</div>}
       {items.length > 0 && layout === "chips" && (
-        <div className="flex flex-wrap items-center gap-[7px]">
-          {items.map((r) => {
-            const isDraft = r.id === draft?.id;
-            const idx = refs.findIndex((x) => x.id === r.id);
-            const name = r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind));
-            return (
-              <div
-                key={r.id}
-                ref={(el) => {
-                  if (el) rowEls.current.set(r.id, el);
-                  else rowEls.current.delete(r.id);
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open ${name}`}
-                title={r.archived ? `${name} (archived)` : `Open ${name}`}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("[data-no-open]")) return;
-                  setOpenId(r.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    setOpenId(r.id);
-                  }
-                }}
-                className={`flex max-w-full cursor-pointer items-center gap-[6px] rounded-full border bg-card py-[4px] pl-[5px] pr-[10px] text-[12px] font-medium shadow-[var(--shadow)] outline-none hover:border-faint focus-visible:border-faint ${
-                  overId === r.id ? "border-faint" : "border-rule"
-                } ${dragId === r.id || isDraft || r.archived ? "opacity-50" : ""}`}
-              >
-                {onReorder && !isDraft && (
-                  <span
-                    data-no-open
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      startGripDrag(r.id);
-                    }}
-                    className={`-my-[4px] flex h-[22px] w-[12px] shrink-0 select-none items-center justify-center text-[11px] leading-none text-faint hover:text-soft ${
-                      dragId === r.id ? "cursor-grabbing" : "cursor-grab"
-                    }`}
-                    title="Drag to reorder"
-                  >
-                    ⠿
-                  </span>
-                )}
-                {isDraft || idx === -1 ? (
-                  <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
-                    {isDraft ? "New" : "?"}
-                  </span>
-                ) : onReorder ? (
-                  <span data-no-open className="shrink-0">
-                    <PositionInput small index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
-                )}
-                <span className={`truncate ${r.label ? "text-ink" : "text-faint"}`}>{name}</span>
-                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-faint">
-                  {KIND_WORD[r.kind]}
-                </span>
+        <div {...reorder.containerProps} className="flex flex-wrap items-center gap-[7px]">
+          {drawn().map((r) =>
+            r.id === draft?.id ? (
+              <div key={r.id} className="flex max-w-full">
+                {chipOf(r)}
               </div>
-            );
-          })}
+            ) : (
+              <ReorderItem key={r.id} r={reorder} id={r.id} chip className="flex max-w-full">
+                {chipOf(r)}
+              </ReorderItem>
+            )
+          )}
+          {reorder.dragId && reorder.renderLifted(chipOf(refs.find((x) => x.id === reorder.dragId)!))}
         </div>
       )}
       {items.length > 0 && layout === "tiles" && (
-        <TileGrid min={tileMin}>
-          {items.map((r) => {
-            const isDraft = r.id === draft?.id;
-            return (
-              <div
-                key={r.id}
-                ref={(el) => {
-                  // Live registry of tile boxes, so a drag can hit-test tiles by
-                  // pointer position without measuring the whole list each move.
-                  if (el) rowEls.current.set(r.id, el);
-                  else rowEls.current.delete(r.id);
-                }}
-                className="flex"
-              >
-                <div className="min-w-0 flex-1">
-                  <DetailCard
-                    onOpen={() => setOpenId(r.id)}
-                    minHeight={tileMin ? (tileMin < 200 ? 120 : 142) : 0}
-                    grip={
-                      onReorder && !isDraft ? (
-                        <span
-                          data-no-open
-                          // The grip is the only drag handle, so a click anywhere
-                          // else on the tile always opens it.
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            startGripDrag(r.id);
-                          }}
-                          // Padded well past the glyph: a bare 8px dot-grid is a
-                          // fiddly thing to catch with a pointer.
-                          className={`-my-[4px] -ml-[4px] flex h-[26px] w-[18px] shrink-0 select-none items-center justify-center text-[12px] leading-none text-faint hover:text-soft ${
-                            dragId === r.id ? "cursor-grabbing" : "cursor-grab"
-                          }`}
-                          title="Drag to reorder"
-                        >
-                          ⠿
-                        </span>
-                      ) : undefined
-                    }
-                    badge={badgeOf(r)}
-                    tag={KIND_WORD[r.kind]}
-                    title={r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind))}
-                    untitled={!r.label}
-                    body={bodyOf(r)}
-                    meta={[r.kind === "TODO" && !isDraft ? todoProgress(r.items) : null, capOf(r)]}
-                    dim={r.archived}
-                    highlight={overId === r.id}
-                    faded={dragId === r.id || isDraft}
-                  />
+        <div {...reorder.containerProps}>
+          <TileGrid min={tileMin}>
+            {drawn().map((r) =>
+              r.id === draft?.id ? (
+                <div key={r.id} className="flex">
+                  {tileOf(r)}
                 </div>
-              </div>
-            );
-          })}
-        </TileGrid>
+              ) : (
+                <ReorderItem key={r.id} r={reorder} id={r.id} className="flex">
+                  {tileOf(r)}
+                </ReorderItem>
+              )
+            )}
+          </TileGrid>
+          {reorder.dragId && reorder.renderLifted(tileOf(refs.find((x) => x.id === reorder.dragId)!))}
+        </div>
       )}
+      <ReorderLive r={reorder} />
       {layout === "chips" ? (
         <div className="flex flex-wrap items-center gap-[7px]">{addButtons(ADD_CHIP)}</div>
       ) : (
@@ -694,60 +630,5 @@ export function RefList({
         </DetailWindow>
       )}
     </div>
-  );
-}
-
-/**
- * The typed half of reordering: shows an item's 1-based position and moves it
- * there. Held in local state while being typed (so a half-typed "1" on the way
- * to "12" doesn't move anything) and committed on Enter or blur.
- */
-function PositionInput({
-  index,
-  total,
-  small = false,
-  onCommit,
-}: {
-  index: number;
-  total: number;
-  /** The pill-sized badge a chip carries. */
-  small?: boolean;
-  onCommit: (toIdx: number) => void;
-}) {
-  const [typed, setTyped] = useState<string | null>(null);
-  // Shown like a chapter number ("03") at rest; editing shows what's typed.
-  const shown = typed ?? String(index + 1).padStart(2, "0");
-  const commit = () => {
-    if (typed === null) return;
-    const n = parseInt(typed, 10);
-    setTyped(null);
-    if (!Number.isFinite(n)) return;
-    const to = Math.max(0, Math.min(total - 1, n - 1));
-    if (to !== index) onCommit(to);
-  };
-  return (
-    <input
-      value={shown}
-      onChange={(e) => setTyped(e.target.value.replace(/[^0-9]/g, ""))}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          (e.target as HTMLInputElement).blur();
-        }
-        // Cancels the typing only: the window this sits in stays open.
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          setTyped(null);
-        }
-      }}
-      onFocus={(e) => e.target.select()}
-      onBlur={commit}
-      onClick={(e) => e.stopPropagation()}
-      title={`Position ${index + 1} of ${total}, type a number to move it`}
-      aria-label={`Position ${index + 1} of ${total}`}
-      className={`shrink-0 border border-transparent bg-ink text-center font-mono font-semibold text-bg outline-none hover:border-faint focus:border-ink focus:bg-card focus:text-ink ${
-        small ? "h-[18px] w-[26px] rounded-full text-[10px]" : "h-[20px] w-[32px] rounded-md text-[11px]"
-      }`}
-    />
   );
 }

@@ -618,7 +618,12 @@ export type DocUnit =
   | "seriesMap"
   | "view"
   | "form"
-  | "lineBreaks";
+  | "lineBreaks"
+  // Order only: which way round the cards sit in each list. Compared over the
+  // records both copies have, so adding or deleting one is never an order change.
+  | "charOrder"
+  | "worldOrder"
+  | "libraryOrder";
 
 /**
  * Where a difference lives, structurally — everything a merge needs to apply a
@@ -990,6 +995,46 @@ function docItem(
   };
 }
 
+/**
+ * The ids both copies have, each in that copy's order. Two copies "disagree on
+ * order" only when these differ: a record one side added or deleted is its own
+ * difference, never an order one. Archived records count (they keep their
+ * slots), but only visible names are shown.
+ */
+export function sharedOrder<T extends { id: string }>(mine: T[], theirs: T[]) {
+  const inMine = new Set(mine.map((x) => x.id));
+  const inTheirs = new Set(theirs.map((x) => x.id));
+  return {
+    mine: mine.filter((x) => inTheirs.has(x.id)).map((x) => x.id),
+    theirs: theirs.filter((x) => inMine.has(x.id)).map((x) => x.id),
+  };
+}
+
+/** A story-wide order unit for one list, or null when the shared records sit the same way. */
+function orderItem<T extends { id: string; archived?: boolean }>(
+  unit: DocUnit,
+  name: string,
+  mine: T[],
+  theirs: T[],
+  nameOf: (x: T) => string
+): DiffItem | null {
+  const order = sharedOrder(mine, theirs);
+  const firstFew = (list: T[], ids: string[]) => {
+    const byIdMap = new Map(list.map((x) => [x.id, x]));
+    const shown = ids.map((id) => byIdMap.get(id)!).filter((x) => !x.archived);
+    const names = shown.slice(0, 4).map((x, i) => `${i + 1}. ${nameOf(x)}`);
+    return shown.length > 4 ? `${names.join(", ")}, and ${shown.length - 4} more` : names.join(", ");
+  };
+  return docItem(
+    unit,
+    name,
+    order.mine,
+    order.theirs,
+    [{ label: "order", mine: firstFew(mine, order.mine), theirs: firstFew(theirs, order.theirs) }],
+    "the order of the cards, not what's on them"
+  );
+}
+
 /** A book's display title, from whichever copy still has the book. */
 function bookTitle(id: string, mine: StoryDoc, theirs: StoryDoc): string {
   const b = mine.books.find((x) => x.id === id) ?? theirs.books.find((x) => x.id === id);
@@ -1274,8 +1319,16 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
     ])
   );
 
+  // The order of the cards in each list. Records stay their own units above;
+  // this only says which way round the shared ones sit.
+  storyWide.push(
+    orderItem("charOrder", "Character order", mine.characters, theirs.characters, (c) => c.name || "Unnamed"),
+    orderItem("worldOrder", "World order", mine.world, theirs.world, (w) => w.name || "Untitled"),
+    orderItem("libraryOrder", "Library order", mine.assets, theirs.assets, (a) => a.label || "Untitled")
+  );
+
   const storyItems = storyWide.filter((i): i is DiffItem => i !== null);
-  total += 9; // the nine story-wide units above, differing or not
+  total += 12; // the twelve story-wide units above, differing or not
   if (storyItems.length) {
     sections.push({ label: "Story-wide", items: storyItems });
     for (const it of storyItems) {

@@ -6407,3 +6407,46 @@ prompt), and try Draft done on a copy of a book first.
   for Characters, World, "Where a note is pinned" and "Remove vs. archive vs.
   delete" were brought in line with the build afterwards (docs only).
 
+### 2026-11-22 — Rearrange character and world cards
+
+Plan and mockup: `docs/PLAN-detail-cards-reorder.md`,
+`docs/mockups/detail-cards-reorder.html`. Built on the detail-card restyle
+(tiles in the drawers, chips inside a chapter or piece).
+
+- **Grip drag on every ordered tile and chip.** One hook,
+  `src/components/ui/useTileReorder.tsx`, behind Characters, World, the Notes
+  library, a world entry's references and a chapter's pinned-reference chips.
+  The ⠿ grip is the only drag source; a press lifts after 4px; the others make
+  room live around a dashed space (the carried card's own element, kept
+  mounted) in reading order; auto-scroll near the edges; arrow keys on a
+  focused grip. Pointer events with `touch-action: none` on the grip, so it
+  works with a finger (not yet tried on a real touchscreen). It replaces
+  RefList's mouse-only "drop on a tile to take its place".
+- **Pressing the grip never opens the window.** The grip and the number are
+  `data-no-open`, and the click the browser fires after a drop (on the tile
+  itself when a card is dropped back where it was) is swallowed.
+- **Typed position**, moved out of RefList into `PositionInput.tsx` with three
+  looks: the ink badge (library and reference tiles), the chip badge, and a
+  faint field on character and world tiles shown only while rearranging (Ray's
+  answer: "when re-arranging only").
+- **Store:** `reorderCharacter` / `reorderWorldEntry`, sharing a new
+  `moveAmongVisible` with `reorderAsset` (archived keep their slots, so
+  Restore returns a card near its old place). No schema change.
+- **Compare and merge:** story-wide rows Character order, World order and
+  Library order (`orderItem` / `sharedOrder` in `sync.ts`, `followOrder` in
+  `merge.ts`, applied after record choices and reference closure). Story-wide
+  units 9 → 12. New `src/lib/order.test.ts`.
+- **Decisions relayed:** the coordinator's list said "position number shows
+  faintly" and named only character and world order; Ray's own answers
+  (2026-11-21) were "when re-arranging only" and "ok" to including the
+  library, so those were built. The relationship chart decides its own ring
+  rule (roster order for undragged characters and "Arrange in a ring").
+- **Verified** in the in-app browser on the sample at 1280px: column drag in
+  the side panel, grid drag in the expanded drawer (dashed space and lifted
+  card checked on screen), drop-on-itself and a still press on the grip leave
+  the window shut, a plain click opens it, typed position with real
+  keystrokes, arrow keys keep focus on the grip, numbers hide on a press
+  elsewhere, chip drag in a chapter's Pinned tab, library tile drag. The
+  conflict rows are covered by unit tests, not tried in the dialog.
+  Typecheck, 302 tests, production build. Not pushed or deployed.
+

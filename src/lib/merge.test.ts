@@ -74,7 +74,7 @@ describe("diffDocs: form and line breaks", () => {
   it("counts the two new units in the total", () => {
     const doc = makeDoc();
     expect(diffDocs(doc, { ...doc, keepLineBreaks: true }).total).toBe(
-      1 /* chapter */ + 1 /* book */ + 9 /* story-wide units */
+      1 /* chapter */ + 1 /* book */ + 12 /* story-wide units */
     );
   });
 });

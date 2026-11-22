@@ -6,6 +6,8 @@ import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { DetailCard, EmptyBody, InkBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
+import { PositionInput } from "@/components/ui/PositionInput";
+import { Grip, ReorderItem, ReorderLive, useTileReorder } from "@/components/ui/useTileReorder";
 import { DetailWindow } from "@/components/ui/DetailWindow";
 import { DrawerFooter } from "@/components/panels/CharactersPanel";
 import { resolveRefs } from "@/lib/refs";
@@ -42,6 +44,14 @@ export function WorldPanel() {
   const chapters = useStore((s) => s.doc.chapters);
   const activeBookId = useStore((s) => s.doc.activeBookId);
   const activeDraftId = useStore((s) => s.doc.activeDraftId);
+  const reorderWorldEntry = useStore((s) => s.reorderWorldEntry);
+  // Grip-drag ordering of the live entries (archived ones keep their slots).
+  const reorder = useTileReorder({
+    ids: world.filter((w) => !w.archived).map((w) => w.id),
+    onMove: reorderWorldEntry,
+    mode: panelExpanded ? "grid" : "column",
+    nameOf: (id) => world.find((w) => w.id === id)?.name || "Untitled entry",
+  });
   if (!show) return null;
   const close = () => setPanel("showWorld", false);
   // Archived entries keep their chapter references but leave this list.
@@ -58,6 +68,49 @@ export function WorldPanel() {
   const jumpTo = (chapterId: string) => {
     closeWindow();
     jumpToChapter(activeBookId, activeDraftId, chapterId);
+  };
+
+  /** One world tile. The grip is the only drag handle; the position number
+   *  shows only while the list is being rearranged. */
+  const tileFor = (w: WorldEntry) => {
+    const isDraft = w.id === draft?.id;
+    const n = appearsIn(w.id).length;
+    const refs = w.refs.length;
+    const name = w.name || (isDraft ? "New entry" : "Untitled entry");
+    const idx = reorder.indexOf(w.id);
+    return (
+      <div className="min-w-0 flex-1">
+        <DetailCard
+          onOpen={() => selectWorld(w.id)}
+          grip={isDraft ? undefined : <Grip r={reorder} id={w.id} name={name} />}
+          position={
+            isDraft || idx === -1 ? undefined : (
+              <PositionInput
+                look="faint"
+                hidden={!reorder.arranging}
+                index={idx}
+                total={entries.length}
+                onCommit={(to) => reorderWorldEntry(w.id, to)}
+              />
+            )
+          }
+          badge={<InkBadge>{w.cat}</InkBadge>}
+          title={name}
+          untitled={!w.name}
+          faded={isDraft}
+          body={
+            isDraft ? (
+              <EmptyBody>Nothing saved yet, type anything to add it</EmptyBody>
+            ) : w.desc ? (
+              w.desc
+            ) : (
+              <EmptyBody>No description yet</EmptyBody>
+            )
+          }
+          meta={isDraft ? [] : [`on ${n} chapter${n === 1 ? "" : "s"}`, refs > 0 && `${refs} ref${refs === 1 ? "" : "s"}`]}
+        />
+      </div>
+    );
   };
 
   return (
@@ -81,40 +134,28 @@ export function WorldPanel() {
       }
     >
       <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
-        <TileGrid min={panelExpanded ? 230 : undefined}>
-          {tiles.map((w) => {
-            const isDraft = w.id === draft?.id;
-            const n = appearsIn(w.id).length;
-            const refs = w.refs.length;
-            return (
-              <DetailCard
-                key={w.id}
-                onOpen={() => selectWorld(w.id)}
-                badge={<InkBadge>{w.cat}</InkBadge>}
-                title={w.name || (isDraft ? "New entry" : "Untitled entry")}
-                untitled={!w.name}
-                faded={isDraft}
-                body={
-                  isDraft ? (
-                    <EmptyBody>Nothing saved yet, type anything to add it</EmptyBody>
-                  ) : w.desc ? (
-                    w.desc
-                  ) : (
-                    <EmptyBody>No description yet</EmptyBody>
-                  )
-                }
-                meta={
-                  isDraft
-                    ? []
-                    : [`on ${n} chapter${n === 1 ? "" : "s"}`, refs > 0 && `${refs} ref${refs === 1 ? "" : "s"}`]
-                }
-              />
-            );
-          })}
-          <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
-            + Add world entry
-          </AddTile>
-        </TileGrid>
+        <div {...reorder.containerProps}>
+          <TileGrid min={panelExpanded ? 230 : undefined}>
+            {reorder.order.map((id) => {
+              const w = entries.find((x) => x.id === id);
+              return w ? (
+                <ReorderItem key={id} r={reorder} id={id} className="flex">
+                  {tileFor(w)}
+                </ReorderItem>
+              ) : null;
+            })}
+            {draft && (
+              <div key={draft.id} className="flex">
+                {tileFor(draft)}
+              </div>
+            )}
+            <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
+              + Add world entry
+            </AddTile>
+          </TileGrid>
+          {reorder.dragId && reorder.renderLifted(tileFor(entries.find((x) => x.id === reorder.dragId)!))}
+          <ReorderLive r={reorder} />
+        </div>
 
         <ArchiveShelf
           blurb="Archived entries stay on the chapters that reference them, shown dimmed, but can't be added to new ones. Restoring puts them back in the world list unchanged."

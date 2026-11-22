@@ -1,8 +1,31 @@
 # Plan: rearrange character and world cards (and the tiles that already reorder)
 
-Status: **PLAN ONLY.** Ray answered the questions on 2026-11-21 (below); build
-order to be chosen once all four features are planned. No feature code.
-Branch: `claude/detail-cards-reorder-f20e90` (worktree), not pushed.
+Status: **BUILT 2026-11-22**, on `origin/main` 38be99c (restyle and anthology
+shipped), not pushed. SPECS §4 "Rearrange cards" and §8 "Card order is its own
+unit" describe the build; this file keeps the reasoning.
+Branch: `claude/detail-cards-reorder-f20e90` (worktree).
+
+## As built (differences from the plan below)
+
+- **Inside a chapter or anthology piece the pinned references are chips, not
+  tiles** (the restyle's final call). Chips carry the grip and the typed order
+  badge and reorder with the same hook in grid mode (reading order works for a
+  wrapped row of chips). Cast and world chips in a chapter are not ordered.
+- **Shared pieces:** `src/components/ui/useTileReorder.tsx` (hook plus
+  `ReorderItem`, `Grip`, `ReorderLive`) and `src/components/ui/PositionInput.tsx`
+  (looks: `badge`, `chip`, `faint`). RefList's `startGripDrag`, `rowEls`,
+  `dragId`/`overId` and its own `PositionInput` are gone.
+- **Position number on character and world tiles:** faint, and shown only while
+  rearranging (Ray's answer 8). The coordinator's relay said "shows faintly";
+  Ray's own words were "when re-arranging only", so both are honoured.
+- **Library order** is included in compare and merge (Ray's "ok" to question 6);
+  the coordinator's relay listed only character and world order.
+- **Merge rule:** the file's order is applied after all record choices and the
+  reference closure; shared records take the file's sequence in the slots they
+  already hold, so a record only this copy has stays exactly where it is
+  (`followOrder`). Story-wide units 9 → 12 (14 once relationships lands).
+- Not tried on a real touchscreen; not tried in the live conflict dialog
+  (covered by `src/lib/order.test.ts`).
 Mockup: [`docs/mockups/detail-cards-reorder.html`](mockups/detail-cards-reorder.html)
 (clickable: every place shown with the drawer collapsed and expanded, drag,
 typed position, click to open, merge sketch).

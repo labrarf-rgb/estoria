@@ -3,6 +3,8 @@ import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { DetailCard, EmptyBody, InitialsBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
 import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
+import { PositionInput } from "@/components/ui/PositionInput";
+import { Grip, ReorderItem, ReorderLive, useTileReorder } from "@/components/ui/useTileReorder";
 import { countCharacterCastings } from "@/lib/entities";
 import type { Character } from "@/types";
 
@@ -25,6 +27,14 @@ export function CharactersPanel() {
   const panelExpanded = useStore((s) => s.panelExpanded);
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
+  const reorderCharacter = useStore((s) => s.reorderCharacter);
+  // Grip-drag ordering of the roster (archived characters keep their slots).
+  const reorder = useTileReorder({
+    ids: doc.characters.filter((c) => !c.archived).map((c) => c.id),
+    onMove: reorderCharacter,
+    mode: panelExpanded ? "grid" : "column",
+    nameOf: (id) => doc.characters.find((c) => c.id === id)?.name || "Unnamed character",
+  });
 
   if (!show) return null;
   const close = () => setPanel("showChars", false);
@@ -52,6 +62,49 @@ export function CharactersPanel() {
     jumpToChapter(doc.activeBookId, doc.activeDraftId, chapterId);
   };
 
+  /** One roster tile. The grip is the only drag handle; the position number
+   *  shows only while the roster is being rearranged. */
+  const tileFor = (p: Character) => {
+    const isDraft = p.id === draft?.id;
+    const n = chapterCount(p.id);
+    const name = p.name || (isDraft ? "New character" : "Unnamed character");
+    const idx = reorder.indexOf(p.id);
+    return (
+      <div className="min-w-0 flex-1">
+        <DetailCard
+          onOpen={() => selectChar(p.id)}
+          grip={isDraft ? undefined : <Grip r={reorder} id={p.id} name={name} />}
+          position={
+            isDraft || idx === -1 ? undefined : (
+              <PositionInput
+                look="faint"
+                hidden={!reorder.arranging}
+                index={idx}
+                total={roster.length}
+                onCommit={(to) => reorderCharacter(p.id, to)}
+              />
+            )
+          }
+          badge={<InitialsBadge initials={p.initials} color={p.color} />}
+          tag={isDraft ? undefined : p.role || "No role"}
+          title={name}
+          untitled={!p.name}
+          faded={isDraft}
+          body={
+            isDraft ? (
+              <EmptyBody>Nothing saved yet, type anything to add them</EmptyBody>
+            ) : p.desc ? (
+              p.desc
+            ) : (
+              <EmptyBody>No description yet</EmptyBody>
+            )
+          }
+          meta={isDraft ? [] : [p.type, `in ${n} chapter${n === 1 ? "" : "s"}`]}
+        />
+      </div>
+    );
+  };
+
   return (
     <Drawer
       expanded={panelExpanded}
@@ -68,36 +121,28 @@ export function CharactersPanel() {
       }
     >
       <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
-        <TileGrid min={panelExpanded ? 230 : undefined}>
-          {tiles.map((p) => {
-            const isDraft = p.id === draft?.id;
-            const n = chapterCount(p.id);
-            return (
-              <DetailCard
-                key={p.id}
-                onOpen={() => selectChar(p.id)}
-                badge={<InitialsBadge initials={p.initials} color={p.color} />}
-                tag={isDraft ? undefined : p.role || "No role"}
-                title={p.name || (isDraft ? "New character" : "Unnamed character")}
-                untitled={!p.name}
-                faded={isDraft}
-                body={
-                  isDraft ? (
-                    <EmptyBody>Nothing saved yet, type anything to add them</EmptyBody>
-                  ) : p.desc ? (
-                    p.desc
-                  ) : (
-                    <EmptyBody>No description yet</EmptyBody>
-                  )
-                }
-                meta={isDraft ? [] : [p.type, `in ${n} chapter${n === 1 ? "" : "s"}`]}
-              />
-            );
-          })}
-          <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
-            + Add character
-          </AddTile>
-        </TileGrid>
+        <div {...reorder.containerProps}>
+          <TileGrid min={panelExpanded ? 230 : undefined}>
+            {reorder.order.map((id) => {
+              const p = roster.find((c) => c.id === id);
+              return p ? (
+                <ReorderItem key={id} r={reorder} id={id} className="flex">
+                  {tileFor(p)}
+                </ReorderItem>
+              ) : null;
+            })}
+            {draft && (
+              <div key={draft.id} className="flex">
+                {tileFor(draft)}
+              </div>
+            )}
+            <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
+              + Add character
+            </AddTile>
+          </TileGrid>
+          {reorder.dragId && reorder.renderLifted(tileFor(roster.find((c) => c.id === reorder.dragId)!))}
+          <ReorderLive r={reorder} />
+        </div>
 
         <ArchiveShelf
           blurb="Archived characters stay in the chapters they appear in, shown dimmed, but can't be cast into new ones. Restoring puts them back on the roster unchanged."

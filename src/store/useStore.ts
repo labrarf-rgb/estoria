@@ -488,6 +488,8 @@ interface StoreState extends UiState {
   updateCharacter: (id: string, patch: Partial<Character>) => void;
   deleteCharacter: (id: string) => void;
   /** Retire from the roster, keeping every casting. See the archive rule in `types.ts`. */
+  /** Move a character among the roster. `toIdx` counts non-archived characters. */
+  reorderCharacter: (id: string, toIdx: number) => void;
   archiveCharacter: (id: string) => void;
   unarchiveCharacter: (id: string) => void;
 
@@ -498,6 +500,8 @@ interface StoreState extends UiState {
   updateWorldEntry: (id: string, patch: Partial<WorldEntry>) => void;
   deleteWorldEntry: (id: string) => void;
   /** Retire from the world list, keeping every chapter reference. */
+  /** Move a world entry among the live entries. `toIdx` counts non-archived ones. */
+  reorderWorldEntry: (id: string, toIdx: number) => void;
   archiveWorldEntry: (id: string) => void;
   unarchiveWorldEntry: (id: string) => void;
   /** `refId` lets the caller pre-assign the link id it already rendered a draft under. */
@@ -621,6 +625,27 @@ const moveById = <T extends { id: string }>(arr: T[], id: string, toIdx: number)
   const next = arr.slice();
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
+  return next;
+};
+
+/**
+ * Reorder a list the user sees with its archived items hidden. `toIdx` counts
+ * the visible items only (that is the list being dragged in), and archived
+ * items keep their exact slots in the array, so archiving never reshuffles the
+ * order around them and restoring puts an item back near where it was.
+ * Returns the same array when nothing moves.
+ */
+const moveAmongVisible = <T extends { id: string; archived?: boolean }>(
+  list: T[],
+  id: string,
+  toIdx: number
+): T[] => {
+  const slots = list.reduce<number[]>((acc, x, i) => (x.archived ? acc : acc.concat(i)), []);
+  const visible = slots.map((i) => list[i]);
+  const moved = moveById(visible, id, toIdx);
+  if (moved === visible) return list;
+  const next = list.slice();
+  slots.forEach((slot, k) => (next[slot] = moved[k]));
   return next;
 };
 
@@ -2392,6 +2417,14 @@ export const useStore = create<StoreState>()(
       // castings are the record of who was in the scene, and keeping them is
       // what makes Restore lossless (the archive rule in `types.ts`). Collapse
       // the card on the way out so it doesn't land on the shelf still expanded.
+      // Same rule as `reorderAsset`: archived characters keep their slots, so
+      // restoring one puts it back near where it was, not at the end.
+      reorderCharacter: (id, toIdx) =>
+        set((s) => {
+          const next = moveAmongVisible(s.doc.characters, id, toIdx);
+          return next === s.doc.characters ? s : { doc: { ...s.doc, characters: next } };
+        }),
+
       archiveCharacter: (id) =>
         set((s) => ({
           doc: { ...s.doc, characters: setArchived(s.doc.characters, id, true) },
@@ -2448,6 +2481,12 @@ export const useStore = create<StoreState>()(
 
       // Same rule as `archiveCharacter`: the chapters that reference this entry
       // keep referencing it, dimmed, and its own pinned refs stay pinned to it.
+      reorderWorldEntry: (id, toIdx) =>
+        set((s) => {
+          const next = moveAmongVisible(s.doc.world, id, toIdx);
+          return next === s.doc.world ? s : { doc: { ...s.doc, world: next } };
+        }),
+
       archiveWorldEntry: (id) =>
         set((s) => ({
           doc: { ...s.doc, world: setArchived(s.doc.world, id, true) },
@@ -2545,14 +2584,8 @@ export const useStore = create<StoreState>()(
        */
       reorderAsset: (id, toIdx) =>
         set((s) => {
-          const assets = s.doc.assets;
-          const slots = assets.reduce<number[]>((acc, a, i) => (a.archived ? acc : acc.concat(i)), []);
-          const visible = slots.map((i) => assets[i]);
-          const moved = moveById(visible, id, toIdx);
-          if (moved === visible) return s;
-          const next = assets.slice();
-          slots.forEach((slot, k) => (next[slot] = moved[k]));
-          return { doc: { ...s.doc, assets: next } };
+          const next = moveAmongVisible(s.doc.assets, id, toIdx);
+          return next === s.doc.assets ? s : { doc: { ...s.doc, assets: next } };
         }),
 
       /**
