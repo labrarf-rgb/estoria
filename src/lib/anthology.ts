@@ -1,3 +1,4 @@
+import { relationshipFieldsAmong, unionRelationshipFields } from "@/lib/relationships";
 import type { Chapter, PaceCell, PaceLog, PieceKind, StoryDoc, VersionData } from "@/types";
 import { emptyStory } from "@/data/emptyStory";
 import { uid } from "@/lib/ids";
@@ -319,6 +320,7 @@ export function bringIn(anth: StoryDoc, source: StoryDoc, section: string, at = 
     characters: dedupeById(anth.characters.concat(source.characters)),
     world: dedupeById(anth.world.concat(source.world)),
     assets: dedupeById(anth.assets.concat(source.assets)),
+    ...unionRelationshipFields(anth, source),
     ...(pace ? { pace } : {}),
   };
 }
@@ -351,6 +353,8 @@ export function takeOut(anth: StoryDoc, chId: string): StoryDoc | null {
     ...(keep ? { keepLineBreaks: true } : {}),
     books: base.books.map((b) => ({ ...b, title })),
     characters: anth.characters.filter((c) => ch.chars.includes(c.id)),
+    // The relationships among the piece's own cast come along, with the kinds.
+    ...relationshipFieldsAmong(anth, new Set(ch.chars)),
     world,
     assets: anth.assets.filter((a) => assetIds.has(a.id)),
     chapters: [{ ...rest, num: 1, act: 1, x: 60, y: 90, sceneLinks: rest.sceneLinks.map(() => "none" as const) }],

@@ -6485,6 +6485,10 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   relationship from the file closes over its characters and kind. Tests in
   `src/lib/relationships.test.ts`; `merge.test.ts` count updated.
 - **Markdown export** lists relationships per character (export only).
+- **Joining and pruning:** merging a project into a series and bringing a
+  piece into an anthology union the relationship fields (target wins);
+  taking a piece out copies the ties among its cast; a blank character with
+  ties is not pruned; delete confirms count the ties that go.
 - **Android** (checked on `Estoria-aa` main `0f27338`): carries the three
   fields untouched as top-level extras and shows them in its conflict dialog
   as "Other story settings". No phone change needed.
@@ -6497,5 +6501,5 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   chart" opening the chart with Wren highlighted, a real drag saving Bram's
   position with no overlapping labels and no selection on drop, the position
   surviving a reload, Edit kinds with the remove confirmation. Typecheck,
-  314 tests, production build. Not pushed or deployed.
+  318 tests, production build. Not pushed or deployed.
 

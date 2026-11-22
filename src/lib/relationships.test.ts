@@ -4,7 +4,15 @@ import { normalizeDoc } from "@/store/persistence";
 import { diffDocs } from "@/lib/sync";
 import { mergeDocs } from "@/lib/merge";
 import { deleteCharacterDoc } from "@/lib/entities";
-import { STARTER_KINDS, kindName, kindsOf, tiesOf } from "@/lib/relationships";
+import {
+  STARTER_KINDS,
+  kindName,
+  kindsOf,
+  relationshipFieldsAmong,
+  tiesOf,
+  unionRelationshipFields,
+} from "@/lib/relationships";
+import { pruneEmptyEntries } from "@/lib/prune";
 
 /**
  * Relationships (SPECS §4 "Relationships"): three optional top-level fields
@@ -168,5 +176,54 @@ describe("compare and merge: relationships", () => {
     const diff = diffDocs(mine, theirs);
     expect(mergeDocs(mine, theirs, diff, {}).doc.relationships![0].label).toBe("here");
     expect(mergeDocs(mine, theirs, diff, { "relationship:r1": "theirs" }).doc.relationships![0].label).toBe("there");
+  });
+});
+
+describe("joining projects (merge into a series, bring into an anthology)", () => {
+  it("keeps both projects' relationships, the target winning on a shared pair", () => {
+    const target = makeDoc({
+      relationships: [{ id: "r1", a: "wren", b: "sela", label: "here" }],
+      relationshipLayout: { wren: { x: 0.1, y: 0.1 } },
+    });
+    const source = {
+      relationships: [
+        { id: "r9", a: "sela", b: "wren", label: "there" }, // same pair
+        { id: "r2", a: "pip", b: "tam" },
+      ],
+      relationshipKinds: [{ id: "k1", name: "Debt", color: 8 }],
+      relationshipLayout: { wren: { x: 0.9, y: 0.9 }, pip: { x: 0.5, y: 0.5 } },
+    };
+    const u = unionRelationshipFields(target, source);
+    expect(u.relationships!.map((r) => r.id)).toEqual(["r1", "r2"]);
+    // The target had no list of its own, so it brings the starters and the source adds Debt.
+    expect(u.relationshipKinds!.map((k) => k.id)).toEqual([...STARTER_KINDS.map((k) => k.id), "k1"]);
+    expect(u.relationshipLayout).toEqual({ wren: { x: 0.1, y: 0.1 }, pip: { x: 0.5, y: 0.5 } });
+  });
+
+  it("leaves kinds absent when neither project has its own list", () => {
+    expect(unionRelationshipFields(makeDoc(), makeDoc()).relationshipKinds).toBeUndefined();
+  });
+
+  it("takes out only the relationships among the piece's own cast", () => {
+    const doc = makeDoc({
+      relationships: [
+        { id: "r1", a: "wren", b: "sela" },
+        { id: "r2", a: "wren", b: "bram" },
+      ],
+    });
+    expect(relationshipFieldsAmong(doc, new Set(["wren", "sela"])).relationships!.map((r) => r.id)).toEqual(["r1"]);
+  });
+});
+
+describe("pruning blank characters", () => {
+  it("keeps a blank character that has relationships", () => {
+    const blank = { ...char("x", ""), initials: "" };
+    const doc = makeDoc({
+      characters: [char("wren", "Wren"), blank, { ...char("y", ""), initials: "" }],
+      relationships: [{ id: "r1", a: "wren", b: "x" }],
+    });
+    const pruned = pruneEmptyEntries(doc);
+    expect(pruned.characters.map((c) => c.id)).toEqual(["wren", "x"]);
+    expect(pruned.relationships).toHaveLength(1);
   });
 });

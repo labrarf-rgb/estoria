@@ -10,7 +10,9 @@
 > does name a relationship difference, as one "Other story settings" row
 > (checked on Android main `0f27338`), so the "won't name it" gap below no
 > longer holds. The add/edit and Edit kinds dialogs are `DetailWindow`s
-> (the restyle's window) rather than confirm-style dialogs.
+> (the restyle's window) rather than confirm-style dialogs. The mockup is
+> not updated to match: the build supersedes it, and SPECS §4 is the source
+> of truth.
 
 ## What it is
 

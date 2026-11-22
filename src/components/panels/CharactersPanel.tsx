@@ -69,6 +69,11 @@ export function CharactersPanel() {
   /** Relationships with someone still on the roster (archived partners aren't counted on the tile). */
   const tieCount = (id: string) =>
     tiesOf(doc, id).filter((r) => !doc.characters.find((c) => c.id === otherEnd(r, id))?.archived).length;
+  /** The delete confirms' line about relationships, which go with the character. */
+  const tiesGone = (id: string) => {
+    const t = tiesOf(doc, id).length;
+    return t ? ` Their ${t} relationship${t === 1 ? "" : "s"} will be deleted too.` : "";
+  };
   /** Closing the window on an untouched draft drops it: there's nothing to keep. */
   const closeWindow = () => (openIsDraft ? discardDraft() : sel && selectChar(sel));
   /** Leave for a chapter: the window and the panel close on the way. */
@@ -209,9 +214,9 @@ export function CharactersPanel() {
             askConfirm({
               message: `Delete ${it.title} for good?`,
               detail:
-                n > 0
+                (n > 0
                   ? `They will be removed from the ${n} chapter${n === 1 ? "" : "s"} they still appear in, across your versions and books.`
-                  : "They aren't in any chapters.",
+                  : "They aren't in any chapters.") + tiesGone(it.id),
               danger: true,
               onConfirm: () => deleteCharacter(it.id),
             });
@@ -262,7 +267,7 @@ export function CharactersPanel() {
               ? discardDraft()
               : askConfirm({
                   message: `Delete ${open.name || "this character"}?`,
-                  detail: "They will be removed from every chapter they appear in.",
+                  detail: `They will be removed from every chapter they appear in.${tiesGone(open.id)}`,
                   danger: true,
                   onConfirm: () => deleteCharacter(open.id),
                 })

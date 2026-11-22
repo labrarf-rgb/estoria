@@ -1,3 +1,4 @@
+import { tiesOf } from "@/lib/relationships";
 import type { Asset, Character, StoryDoc, WorldEntry } from "@/types";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
@@ -36,7 +37,11 @@ export function pruneEmptyEntries(doc: StoryDoc): StoryDoc {
     next = { ...next, assets: next.assets.filter((a) => !isAssetEmpty(a)) };
   }
 
-  for (const c of next.characters.filter(isCharacterEmpty)) next = deleteCharacterDoc(next, c.id);
+  // A character with relationships isn't blank, even with every field empty:
+  // pruning it would take the relationships with it.
+  for (const c of next.characters.filter((c) => isCharacterEmpty(c) && !tiesOf(next, c.id).length)) {
+    next = deleteCharacterDoc(next, c.id);
+  }
   for (const w of next.world.filter(isWorldEntryEmpty)) next = deleteWorldEntryDoc(next, w.id);
 
   return next;

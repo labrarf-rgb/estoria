@@ -88,6 +88,47 @@ export function withoutCharacter<T extends Pick<StoryDoc, "relationships" | "rel
   return next;
 }
 
+type RelFields = Pick<StoryDoc, "relationships" | "relationshipKinds" | "relationshipLayout">;
+
+/**
+ * The relationship fields of two projects joined (merging a book into a series,
+ * bringing a piece into an anthology). The target wins wherever both have
+ * something: a relationship id or pair, a kind id, a character's position.
+ * Kinds stay absent (the starters) only when neither project has its own list.
+ */
+export function unionRelationshipFields(target: RelFields, source: RelFields): RelFields {
+  const out: RelFields = {};
+  const pairs = new Set<string>();
+  const ids = new Set<string>();
+  const rels: Relationship[] = [];
+  for (const r of [...(target.relationships ?? []), ...(source.relationships ?? [])]) {
+    const key = pairKey(r.a, r.b);
+    if (ids.has(r.id) || pairs.has(key)) continue;
+    ids.add(r.id);
+    pairs.add(key);
+    rels.push(r);
+  }
+  if (rels.length) out.relationships = rels;
+  if (target.relationshipKinds || source.relationshipKinds) {
+    const base = kindsOf(target);
+    out.relationshipKinds = [...base, ...kindsOf(source).filter((k) => !base.some((b) => b.id === k.id))];
+  }
+  const layout = { ...source.relationshipLayout, ...target.relationshipLayout };
+  if (Object.keys(layout).length) out.relationshipLayout = layout;
+  return out;
+}
+
+/** The relationship fields limited to some characters (a piece taken out of an anthology). */
+export function relationshipFieldsAmong(doc: RelFields, charIds: Set<string>): RelFields {
+  const out: RelFields = {};
+  const rels = (doc.relationships ?? []).filter((r) => charIds.has(r.a) && charIds.has(r.b));
+  if (rels.length) out.relationships = rels;
+  if (doc.relationshipKinds) out.relationshipKinds = doc.relationshipKinds.map((k) => ({ ...k }));
+  const layout = Object.fromEntries(Object.entries(doc.relationshipLayout ?? {}).filter(([id]) => charIds.has(id)));
+  if (Object.keys(layout).length) out.relationshipLayout = layout;
+  return out;
+}
+
 // ---- Reading (normalizeDoc) -------------------------------------------------------------
 
 const text = (v: unknown): string | undefined =>

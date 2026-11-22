@@ -55,7 +55,7 @@ import {
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
-import { pairKey } from "@/lib/relationships";
+import { pairKey, unionRelationshipFields } from "@/lib/relationships";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
@@ -1248,6 +1248,8 @@ export const useStore = create<StoreState>()(
             characters: dedupeById(target.characters.concat(source.characters)),
             world: dedupeById(target.world.concat(source.world)),
             assets: dedupeById(target.assets.concat(source.assets)),
+            // The book that moves in brings its relationships, kinds and chart positions.
+            ...unionRelationshipFields(target, source),
           };
 
           const stash = { ...s.projectStash };
