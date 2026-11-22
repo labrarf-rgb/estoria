@@ -178,7 +178,10 @@ Ray chose option B, everywhere):
   rearrange plan's question 5.
 - No data overlap: relationships point at ids, order is the array.
 - Both features add story-wide units to the conflict diff; whichever lands
-  second updates the unit count in `sync.test.ts`.
+  second updates the unit count in `sync.test.ts` (`total += 9` today).
+  Relationships adds two story-wide units, Relationship kinds and Chart layout,
+  plus one row per relationship. Rearrange adds three (Character order, World
+  order, Library order). With both landed it is `total += 14`.
 
 ## Store, persistence, sync (web)
 
