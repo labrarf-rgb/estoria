@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cast and World Tiles</title>
+<title>Chapter Tabs Compared</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -144,155 +144,99 @@ th { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color:
 td:first-child { font-weight: 600; white-space: nowrap; }
 </style>
 <style>
-.page { background: var(--panel); align-self: start; min-height: 100%; }
-.ptop { display: flex; align-items: center; gap: 10px; padding: 12px 26px; border-bottom: 1px solid var(--rule); font-size: 12px; color: var(--soft); }
-.ptitle { padding: 18px 26px 6px; font-family: Spectral, serif; font-size: 26px; font-weight: 600; }
-.pmeta { padding: 0 26px 12px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
-.pchip { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); border: 1px solid var(--rule); border-radius: 6px; padding: 2px 7px; margin-right: 8px; font-family: "Hanken Grotesk"; }
-.tabs2 { display: flex; gap: 6px; padding: 12px 26px; flex-wrap: wrap; }
-.tabs2 span { font-size: 12px; font-weight: 500; color: var(--soft); background: var(--chip); border-radius: 8px; padding: 6px 11px; }
+.cols3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
+.colh { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; }
+.colh span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.colh.now { color: var(--therefore); }
+.pg { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pgtitle { padding: 14px 18px 4px; font-family: Spectral, serif; font-size: 20px; font-weight: 600; }
+.pgmeta { padding: 0 18px 8px; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--soft); }
+.tabs2 { display: flex; gap: 5px; padding: 8px 18px 10px; flex-wrap: wrap; }
+.tabs2 span { font-size: 11.5px; font-weight: 500; color: var(--soft); background: var(--chip); border-radius: 8px; padding: 5px 9px; }
 .tabs2 span.on { background: var(--ink); color: var(--bg); }
-.tabs2 i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; margin-left: 6px; opacity: .7; }
-.tabbody { padding: 0 26px 16px; border-bottom: 1px solid var(--rule); }
-.flow { padding: 14px 26px 26px; }
-.flow .lbl { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
-.flow .row { display: flex; gap: 14px; flex-wrap: wrap; }
-.scene { width: 200px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.45; box-shadow: var(--shadow); }
-.scene b { display: block; font-size: 10px; letter-spacing: .1em; color: var(--faint); margin-bottom: 4px; }
+.tabs2 i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10px; margin-left: 5px; opacity: .7; }
+.tb { padding: 0 18px 14px; border-bottom: 1px solid var(--rule); }
+.flow { padding: 10px 18px 16px; display: flex; gap: 10px; }
+.flow div { flex: 1; border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 7px 9px; font-size: 11px; color: var(--soft); line-height: 1.4; }
+.flow b { display: block; font-size: 9px; letter-spacing: .1em; color: var(--faint); }
 .chiprow { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
-.cchip { display: flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 6px 5px 8px; font-size: 12px; font-weight: 500; color: #fff; }
+.cchip { display: flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 7px 5px 8px; font-size: 12px; font-weight: 500; color: #fff; }
 .cchip .ci { width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.25); font-size: 8.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.wchip { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 6px 5px 10px; font-size: 12px; font-weight: 500; background: var(--ink); color: var(--bg); }
+.wchip { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 7px 5px 10px; font-size: 12px; font-weight: 500; background: var(--ink); color: var(--bg); }
 .wchip small { font-size: 9px; text-transform: uppercase; opacity: .7; }
+.rchip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--card); border-radius: 999px; padding: 4px 9px 4px 5px; font-size: 12px; font-weight: 500; color: var(--ink); box-shadow: var(--shadow); }
+.rchip .n { background: var(--ink); color: var(--bg); border-radius: 999px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; font-weight: 600; padding: 1px 6px; }
+.rchip small { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
 .dashchip { border: 1px dashed var(--line); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--soft); }
-.ttile { position: relative; }
-.picker { margin-top: 10px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
-.pick { display: flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--panel); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 500; }
-.pick .d { width: 16px; height: 16px; border-radius: 50%; color: #fff; font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.sbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 24px; align-items: start; }
-.sbs .scene { width: 150px; }
-.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+.tg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tg .tile { min-height: 118px; padding: 10px 12px; }
+.tg .title { font-size: 14.5px; }
+.tg .sum { font-size: 11.5px; }
+.tg .add { min-height: 118px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 12px; }
+.addrow { margin-top: 9px; }
+.notebox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.55; min-height: 70px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 14px; font-size: 13.5px; }
+.legend b { font-weight: 600; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">Estoria · one more piece of option B</div>
-  <h1>Characters and World tabs as tiles</h1>
-  <p class="lede">An anthology piece's Characters and World tabs (a chapter uses the same tabs). Today on the left, tiles on the right, row by row. Scroll down.</p>
-  <ul class="rules">
-    <li><b>Same tiles.</b> The cast of this piece as character tiles, its world entries as world tiles. A grid, like the chapter's pinned references.</li>
-    <li><b>Click to open.</b> Opens the same character or world window as the drawers do, so you can edit them from here.</li>
-    <li><b>Take one off this piece</b> with "Remove from this piece" at the foot of the window. They stay in your cast. (Today that is the ✕ on the chip.)</li>
-    <li><b>Add</b> with the "+ Add character" tile, which opens the same picker as today.</li>
-  </ul>
-
-  <section>
-    <div class="eyebrow">1 · Characters tab</div>
-    <h2>The piece's cast</h2>
-    <div class="sbs">
-      <div><div class="cap">Today · chips</div><div id="c-today"></div></div>
-      <div><div class="cap">Proposed · tiles</div><div id="c-new"></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">2 · World details tab</div>
-    <h2>The piece's world entries</h2>
-    <div class="sbs">
-      <div><div class="cap">Today · chips</div><div id="w-today"></div></div>
-      <div><div class="cap">Proposed · tiles</div><div id="w-new"></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">3 · Clicking one</div>
-    <h2>Wren Calloway, clicked</h2>
-    <div class="sbs">
-      <div><div class="cap">Today <span>(clicking a chip does nothing; its ✕ takes her off this piece)</span></div><div id="click-today"></div></div>
-      <div><div class="cap">Proposed <span>(her window opens; "Remove from this piece" at its foot)</span></div><div id="click-new"></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">4 · Adding one</div>
-    <h2>"+ Add character", clicked</h2>
-    <div class="sbs">
-      <div><div class="cap">Today</div><div id="add-today"></div></div>
-      <div><div class="cap">Proposed <span>(same picker)</span></div><div id="add-new"></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">5 · Inside a chapter</div>
-    <h2>A chapter uses the same tabs</h2>
-    <p class="note">So it changes the same way, unless chapters keep chips. Keeping them the same means a chapter and an anthology piece never look different.</p>
-    <div class="sbs">
-      <div><div class="cap">Today · chips</div><div id="ch-today"></div></div>
-      <div><div class="cap">Proposed · tiles</div><div id="ch-new"></div></div>
-    </div>
-  </section>
+  <div class="eyebrow">Estoria · for review</div>
+  <h1>A chapter's tabs, three ways</h1>
+  <p class="lede">The tabs inside a chapter and on an anthology piece's page (they are the same tabs). Each row is one tab. Left is what the current build does, then everything as tiles, then everything as chips. Scroll down.</p>
+  <div class="legend">
+    <div><b>Now (current build):</b> Characters and World are chips; Pinned references are tiles.</div>
+    <div><b>All tiles:</b> every list in a chapter is tiles.</div>
+    <div><b>All chips:</b> every list in a chapter is chips.</div>
+    <div><b>Notes</b> is a text box in all three.</div>
+  </div>
+  <div id="rows"></div>
 </div>
-
 <script>
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sep = '<span class="sep">·</span>';
-const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
-const put = (id, html) => (document.getElementById(id).innerHTML = html);
-const inp = (v, ph) => `<div class="inp ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
-const area = (v, ph) => `<div class="inp ta ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
-
 const CAST = [
-  { name: "Wren Calloway", ini: "WC", color: "oklch(0.55 0.1 220)", role: "Protagonist", type: "Hero", desc: "A cartographer who can chart any coast but her own way home.", n: 8, bio: "Grew up on the tide flats, apprenticed to the harbour's last chart-maker.", want: "To find her mother's map", need: "To stop running" },
+  { name: "Wren Calloway", ini: "WC", color: "oklch(0.55 0.1 220)", role: "Protagonist", type: "Hero", desc: "A cartographer who can chart any coast but her own way home.", n: 8 },
   { name: "Pip", ini: "P", color: "oklch(0.52 0.12 300)", role: "Catalyst", type: "Trickster", desc: "A dock-rat who trades in secrets and stolen tide-charts.", n: 4 },
 ];
-const NOT_CAST = [
-  { name: "Sela Voss", ini: "SV", color: "oklch(0.55 0.13 30)" },
-  { name: "Bram Okonkwo", ini: "BO", color: "oklch(0.55 0.1 80)" },
-];
-const WORLD = [
-  { name: "The Lower City", cat: "Place", desc: "A tide-flooded port built on the drowned bones of an older one.", notes: "Streets renumber themselves at high water; locals navigate by smell and habit.", n: 6, refs: 2 },
+const WORLD = [{ name: "The Lower City", cat: "Place", desc: "A tide-flooded port built on the drowned bones of an older one.", n: 6, refs: 2 }];
+const REFS = [
+  { label: "Tide-chart sketch", kind: "Image", body: "", img: true },
+  { label: "Map symbology key", kind: "Note", body: "Anchor = safe; gull = warning." },
 ];
 
-const charTile = (c) => `<div class="tile"><div class="top"><span class="ini" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role)}</span></div>
-  <div class="title">${esc(c.name)}</div><div class="sum">${esc(c.desc)}</div><div class="grow"></div>
-  <div class="meta"><span>${esc(c.type)}</span>${sep}<span>in ${nch(c.n)}</span></div></div>`;
-const worldTile = (w) => `<div class="tile"><div class="top"><span class="badge">${esc(w.cat.toUpperCase())}</span></div>
-  <div class="title">${esc(w.name)}</div><div class="sum">${esc(w.desc)}</div><div class="grow"></div>
-  <div class="meta"><span>on ${nch(w.n)}</span>${sep}<span>${w.refs} refs</span></div></div>`;
-const addTile = (label) => `<div class="add" style="display:flex;align-items:center;justify-content:center;min-height:142px">+ ${label}</div>`;
+const charTile = (c) => `<div class="tile"><div class="top"><span class="ini" style="background:${c.color}">${c.ini}</span><span class="tag">${esc(c.role)}</span></div><div class="title">${esc(c.name)}</div><div class="sum">${esc(c.desc)}</div><div class="grow"></div><div class="meta"><span>in ${c.n} chapters</span></div></div>`;
+const worldTile = (w) => `<div class="tile"><div class="top"><span class="badge">${w.cat.toUpperCase()}</span></div><div class="title">${esc(w.name)}</div><div class="sum">${esc(w.desc)}</div><div class="grow"></div><div class="meta"><span>on ${w.n} chapters</span>${sep}<span>${w.refs} refs</span></div></div>`;
+const refTile = (r, i) => `<div class="tile"><div class="top"><span class="badge">0${i + 1}</span><span class="tag">${r.kind}</span></div><div class="title">${esc(r.label)}</div>${r.img ? '<div class="sum empty">No image yet</div>' : `<div class="sum">${esc(r.body)}</div>`}<div class="grow"></div></div>`;
+const add = (t) => `<div class="add">+ ${t}</div>`;
 
-const tabsFor = (on, chapter) => `<div class="tabs2"><span class="${on === "c" ? "on" : ""}">Characters<i>2</i></span><span class="${on === "w" ? "on" : ""}">World details<i>1</i></span><span>${chapter ? "Chapter notes" : "Piece notes"}</span><span>Pinned references<i>2</i></span></div>`;
-const flow = `<div class="flow"><div class="lbl">Map · 3 scenes</div><div class="row"><div class="scene"><b>SCENE 1</b>Wren haggles for a water-ruined chart at the night market.</div><div class="scene"><b>SCENE 2</b>She recognizes her mother's hand inking the margins.</div><div class="scene"><b>SCENE 3</b>The coastline rearranges itself when the paper gets wet.</div></div></div>`;
-const pieceTop = `<div class="ptop">Piece 1 of 8<span class="grow"></span>‹ Previous · A Door in the Floor ›</div><div class="ptitle">The Drowned Map</div><div class="pmeta"><span class="pchip">Short story</span>3,200 words · 3 scenes · Done</div>`;
-const piecePage = (on, tab, win = "") => `<div class="app"><div class="page"><div class="appbar" style="position:static">Untitled Voyage · Anthology</div>${pieceTop}${tabsFor(on)}<div class="tabbody">${tab}</div>${flow}</div>${win}</div>`;
-const tgrid = (inner) => `<div class="tgrid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${inner}</div>`;
+const charChips = `<div class="chiprow">${CAST.map((c) => `<span class="cchip" style="background:${c.color}"><span class="ci">${c.ini}</span>${esc(c.name)} ✕</span>`).join("")}<span class="dashchip">+ Add character</span></div>`;
+const worldChips = `<div class="chiprow">${WORLD.map((w) => `<span class="wchip">${esc(w.name)}<small>${w.cat}</small> ✕</span>`).join("")}<span class="dashchip">+ Add world detail</span></div>`;
+const refChips = `<div class="chiprow">${REFS.map((r, i) => `<span class="rchip"><span class="n">0${i + 1}</span>${esc(r.label)}<small>${r.kind}</small></span>`).join("")}<span class="dashchip">+ Note</span><span class="dashchip">+ To-do</span><span class="dashchip">+ Image</span><span class="dashchip">Link book asset</span></div>`;
+const addRow = `<div class="addrow chiprow"><span class="dashchip">+ Note</span><span class="dashchip">+ To-do</span><span class="dashchip">+ Image</span><span class="dashchip">Link book asset</span></div>`;
 
-const chipsC = `<div class="chiprow">${CAST.map((c) => `<span class="cchip" style="background:${c.color}"><span class="ci">${c.ini}</span>${esc(c.name)} ✕</span>`).join("")}<span class="dashchip">+ Add character</span></div>`;
-const chipsW = `<div class="chiprow">${WORLD.map((w) => `<span class="wchip">${esc(w.name)}<small>${w.cat}</small> ✕</span>`).join("")}<span class="dashchip">+ Add world detail</span></div>`;
-const cTab = tgrid(CAST.map(charTile).join("") + addTile("Add character"));
-const wTab = tgrid(WORLD.map(worldTile).join("") + addTile("Add world detail"));
-const picker = `<div class="picker">${NOT_CAST.map((c) => `<span class="pick"><span class="d" style="background:${c.color}">${c.ini}</span>${esc(c.name)}</span>`).join("")}<span class="dashchip">+ Create new character</span></div>`;
-const winFoot = (keep) => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding:12px 20px"><span class="ghost">Remove from this piece</span><span class="hint">${keep}</span></div>`;
-const w0 = CAST[0];
-const charWin = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="ini" style="background:${w0.color}">${w0.ini}</span><span class="tag">${w0.role}</span><div class="title">${w0.name}</div><span class="grow"></span><span class="iconbtn">✕</span></div>
-  <div class="mbody"><div class="fields">
-  <div class="pair"><div><div class="lab">Name</div>${inp(w0.name)}</div><div style="flex:0 0 70px"><div class="lab">Initials</div>${inp(w0.ini)}</div></div>
-  <div class="pair"><div><div class="lab">Role</div>${inp(w0.role)}</div><div><div class="lab">Archetype</div>${inp(w0.type)}</div></div>
-  <div><div class="lab">Description</div>${area(w0.desc)}</div>
-  <div class="more">Bio, Traits, Goals, Motivations, Wants, Needs, Notes, Appears in (same as the drawer's window)</div>
-  </div></div>${winFoot("They stay in your cast.")}</div></div>`;
+const charTiles = `<div class="tg">${CAST.map(charTile).join("")}${add("Add character")}</div>`;
+const worldTiles = `<div class="tg">${WORLD.map(worldTile).join("")}${add("Add world detail")}</div>`;
+const refTiles = `<div class="tg">${REFS.map(refTile).join("")}</div>${addRow}`;
+const notes = `<div class="notebox">Remember the chart's watermark matches the one in chapter 6.</div>`;
 
-put("c-today", piecePage("c", chipsC));
-put("c-new", piecePage("c", cTab));
-put("w-today", piecePage("w", chipsW));
-put("w-new", piecePage("w", wTab));
-put("click-today", piecePage("c", chipsC));
-put("click-new", piecePage("c", cTab, charWin));
-put("add-today", piecePage("c", chipsC + picker));
-put("add-new", piecePage("c", cTab + picker));
-const chapter = (tab) => `<div class="app"><div class="dim"></div><div class="chmodal" style="margin:18px"><div class="chhead"><div class="row"><span class="badge">01</span><div class="title">The Drowned Map</div><span class="grow"></span><span class="iconbtn">‹</span><span class="iconbtn">›</span><span class="iconbtn">✕</span></div><div class="chmeta">3,200 words · 3 scenes · Done · Act 1</div></div>${tabsFor("c", true)}<div class="tabbody">${tab}</div>${flow}</div></div>`;
-put("ch-today", chapter(chipsC));
-put("ch-new", chapter(cTab));
+const page = (on, body) => `<div class="pg"><div class="pgtitle">The Drowned Map</div><div class="pgmeta">3,200 words · 3 scenes · Done</div>
+  <div class="tabs2"><span class="${on === "c" ? "on" : ""}">Characters<i>2</i></span><span class="${on === "w" ? "on" : ""}">World details<i>1</i></span><span class="${on === "n" ? "on" : ""}">Notes</span><span class="${on === "r" ? "on" : ""}">Pinned references<i>2</i></span></div>
+  <div class="tb">${body}</div><div class="flow"><div><b>SCENE 1</b>Wren haggles for a chart.</div><div><b>SCENE 2</b>Her mother's hand.</div><div><b>SCENE 3</b>The coast rearranges.</div></div></div>`;
+
+const ROWS = [
+  { t: "Characters tab", on: "c", now: charChips, tiles: charTiles, chips: charChips, note: "Now and All chips are the same here." },
+  { t: "World details tab", on: "w", now: worldChips, tiles: worldTiles, chips: worldChips, note: "Now and All chips are the same here." },
+  { t: "Pinned references tab", on: "r", now: refTiles, tiles: refTiles, chips: refChips, note: "Now and All tiles are the same here. As chips, clicking one would still open its window." },
+  { t: "Notes tab", on: "n", now: notes, tiles: notes, chips: notes, note: "A text box in every version." },
+];
+document.getElementById("rows").innerHTML = ROWS.map((r, i) => `<section>
+  <div class="eyebrow">${i + 1} · ${r.t}</div><h2>${r.t}</h2><p class="note">${r.note}</p>
+  <div class="cols3">
+    <div><div class="colh now">Now <span>(current build)</span></div>${page(r.on, r.now)}</div>
+    <div><div class="colh">All tiles</div>${page(r.on, r.tiles)}</div>
+    <div><div class="colh">All chips</div>${page(r.on, r.chips)}</div>
+  </div></section>`).join("");
 </script>
 </body>
 </html>
