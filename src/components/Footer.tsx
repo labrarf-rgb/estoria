@@ -34,6 +34,7 @@ import {
 } from "@/lib/driveSession";
 import { activeTarget, chosenTarget, currentDriveStatus, driveAvailableHere } from "@/lib/syncTarget";
 import type { StoryDoc } from "@/types";
+import { storageWarning, useStorageUse } from "@/lib/storageDurability";
 
 // Chrome refuses system-adjacent folders (home root, Library, drive roots)
 // with a "contains system files" dialog; a normal subfolder always works.
@@ -451,6 +452,7 @@ export function Footer() {
   }, [pickerSupported, driveMode]);
 
   const failed = status.state === "error";
+  const storageUse = useStorageUse();
   const folderSuffix =
     !pickerSupported || mirror === "unknown"
       ? ""
@@ -487,6 +489,8 @@ export function Footer() {
                       : "";
   const driveWarn = driveMode && (needsReconnect || driveStale || mirror === "missing");
   const mirrorSuffix = driveMode ? driveSuffix : folderSuffix;
+  // Past 80% of browser storage: say so before a save fails (review S7).
+  const storageFull = storageWarning(storageUse);
   const saveText = failed
     ? status.reason === "locked"
       ? "Auto-save is paused: Estoria couldn't read what's already saved here, and won't write over it. Reload, or export this to a file."
@@ -501,7 +505,9 @@ export function Footer() {
       ? "Saving..."
       : (status.savedAt
           ? `Saved in this browser · ${new Date(status.savedAt).toLocaleTimeString()}`
-          : "Saved in this browser") + mirrorSuffix;
+          : "Saved in this browser") +
+        mirrorSuffix +
+        (storageFull ? ` · browser storage ${storageFull} full: delete old saved copies or export` : "");
 
   const pieceKind = useStore((s) => (s.doc.form === "piece" ? s.doc.kind ?? "story" : null));
   const anthology = useStore((s) => s.doc.form === "anthology");
@@ -518,7 +524,7 @@ export function Footer() {
       <span
         className="flex shrink-0 items-center gap-[6px]"
         style={
-          failed || driveWarn
+          failed || driveWarn || storageFull
             ? { color: "var(--but)" }
             : mirror === "behind"
               ? { color: "var(--soft)" }

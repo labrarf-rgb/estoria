@@ -159,10 +159,13 @@ function BringInConfirm({
           <li>
             <b className="text-ink">Writing, map, notes, status, target:</b> come in as one piece, still a {label}
             {source.keepLineBreaks ? ", line breaks kept" : ""}
+            {source.storyNotes.trim() ? ". Its Story notes go into the piece's own notes" : ""}
           </li>
           <li>
             <b className="text-ink">Characters, world, library:</b>{" "}
-            {castN ? "added to the anthology's lists. One typed separately in both shows up twice until you archive one" : "it has none"}
+            {castN
+              ? "added to the anthology's lists. One that is the same in both stays one; one that differs, or was typed separately, shows up twice until you archive one"
+              : "it has none"}
           </li>
           <li>
             <b className="text-ink">Versions:</b>{" "}

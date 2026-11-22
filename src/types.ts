@@ -202,6 +202,12 @@ export interface SavedCopyInfo {
   savedAt: string;
   /** The project it was copied from, for "saved from …" wording. */
   fromId: string;
+  /**
+   * The file this copy was also written to in the Estoria folder, once that
+   * write succeeded. Only a copy with a file there is ever trimmed from the
+   * browser (`savedCopiesToTrim`), so trimming never removes the last copy.
+   */
+  file?: string;
 }
 
 /** Series-level metadata for a book. The board itself lives in BookData. */

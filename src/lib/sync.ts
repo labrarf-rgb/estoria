@@ -10,6 +10,7 @@ import type {
 import { keepPaceHistory, withoutPace } from "@/lib/paceLog";
 import type { PaceLog, Relationship } from "@/types";
 import { kindName, kindsOf } from "@/lib/relationships";
+import { inOrder, isAnthology } from "@/lib/anthology";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
 import { AUTHOR_FIELDS, AUTHOR_LABELS, authorOf } from "@/lib/author";
@@ -588,14 +589,17 @@ export function restoreFromFile(
  * projects. Never pruned — unlike backups, a saved copy is the way back from a
  * specific change, and only the writer knows when that is no longer wanted.
  */
-export async function writeSavedCopyFile(doc: StoryDoc): Promise<void> {
+/** Write a saved copy to the Estoria folder too. Resolves to the file's name, or null when it wasn't written. */
+export async function writeSavedCopyFile(doc: StoryDoc): Promise<string | null> {
   try {
     const folder = await getSyncFolder({ requestPermission: false });
-    if (!folder || !doc.savedCopy) return;
+    if (!folder || !doc.savedCopy) return null;
     const name = `${slugify(doc.projectTitle || "story")}-saved-${doc.savedCopy.reason}-${fileStamp()}.estoria.json`;
     await writeDoc(folder, name, doc);
+    return name;
   } catch {
     // The browser copy is the copy; the file is a bonus.
+    return null;
   }
 }
 
@@ -629,7 +633,10 @@ export type DocUnit =
   // each taken whole, so a merge never pairs one copy's kind name with the
   // other's color, or half of one arrangement with half of the other.
   | "relKinds"
-  | "relLayout";
+  | "relLayout"
+  // Anthologies only: the order of the pieces and the section each sits in,
+  // one unit (review S5). Per-piece rows then leave `num` and `section` out.
+  | "pieceOrder";
 
 /**
  * Where a difference lives, structurally — everything a merge needs to apply a
@@ -925,14 +932,23 @@ interface CollectionSpec<T extends { id: string }> {
   /** One-line description of a record that exists on only one side. */
   summaryOf: (e: T, doc: StoryDoc) => string;
   address: (id: string) => DiffAddress;
+  /** Fields compared elsewhere (an anthology's `num` and `section`), left out here. */
+  ignore?: readonly string[];
 }
+
+const without = <T extends object>(x: T, keys: readonly string[] | undefined): T => {
+  if (!keys?.length) return x;
+  const out = { ...x } as Record<string, unknown>;
+  for (const k of keys) delete out[k];
+  return out as T;
+};
 
 function diffCollection<T extends { id: string }>(
   spec: CollectionSpec<T>,
   mineDoc: StoryDoc,
   theirsDoc: StoryDoc
 ): { section: DiffSection; line: string | null; total: number } {
-  const { label, unit, mine, theirs, nameOf, summaryOf, address } = spec;
+  const { label, unit, mine, theirs, nameOf, summaryOf, address, ignore } = spec;
   const items: DiffItem[] = [];
   let changed = 0;
   let onlyMine = 0;
@@ -949,9 +965,9 @@ function diffCollection<T extends { id: string }>(
         state: "only-here",
         detail: [{ label: `whole ${unit}`, mine: summaryOf(m, mineDoc), theirs: "not in file" }],
       });
-    } else if (!sameJson(m, t)) {
+    } else if (!sameJson(without(m, ignore), without(t, ignore))) {
       changed++;
-      const { fields, detail } = compareFields(m, t, mineDoc, theirsDoc);
+      const { fields, detail } = compareFields(without(m, ignore), without(t, ignore), mineDoc, theirsDoc);
       items.push({
         addr: address(id),
         key: addressKey(address(id)),
@@ -1048,6 +1064,37 @@ function orderItem<T extends { id: string; archived?: boolean }>(
   );
 }
 
+/** The fields an anthology's "Piece order and sections" unit carries. */
+export const PIECE_PLACE = ["num", "section"] as const;
+
+/**
+ * An anthology's pieces that both copies have, in each copy's order, with the
+ * section each sits in. Null when they sit the same way.
+ */
+function pieceOrderItem(mine: Chapter[], theirs: Chapter[]): DiffItem | null {
+  const inMine = new Set(mine.map((c) => c.id));
+  const inTheirs = new Set(theirs.map((c) => c.id));
+  const placeOf = (list: Chapter[], other: Set<string>) =>
+    inOrder(list)
+      .filter((c) => other.has(c.id))
+      .map((c) => ({ c, section: c.section?.trim() ?? "" }));
+  const m = placeOf(mine, inTheirs);
+  const t = placeOf(theirs, inMine);
+  const key = (xs: typeof m) => xs.map((x) => [x.c.id, x.section]);
+  const firstFew = (xs: typeof m) => {
+    const names = xs.slice(0, 4).map((x, i) => `${i + 1}. ${x.c.title || "Untitled"}${x.section ? ` (${x.section})` : ""}`);
+    return xs.length > 4 ? `${names.join(", ")}, and ${xs.length - 4} more` : names.join(", ");
+  };
+  return docItem(
+    "pieceOrder",
+    "Piece order and sections",
+    key(m),
+    key(t),
+    [{ label: "order", mine: firstFew(m), theirs: firstFew(t) }],
+    "which way round the pieces sit and the section each is in, taken as one"
+  );
+}
+
 /** A book's display title, from whichever copy still has the book. */
 function bookTitle(id: string, mine: StoryDoc, theirs: StoryDoc): string {
   const b = mine.books.find((x) => x.id === id) ?? theirs.books.find((x) => x.id === id);
@@ -1081,6 +1128,10 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
   const sections: DiffSection[] = [];
   let total = 0;
 
+  // Two anthologies: where each piece sits is one story-wide unit, not a field
+  // of every piece, so a merge can't take half of a reorder (review S5).
+  const pieces = isAnthology(mine) && isAnthology(theirs);
+
   // --- Chapters, per book (the address a merge needs) ---
   const mineChapters = chaptersByBook(mine);
   const theirsChapters = chaptersByBook(theirs);
@@ -1103,6 +1154,7 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
         summaryOf: (c) =>
           `Chapter ${c.num}, act ${c.act}, ${c.status}, ${c.scenes.length} ${c.scenes.length === 1 ? "beat" : "beats"}`,
         address: (id) => ({ kind: "chapter", bookId, id }),
+        ...(pieces ? { ignore: PIECE_PLACE } : {}),
       },
       mine,
       theirs
@@ -1379,8 +1431,11 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
     ], "where characters sit on the relationship chart")
   );
 
+  if (pieces) storyWide.push(pieceOrderItem(mine.chapters, theirs.chapters));
+
   const storyItems = storyWide.filter((i): i is DiffItem => i !== null);
-  total += 14; // the fourteen story-wide units above, differing or not
+  // The fourteen story-wide units above, differing or not, and Piece order in an anthology.
+  total += 14 + (pieces ? 1 : 0);
   if (storyItems.length) {
     sections.push({ label: "Story-wide", items: storyItems });
     for (const it of storyItems) {

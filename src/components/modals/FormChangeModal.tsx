@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import {
   KINDS,
+  SAVED_COPIES_KEPT,
   SAVED_REASON,
   canCollapse,
   collapsePreview,
@@ -11,6 +12,7 @@ import {
   type ChapterJoin,
 } from "@/lib/piece";
 import type { GrownInto, PieceKind } from "@/types";
+import { storageWarning, useStorageUse } from "@/lib/storageDurability";
 
 /**
  * The three changes of form: a piece into a book, a book into a piece, and a
@@ -264,12 +266,19 @@ function BookDialog({ close }: { close: () => void }) {
 
 /** The line every change of form carries. */
 export function CopyNote({ what }: { what?: string }) {
+  const full = storageWarning(useStorageUse());
   return (
     <div className="flex items-start gap-[10px] rounded-[10px] border border-rule bg-card px-[12px] py-[10px] text-[12px]">
       <span className="text-[15px] leading-none text-soft">↺</span>
       <div>
         <b className="text-ink">A copy is saved first.</b> {what ?? "The project as it is now"} is saved as its
         own project, under <b className="text-ink">Projects › Saved copies</b>. Open it any time to go back.
+        {full && (
+          <div className="mt-[6px]" style={{ color: "var(--but)" }}>
+            Browser storage is {full} full, and each saved copy keeps every picture. Delete old copies under Projects ›
+            Saved copies, or export this project, first.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -373,18 +382,34 @@ export function Choices<T extends string>({
  */
 export function SavedNotice() {
   const notice = useStore((s) => s.savedNotice);
-  const dismiss = useStore((s) => s.dismissSavedNotice);
+  const trim = useStore((s) => s.trimNotice);
+  const dismissSaved = useStore((s) => s.dismissSavedNotice);
+  const dismissTrim = useStore((s) => s.dismissTrimNotice);
   const setPanel = useStore((s) => s.setPanel);
+  const dismiss = () => {
+    dismissSaved();
+    dismissTrim();
+  };
   useEffect(() => {
-    if (!notice) return;
-    const t = setTimeout(dismiss, 9000);
+    if (!notice && !trim) return;
+    const t = setTimeout(() => {
+      dismissSaved();
+      dismissTrim();
+    }, 9000);
     return () => clearTimeout(t);
-  }, [notice, dismiss]);
-  if (!notice) return null;
+  }, [notice, trim, dismissSaved, dismissTrim]);
+  if (!notice && !trim) return null;
   return (
     <div className="fixed bottom-[44px] left-1/2 z-[80] flex max-w-[92vw] -translate-x-1/2 items-center gap-[12px] rounded-xl bg-ink px-[16px] py-[10px] text-[12.5px] text-bg shadow-[0_12px_32px_rgba(0,0,0,0.3)]">
       <span>
-        Saved a copy of "{notice.title}" · {SAVED_REASON[notice.reason].toLowerCase()}.
+        {notice && <>Saved a copy of "{notice.title}" · {SAVED_REASON[notice.reason].toLowerCase()}. </>}
+        {trim && (
+          <>
+            Removed the {trim.n === 1 ? "oldest saved copy" : `${trim.n} oldest saved copies`} of "{trim.title}" from this
+            browser ({SAVED_COPIES_KEPT} are kept); {trim.n === 1 ? "its file stays" : "their files stay"} in your Estoria
+            folder.
+          </>
+        )}
       </span>
       <button
         onClick={() => {

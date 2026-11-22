@@ -91,10 +91,11 @@ describe("writeSavedCopyFile", () => {
     savedCopy: { reason: "expand", savedAt: "2026-10-11T09:00:00.000Z", fromId: "p0" },
   });
 
-  it("writes the copy beside the project's files", async () => {
-    await writeSavedCopyFile(doc);
+  it("writes the copy beside the project's files, and says which file", async () => {
+    const written = await writeSavedCopyFile(doc);
     const names = folder!.names();
     expect(names).toHaveLength(1);
+    expect(written).toBe(names[0]);
     expect(names[0]).toMatch(/^my-story-saved-expand-\d{8}-\d{6}\.estoria\.json$/);
   });
 
@@ -102,12 +103,12 @@ describe("writeSavedCopyFile", () => {
     await writeSavedCopyFile({ ...doc, savedCopy: undefined });
     expect(folder!.names()).toEqual([]);
     folder = null;
-    await expect(writeSavedCopyFile(doc)).resolves.toBeUndefined();
+    await expect(writeSavedCopyFile(doc)).resolves.toBeNull();
   });
 
   it("stays silent when the folder is gone", async () => {
     folder!.gone = true;
-    await expect(writeSavedCopyFile(doc)).resolves.toBeUndefined();
+    await expect(writeSavedCopyFile(doc)).resolves.toBeNull();
   });
 });
 

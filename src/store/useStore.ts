@@ -29,11 +29,13 @@ import {
   formLabel,
   isPiece,
   makeSavedCopy,
+  savedCopiesToTrim,
   newPiece,
   shortDate,
   type ChapterJoin,
 } from "@/lib/piece";
 import { writeSavedCopyFile } from "@/lib/sync";
+import { refreshStorageUse } from "@/lib/storageDurability";
 import {
   bringIn,
   canBringIn,
@@ -50,12 +52,14 @@ import {
   sectionNames,
   startSections,
   takeOut,
+  removePiece,
   toAnthology,
 } from "@/lib/anthology";
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
 import { pairKey, unionRelationshipFields } from "@/lib/relationships";
+import { reconcileIncoming } from "@/lib/join";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
@@ -372,6 +376,15 @@ interface StoreState extends UiState {
   /** Bring a saved copy back as an ordinary project, and open it. */
   openSavedCopy: (id: string) => void;
   dismissSavedNotice: () => void;
+  /**
+   * Write a just-made saved copy to the Estoria folder, note the file on the
+   * copy, then trim that project's oldest browser copies past
+   * `SAVED_COPIES_KEPT` (only ones whose file is in the folder).
+   */
+  fileSavedCopy: (copy: StoryDoc) => Promise<void>;
+  /** After a trim: which project, and how many browser copies went. Transient. */
+  trimNotice: { title: string; n: number } | null;
+  dismissTrimNotice: () => void;
   setFormDialog: (d: FormDialog | null) => void;
   openDoc: (doc: StoryDoc) => void;
   deleteProject: (id: string) => void;
@@ -1111,7 +1124,7 @@ export const useStore = create<StoreState>()(
           arrangeN: 0,
           newMenu: false,
         }));
-        void writeSavedCopyFile(copy);
+        void get().fileSavedCopy(copy);
       },
 
       turnIntoPiece: (kind, join) => {
@@ -1128,7 +1141,7 @@ export const useStore = create<StoreState>()(
           chapterMode: "map",
           newMenu: false,
         }));
-        void writeSavedCopyFile(copy);
+        void get().fileSavedCopy(copy);
       },
 
       openSavedCopy: (id) => {
@@ -1152,6 +1165,26 @@ export const useStore = create<StoreState>()(
       },
 
       dismissSavedNotice: () => set({ savedNotice: null }),
+
+      trimNotice: null,
+      dismissTrimNotice: () => set({ trimNotice: null }),
+      fileSavedCopy: async (copy) => {
+        const file = await writeSavedCopyFile(copy);
+        if (file) {
+          set((s) => {
+            const here = s.projectStash[copy.id];
+            if (!here?.savedCopy) return s;
+            const stash = { ...s.projectStash, [copy.id]: { ...here, savedCopy: { ...here.savedCopy, file } } };
+            const trim = savedCopiesToTrim(stash, here.savedCopy.fromId);
+            for (const d of trim) delete stash[d.id];
+            return {
+              projectStash: stash,
+              ...(trim.length ? { trimNotice: { title: copy.projectTitle || "Untitled", n: trim.length } } : {}),
+            };
+          });
+        }
+        void refreshStorageUse();
+      },
       setFormDialog: (d) => set({ formDialog: d, newMenu: false }),
 
       openDoc: (incoming) =>
@@ -1208,9 +1241,12 @@ export const useStore = create<StoreState>()(
         set((s) => {
           if (sourceId === targetId) return s;
           const getDoc = (id: string) => (id === s.doc.id ? s.doc : s.projectStash[id]);
-          const source = getDoc(sourceId);
+          const original = getDoc(sourceId);
           const target = getDoc(targetId);
-          if (!source || !target) return s;
+          if (!original || !target) return s;
+          // Records the two projects both hold by id but that differ come in as
+          // second records, so neither version is lost (lib/join.ts).
+          const { source } = reconcileIncoming(target, original);
 
           // Each source book + its board data (active book lives at the top level).
           const sourceBooks = source.books.map((b) => ({
@@ -1259,10 +1295,10 @@ export const useStore = create<StoreState>()(
           if (s.doc.id !== sourceId && s.doc.id !== targetId) stash[s.doc.id] = s.doc;
           // A merge changes two projects — the book that moves in disappears,
           // and the series gains a book — so both are saved as they were.
-          for (const d of [source, target]) {
+          for (const d of [original, target]) {
             const copy = makeSavedCopy(d, "merge");
             stash[copy.id] = copy;
-            void writeSavedCopyFile(copy);
+            void get().fileSavedCopy(copy);
           }
 
           return {
@@ -1291,7 +1327,7 @@ export const useStore = create<StoreState>()(
           pendingSections: [],
           newMenu: false,
         }));
-        void writeSavedCopyFile(copy);
+        void get().fileSavedCopy(copy);
       },
 
       makeBook: () => {
@@ -1308,7 +1344,7 @@ export const useStore = create<StoreState>()(
           arrangeN: 0,
           newMenu: false,
         }));
-        void writeSavedCopyFile(copy);
+        void get().fileSavedCopy(copy);
       },
 
       addPiece: (kind, section) => {
@@ -1340,7 +1376,7 @@ export const useStore = create<StoreState>()(
             addPieceDialog: null,
           };
         });
-        void writeSavedCopyFile(copy);
+        void get().fileSavedCopy(copy);
       },
 
       takeOutPiece: (chId, how) => {
@@ -1354,9 +1390,9 @@ export const useStore = create<StoreState>()(
         const copy = how === "move" ? makeSavedCopy(before, "takeout") : null;
         set((s) => {
           const stash = { ...s.projectStash, [project.id]: project, ...(copy ? { [copy.id]: copy } : {}) };
-          const chapters = how === "move" ? renumber(s.doc.chapters.filter((c) => c.id !== chId)) : s.doc.chapters;
+          // A move takes it out of every version, not only the one being viewed.
           return {
-            doc: { ...s.doc, chapters },
+            doc: how === "move" ? removePiece(s.doc, chId) : s.doc,
             projectStash: stash,
             takeOutDialog: null,
             openCh: how === "move" && s.openCh === chId ? null : s.openCh,
@@ -1365,7 +1401,7 @@ export const useStore = create<StoreState>()(
             showProjects: true,
           };
         });
-        if (copy) void writeSavedCopyFile(copy);
+        if (copy) void get().fileSavedCopy(copy);
       },
 
       movePiece: (id, targetId, after, section) =>
@@ -2248,7 +2284,7 @@ export const useStore = create<StoreState>()(
           // A piece or an anthology never goes straight into a series.
           if (s.doc.seriesMode || s.doc.form) return s;
           const copy = makeSavedCopy(s.doc, "series");
-          void writeSavedCopyFile(copy);
+          void get().fileSavedCopy(copy);
           const books = s.doc.books.map((b) =>
             b.id === s.doc.activeBookId ? { ...b, title: s.doc.projectTitle || b.title } : b
           );

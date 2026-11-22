@@ -1,4 +1,5 @@
 import { relationshipFieldsAmong, unionRelationshipFields } from "@/lib/relationships";
+import { reconcileIncoming } from "@/lib/join";
 import type { Chapter, PaceCell, PaceLog, PieceKind, StoryDoc, VersionData } from "@/types";
 import { emptyStory } from "@/data/emptyStory";
 import { uid } from "@/lib/ids";
@@ -292,16 +293,29 @@ export function addPace(into: PaceLog | undefined, from: PaceLog | undefined, at
 
 /**
  * Move a single-piece project into an anthology, as one piece at the end of
- * `section`, in the version being viewed. Its main version comes in (the rest
- * stay in the saved copy the caller takes first); its characters, world entries
- * and library are added the way Merge into a series adds them (deduped by id,
- * so separate projects simply append); its Pace days add into the anthology's.
+ * `section`, in **every** version of the anthology (a piece brought in while
+ * viewing a side version would otherwise vanish with that version). Its main
+ * version comes in (the rest stay in the saved copy the caller takes first).
+ *
+ * Its characters, world entries, library and relationships are added the way
+ * Merge into a series adds them, after `reconcileIncoming`: a record with the
+ * same id as one here but different content comes in as a second record with
+ * a fresh id, so neither version is lost. Its Story notes go into the piece's
+ * own notes, which travel with it. Its Pace days add into the anthology's.
  */
-export function bringIn(anth: StoryDoc, source: StoryDoc, section: string, at = Date.now()): StoryDoc {
+export function bringIn(anth: StoryDoc, incoming: StoryDoc, section: string, at = Date.now()): StoryDoc {
+  const { source } = reconcileIncoming(anth, incoming);
   const ch = mainBoard(source).chapters[0];
   if (!ch) return anth;
+  const projectNotes = source.storyNotes.trim();
+  const pieceNotes = (ch.notes ?? "").trim();
+  const notes =
+    projectNotes && projectNotes !== pieceNotes
+      ? [pieceNotes, `From the project's notes:\n${projectNotes}`].filter(Boolean).join("\n\n")
+      : ch.notes;
   const piece: Chapter = {
     ...ch,
+    ...(notes !== undefined ? { notes } : {}),
     // A fresh id: a piece taken out by copy and brought back would otherwise
     // share its id with the one still here.
     id: uid("c"),
@@ -314,15 +328,33 @@ export function bringIn(anth: StoryDoc, source: StoryDoc, section: string, at = 
   if (section.trim()) piece.section = section.trim();
   else delete piece.section;
   const pace = addPace(anth.pace, source.pace, at);
+  const placed = mapVersions(anth, (v) => ({ ...v, chapters: insertPiece(v.chapters, piece) }));
   return {
-    ...anth,
-    chapters: insertPiece(anth.chapters, piece),
+    ...placed,
     characters: dedupeById(anth.characters.concat(source.characters)),
     world: dedupeById(anth.world.concat(source.world)),
     assets: dedupeById(anth.assets.concat(source.assets)),
     ...unionRelationshipFields(anth, source),
     ...(pace ? { pace } : {}),
   };
+}
+
+/**
+ * A piece leaves the anthology: from **every** version, renumbered, with any
+ * chapter links that touched it (hidden in an anthology, but a book made from
+ * it later would show a broken chain). Used by "Move it out".
+ */
+export function removePiece(anth: StoryDoc, chId: string): StoryDoc {
+  return mapVersions(anth, (v) =>
+    // A version where it is the only piece keeps it: no board is ever left empty.
+    v.chapters.length > 1 && v.chapters.some((c) => c.id === chId)
+      ? {
+          ...v,
+          chapters: renumber(inOrder(v.chapters.filter((c) => c.id !== chId))),
+          links: v.links.filter((l) => l.fromId !== chId && l.toId !== chId),
+        }
+      : v
+  );
 }
 
 /**

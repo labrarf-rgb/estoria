@@ -12,6 +12,7 @@ import type {
 import { MAIN_DRAFT_ID } from "@/types";
 import { normalizeDoc } from "@/store/persistence";
 import { STARTER_KINDS } from "@/lib/relationships";
+import { inOrder, isAnthology, renumber } from "@/lib/anthology";
 import type { DiffItem, DocDiff, Side } from "@/lib/sync";
 
 /**
@@ -242,7 +243,7 @@ export function mergeDocs(
   let relationshipLayout = mine.relationshipLayout;
   // Order units are applied last, once every record taken or carried in is in
   // the lists, so the file's order can place those too.
-  const takeOrder = { characters: false, world: false, assets: false };
+  const takeOrder = { characters: false, world: false, assets: false, pieces: false };
   let fromFile = 0;
 
   // A piece and a book can't be merged part by part (a book's chapters taken
@@ -339,6 +340,9 @@ export function mergeDocs(
         case "libraryOrder":
           takeOrder.assets = true;
           break;
+        case "pieceOrder":
+          takeOrder.pieces = true;
+          break;
         case "relKinds":
           relationshipKinds = theirs.relationshipKinds;
           break;
@@ -434,6 +438,26 @@ export function mergeDocs(
     if (!rec) continue;
     relationshipKinds = [...kept, rec];
     carried.push({ kind: "relationship kind", name: rec.name || "Unnamed kind" });
+  }
+
+  // Two anthologies: a piece taken from the file brings its content, not its
+  // place. Every piece both copies have sits where the chosen side has it
+  // (this copy's, unless "Piece order and sections" was taken), and the board
+  // is renumbered, so no two pieces ever share a number and no section is
+  // split in two (review S5).
+  if (isAnthology(mine) && isAnthology(theirs)) {
+    for (const [bookId, list] of boards.chapters) {
+      const ref = new Map(
+        ((takeOrder.pieces ? theirsBoards : mineBoards).chapters.get(bookId) ?? []).map((c) => [c.id, c])
+      );
+      const placed = list.map((c) => {
+        const r = ref.get(c.id);
+        if (!r) return c;
+        const { section: _s, ...rest } = c;
+        return { ...rest, num: r.num, ...(r.section ? { section: r.section } : {}) };
+      });
+      boards.chapters.set(bookId, renumber(inOrder(placed)));
+    }
   }
 
   if (takeOrder.characters) characters = followOrder(characters, theirs.characters);

@@ -1,5 +1,5 @@
 import { kindName, kindOf, otherEnd, tiesOf } from "@/lib/relationships";
-import { isAnthology } from "@/lib/anthology";
+import { inOrder, isAnthology } from "@/lib/anthology";
 import {
   MAIN_DRAFT_ID,
   SCHEMA_VERSION,
@@ -113,11 +113,16 @@ export function buildMarkdown(doc: StoryDoc): string {
     });
   }
 
-  const acts = [...new Set(doc.chapters.map((c) => c.act))];
+  // An anthology's pieces keep the acts they had as a book's chapters, but its
+  // order is `num` alone: one Act I in reading order, which the importer reads
+  // back in the same order (review S3). A book groups by act as always.
+  const anthology = isAnthology(doc);
+  const acts = anthology ? [1] : [...new Set(doc.chapters.map((c) => c.act))];
+  const listed = anthology ? inOrder(doc.chapters) : doc.chapters;
   acts.forEach((a) => {
     md += `\n## Act ${roman(a)}\n`;
-    doc.chapters
-      .filter((c) => c.act === a)
+    listed
+      .filter((c) => anthology || c.act === a)
       .forEach((c) => {
         md += `\n### ${c.num}. ${c.title}  ·  ${c.words.toLocaleString()} words\n> ${displaySummary(c)}\n\n**Scenes**\n`;
         c.scenes.forEach((s, j) => {

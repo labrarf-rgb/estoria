@@ -5,7 +5,7 @@ import "./index.css";
 // its listener has to be registered at startup (see lib/install.ts).
 import "@/lib/install";
 import { resetIfRequested } from "@/lib/sw";
-import { requestDurableStorage } from "@/lib/storageDurability";
+import { refreshStorageUse, requestDurableStorage } from "@/lib/storageDurability";
 import { App } from "@/App";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppCrash } from "@/components/CrashScreen";
@@ -17,6 +17,9 @@ if (!resetIfRequested()) {
   // Ask the browser to stop treating this origin's storage as disposable.
   // Fire-and-forget: nothing waits on the answer, but About reports it.
   void requestDurableStorage();
+  // How full storage is, for the warning before it runs out (review S7).
+  void refreshStorageUse();
+  setInterval(() => void refreshStorageUse(), 5 * 60_000);
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       {/* Outermost, and therefore the one that catches what nothing else did.

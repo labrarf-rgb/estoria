@@ -176,6 +176,25 @@ export function makeSavedCopy(doc: StoryDoc, reason: SavedCopyReason): StoryDoc 
   };
 }
 
+/** How many saved copies of one project the browser keeps (Ray, 2026-11-22). */
+export const SAVED_COPIES_KEPT = 5;
+
+/**
+ * The saved copies of `fromId` to remove from this browser: beyond the newest
+ * `SAVED_COPIES_KEPT`, and only those whose file is known to be in the Estoria
+ * folder. A copy with no file there is the only copy, so it is never trimmed;
+ * the storage warning covers those. Oldest first.
+ */
+export function savedCopiesToTrim(stash: Record<string, StoryDoc>, fromId: string): StoryDoc[] {
+  const copies = Object.values(stash)
+    .filter((d) => d.savedCopy?.fromId === fromId)
+    .sort((a, b) => (a.savedCopy!.savedAt < b.savedCopy!.savedAt ? 1 : a.savedCopy!.savedAt > b.savedCopy!.savedAt ? -1 : 0));
+  return copies
+    .slice(SAVED_COPIES_KEPT)
+    .filter((d) => !!d.savedCopy?.file)
+    .reverse();
+}
+
 export const SAVED_REASON: Record<SavedCopyReason, string> = {
   expand: "Before expanding into a book",
   collapse: "Before turning into a single piece",
