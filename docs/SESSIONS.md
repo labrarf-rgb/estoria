@@ -6501,5 +6501,9 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   chart" opening the chart with Wren highlighted, a real drag saving Bram's
   position with no overlapping labels and no selection on drop, the position
   surviving a reload, Edit kinds with the remove confirmation. Typecheck,
-  318 tests, production build. Not pushed or deployed.
+  318 tests, production build.
+- **Shipped** on Ray's /ship: main fast-forwarded to 7e0fa0e, pushed, and
+  deployed with `npm run deploy` (v4 build 104, verified live at
+  labrarf.com/estoria). Not yet tried: the chart on a real touchscreen, and
+  the conflict rows in the dialog itself (covered by unit tests).
 

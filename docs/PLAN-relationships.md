@@ -1,9 +1,9 @@
-# Plan: character relationships (BUILT 2026-11-22, not shipped)
+# Plan: character relationships (BUILT and SHIPPED 2026-11-22, v4 build 104)
 
 > Built on `claude/relationship-chart-4c8990`, rebased onto `8084767`. What
 > exists is described in SPECS §4 ("Relationships and the relationship
 > chart") and §8; the record is in SESSIONS (2026-11-22). This plan is kept
-> for the reasoning and is archived once shipped. Mockup:
+> for the reasoning. Mockup:
 > [`mockups/relationship-chart.html`](mockups/relationship-chart.html).
 >
 > **Where the build differs from this plan:** the phone's conflict dialog
