@@ -67,7 +67,8 @@ Why this shape:
 2. `persistence.ts` `normalizeDoc`: **whitelist the field** (it rebuilds the
    top level from named keys; without this a file round trip drops it, the trap
    piece mode hit). Read defensively: drop entries with a missing endpoint, a
-   self-tie, or a duplicate pair (keep the first); unknown kind becomes "other";
+   self-tie, or a duplicate pair (the pair is unordered: (a,b) and (b,a) are
+   the same pair; keep the first); unknown kind becomes "other";
    blank strings dropped; omit the field when empty.
 3. `useStore.ts`: `addRelationship`, `updateRelationship`, `removeRelationship`.
    `deleteCharacter` removes that character's relationships (no dangling ids,

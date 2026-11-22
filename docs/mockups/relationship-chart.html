@@ -364,6 +364,7 @@
       <b>Relationships are added and edited on the card,</b> in a new field under "Appears in", the same way cast and chapters already work. Each row names the other character, the kind, the label, and both points of view; clicking it opens the editor. "See on chart" switches to the chart with this character in the middle.
       <ul>
         <li><b>A pair is one record,</b> so the tie shows on both cards (Wren's and Sela's) and editing either edits the same thing.</li>
+        <li><b>Wren is already tied to everyone,</b> so "+ Add relationship" on her card greys out the whole picker. That is the one-record-per-pair rule at work. To try adding, center Bram or Ione on the chart and add from there.</li>
         <li><b>The card's subtitle</b> gains a tie count beside the chapter count. <span class="flag q">Optional</span></li>
       </ul>
     </div>
@@ -375,7 +376,7 @@
       <div class="stage" id="stage"></div>
     </div>
     <div class="caption">
-      <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. Adding from Wren's card starts with Wren filled in, and the picker greys out anyone she already has a tie with, since a pair has one record.
+      <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. Shown here: adding a tie from Bram's card, with Sela picked. The picker greys out anyone Bram already has a tie with, since a pair has one record. Click the dialog to try it live; it also opens from "+ Add relationship" on any card or in the chart, and from any tie row (as Edit, with Remove).
       <ul>
         <li><b>Kind</b> is a short fixed list that sets the color: Family, Friend, Romance, Mentor, Rival, Other. <b>Label</b> is free text for the specifics ("former mentor", "sisters").</li>
         <li><b>Both points of view are optional.</b> Leave one blank for a tie only one of them feels, or write "doesn't know she exists".</li>
@@ -764,7 +765,7 @@ interface Relationship {
     const meC = byId(me);
     const withId = r ? r.b : d.with || null;
     const W = withId ? byId(withId) : null;
-    const kind = r ? r.kind : d.kind || "friend";
+    const kind = d.kind || (r ? r.kind : "friend");
     const taken = new Set(RELS.filter((x) => x.a === me || x.b === me).map((x) => other(x, me)));
     const title = r ? `${meC.first} and ${W.first}` : `New relationship for ${meC.first}`;
     const pick = r ? "" : `
@@ -820,28 +821,32 @@ interface Relationship {
     const keep = () => { const v = readForm(scrim); scrim.innerHTML = dialogHTML(dlgState, true); scrim.querySelector("#f-label").value = v.label; scrim.querySelector("#f-a").value = v.aView; scrim.querySelector("#f-b").value = v.bView; scrim.querySelector("#f-n").value = v.notes; };
     if (t.dataset.k) {
       dlgState.kind = t.dataset.k;
-      if (dlgState.id) RELS.find((x) => x.id === dlgState.id).kind = t.dataset.k;
       keep();
     } else if (t.dataset.pick) { dlgState.with = t.dataset.pick; keep(); }
     else if (t.dataset.act === "cancel") closeDialog();
     else if (t.dataset.act === "remove") { const i = RELS.findIndex((x) => x.id === dlgState.id); RELS.splice(i, 1); closeDialog(); refresh(); }
     else if (t.dataset.act === "save") {
       const v = readForm(scrim);
-      if (dlgState.id) Object.assign(RELS.find((x) => x.id === dlgState.id), v);
+      if (dlgState.id) { const rel = RELS.find((x) => x.id === dlgState.id); Object.assign(rel, v, { kind: dlgState.kind || rel.kind }); }
       else if (dlgState.with) RELS.push({ id: "r" + uid++, a: dlgState.from, b: dlgState.with, kind: dlgState.kind || "friend", ...v });
       closeDialog(); refresh();
     }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !scrim.hidden) closeDialog(); });
-  // Screen 3 shows a static copy of the editor, open on Sela and Wren.
-  document.getElementById("stage").innerHTML = dialogHTML({ id: "r1" }, false);
+  // Screen 3 shows a static copy of the editor: adding Sela to Bram, a pair with no record yet.
+  // Clicking it opens the live dialog with the same choices.
+  const STAGE = { from: "bram", with: "sela", kind: "romance" };
+  const stage = document.getElementById("stage");
+  const drawStage = () => { stage.innerHTML = dialogHTML(STAGE, false); };
+  drawStage();
+  stage.addEventListener("click", (e) => { if (e.target.closest("button, input, textarea")) { e.preventDefault(); openDialog({ ...STAGE }); } });
 
   function refresh() {
     const keepFocus = chart.st.focus, keepSel = RELS.some((r) => r.id === chart.st.sel) ? chart.st.sel : null;
     chart.rebuild(); chart.st.focus = keepFocus; chart.st.sel = keepSel; chart.update(false);
     chartArch.rebuild(); chartArch.st.focus = "bram"; chartArch.update(false);
     renderRoster();
-    document.getElementById("stage").innerHTML = dialogHTML(RELS.some((r) => r.id === "r1") ? { id: "r1" } : { from: "wren" }, false);
+    drawStage();
   }
 
   /* ---------------- Tabs + theme ---------------- */
