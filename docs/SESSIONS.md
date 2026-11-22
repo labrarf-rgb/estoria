@@ -6402,4 +6402,8 @@ prompt), and try Draft done on a copy of a book first.
   kind, opening the same item window. Verified in the in-app browser on a
   chapter and an anthology piece (open, ✕, Remove, + Note draft, grip drag,
   drawers' footers unchanged); typecheck, 294 tests, production build.
+- **Shipped** on Ray's OK: main fast-forwarded to this branch (d8d4da1),
+  pushed, and deployed with `npm run deploy` (verified live). The SPECS rows
+  for Characters, World, "Where a note is pinned" and "Remove vs. archive vs.
+  delete" were brought in line with the build afterwards (docs only).
 
