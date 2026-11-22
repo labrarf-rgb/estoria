@@ -123,7 +123,11 @@ section?: string;               // "a section starts here, called this" (Part On
   positions as chapter cards do, so the order you see is the book's order.
   Chapter `x` / `y` stay in the file, unused here.
 - Click (a press that doesn't move) opens the piece, as on the board today.
-- *Option A, a contents list, was the alternative; dropped.*
+- **Each band has a ⋯ menu:** Rename (inline; Enter keeps it), Move section
+  up / down (its pieces move with it), Remove section (only the heading goes;
+  its pieces join the section above, or below for the first one).
+- *A contents list (Option A) was the alternative; dropped, and removed from
+  the mockup.*
 - Both: the toolbar keeps Characters, World, Notes, versions, Export, Sync;
   drops New chapter, Auto-arrange, Timeline and templates; gains **+ Add piece**.
 

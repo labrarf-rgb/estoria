@@ -142,6 +142,10 @@
   .ghostcard small { font-weight: 400; font-size: 11px; color: var(--faint); }
   .ghostcard:hover, .ghostband:hover { border-color: var(--ink); color: var(--ink); }
   .ghostband { display: block; width: 100%; border: 1.5px dashed var(--line); border-radius: 14px; padding: 14px; background: transparent; color: var(--soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .secbtn { position: absolute; top: 5px; right: 10px; border: 0; background: transparent; color: var(--soft); font-size: 15px; padding: 2px 8px; border-radius: 6px; cursor: pointer; }
+  .secbtn:hover { background: var(--chip); color: var(--ink); }
+  .menu.secmenu { top: 30px; right: 10px; }
+  .secname.editing { outline: none; border-bottom: 1.5px solid var(--new); color: var(--ink); padding: 0 2px; }
   .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 11.5px; color: var(--soft); margin-bottom: 14px; align-items: center; }
   .legend b { color: var(--ink); }
   .lg-card, .lg-band { display: inline-block; width: 16px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
@@ -274,7 +278,7 @@ const PROJECTS = [
   { id: "x3", title: "Against Tidiness", kind: "essay", m: "Essay · 4 sections · 2,330 words" },
   { id: "x4", title: "Harbor Lights", kind: null, m: "Book · 24 chapters · not offered: only single pieces come in" },
 ];
-const S = { sections: ["One: Harbor", "Two: Inland"], addSec: "Two: Inland", step: 1, expand: "collection", home: "board", pi: 0, mode: "write", menu: false, addTab: "new", pick: "x1", confirm: false, takeChoice: "move", takeDone: false, lbOverride: {} };
+const S = { secMenu: null, renaming: null, secShown: false, sections: ["One: Harbor", "Two: Inland"], addSec: "Two: Inland", step: 1, expand: "collection", home: "board", pi: 0, mode: "write", menu: false, addTab: "new", pick: "x1", confirm: false, takeChoice: "move", takeDone: false, lbOverride: {} };
 const STEPS = ["Expand", "Home", "A piece", "Add a piece", "Sections", "Take one out", "Export", "Projects & File", "On the phone"];
 const fmt = (n) => n.toLocaleString("en-US");
 const total = () => PIECES.reduce((n, p) => n + p.words, 0);
@@ -312,30 +316,22 @@ function screenExpand() {
   </div></div></div>`;
 }
 
-function contentsList() {
-  let html = `<div class="contents"><div class="bookhead"><div class="eyebrow">Anthology</div><h2>Salt and Lantern</h2><p>by R. L. · 6 pieces · ${fmt(total())} words</p></div>`;
-  let sec = null;
-  PIECES.forEach((p, i) => {
-    if (p.sec !== sec) {
-      sec = p.sec;
-      const n = PIECES.filter((q) => q.sec === sec).length;
-      html += `<div class="sect"><span class="n">${sec}</span><span class="c">${n} pieces</span></div>`;
-    }
-    const k = KIND[p.kind];
-    html += `<button class="crow" data-open="${i}"><span class="grip" aria-hidden="true">⋮⋮</span>
-      <span style="min-width:0"><span class="line1"><span class="t">${p.title}</span><span class="tagk">${k.label}</span></span><span class="s">${p.sum}</span></span>
-      <span class="r"><span class="st ${p.st}">${p.st}</span><span class="w">${fmt(p.words)}${p.target ? " / " + fmt(p.target) : ""} words · ${p.parts} ${k.many}</span></span></button>`;
-  });
-  html += `<div class="addrow"><button class="ghostbtn" data-go="4">+ Add piece</button><button class="ghostbtn" data-go="5">+ Add section</button></div></div>`;
-  return html;
-}
-
 function boardView() {
   return `<div class="board dotgrid">
     <div class="legend"><span><span class="lg-card"></span>Each card is a <b>piece</b></span><span><span class="lg-band"></span>Each dashed band is a <b>section</b></span><span>Drag a card to reorder it, or into another section</span></div>
     ${S.sections.map((sec) => {
       const n = PIECES.filter((p) => p.sec === sec).length;
-      return `<div class="band" data-band="${esc(sec)}"><span class="bl">${esc(sec)} <span class="bc">${n} ${n === 1 ? "piece" : "pieces"}</span></span><div class="cards">${PIECES.map((p, i) => p.sec !== sec ? "" : `
+      const si = S.sections.indexOf(sec);
+      const label = S.renaming === sec
+        ? `<span class="secname editing" contenteditable="true" data-rename="${esc(sec)}">${esc(sec)}</span>`
+        : `<span class="secname">${esc(sec)}</span>`;
+      const menu = S.secMenu !== sec ? "" : `<div class="menu secmenu"><div class="eyebrow" style="padding:6px 10px 4px">${esc(sec)}</div>
+        <button data-secact="rename" data-sec="${esc(sec)}">Rename</button>
+        <button data-secact="up" data-sec="${esc(sec)}" ${si === 0 ? "disabled style=\"opacity:.4\"" : ""}>Move section up<small>Its pieces move with it</small></button>
+        <button data-secact="down" data-sec="${esc(sec)}" ${si === S.sections.length - 1 ? "disabled style=\"opacity:.4\"" : ""}>Move section down</button>
+        <div class="sep"></div>
+        <button data-secact="remove" data-sec="${esc(sec)}">Remove section<small>Only the heading goes. ${n ? `Its ${n} ${n === 1 ? "piece joins" : "pieces join"} ${si === 0 ? "the section below" : "the section above"}.` : "It has no pieces."}</small></button></div>`;
+      return `<div class="band" data-band="${esc(sec)}"><span class="bl">${label} <span class="bc">${n} ${n === 1 ? "piece" : "pieces"}</span></span><button class="secbtn" data-secmenu="${esc(sec)}" aria-label="Section menu">⋯</button>${menu}<div class="cards">${PIECES.map((p, i) => p.sec !== sec ? "" : `
     <button class="chcard" draggable="true" data-drag="${i}" data-open="${i}"><span class="top"><span class="tagk">${KIND[p.kind].label}</span><span class="st ${p.st}">${p.st}</span></span>
     <div class="t">${p.title}</div><div class="s">${p.sum}</div>
     <div class="f"><span>${p.parts} ${KIND[p.kind].many}</span><span>${fmt(p.words)}${p.target ? " / " + fmt(p.target) : ""} words</span></div></button>`).join("")}
@@ -346,7 +342,7 @@ function boardView() {
 
 function screenHome() {
   return `<div class="frame">${appbar(`<button class="btn newb" data-go="4">+ Add piece</button><span class="btn">Export</span>`)}
-    ${S.home === "list" ? contentsList() : boardView()}${statusbar(`Anthology · 2 sections · 6 pieces · ${fmt(total())} words`)}</div>`;
+    ${boardView()}${statusbar(`Anthology · 2 sections · 6 pieces · ${fmt(total())} words`)}</div>`;
 }
 
 function screenPiece() {
@@ -408,16 +404,9 @@ function screenAdd() {
 }
 
 function screenSections() {
-  return `<div class="frame">${appbar()}<div class="contents">
-    <div class="sect"><span class="n">One: Harbor</span><span class="c">4 pieces</span><span class="btn">Rename</span><span class="btn">⋯</span></div>
-    ${PIECES.slice(0, 2).map((p, i) => `<button class="crow" data-open="${i}"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">${p.title}</span><span class="tagk">${KIND[p.kind].label}</span></span></span><span class="w" style="font-family:var(--mono);font-size:10.5px;color:var(--soft)">${fmt(p.words)} words</span></button>`).join("")}
-    <div class="crow" style="opacity:.55;border-style:dashed;cursor:grabbing"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">Gulls</span><span class="tagk">Poem</span></span><span class="s">Dragging…</span></span><span></span></div>
-    <div style="height:2px;background:var(--new);border-radius:2px;margin:-2px 0 6px"></div>
-    <div class="crow"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">Notes on Fog</span><span class="tagk">Essay</span></span></span><span class="w" style="font-family:var(--mono);font-size:10.5px;color:var(--soft)">1,940 words</span></div>
-    <div class="sect" style="border-bottom-color:var(--new)"><span class="n" contenteditable="true" style="outline:none;border-bottom:1px dashed var(--new)">Two: Inland</span><span class="c">2 pieces</span></div>
-    <div style="font-size:12px;color:var(--soft);line-height:1.6;padding:6px 2px">
-      <b style="color:var(--ink)">+ Add section</b> puts a heading after the last piece; drag pieces under it. A section is only a heading: <b style="color:var(--ink)">⋯ › Remove section</b> leaves its pieces where they are, joined to the section above. Pieces with no section before the first heading are fine.</div>
-  </div>${statusbar("Anthology · 2 sections · 6 pieces")}</div>`;
+  // The board, with the section menu open on the second band.
+  if (S.secMenu === null && S.renaming === null && !S.secShown) { S.secMenu = S.sections[1] ?? S.sections[0]; S.secShown = true; }
+  return `<div class="frame">${appbar()}${boardView()}${statusbar(`Anthology · ${S.sections.length} sections · ${PIECES.length} pieces`)}</div>`;
 }
 
 function screenTakeOut() {
@@ -499,10 +488,10 @@ function screenPhone() {
 
 const CAPTIONS = {
   1: `<b>The Expand dialog you have today</b>, with "A collection" made real. Pick it and the piece becomes the first piece of an anthology, still a poem. The other choice, one poem that keeps growing (like the Divine Comedy), is renamed for poems from "One longer work / A long poem" to <b>An epic</b>, tagged "Epic" in your project list; stories and essays keep "One longer work". Click either choice to compare, then <b>Make an anthology</b> to see the result.`,
-  2: `<b>The anthology's home: Option B, the board, is your pick.</b> <b>Each card is one piece</b> (a poem, a story, an essay). <b>Each dashed band is a section</b>, and a section is only a heading over the pieces in it. <b>Try it:</b> drag a card to reorder it within its section, or drop it into the other band to move it there (the blue edge shows where it lands). Every section ends with a <b>+ Add piece</b> card that adds into that section; <b>+ Add section</b> at the bottom adds an empty band you can drag pieces into. Clicking a card (without dragging) opens the piece as its own page. No acts, chapter numbers, chapter links or Timeline. Option A, the contents list, is still here for comparison.`,
+  2: `<b>The anthology's home: the board.</b> <b>Each card is one piece</b> (a poem, a story, an essay). <b>Each dashed band is a section</b>, and a section is only a heading over the pieces in it. <b>Try it:</b> drag a card to reorder it within its section, or drop it into the other band to move it there (the blue edge shows where it lands). Every section ends with a <b>+ Add piece</b> card that adds into that section; <b>+ Add section</b> at the bottom adds an empty band you can drag pieces into. Each band's <b>⋯</b> holds Rename, Move section up / down and Remove section (step 5). Clicking a card (without dragging) opens the piece as its own page. No acts, chapter numbers, chapter links or Timeline.`,
   3: `<b>A piece opens exactly as a single piece does today</b>, plus a way back to the contents and ‹ › to the next piece. Step through them: the poems keep their line breaks, the stories and the essay read as paragraphs, and each counts its own parts (stanzas, scenes, sections). The kind and the Line breaks toggle belong to this piece only. Open <b>⋯</b> for Move to section and Make its own project.`,
   4: `<b>+ Add piece</b> has two halves: a new blank piece (the same kind cards as New project) or <b>Bring in a project</b>, which lists only your single pieces. Pick one and click Bring in to see what moves. Your choice: it moves in, and a saved copy is kept first.`,
-  5: `<b>Sections</b> are headings between pieces (Part One, Harbor, Inland). Drag a piece to move it; the blue line is where it lands. A section is only a heading, so removing one never removes a piece.`,
+  5: `<b>Sections, on the board.</b> A section is the dashed band and its heading; it holds no writing of its own. The <b>⋯</b> at the right of each band (open here on the second one) has <b>Rename</b> (type the new name, Enter keeps it), <b>Move section up / down</b> (its pieces go with it) and <b>Remove section</b>: only the heading goes, and its pieces join the section above (or below, for the first one), so no piece is ever removed. <b>+ Add section</b> under the last band adds an empty one. All of these work here; try them.`,
   6: `<b>Taking a piece out.</b> From the piece's ⋯ menu: <b>Make its own project…</b> Move it out (the default) or Copy it out. Click the button to see your project list afterwards.<span class="q">Question 2: is this how you picture it? Should Move or Copy be the default, or should it ask every time with neither picked?</span>`,
   7: `<b>Export.</b> A title page, a contents page, a page per section, then each piece on a new page under its own title, with its own line breaks. No "Chapter 3".`,
   8: `<b>Projects and the File menu.</b> The anthology carries an "Anthology" tag. A book that was expanded as a collection before this existed (or any standalone book) gets <b>Make this an anthology…</b>: each chapter becomes a piece, nothing is joined, a copy is saved first.`,
@@ -512,22 +501,42 @@ const CAPTIONS = {
 function render() {
   stepper();
   const o = document.getElementById("opts");
-  o.innerHTML = S.step === 2 ? `<span class="lbl">Option:</span><button class="${S.home === "list" ? "on" : ""}" data-home="list">A · Contents list</button><button class="${S.home === "board" ? "on" : ""}" data-home="board">B · Board of cards</button>`
-    : S.step === 3 ? `<span class="lbl">Piece:</span>${PIECES.map((p, i) => `<button class="${S.pi === i ? "on" : ""}" data-pi="${i}">${p.title} (${KIND[p.kind].label.toLowerCase()})</button>`).join("")}`
+  o.innerHTML = S.step === 3 ? `<span class="lbl">Piece:</span>${PIECES.map((p, i) => `<button class="${S.pi === i ? "on" : ""}" data-pi="${i}">${p.title} (${KIND[p.kind].label.toLowerCase()})</button>`).join("")}`
     : S.step === 4 ? `<span class="lbl">Show:</span><button class="${S.addTab === "new" ? "on" : ""}" data-tab="new">New piece</button><button class="${S.addTab === "bring" && !S.confirm ? "on" : ""}" data-tab="bring">Bring in: pick</button><button class="${S.confirm ? "on" : ""}" data-tab="confirm">Bring in: confirm</button>`
     : S.step === 6 ? `<span class="lbl">Show:</span><button class="${!S.takeDone ? "on" : ""}" data-takedone="0">Dialog</button><button class="${S.takeDone ? "on" : ""}" data-takedone="1">After</button>`
     : "";
   const fn = { 1: screenExpand, 2: screenHome, 3: screenPiece, 4: screenAdd, 5: screenSections, 6: screenTakeOut, 7: screenExport, 8: () => screenProjects(false), 9: screenPhone }[S.step];
   document.getElementById("screen").innerHTML = fn();
   document.getElementById("caption").innerHTML = CAPTIONS[S.step];
+  const ed = document.querySelector(".secname.editing");
+  if (ed) { ed.focus(); const r = document.createRange(); r.selectNodeContents(ed); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
 }
 
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-go]");
   if (!t || t.disabled) return;
   const d = t.dataset;
-  if (d.step) { S.step = +d.step; S.menu = false; }
+  if (d.step) { S.step = +d.step; S.menu = false; S.secMenu = null; S.secShown = false; }
   else if (d.go) { S.step = +d.go; S.menu = false; S.confirm = false; S.takeDone = false; }
+  else if (d.secmenu) { S.secMenu = S.secMenu === d.secmenu ? null : d.secmenu; }
+  else if (d.secact) {
+    const sec = d.sec, i = S.sections.indexOf(sec);
+    S.secMenu = null;
+    if (d.secact === "rename") S.renaming = sec;
+    else if (d.secact === "up" || d.secact === "down") {
+      const j = d.secact === "up" ? i - 1 : i + 1;
+      [S.sections[i], S.sections[j]] = [S.sections[j], S.sections[i]];
+      const order = (p) => S.sections.indexOf(p.sec);
+      PIECES.sort((a, b) => order(a) - order(b));
+    } else if (d.secact === "remove") {
+      const into = S.sections[i === 0 ? 1 : i - 1];
+      PIECES.forEach((p) => { if (p.sec === sec) p.sec = into ?? ""; });
+      S.sections.splice(i, 1);
+      const order = (p) => S.sections.indexOf(p.sec);
+      PIECES.sort((a, b) => order(a) - order(b));
+      if (S.addSec === sec) S.addSec = S.sections[S.sections.length - 1] ?? "";
+    }
+  }
   else if (d.addsec) { S.addSec = d.addsec; S.step = 4; S.addTab = "new"; S.confirm = false; }
   else if (d.newsec) { let n = S.sections.length + 1; S.sections.push(`Untitled section ${n}`); S.addSec = S.sections[S.sections.length - 1]; }
   else if (d.expand) S.expand = d.expand;
@@ -545,6 +554,20 @@ document.addEventListener("click", (e) => {
   else return;
   render();
 });
+
+// Renaming a section: Enter or clicking away keeps the new name.
+function commitRename(el) {
+  const old = el.dataset.rename, name = el.textContent.trim() || old;
+  S.renaming = null;
+  if (name !== old && !S.sections.includes(name)) {
+    S.sections[S.sections.indexOf(old)] = name;
+    PIECES.forEach((p) => { if (p.sec === old) p.sec = name; });
+    if (S.addSec === old) S.addSec = name;
+  }
+  render();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.rename) { e.preventDefault(); e.target.blur(); } });
+document.addEventListener("focusout", (e) => { if (e.target.dataset && e.target.dataset.rename && S.renaming) commitRename(e.target); });
 
 // Drag a piece card: drop on a card to land before / after it, or on a band to land at its end.
 let dragI = null;
