@@ -8,8 +8,9 @@
 ## What it is
 
 A way to record how characters relate (who is family, who is a rival, how each
-one sees the other) and to see it as a chart. Relationships are edited on each
-character's card; the chart is a second view of the Characters drawer.
+one sees the other) and to see it as a chart. Relationships are edited in each
+character's window (opened from its card); the chart is a second view of the
+Characters drawer.
 
 ## Data model
 
@@ -49,17 +50,65 @@ Why this shape:
 
 ## UI
 
+Built on the detail-card restyle Ray chose (option B, see "Fitting with the
+detail-card plans" below): characters are tiles, and clicking one opens the
+character in a window.
+
 - **Chart:** a Roster / Chart switch in the Characters drawer header. Chart opens
-  the drawer at its expanded size. Characters sit on a ring; clicking one puts
-  them in the middle with their ties around them; clicking a line shows both
-  points of view in a side panel with Edit. Kind filters; "Show archived" off by
-  default. **No stored layout**, so nothing to sync or merge for positions.
-- **Card:** a new "Relationships" field under "Appears in" on each character
-  card, listing ties (other character, kind, label, both views). Click to edit,
-  "+ Add relationship" to add, "See on chart" to jump.
+  the drawer at its expanded size. Characters sit on a ring **in roster order**
+  (clockwise from the top); clicking one puts them in the middle with their ties
+  around them; clicking a line shows both points of view in a side panel with
+  Edit. A centered character's panel has "Open <name>'s card", which opens the
+  character window. Kind filters; "Show archived" off by default. **No stored
+  layout**, so nothing to sync or merge for positions.
+- **Character window:** a new "Relationships" field under "Appears in", listing
+  ties (other character, kind, label, both views). Click a row to edit,
+  "+ Add relationship" to add, "See on chart" to close the window and jump to the
+  chart with this character centered. Archived characters' windows list their
+  ties but have no Add button.
+- **Tile footer:** the restyle's mono footer ("archetype · in N chapters") gains
+  "· N ties" when there are any (archived partners not counted). Optional.
 - **Editor:** one small dialog: With (picker; self, archived and already-tied
   characters excluded), Kind, Label, both views, Notes. Remove in the footer.
-- **Empty state:** plain copy pointing at the card.
+  It opens over the character window, or over the drawer from the chart.
+- **Empty state:** plain copy pointing at the character's card.
+
+## Fitting with the detail-card plans
+
+Two sibling plans change the character card. Neither is merged; this plan
+assumes both as currently written.
+
+**Restyle** (`claude/detail-cards-style-5424f7`, `docs/PLAN-detail-cards.md`;
+Ray chose option B, everywhere):
+
+- The expanded card goes away. Its fields move unchanged into a window
+  (`DetailWindow.tsx`), so the Relationships field goes into that window's
+  field block, under "Appears in", instead of into the inline card.
+- The tie count goes in `DetailCard`'s footer slot, as the restyle suggests.
+- **Stacking:** the restyle puts its window between the chapter modal and
+  `ConfirmDialog`. The relationship dialog opens from inside that window, so it
+  sits one level above it and still below `ConfirmDialog` (Remove asks for no
+  confirmation today; if it ever does, the confirm stacks on top).
+- "See on chart" closes the window (the restyle's `selChar` becomes "which
+  window is open") and switches the drawer to Chart.
+- **Landing order:** the restyle should land first. If relationships landed
+  first, the field would go into today's inline card and move into the window
+  with the rest of the field block; a small rebase either way.
+
+**Rearrange** (`claude/detail-cards-reorder-f20e90`,
+`docs/PLAN-detail-cards-reorder.md`):
+
+- The grip and typed position number sit at the head of the tile's top row,
+  before the badge. Nothing here touches them; the mockup shows them so the
+  tile matches.
+- **The chart ring follows roster order** (the array order of
+  `doc.characters`, non-archived only). That answers the rearrange plan's
+  question 5 with a yes, if Ray agrees: dragging a card moves its place on the
+  ring, and the chart still stores no layout. Archived characters, when shown,
+  sit apart from the ring.
+- No data overlap: relationships point at ids, order is the array.
+- Both features add story-wide units to the conflict diff; whichever lands
+  second updates the unit count in `sync.test.ts`.
 
 ## Store, persistence, sync (web)
 
@@ -105,6 +154,7 @@ See the report in the session; repeated here so they stay with the plan.
    Proposal: static first.
 2. Is the kind list right (Family, Friend, Romance, Mentor, Rival, Other)?
 3. Chart in the drawer (proposed), or a third main view beside Board / Timeline?
-4. Auto layout only (proposed), or let characters be dragged and remember where?
-5. Tie count in the card subtitle: yes or no?
+4. Ring in roster order with no saved layout (proposed; rearranging cards then
+   arranges the ring), or drag characters on the chart and remember where?
+5. Tie count in the tile footer: yes or no?
 6. Phone: leave it carrying the data silently, or plan a read-only list there?

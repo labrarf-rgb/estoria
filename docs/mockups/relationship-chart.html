@@ -205,33 +205,57 @@
   }
   .dashed:hover { border-color: var(--faint); color: var(--ink); }
 
-  /* ---------- Roster screen ---------- */
-  .split { display: grid; grid-template-columns: minmax(0, 1fr) min(460px, 100%); min-height: 640px; }
-  .board {
+  /* ---------- Cards and window (matches the detail-card restyle, option B) ---------- */
+  .app { display: grid; }
+  .app > * { grid-area: 1 / 1; min-width: 0; }
+  .boardbg {
     background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px;
-    position: relative; overflow: hidden;
+    padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start;
   }
-  .board .ghost { position: absolute; width: 190px; height: 112px; border-radius: 13px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--shadow); opacity: .55; }
-  .board::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.18); }
-  .drawer { background: var(--panel); border-left: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
-  .roster { padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
-  .ccard { border: 1px solid var(--rule); background: var(--card); border-radius: 13px; padding: 14px; }
-  .ccard .top { display: flex; align-items: center; gap: 11px; }
-  .ccard .cn { font-family: var(--serif); font-size: 15px; font-weight: 600; }
-  .ccard .cs { font-size: 11.5px; font-weight: 500; color: var(--soft); }
-  .ccard .chev { margin-left: auto; color: var(--faint); font-size: 13px; }
-  .ccard .body { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 12px; }
-  .field-ghost { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+  .boardbg .ghost { width: 220px; height: 130px; border-radius: 12px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--shadow); }
+  .dimlayer { background: rgba(20,14,6,.46); }
+  .sidedrawer { justify-self: end; width: min(460px, 100%); background: var(--panel); border-left: 1px solid var(--rule); box-shadow: -20px 0 60px rgba(0,0,0,.3); }
+  .fulldrawer { background: var(--panel); }
+  .tlist { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 16px; padding: 18px 22px 22px; }
+  .tile {
+    display: flex; flex-direction: column; gap: 7px; text-align: left; width: 100%;
+    border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow);
+    transition: border-color .2s;
+  }
+  .tile:hover { border-color: var(--faint); }
+  .tgrid .tile { min-height: 142px; }
+  .tile .top { display: flex; align-items: center; gap: 8px; }
+  .ibadge { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: var(--mono); font-size: 11px; font-weight: 600; flex: none; }
+  .tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .tile .ttl { font-family: var(--serif); font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .tile .sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tile .grow { flex: 1; }
+  .tile .meta { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--soft); }
+  .tile .meta .sep { color: var(--faint); }
+  .tile .meta .ties { color: var(--new); }
+  .grip { color: var(--faint); font-size: 13px; line-height: 1; cursor: grab; }
+  .pos { font-family: var(--mono); font-size: 10.5px; color: var(--soft); border: 1px solid var(--rule); border-radius: 5px; padding: 0 5px; min-width: 22px; text-align: center; }
+  .addtile { border: 1.5px dashed var(--line); background: transparent; border-radius: 12px; padding: 13px; font-size: 13px; font-weight: 600; color: var(--soft); }
+  .tgrid .addtile { min-height: 142px; }
+  .winscrim { background: rgba(20,14,6,.38); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; }
+  .win { width: min(600px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .whead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+  .whead .ttl { font-family: var(--serif); font-size: 20px; font-weight: 600; min-width: 0; }
+  .wbody { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .field-ghost { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
+  .pairf { display: flex; gap: 12px; } .pairf > * { flex: 1; min-width: 0; }
   .collapsed-note { font-size: 11.5px; color: var(--faint); font-style: italic; }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .chips .chch { padding: 2px 8px; }
   .newfield { position: relative; border-radius: 10px; outline: 1.5px dashed color-mix(in oklch, var(--new) 55%, transparent); outline-offset: 6px; }
   .rels { display: flex; flex-direction: column; gap: 2px; }
   .rels .tie { padding: 7px 6px; }
+  .stagedlg { display: flex; justify-content: center; align-items: flex-start; padding: 60px 16px 36px; background: rgba(20,14,6,.35); }
+  .live .win { max-height: calc(100vh - 32px); overflow: auto; }
   @media (max-width: 820px) {
-    .split { grid-template-columns: minmax(0, 1fr); }
-    .board { display: none; }
-    .drawer { border-left: 0; }
+    .boardbg { display: none; }
+    .sidedrawer { width: 100%; border-left: 0; }
   }
 
   /* ---------- Dialog ---------- */
@@ -327,7 +351,7 @@
     <div class="caption">
       <b>The chart is the Characters drawer's second view.</b> A Roster / Chart switch sits in the drawer header, and Chart opens the drawer full width (the existing Expand size), because a chart does not fit in 460px. One line per pair, colored by kind and always labeled, so color is never the only cue.
       <ul>
-        <li><b>No saved layout.</b> Everyone sits on a ring. Clicking a character moves them to the middle with their ties around them, so there are no positions to store or sync.</li>
+        <li><b>No saved layout.</b> Everyone sits on a ring in roster order, clockwise from the top (Wren, Bram, Ione, Sela, Pip, the same order as the tiles). Clicking a character moves them to the middle with their ties around them. There are no positions to store or sync. If cards become rearrangeable, moving a card moves its place on the ring.</li>
         <li><b>Kind filters</b> in the side panel hide whole kinds of tie. Archived characters are off by default (screen 4).</li>
         <li><b>The side panel</b> shows the selected pair or character. Each pair has a line for how each one sees the other, because feelings are rarely mutual.</li>
       </ul>
@@ -336,16 +360,26 @@
 
   <!-- 2 · Character card -->
   <section class="screen" data-screen="card" hidden>
+    <div class="label" style="margin:0">Expanded drawer, Roster view</div>
     <div class="frame">
-      <div class="split">
-        <div class="board" aria-hidden="true">
-          <div class="ghost" style="left:40px; top:60px"></div>
-          <div class="ghost" style="left:270px; top:40px"></div>
-          <div class="ghost" style="left:120px; top:230px"></div>
-          <div class="ghost" style="left:350px; top:260px"></div>
-          <div class="ghost" style="left:60px; top:420px"></div>
+      <div class="dhead">
+        <div class="dtitle">Characters</div>
+        <div class="toggle" role="group" aria-label="Characters view">
+          <button aria-pressed="true">Roster</button>
+          <button aria-pressed="false" data-goto="chart">Chart</button>
         </div>
-        <div class="drawer">
+        <div class="spacer"></div>
+        <button class="btn">Collapse</button>
+        <button class="btn x" aria-label="Close">✕</button>
+      </div>
+      <div class="fulldrawer"><div class="tgrid" id="cardsGrid"></div></div>
+    </div>
+    <div class="label" style="margin:8px 0 0">Collapsed drawer, after clicking Wren</div>
+    <div class="frame">
+      <div class="app">
+        <div class="boardbg" aria-hidden="true"><div class="ghost"></div><div class="ghost"></div><div class="ghost"></div></div>
+        <div class="dimlayer"></div>
+        <div class="sidedrawer">
           <div class="dhead">
             <div class="dtitle">Characters</div>
             <div class="toggle" role="group" aria-label="Characters view">
@@ -356,16 +390,18 @@
             <button class="btn">Expand</button>
             <button class="btn x" aria-label="Close">✕</button>
           </div>
-          <div class="roster" id="roster"></div>
+          <div class="tlist" id="cardsList"></div>
         </div>
+        <div class="winscrim" id="winStatic"></div>
       </div>
     </div>
     <div class="caption">
-      <b>Relationships are added and edited on the card,</b> in a new field under "Appears in", the same way cast and chapters already work. Each row names the other character, the kind, the label, and both points of view; clicking it opens the editor. "See on chart" switches to the chart with this character in the middle.
+      <b>The cards follow the detail-card restyle,</b> which Ray has chosen (option B): each character is a tile with the chapter card's face, and clicking it opens the character in a window instead of expanding it in the list. <b>The Relationships field lives in that window,</b> under "Appears in". Each row names the other character, the kind, the label and both points of view, and clicking a row opens the editor on top of the window. "See on chart" closes the window and switches to the chart with this character in the middle. Click any tile here to open its window.
       <ul>
-        <li><b>A pair is one record,</b> so the tie shows on both cards (Wren's and Sela's) and editing either edits the same thing.</li>
-        <li><b>Wren is already tied to everyone,</b> so "+ Add relationship" on her card greys out the whole picker. That is the one-record-per-pair rule at work. To try adding, center Bram or Ione on the chart and add from there.</li>
-        <li><b>The card's subtitle</b> gains a tie count beside the chapter count. <span class="flag q">Optional</span></li>
+        <li><b>Tile face:</b> initials badge in the character's color, role tag, name, two lines of description, and a footer of archetype · chapters, plus a relationship count in green. <span class="flag q">Optional</span></li>
+        <li><b>Grip and position number</b> at the start of each tile come from the separate plan for rearranging cards. That plan isn't decided yet; they're shown so the pieces line up.</li>
+        <li><b>A pair is one record,</b> so the tie shows in both windows (Wren's and Sela's), and editing either one edits the same tie.</li>
+        <li><b>Wren is already tied to everyone,</b> so "+ Add relationship" in her window greys out the whole picker. That is the one-record-per-pair rule at work. To try adding, open Bram or Ione.</li>
       </ul>
     </div>
   </section>
@@ -373,10 +409,13 @@
   <!-- 3 · Add or edit -->
   <section class="screen" data-screen="edit" hidden>
     <div class="frame">
-      <div class="stage" id="stage"></div>
+      <div class="app">
+        <div class="winscrim" id="stageWin" aria-hidden="true" style="background:var(--bg)"></div>
+        <div class="stagedlg" id="stage"></div>
+      </div>
     </div>
     <div class="caption">
-      <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. Shown here: adding a tie from Bram's card, with Sela picked. The picker greys out anyone Bram already has a tie with, since a pair has one record. Click the dialog to try it live; it also opens from "+ Add relationship" on any card or in the chart, and from any tie row (as Edit, with Remove).
+      <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. It opens on top of the character window, so it stacks one level higher than the restyle's window. Shown here: adding a tie from Bram's window, with Sela picked. The picker greys out anyone Bram already has a tie with, since a pair has one record. Click the dialog to try it live; it also opens from "+ Add relationship" on any card or in the chart, and from any tie row (as Edit, with Remove).
       <ul>
         <li><b>Kind</b> is a short fixed list that sets the color: Family, Friend, Romance, Mentor, Rival, Other. <b>Label</b> is free text for the specifics ("former mentor", "sisters").</li>
         <li><b>Both points of view are optional.</b> Leave one blank for a tie only one of them feels, or write "doesn't know she exists".</li>
@@ -410,7 +449,7 @@
           <div class="in">
             <div class="eyebrow">No relationships yet</div>
             <div class="big">Lines appear here as you connect your characters.</div>
-            <p>Open a character on the roster and use Add relationship. Each one you add shows up here as a line between two people.</p>
+            <p>Open a character's card on the roster and use Add relationship. Each one you add shows up here as a line between two people.</p>
             <button class="btn big" data-goto="card">Open the roster</button>
           </div>
         </div>
@@ -466,17 +505,24 @@ interface Relationship {
   </section>
 </div>
 
+<div class="scrim live" id="winScrim" style="z-index:35; align-items:flex-start" hidden></div>
 <div class="scrim" id="scrim" hidden></div>
 
 <script>
 (function () {
   const CHARS = [
-    { id: "wren", name: "Wren Calloway", first: "Wren", role: "Protagonist", ini: "WC", color: "oklch(0.60 0.10 215)", ch: 8 },
-    { id: "bram", name: "Bram Okonkwo", first: "Bram", role: "Ally", ini: "BO", color: "oklch(0.62 0.12 85)", ch: 7 },
-    { id: "ione", name: "Ione Calloway", first: "Ione", role: "Missing", ini: "IC", color: "oklch(0.60 0.12 145)", ch: 2 },
-    { id: "sela", name: "Sela Voss", first: "Sela", role: "Antagonist", ini: "SV", color: "oklch(0.58 0.15 30)", ch: 6 },
-    { id: "pip", name: "Pip", first: "Pip", role: "Catalyst", ini: "P", color: "oklch(0.56 0.12 305)", ch: 5 },
-    { id: "dace", name: "Captain Dace", first: "Dace", role: "Mentor", ini: "CD", color: "oklch(0.60 0.11 100)", ch: 1, archived: true },
+    { id: "wren", name: "Wren Calloway", first: "Wren", role: "Protagonist", type: "Hero", ini: "WC", color: "oklch(0.60 0.10 215)", ch: 8,
+      desc: "A cartographer who can chart any coast but her own way home.", notes: "Left-handed; signs every chart with a tiny anchor." },
+    { id: "bram", name: "Bram Okonkwo", first: "Bram", role: "Ally", type: "Companion", ini: "BO", color: "oklch(0.62 0.12 85)", ch: 7,
+      desc: "A navigator who has sailed everywhere except toward the truth.", notes: "Hums when he lies." },
+    { id: "ione", name: "Ione Calloway", first: "Ione", role: "Missing", type: "Herald", ini: "IC", color: "oklch(0.60 0.12 145)", ch: 2,
+      desc: "Wren's mother, lost with the last expedition to the False Harbor.", notes: "" },
+    { id: "sela", name: "Sela Voss", first: "Sela", role: "Antagonist", type: "Shadow", ini: "SV", color: "oklch(0.58 0.15 30)", ch: 6,
+      desc: "Wren's former mentor, now harbormaster of a city that forgives no debts.", notes: "Keeps Wren's old apprentice mug on her desk." },
+    { id: "pip", name: "Pip", first: "Pip", role: "Catalyst", type: "Trickster", ini: "P", color: "oklch(0.56 0.12 305)", ch: 5,
+      desc: "A dock-rat who trades in secrets and stolen tide-charts.", notes: "Counts the exits in every room." },
+    { id: "dace", name: "Captain Dace", first: "Dace", role: "Mentor", type: "Mentor", ini: "CD", color: "oklch(0.60 0.11 100)", ch: 1, archived: true,
+      desc: "Bram's first captain. Cut in the second draft.", notes: "" },
   ];
   const KINDS = [
     ["family", "Family"], ["friend", "Friend"], ["romance", "Romance"],
@@ -701,7 +747,7 @@ interface Relationship {
         <div class="who">${avatar(c)}<div><h3>${esc(c.name)}</h3><div class="sub">${esc(c.role)} · ${ties.length} ${ties.length === 1 ? "relationship" : "relationships"}</div></div></div>
         <div class="tie-list">${ties.map((r) => tieRow(r, c.id)).join("") || '<p>No relationships yet.</p>'}</div>
         ${c.archived ? "" : `<button class="dashed" data-new="${c.id}">+ Add relationship</button>`}
-        <div class="row"><button class="link" data-clear>Back to everyone</button></div>`;
+        <div class="row"><button class="btn big" data-open="${c.id}">Open ${esc(c.first)}'s card</button><button class="link" data-clear>Back to everyone</button></div>`;
     } else {
       top = `
         <div><div class="eyebrow">Untitled Voyage</div><h3 style="margin-top:4px">${RELS.filter((r) => !byId(r.a).archived && !byId(r.b).archived).length} relationships among ${CHARS.filter((c) => !c.archived).length} characters</h3></div>
@@ -717,6 +763,7 @@ interface Relationship {
     if (t.dataset.kind) { const k = new Set(chart.st.kinds); k.has(t.dataset.kind) ? k.delete(t.dataset.kind) : k.add(t.dataset.kind); chart.setKinds(k); }
     else if (t.dataset.edit) openDialog({ id: t.dataset.edit });
     else if (t.dataset.new) openDialog({ from: t.dataset.new });
+    else if (t.dataset.open) openWindow(t.dataset.open);
     else if ("clear" in t.dataset) { chart.st.focus = null; chart.st.sel = null; chart.update(true); }
     else if (t.id === "archToggle") chart.setArch(t.checked);
   });
@@ -725,38 +772,62 @@ interface Relationship {
   const chartArch = makeChart(document.getElementById("chartArch"), { showArch: true });
   chartArch.selectNode("bram");
 
-  /* ---------------- Roster card ---------------- */
-  const roster = document.getElementById("roster");
-  function renderRoster() {
-    const me = "wren", c = byId(me), ties = tiesOf(me);
-    const others = CHARS.filter((x) => !x.archived && x.id !== me);
-    roster.innerHTML = `
-      <div class="ccard">
-        <div class="top">${avatar(c)}<div><div class="cn">${esc(c.name)}</div><div class="cs">${c.role} · in ${c.ch} chapters · ${ties.length} relationships</div></div><span class="chev">▴</span></div>
-        <div class="body">
-          <div class="collapsed-note">Name, role, bio, traits, goals, wants and needs sit above, unchanged.</div>
-          <div><div class="label">Notes</div><div class="field-ghost">Left-handed; signs every chart with a tiny anchor.</div></div>
-          <div><div class="label">Appears in</div><div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<span class="chch">Ch ${n} ↗</span>`).join("")}</div></div>
-          <div class="newfield">
-            <div class="label" style="display:flex;align-items:center;justify-content:space-between">
-              <span>Relationships <span class="flag">New</span></span>
-              <button class="link" data-goto-focus="${me}" style="font-size:11px;text-transform:none;letter-spacing:0">See on chart ↗</button>
-            </div>
-            <div class="rels">${ties.map((r) => tieRow(r, me)).join("")}</div>
-            <button class="dashed" style="margin-top:6px" data-new="${me}">+ Add relationship</button>
-          </div>
-          <div class="row"><button class="btn big">Archive</button><button class="btn big danger">Delete character</button></div>
-        </div>
-      </div>
-      ${others.map((o) => { const n = tiesOf(o.id).length; return `<div class="ccard"><div class="top">${avatar(o)}<div><div class="cn">${esc(o.name)}</div><div class="cs">${o.role} · in ${o.ch} chapters · ${n} ${n === 1 ? "relationship" : "relationships"}</div></div><span class="chev">▾</span></div></div>`; }).join("")}
-      <button class="dashed" style="padding:13px;border-radius:13px">+ Add character</button>`;
+  /* ---------------- Tiles and the character window (detail-card restyle, option B) ---------------- */
+  const SEP = '<span class="sep">·</span>';
+  function tileHTML(c, i) {
+    const n = tiesOf(c.id).filter((r) => !byId(other(r, c.id)).archived).length;
+    const meta = [c.type && `<span>${esc(c.type)}</span>`, `<span>in ${c.ch} chapter${c.ch === 1 ? "" : "s"}</span>`,
+      n ? `<span class="ties">${n} tie${n === 1 ? "" : "s"}</span>` : ""].filter(Boolean).join(SEP);
+    return `<button class="tile" data-open="${c.id}" aria-label="Open ${esc(c.name)}">
+      <div class="top"><span class="grip" aria-hidden="true">⠿</span><span class="pos">${i + 1}</span>
+        <span class="ibadge" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role || "No role")}</span></div>
+      <div class="ttl">${esc(c.name)}</div><div class="sum">${esc(c.desc || "No description yet")}</div><div class="grow"></div>
+      <div class="meta">${meta}</div></button>`;
   }
-  roster.addEventListener("click", (e) => {
-    const t = e.target.closest("button"); if (!t) return;
+  function windowHTML(c, live) {
+    const ties = tiesOf(c.id);
+    return `<div class="win" role="${live ? "dialog" : "group"}" aria-label="${esc(c.name)}">
+      <div class="whead"><span class="ibadge" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role)}</span>
+        <div class="ttl">${esc(c.name)}</div><span class="spacer"></span><button class="btn x" data-close-win aria-label="Close">✕</button></div>
+      <div class="wbody">
+        <div class="pairf"><div><div class="label">Name</div><div class="field-ghost">${esc(c.name)}</div></div><div style="flex:0 0 70px"><div class="label">Initials</div><div class="field-ghost">${esc(c.ini)}</div></div></div>
+        <div class="pairf"><div><div class="label">Role</div><div class="field-ghost">${esc(c.role)}</div></div><div><div class="label">Archetype</div><div class="field-ghost">${esc(c.type)}</div></div></div>
+        <div><div class="label">Description</div><div class="field-ghost">${esc(c.desc)}</div></div>
+        <div class="collapsed-note">Bio, Traits, Goals, Motivations, Wants, Needs, Notes (same fields as today)</div>
+        <div><div class="label">Appears in</div><div class="chips">${Array.from({ length: c.ch }, (_, i) => `<span class="chch">Ch ${i + 1} ↗</span>`).join("")}</div></div>
+        <div class="newfield">
+          <div class="label" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Relationships <span class="flag">New</span></span>
+            <button class="link" data-goto-focus="${c.id}" style="font-size:11px;text-transform:none;letter-spacing:0">See on chart ↗</button>
+          </div>
+          <div class="rels">${ties.map((r) => tieRow(r, c.id)).join("") || '<p class="collapsed-note" style="margin:4px 0">No relationships yet.</p>'}</div>
+          ${c.archived ? "" : `<button class="dashed" style="margin-top:6px" data-new="${c.id}">+ Add relationship</button>`}
+        </div>
+        <div class="row"><button class="btn big">Archive</button><button class="btn big danger">Delete character</button></div>
+      </div></div>`;
+  }
+  const winScrim = document.getElementById("winScrim");
+  let openWin = null;
+  function openWindow(id) { openWin = id; winScrim.innerHTML = windowHTML(byId(id), true); winScrim.hidden = false; const x = winScrim.querySelector("[data-close-win]"); if (x) x.focus(); }
+  function closeWindow() { openWin = null; winScrim.hidden = true; winScrim.innerHTML = ""; }
+  function renderCards() {
+    const act = CHARS.filter((c) => !c.archived);
+    const tiles = act.map(tileHTML).join("");
+    document.getElementById("cardsGrid").innerHTML = tiles + '<button class="addtile">+ Add character</button>';
+    document.getElementById("cardsList").innerHTML = tiles + '<button class="addtile">+ Add character</button>';
+    document.getElementById("winStatic").innerHTML = windowHTML(byId("wren"), false);
+    if (openWin) winScrim.innerHTML = windowHTML(byId(openWin), true);
+  }
+  function cardClicks(e) {
+    const t = e.target.closest("button"); if (!t) { if (e.currentTarget === winScrim && e.target === winScrim) closeWindow(); return; }
     if (t.dataset.edit) openDialog({ id: t.dataset.edit });
     else if (t.dataset.new) openDialog({ from: t.dataset.new });
-    else if (t.dataset.gotoFocus) { show("chart"); chart.st.sel = null; chart.st.focus = t.dataset.gotoFocus; chart.update(true); }
-  });
+    else if (t.dataset.open) openWindow(t.dataset.open);
+    else if ("closeWin" in t.dataset) { if (e.currentTarget === winScrim) closeWindow(); }
+    else if (t.dataset.gotoFocus) { closeWindow(); show("chart"); chart.st.sel = null; chart.st.focus = t.dataset.gotoFocus; chart.update(true); }
+  }
+  document.querySelector('section[data-screen="card"]').addEventListener("click", cardClicks);
+  winScrim.addEventListener("click", cardClicks);
 
   /* ---------------- Dialog ---------------- */
   function dialogHTML(d, live) {
@@ -832,12 +903,12 @@ interface Relationship {
       closeDialog(); refresh();
     }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !scrim.hidden) closeDialog(); });
+  document.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; if (!scrim.hidden) closeDialog(); else if (!winScrim.hidden) closeWindow(); });
   // Screen 3 shows a static copy of the editor: adding Sela to Bram, a pair with no record yet.
   // Clicking it opens the live dialog with the same choices.
   const STAGE = { from: "bram", with: "sela", kind: "romance" };
   const stage = document.getElementById("stage");
-  const drawStage = () => { stage.innerHTML = dialogHTML(STAGE, false); };
+  const drawStage = () => { stage.innerHTML = dialogHTML(STAGE, false); document.getElementById("stageWin").innerHTML = windowHTML(byId("bram"), false); };
   drawStage();
   stage.addEventListener("click", (e) => { if (e.target.closest("button, input, textarea")) { e.preventDefault(); openDialog({ ...STAGE }); } });
 
@@ -845,7 +916,7 @@ interface Relationship {
     const keepFocus = chart.st.focus, keepSel = RELS.some((r) => r.id === chart.st.sel) ? chart.st.sel : null;
     chart.rebuild(); chart.st.focus = keepFocus; chart.st.sel = keepSel; chart.update(false);
     chartArch.rebuild(); chartArch.st.focus = "bram"; chartArch.update(false);
-    renderRoster();
+    renderCards();
     drawStage();
   }
 
@@ -870,6 +941,7 @@ interface Relationship {
   themeBtns.forEach((b) => b.addEventListener("click", () => setTheme(b.getAttribute("aria-pressed") === "true" ? null : b.dataset.themeBtn)));
   const cur = document.documentElement.getAttribute("data-theme"); if (cur) setTheme(cur);
 
-  renderRoster();
+  renderCards();
+  drawStage();
 })();
 </script>
