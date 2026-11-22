@@ -1,0 +1,870 @@
+<title>Relationship Chart</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a review page of app frames (Estoria's own tokens), tabbed by screen, each with a caption. */
+  :root {
+    --desk: #d9cfba;
+    --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+    --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+    --on-ink: #fffdf6;
+    --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+    --frame-shadow: 0 20px 60px rgba(40,28,10,.22);
+    --but: oklch(0.55 0.15 33);
+    --new: oklch(0.54 0.10 152);
+    --k-family: oklch(0.55 0.09 70);
+    --k-friend: oklch(0.54 0.10 152);
+    --k-romance: oklch(0.55 0.12 355);
+    --k-mentor: oklch(0.52 0.08 250);
+    --k-rival: oklch(0.55 0.15 33);
+    --k-other: oklch(0.56 0.02 70);
+    --serif: "Spectral", Georgia, serif;
+    --sans: "Hanken Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #1b1813;
+      --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+      --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+      --on-ink: #231f19;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+      --frame-shadow: 0 20px 60px rgba(0,0,0,.45);
+      --but: oklch(0.63 0.13 33);
+      --new: oklch(0.62 0.09 152);
+      --k-family: oklch(0.64 0.08 70);
+      --k-friend: oklch(0.62 0.09 152);
+      --k-romance: oklch(0.64 0.11 355);
+      --k-mentor: oklch(0.62 0.08 250);
+      --k-rival: oklch(0.63 0.13 33);
+      --k-other: oklch(0.64 0.02 70);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #1b1813;
+    --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+    --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+    --on-ink: #231f19;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+    --frame-shadow: 0 20px 60px rgba(0,0,0,.45);
+    --but: oklch(0.63 0.13 33);
+    --new: oklch(0.62 0.09 152);
+    --k-family: oklch(0.64 0.08 70);
+    --k-friend: oklch(0.62 0.09 152);
+    --k-romance: oklch(0.64 0.11 355);
+    --k-mentor: oklch(0.62 0.08 250);
+    --k-rival: oklch(0.63 0.13 33);
+    --k-other: oklch(0.64 0.02 70);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--desk); color: var(--ink); font-family: var(--sans); font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    padding-block: 28px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--new); outline-offset: 2px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--new); }
+  .label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+
+  .intro { display: flex; flex-direction: column; gap: 6px; }
+  .intro h1 { font-family: var(--serif); font-size: 28px; font-weight: 500; margin: 0; text-wrap: balance; }
+  .intro p { margin: 0; color: var(--soft); font-size: 13.5px; line-height: 1.6; max-width: 72ch; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tabs button, .seg button {
+    font-size: 12.5px; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    padding: 7px 13px; border-radius: 9px; transition: background .2s, color .2s, border-color .2s;
+  }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .seg { display: flex; gap: 4px; align-items: center; font-size: 11.5px; color: var(--soft); }
+  .seg button { padding: 5px 10px; font-size: 12px; font-weight: 500; }
+  .seg button[aria-pressed="true"] { border-color: var(--new); color: var(--new); font-weight: 600; }
+
+  .screen { display: flex; flex-direction: column; gap: 12px; }
+  .caption { font-size: 13px; color: var(--soft); line-height: 1.6; max-width: 80ch; }
+  .caption b { color: var(--ink); font-weight: 600; }
+  .caption ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .flag {
+    display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--new); border: 1px solid var(--new); border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px;
+  }
+  .flag.q { color: var(--k-family); border-color: var(--k-family); }
+
+  /* ---------- App frame ---------- */
+  .frame { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); box-shadow: var(--frame-shadow); position: relative; }
+  .dhead { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--rule); background: var(--panel); flex-wrap: wrap; }
+  .dtitle { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+  .spacer { flex: 1; }
+  .toggle { display: flex; background: var(--chip); border-radius: 8px; padding: 3px; }
+  .toggle button { border: 0; background: transparent; border-radius: 6px; padding: 3px 10px; font-size: 11.5px; font-weight: 500; color: var(--soft); }
+  .toggle button[aria-pressed="true"] { background: var(--card); color: var(--ink); }
+  .btn { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 10px; font-size: 11.5px; font-weight: 500; color: var(--ink); transition: border-color .2s; }
+  .btn:hover { border-color: var(--faint); }
+  .btn.x { width: 30px; height: 30px; padding: 0; font-size: 13px; }
+  .btn.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; font-size: 13px; padding: 8px 14px; }
+  .btn.primary:hover { opacity: .88; }
+  .btn.ghost { background: transparent; color: var(--soft); }
+  .btn.ghost:hover { color: var(--ink); }
+  .btn.danger:hover { color: var(--but); }
+  .btn.big { font-size: 13px; padding: 8px 14px; }
+
+  /* ---------- Chart screen ---------- */
+  .chartbody { display: grid; grid-template-columns: minmax(0, 1fr) 320px; background: var(--panel); min-height: 520px; }
+  .canvas {
+    position: relative; min-width: 0; border-right: 1px solid var(--rule);
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px;
+  }
+  .canvas svg { display: block; width: 100%; height: auto; max-height: 640px; }
+  .canvas .hint { position: absolute; left: 14px; bottom: 12px; font-size: 11.5px; color: var(--faint); max-width: calc(100% - 28px); }
+  .side { padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  @media (max-width: 820px) {
+    .chartbody { grid-template-columns: minmax(0, 1fr); }
+    .canvas { border-right: 0; border-bottom: 1px solid var(--rule); }
+  }
+
+  svg text { font-family: var(--sans); }
+  .node { cursor: pointer; }
+  .node .ring { fill: none; stroke: var(--ink); stroke-width: 2; opacity: 0; transition: opacity .2s; }
+  .node.sel .ring { opacity: 1; }
+  .node .nm { font-family: var(--serif); font-size: 13.5px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+  .node .ini { font-size: 12px; font-weight: 600; fill: #fff; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .node.arch .disc { opacity: .45; }
+  .node.arch .nm { fill: var(--faint); }
+  .node .arch-tag { font-size: 9px; font-weight: 700; letter-spacing: .07em; fill: var(--faint); text-anchor: middle; }
+  .edge { cursor: pointer; }
+  .edge .ln { stroke-width: 2.2; fill: none; transition: opacity .2s, stroke-width .2s; }
+  .edge .hit { stroke: transparent; stroke-width: 16; fill: none; }
+  .edge .pill { fill: var(--card); stroke: var(--rule); stroke-width: 1; transition: opacity .2s; }
+  .edge .tx { font-size: 10.5px; font-weight: 600; text-anchor: middle; dominant-baseline: central; transition: opacity .2s; }
+  .edge.sel .ln { stroke-width: 3.6; }
+  .edge.sel .pill { stroke: currentColor; }
+  .edge.arch .ln { stroke-dasharray: 5 5; opacity: .5; }
+  .edge:hover .pill { stroke: var(--faint); }
+
+  .kindpill { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--kc); white-space: nowrap; }
+  .kindpill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--kc); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+  .legend button {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--card);
+    border-radius: 7px; padding: 4px 8px; font-size: 11.5px; font-weight: 500; color: var(--ink); transition: opacity .2s, border-color .2s;
+  }
+  .legend button::before { content: ""; width: 14px; height: 2.5px; border-radius: 2px; background: var(--kc); }
+  .legend button[aria-pressed="false"] { opacity: .45; }
+  .legend button[aria-pressed="false"]::before { background: var(--faint); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--soft); }
+  .check input { accent-color: var(--new); }
+  .side h3 { font-family: var(--serif); font-size: 17px; font-weight: 600; margin: 0; text-wrap: balance; }
+  .side .sub { font-size: 11.5px; color: var(--soft); margin-top: 2px; }
+  .side p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--soft); }
+  .hr { height: 1px; background: var(--rule); }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .av { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .av.sm { width: 24px; height: 24px; font-size: 9.5px; }
+  .av.arch { opacity: .45; }
+  .pair { display: flex; align-items: center; }
+  .pair .av + .av { margin-left: -8px; box-shadow: 0 0 0 2px var(--panel); }
+  .view { display: flex; flex-direction: column; gap: 3px; }
+  .view .who-line { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+  .view .txt { font-size: 13px; line-height: 1.5; color: var(--ink); font-family: var(--serif); }
+  .view .txt.empty { color: var(--faint); font-style: italic; }
+  .arc { display: flex; flex-direction: column; gap: 6px; }
+  .arc .step { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; font-size: 12px; line-height: 1.45; color: var(--soft); }
+  .chch { font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--soft); border: 1px solid var(--rule); border-radius: 6px; padding: 1px 7px; white-space: nowrap; background: var(--card); }
+  .tie-list { display: flex; flex-direction: column; gap: 4px; }
+  .tie {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: start; text-align: left;
+    border: 1px solid transparent; background: transparent; border-radius: 9px; padding: 8px; transition: background .2s, border-color .2s;
+  }
+  .tie:hover { background: var(--card); border-color: var(--rule); }
+  .tie .nm { font-family: var(--serif); font-size: 14px; font-weight: 600; }
+  .tie .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 1px; }
+  .tie .lbl { font-size: 11.5px; color: var(--soft); }
+  .tie .q { grid-column: 2; font-size: 12px; color: var(--soft); line-height: 1.45; }
+  .tie .q b { color: var(--ink); font-weight: 600; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .link { border: 0; background: none; padding: 0; color: var(--soft); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+  .link:hover { color: var(--ink); }
+  .dashed {
+    width: 100%; border: 1.5px dashed var(--line); background: transparent; border-radius: 11px; padding: 10px;
+    font-size: 12.5px; font-weight: 600; color: var(--soft); transition: border-color .2s, color .2s;
+  }
+  .dashed:hover { border-color: var(--faint); color: var(--ink); }
+
+  /* ---------- Roster screen ---------- */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) min(460px, 100%); min-height: 640px; }
+  .board {
+    background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px;
+    position: relative; overflow: hidden;
+  }
+  .board .ghost { position: absolute; width: 190px; height: 112px; border-radius: 13px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--shadow); opacity: .55; }
+  .board::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.18); }
+  .drawer { background: var(--panel); border-left: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
+  .roster { padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
+  .ccard { border: 1px solid var(--rule); background: var(--card); border-radius: 13px; padding: 14px; }
+  .ccard .top { display: flex; align-items: center; gap: 11px; }
+  .ccard .cn { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .ccard .cs { font-size: 11.5px; font-weight: 500; color: var(--soft); }
+  .ccard .chev { margin-left: auto; color: var(--faint); font-size: 13px; }
+  .ccard .body { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 12px; }
+  .field-ghost { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+  .collapsed-note { font-size: 11.5px; color: var(--faint); font-style: italic; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chips .chch { padding: 2px 8px; }
+  .newfield { position: relative; border-radius: 10px; outline: 1.5px dashed color-mix(in oklch, var(--new) 55%, transparent); outline-offset: 6px; }
+  .rels { display: flex; flex-direction: column; gap: 2px; }
+  .rels .tie { padding: 7px 6px; }
+  @media (max-width: 820px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .board { display: none; }
+    .drawer { border-left: 0; }
+  }
+
+  /* ---------- Dialog ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(20,14,6,.45); display: flex; align-items: center; justify-content: center; z-index: 40;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .stage { position: relative; background: rgba(20,14,6,.35); padding: 36px 16px; display: flex; justify-content: center; }
+  .dlg { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--rule); background: var(--panel); border-radius: 16px; box-shadow: 0 30px 90px rgba(0,0,0,.45); }
+  .stage .dlg { max-height: none; }
+  .dlg .hd { padding: 22px 24px 4px; display: flex; flex-direction: column; gap: 8px; }
+  .dlg .hd .t { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+  .dlg .bd { padding: 12px 24px 4px; display: flex; flex-direction: column; gap: 14px; }
+  .dlg .ft { display: flex; align-items: center; gap: 10px; padding: 18px 24px; flex-wrap: wrap; }
+  .dlg .ft .first { margin-right: auto; }
+  .inp, .area, .sel {
+    width: 100%; border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 7px 9px;
+    font: inherit; font-size: 12.5px; color: var(--ink); outline: none; transition: border-color .2s;
+  }
+  .area { resize: none; line-height: 1.5; }
+  .inp:focus, .area:focus, .sel:focus { border-color: var(--faint); }
+  .inp::placeholder, .area::placeholder { color: var(--faint); }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kinds button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--card); border-radius: 7px; padding: 5px 9px; font-size: 12px; font-weight: 500; transition: border-color .2s; }
+  .kinds button::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--kc); }
+  .kinds button[aria-pressed="true"] { border-color: var(--kc); color: var(--kc); font-weight: 600; box-shadow: inset 0 0 0 1px var(--kc); }
+  .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+  @media (max-width: 520px) { .two { grid-template-columns: minmax(0,1fr); } }
+  .help { font-size: 11.5px; color: var(--faint); line-height: 1.45; margin-top: 4px; }
+  .arcbox { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .picker { display: flex; flex-wrap: wrap; gap: 6px; }
+  .picker button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 999px; padding: 3px 10px 3px 3px; font-size: 12px; font-weight: 500; }
+  .picker button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .picker button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- Other screens ---------- */
+  .pairgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+  .empty { background: var(--panel); min-height: 360px; display: flex; align-items: center; justify-content: center; padding: 32px 20px; }
+  .empty .in { max-width: 340px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .empty .big { font-family: var(--serif); font-size: 20px; font-weight: 500; text-wrap: balance; }
+  .empty p { margin: 0; color: var(--soft); font-size: 13px; line-height: 1.55; }
+  .paper { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .paper h2 { font-family: var(--serif); font-size: 19px; font-weight: 500; margin: 0; }
+  pre { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; overflow-x: auto; }
+  pre .c { color: var(--faint); }
+  .feats { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55; color: var(--soft); }
+  .feats b { color: var(--ink); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div class="eyebrow">Estoria mockup · not built</div>
+    <h1>Character relationships</h1>
+    <p>A proposal for tracking who matters to whom. Relationships are added on a character's card and drawn as a chart beside the roster. Everything here is clickable: pick a character, pick a line, try Edit. The cast is The Drowned Map sample, plus Ione (Wren's mother) and one archived character, Captain Dace, so the chart has something to show.</p>
+  </header>
+
+  <div class="controls">
+    <div class="tabs" role="tablist" aria-label="Screens">
+      <button role="tab" aria-selected="true" data-screen="chart">1 · Chart</button>
+      <button role="tab" aria-selected="false" data-screen="card">2 · Character card</button>
+      <button role="tab" aria-selected="false" data-screen="edit">3 · Add or edit</button>
+      <button role="tab" aria-selected="false" data-screen="edge">4 · Archived and empty</button>
+      <button role="tab" aria-selected="false" data-screen="data">5 · Data and sync</button>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <span>Theme</span>
+      <button data-theme-btn="light" aria-pressed="false">Light</button>
+      <button data-theme-btn="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+
+  <!-- 1 · Chart -->
+  <section class="screen" data-screen="chart">
+    <div class="frame">
+      <div class="dhead">
+        <div class="dtitle">Characters</div>
+        <div class="toggle" role="group" aria-label="Characters view">
+          <button aria-pressed="false" data-goto="card">Roster</button>
+          <button aria-pressed="true">Chart</button>
+        </div>
+        <span class="flag">New</span>
+        <div class="spacer"></div>
+        <button class="btn">Collapse</button>
+        <button class="btn x" aria-label="Close">✕</button>
+      </div>
+      <div class="chartbody">
+        <div class="canvas">
+          <svg id="chartMain" viewBox="0 0 640 470" role="img" aria-label="Relationship chart"></svg>
+          <div class="hint">Click a character to put them in the middle. Click a line to read it.</div>
+        </div>
+        <aside class="side" id="sideMain" aria-live="polite"></aside>
+      </div>
+    </div>
+    <div class="caption">
+      <b>The chart is the Characters drawer's second view.</b> A Roster / Chart switch sits in the drawer header, and Chart opens the drawer full width (the existing Expand size), because a chart does not fit in 460px. One line per pair, colored by kind and always labeled, so color is never the only cue.
+      <ul>
+        <li><b>No saved layout.</b> Everyone sits on a ring. Clicking a character moves them to the middle with their ties around them, so there are no positions to store or sync.</li>
+        <li><b>Kind filters</b> in the side panel hide whole kinds of tie. Archived characters are off by default (screen 4).</li>
+        <li><b>The side panel</b> shows the selected pair or character. Each pair has a line for how each one sees the other, because feelings are rarely mutual.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2 · Character card -->
+  <section class="screen" data-screen="card" hidden>
+    <div class="frame">
+      <div class="split">
+        <div class="board" aria-hidden="true">
+          <div class="ghost" style="left:40px; top:60px"></div>
+          <div class="ghost" style="left:270px; top:40px"></div>
+          <div class="ghost" style="left:120px; top:230px"></div>
+          <div class="ghost" style="left:350px; top:260px"></div>
+          <div class="ghost" style="left:60px; top:420px"></div>
+        </div>
+        <div class="drawer">
+          <div class="dhead">
+            <div class="dtitle">Characters</div>
+            <div class="toggle" role="group" aria-label="Characters view">
+              <button aria-pressed="true">Roster</button>
+              <button aria-pressed="false" data-goto="chart">Chart</button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn">Expand</button>
+            <button class="btn x" aria-label="Close">✕</button>
+          </div>
+          <div class="roster" id="roster"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <b>Relationships are added and edited on the card,</b> in a new field under "Appears in", the same way cast and chapters already work. Each row names the other character, the kind, the label, and both points of view; clicking it opens the editor. "See on chart" switches to the chart with this character in the middle.
+      <ul>
+        <li><b>A pair is one record,</b> so the tie shows on both cards (Wren's and Sela's) and editing either edits the same thing.</li>
+        <li><b>The card's subtitle</b> gains a tie count beside the chapter count. <span class="flag q">Optional</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 3 · Add or edit -->
+  <section class="screen" data-screen="edit" hidden>
+    <div class="frame">
+      <div class="stage" id="stage"></div>
+    </div>
+    <div class="caption">
+      <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. Adding from Wren's card starts with Wren filled in, and the picker greys out anyone she already has a tie with, since a pair has one record.
+      <ul>
+        <li><b>Kind</b> is a short fixed list that sets the color: Family, Friend, Romance, Mentor, Rival, Other. <b>Label</b> is free text for the specifics ("former mentor", "sisters").</li>
+        <li><b>Both points of view are optional.</b> Leave one blank for a tie only one of them feels, or write "doesn't know she exists".</li>
+        <li><b>Changes over the story</b> is shown greyed as a question, not a decision. It would let a tie turn at a chapter ("rival from Ch 3"). See the open questions.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4 · Archived and empty -->
+  <section class="screen" data-screen="edge" hidden>
+    <div class="pairgrid">
+      <div class="frame">
+        <div class="dhead">
+          <div class="dtitle">Show archived</div>
+          <div class="spacer"></div>
+          <span class="kindpill" style="--kc: var(--faint)">Dimmed, dashed</span>
+        </div>
+        <div class="canvas" style="border-right:0">
+          <svg id="chartArch" viewBox="0 0 640 470" role="img" aria-label="Chart with an archived character shown"></svg>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="dhead">
+          <div class="dtitle">Characters</div>
+          <div class="toggle" role="group" aria-label="Characters view">
+            <button aria-pressed="false">Roster</button>
+            <button aria-pressed="true">Chart</button>
+          </div>
+        </div>
+        <div class="empty">
+          <div class="in">
+            <div class="eyebrow">No relationships yet</div>
+            <div class="big">Lines appear here as you connect your characters.</div>
+            <p>Open a character on the roster and use Add relationship. Each one you add shows up here as a line between two people.</p>
+            <button class="btn big" data-goto="card">Open the roster</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <b>Archiving keeps relationships,</b> following Estoria's archive rule: Captain Dace leaves the roster and the picker, but his tie to Bram is kept and drawn dimmed and dashed when "Show archived" is on. Restoring him brings it back unchanged.
+      <b>Deleting</b> a character removes their relationships too, and the delete confirm says how many ("They will be removed from 6 chapters and 1 relationship").
+      <b>The empty state</b> is plain and points at the one place relationships are added.
+    </div>
+  </section>
+
+  <!-- 5 · Data and sync -->
+  <section class="screen" data-screen="data" hidden>
+    <div class="pairgrid">
+      <div class="paper">
+        <div class="eyebrow">In the project file</div>
+        <h2>One new list, next to characters</h2>
+<pre><span class="c">// StoryDoc gains one optional top-level field</span>
+relationships?: Relationship[]
+
+interface Relationship {
+  id: string;        <span class="c">// its own id, so merge treats it as a unit</span>
+  a: string;         <span class="c">// character id</span>
+  b: string;         <span class="c">// character id (a != b, one record per pair)</span>
+  kind: "family" | "friend" | "romance"
+      | "mentor" | "rival" | "other";
+  label?: string;    <span class="c">// "former mentor"</span>
+  aView?: string;    <span class="c">// how a sees b</span>
+  bView?: string;    <span class="c">// how b sees a</span>
+  notes?: string;
+}
+
+<span class="c">// Example</span>
+{ "id": "rel-k3x9", "a": "sela", "b": "wren",
+  "kind": "mentor", "label": "former mentor",
+  "aView": "Still sees her apprentice.",
+  "bView": "Owes her everything, trusts her with nothing." }</pre>
+      </div>
+      <div class="paper">
+        <div class="eyebrow">What it touches</div>
+        <h2>Sync, merge and the phone</h2>
+        <ul class="feats">
+          <li><b>No schema bump.</b> The field is optional, like manuscript, author and pace before it. A file without it is a project with no relationships.</li>
+          <li><b>Series-wide.</b> It sits beside characters, not on a book or version board, so every book in a series shares it and the phone needs no update first.</li>
+          <li><b>The phone keeps it.</b> Android's normalize starts from the raw file and only overwrites keys it knows, so the list round-trips untouched. It just isn't shown there.</li>
+          <li><b>Read defensively.</b> A tie whose character is gone (deleted on the phone, say) is dropped on read, as is a tie to itself or a second record for the same pair. An unknown kind reads as Other.</li>
+          <li><b>Conflicts and merge.</b> Each relationship becomes its own row in the compare and merge dialog. Taking one from the file brings in both characters it points at.</li>
+          <li><b>Delete cleans up.</b> Deleting a character removes its relationships; archiving keeps them.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<script>
+(function () {
+  const CHARS = [
+    { id: "wren", name: "Wren Calloway", first: "Wren", role: "Protagonist", ini: "WC", color: "oklch(0.60 0.10 215)", ch: 8 },
+    { id: "bram", name: "Bram Okonkwo", first: "Bram", role: "Ally", ini: "BO", color: "oklch(0.62 0.12 85)", ch: 7 },
+    { id: "ione", name: "Ione Calloway", first: "Ione", role: "Missing", ini: "IC", color: "oklch(0.60 0.12 145)", ch: 2 },
+    { id: "sela", name: "Sela Voss", first: "Sela", role: "Antagonist", ini: "SV", color: "oklch(0.58 0.15 30)", ch: 6 },
+    { id: "pip", name: "Pip", first: "Pip", role: "Catalyst", ini: "P", color: "oklch(0.56 0.12 305)", ch: 5 },
+    { id: "dace", name: "Captain Dace", first: "Dace", role: "Mentor", ini: "CD", color: "oklch(0.60 0.11 100)", ch: 1, archived: true },
+  ];
+  const KINDS = [
+    ["family", "Family"], ["friend", "Friend"], ["romance", "Romance"],
+    ["mentor", "Mentor"], ["rival", "Rival"], ["other", "Other"],
+  ];
+  const KIND_NAME = Object.fromEntries(KINDS);
+  let uid = 20;
+  const RELS = [
+    { id: "r1", a: "sela", b: "wren", kind: "mentor", label: "former mentor",
+      aView: "Still sees her apprentice, and wants her back.", bView: "Owes her everything, trusts her with nothing.",
+      notes: "Keeps Wren's old apprentice mug on her desk.",
+      arc: [{ ch: 3, t: "The Mentor's Shadow", note: "Wren learns who sent the hunters. Rival from here." }] },
+    { id: "r2", a: "wren", b: "bram", kind: "friend", label: "shipmates",
+      aView: "Trusts him without asking why.", bView: "Protects her to protect himself.", notes: "",
+      arc: [{ ch: 5, t: "The False Harbor", note: "His confession breaks the trust." }] },
+    { id: "r3", a: "pip", b: "wren", kind: "friend", label: "unlikely friends",
+      aView: "The first adult she might trust.", bView: "Wants to get her off the docks.", notes: "" },
+    { id: "r4", a: "wren", b: "ione", kind: "family", label: "mother and daughter",
+      aView: "A grief she has never named.", bView: "", notes: "Ione left the map for Wren, not Sela." },
+    { id: "r5", a: "sela", b: "ione", kind: "rival", label: "old partners",
+      aView: "Believes the map was left for her.", bView: "Hid the map from her on purpose.", notes: "" },
+    { id: "r6", a: "bram", b: "ione", kind: "other", label: "the last expedition",
+      aView: "Piloted the ship that doomed her.", bView: "", notes: "A secret until Ch 5." },
+    { id: "r7", a: "pip", b: "sela", kind: "rival", label: "spy and mark",
+      aView: "Sells her secrets, and is afraid of her.", bView: "Doesn't know she exists.", notes: "" },
+    { id: "r8", a: "pip", b: "bram", kind: "other", label: "suspicion",
+      aView: "Knows he hums when he lies.", bView: "", notes: "" },
+    { id: "r9", a: "dace", b: "bram", kind: "mentor", label: "old crew",
+      aView: "Taught him the eastern routes.", bView: "Owes him a ship.", notes: "Cut in the second draft." },
+  ];
+  const byId = (id) => CHARS.find((c) => c.id === id);
+  const other = (r, id) => (r.a === id ? r.b : r.a);
+  const viewOf = (r, id) => (r.a === id ? r.aView : r.bView);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+  const kc = (k) => `var(--k-${k})`;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+
+  /* ---------------- Chart ---------------- */
+  function makeChart(svg, opts) {
+    const st = { focus: null, sel: null, kinds: new Set(KINDS.map((k) => k[0])), showArch: !!opts.showArch, pos: {} };
+    const CX = 320, CY = 222, R = 165;
+    const nodes = {}, edges = {};
+    const gEdges = el("g", {}), gNodes = el("g", {});
+    svg.append(gEdges, gNodes);
+
+    function visibleChars() { return CHARS.filter((c) => !c.archived || st.showArch); }
+    function active() { return CHARS.filter((c) => !c.archived); }
+    function targetPos() {
+      const out = {};
+      const act = active();
+      if (!st.focus) {
+        act.forEach((c, i) => {
+          const ang = -Math.PI / 2 + (i * 2 * Math.PI) / act.length;
+          out[c.id] = [CX + R * Math.cos(ang), CY + R * Math.sin(ang)];
+        });
+      } else {
+        out[st.focus] = [CX, CY];
+        const rest = act.filter((c) => c.id !== st.focus);
+        rest.forEach((c, i) => {
+          const ang = -Math.PI / 2 + (i * 2 * Math.PI) / rest.length;
+          out[c.id] = [CX + R * Math.cos(ang), CY + R * Math.sin(ang)];
+        });
+      }
+      CHARS.filter((c) => c.archived).forEach((c, i) => { out[c.id] = [580 - i * 70, 405]; });
+      return out;
+    }
+
+    function build() {
+      gEdges.textContent = ""; gNodes.textContent = "";
+      for (const k in nodes) delete nodes[k];
+      for (const k in edges) delete edges[k];
+      RELS.forEach((r) => {
+        const g = el("g", { class: "edge", tabindex: "0", role: "button" });
+        g.style.color = kc(r.kind);
+        const ln = el("line", { class: "ln", stroke: kc(r.kind) });
+        const hit = el("line", { class: "hit" });
+        const pill = el("rect", { class: "pill", rx: "7", ry: "7", height: "20" });
+        const tx = el("text", { class: "tx", fill: kc(r.kind) });
+        tx.textContent = r.label || KIND_NAME[r.kind];
+        g.append(ln, hit, pill, tx);
+        const A = byId(r.a), B = byId(r.b);
+        g.setAttribute("aria-label", `${A.first} and ${B.first}: ${KIND_NAME[r.kind]}, ${r.label || ""}`);
+        g.addEventListener("click", (e) => { e.stopPropagation(); selectEdge(r.id); });
+        g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEdge(r.id); } });
+        gEdges.append(g);
+        edges[r.id] = { g, ln, hit, pill, tx, r, w: 0 };
+      });
+      CHARS.forEach((c) => {
+        const g = el("g", { class: "node" + (c.archived ? " arch" : ""), tabindex: "0", role: "button", "aria-label": c.name });
+        const ring = el("circle", { class: "ring", r: "28" });
+        const disc = el("circle", { class: "disc", r: "23", fill: c.color });
+        const ini = el("text", { class: "ini" }); ini.textContent = c.ini;
+        const nm = el("text", { class: "nm", y: "43" }); nm.textContent = c.first;
+        g.append(ring, disc, ini, nm);
+        if (c.archived) { const t = el("text", { class: "arch-tag", y: "57" }); t.textContent = "ARCHIVED"; g.append(t); }
+        g.addEventListener("click", (e) => { e.stopPropagation(); selectNode(c.id); });
+        g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectNode(c.id); } });
+        gNodes.append(g);
+        nodes[c.id] = { g, c };
+      });
+      // measure label widths once they are in the DOM
+      requestAnimationFrame(() => {
+        for (const id in edges) { const e = edges[id]; let w = 0; try { w = e.tx.getComputedTextLength(); } catch (_) {} e.w = (w || e.tx.textContent.length * 6.2) + 16; }
+        place(st.pos);
+      });
+      svg.onclick = () => { st.focus = null; st.sel = null; update(true); };
+    }
+
+    function place(pos) {
+      for (const id in nodes) {
+        const p = pos[id]; if (!p) continue;
+        nodes[id].g.setAttribute("transform", `translate(${p[0].toFixed(1)} ${p[1].toFixed(1)})`);
+      }
+      for (const id in edges) {
+        const e = edges[id], p = pos[e.r.a], q = pos[e.r.b];
+        if (!p || !q) continue;
+        for (const l of [e.ln, e.hit]) { l.setAttribute("x1", p[0]); l.setAttribute("y1", p[1]); l.setAttribute("x2", q[0]); l.setAttribute("y2", q[1]); }
+        const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, w = e.w || 80;
+        e.pill.setAttribute("x", mx - w / 2); e.pill.setAttribute("y", my - 10); e.pill.setAttribute("width", w);
+        e.tx.setAttribute("x", mx); e.tx.setAttribute("y", my + 0.5);
+      }
+    }
+
+    function styleAll() {
+      const vis = new Set(visibleChars().map((c) => c.id));
+      for (const id in nodes) {
+        const n = nodes[id];
+        const shown = vis.has(id);
+        n.g.style.display = shown ? "" : "none";
+        let dim = false;
+        if (st.focus && id !== st.focus) dim = !RELS.some((r) => st.kinds.has(r.kind) && ((r.a === st.focus && r.b === id) || (r.b === st.focus && r.a === id)));
+        if (st.sel) { const r = RELS.find((x) => x.id === st.sel); dim = r && id !== r.a && id !== r.b; }
+        n.g.style.opacity = dim ? ".3" : "1";
+        n.g.classList.toggle("sel", id === st.focus);
+      }
+      for (const id in edges) {
+        const e = edges[id], r = e.r;
+        const archived = byId(r.a).archived || byId(r.b).archived;
+        e.g.classList.toggle("arch", archived);
+        const shown = st.kinds.has(r.kind) && vis.has(r.a) && vis.has(r.b);
+        e.g.style.display = shown ? "" : "none";
+        let o = 1, lab = 1;
+        if (st.focus) { const on = r.a === st.focus || r.b === st.focus; o = on ? 1 : 0.12; lab = on ? 1 : 0; }
+        if (st.sel) { o = id === st.sel ? 1 : 0.15; lab = id === st.sel ? 1 : 0; }
+        if (archived) o = Math.min(o, 0.55);
+        e.ln.style.opacity = o; e.pill.style.opacity = lab; e.tx.style.opacity = lab;
+        e.g.style.pointerEvents = lab ? "" : "none";
+        e.g.classList.toggle("sel", id === st.sel);
+      }
+    }
+
+    let anim = 0;
+    function update(animate) {
+      const to = targetPos();
+      const from = Object.keys(st.pos).length ? { ...st.pos } : to;
+      styleAll();
+      cancelAnimationFrame(anim);
+      if (!animate || reduce || from === to) { st.pos = to; place(to); }
+      else {
+        const t0 = performance.now(), D = 260;
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / D), ease = 1 - Math.pow(1 - k, 3);
+          const cur = {};
+          for (const id in to) { const a = from[id] || to[id], b = to[id]; cur[id] = [a[0] + (b[0] - a[0]) * ease, a[1] + (b[1] - a[1]) * ease]; }
+          st.pos = cur; place(cur);
+          if (k < 1) anim = requestAnimationFrame(step); else st.pos = to;
+        };
+        anim = requestAnimationFrame(step);
+      }
+      if (opts.onChange) opts.onChange(st);
+    }
+    function selectNode(id) { st.sel = null; st.focus = st.focus === id ? null : id; update(true); }
+    function selectEdge(id) { st.sel = st.sel === id ? null : id; update(false); }
+
+    build();
+    st.pos = targetPos();
+    update(false);
+    return {
+      st, update, selectNode, selectEdge,
+      rebuild() { build(); st.pos = targetPos(); update(false); },
+      setKinds(k) { st.kinds = k; update(false); },
+      setArch(v) { st.showArch = v; update(false); },
+    };
+  }
+
+  /* ---------------- Side panel ---------------- */
+  const side = document.getElementById("sideMain");
+  function avatar(c, sm) { return `<span class="av${sm ? " sm" : ""}${c.archived ? " arch" : ""}" style="background:${c.color}">${esc(c.ini)}</span>`; }
+  function kindPill(k) { return `<span class="kindpill" style="--kc:${kc(k)}">${KIND_NAME[k]}</span>`; }
+  function tiesOf(id, chart) {
+    return RELS.filter((r) => (r.a === id || r.b === id) && (!chart || chart.st.showArch || !byId(other(r, id)).archived));
+  }
+  function tieRow(r, me) {
+    const o = byId(other(r, me)), mine = viewOf(r, me), theirs = viewOf(r, o.id);
+    const meC = byId(me);
+    return `<button class="tie" data-edit="${r.id}">
+      ${avatar(o, true)}
+      <div><div class="nm">${esc(o.name)}${o.archived ? ' <span class="kindpill" style="--kc:var(--faint)">Archived</span>' : ""}</div>
+      <div class="meta">${kindPill(r.kind)}<span class="lbl">${esc(r.label || "")}</span></div></div>
+      ${mine ? `<div class="q"><b>${esc(meC.first)}:</b> ${esc(mine)}</div>` : ""}
+      ${theirs ? `<div class="q"><b>${esc(o.first)}:</b> ${esc(theirs)}</div>` : ""}
+    </button>`;
+  }
+  function renderSide(st) {
+    let top = "";
+    if (st.sel) {
+      const r = RELS.find((x) => x.id === st.sel);
+      const A = byId(r.a), B = byId(r.b);
+      top = `
+        <div class="who"><span class="pair">${avatar(A)}${avatar(B)}</span>
+          <div><h3>${esc(A.first)} and ${esc(B.first)}</h3><div class="sub">${kindPill(r.kind)} <span style="margin-left:6px">${esc(r.label || "")}</span></div></div></div>
+        <div class="view"><div class="who-line">${esc(A.first)} toward ${esc(B.first)}</div><div class="txt${r.aView ? "" : " empty"}">${esc(r.aView || "Not written yet")}</div></div>
+        <div class="view"><div class="who-line">${esc(B.first)} toward ${esc(A.first)}</div><div class="txt${r.bView ? "" : " empty"}">${esc(r.bView || "Not written yet")}</div></div>
+        ${r.notes ? `<div><div class="label">Notes</div><p>${esc(r.notes)}</p></div>` : ""}
+        ${r.arc && r.arc.length ? `<div class="arc"><div class="label">Changes over the story <span class="flag q">Question</span></div>${r.arc.map((s) => `<div class="step"><span class="chch">Ch ${s.ch}</span><span>${esc(s.note)}</span></div>`).join("")}</div>` : ""}
+        <div class="row"><button class="btn big" data-edit="${r.id}">Edit</button><button class="link" data-clear>Back to everyone</button></div>`;
+    } else if (st.focus) {
+      const c = byId(st.focus), ties = tiesOf(c.id, chart);
+      top = `
+        <div class="who">${avatar(c)}<div><h3>${esc(c.name)}</h3><div class="sub">${esc(c.role)} · ${ties.length} ${ties.length === 1 ? "relationship" : "relationships"}</div></div></div>
+        <div class="tie-list">${ties.map((r) => tieRow(r, c.id)).join("") || '<p>No relationships yet.</p>'}</div>
+        ${c.archived ? "" : `<button class="dashed" data-new="${c.id}">+ Add relationship</button>`}
+        <div class="row"><button class="link" data-clear>Back to everyone</button></div>`;
+    } else {
+      top = `
+        <div><div class="eyebrow">Untitled Voyage</div><h3 style="margin-top:4px">${RELS.filter((r) => !byId(r.a).archived && !byId(r.b).archived).length} relationships among ${CHARS.filter((c) => !c.archived).length} characters</h3></div>
+        <p>Pick a character to see everyone they're tied to, or a line to read both sides of it.</p>`;
+    }
+    side.innerHTML = `${top}
+      <div class="hr"></div>
+      <div><div class="label">Kinds</div><div class="legend" id="legend">${KINDS.map(([k, n]) => `<button style="--kc:${kc(k)}" data-kind="${k}" aria-pressed="${st.kinds.has(k)}">${n}</button>`).join("")}</div></div>
+      <label class="check"><input type="checkbox" id="archToggle" ${st.showArch ? "checked" : ""}> Show archived characters (1)</label>`;
+  }
+  side.addEventListener("click", (e) => {
+    const t = e.target.closest("button, input"); if (!t) return;
+    if (t.dataset.kind) { const k = new Set(chart.st.kinds); k.has(t.dataset.kind) ? k.delete(t.dataset.kind) : k.add(t.dataset.kind); chart.setKinds(k); }
+    else if (t.dataset.edit) openDialog({ id: t.dataset.edit });
+    else if (t.dataset.new) openDialog({ from: t.dataset.new });
+    else if ("clear" in t.dataset) { chart.st.focus = null; chart.st.sel = null; chart.update(true); }
+    else if (t.id === "archToggle") chart.setArch(t.checked);
+  });
+
+  const chart = makeChart(document.getElementById("chartMain"), { onChange: renderSide });
+  const chartArch = makeChart(document.getElementById("chartArch"), { showArch: true });
+  chartArch.selectNode("bram");
+
+  /* ---------------- Roster card ---------------- */
+  const roster = document.getElementById("roster");
+  function renderRoster() {
+    const me = "wren", c = byId(me), ties = tiesOf(me);
+    const others = CHARS.filter((x) => !x.archived && x.id !== me);
+    roster.innerHTML = `
+      <div class="ccard">
+        <div class="top">${avatar(c)}<div><div class="cn">${esc(c.name)}</div><div class="cs">${c.role} · in ${c.ch} chapters · ${ties.length} relationships</div></div><span class="chev">▴</span></div>
+        <div class="body">
+          <div class="collapsed-note">Name, role, bio, traits, goals, wants and needs sit above, unchanged.</div>
+          <div><div class="label">Notes</div><div class="field-ghost">Left-handed; signs every chart with a tiny anchor.</div></div>
+          <div><div class="label">Appears in</div><div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<span class="chch">Ch ${n} ↗</span>`).join("")}</div></div>
+          <div class="newfield">
+            <div class="label" style="display:flex;align-items:center;justify-content:space-between">
+              <span>Relationships <span class="flag">New</span></span>
+              <button class="link" data-goto-focus="${me}" style="font-size:11px;text-transform:none;letter-spacing:0">See on chart ↗</button>
+            </div>
+            <div class="rels">${ties.map((r) => tieRow(r, me)).join("")}</div>
+            <button class="dashed" style="margin-top:6px" data-new="${me}">+ Add relationship</button>
+          </div>
+          <div class="row"><button class="btn big">Archive</button><button class="btn big danger">Delete character</button></div>
+        </div>
+      </div>
+      ${others.map((o) => { const n = tiesOf(o.id).length; return `<div class="ccard"><div class="top">${avatar(o)}<div><div class="cn">${esc(o.name)}</div><div class="cs">${o.role} · in ${o.ch} chapters · ${n} ${n === 1 ? "relationship" : "relationships"}</div></div><span class="chev">▾</span></div></div>`; }).join("")}
+      <button class="dashed" style="padding:13px;border-radius:13px">+ Add character</button>`;
+  }
+  roster.addEventListener("click", (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.edit) openDialog({ id: t.dataset.edit });
+    else if (t.dataset.new) openDialog({ from: t.dataset.new });
+    else if (t.dataset.gotoFocus) { show("chart"); chart.st.sel = null; chart.st.focus = t.dataset.gotoFocus; chart.update(true); }
+  });
+
+  /* ---------------- Dialog ---------------- */
+  function dialogHTML(d, live) {
+    const r = d.id ? RELS.find((x) => x.id === d.id) : null;
+    const me = r ? r.a : d.from;
+    const meC = byId(me);
+    const withId = r ? r.b : d.with || null;
+    const W = withId ? byId(withId) : null;
+    const kind = r ? r.kind : d.kind || "friend";
+    const taken = new Set(RELS.filter((x) => x.a === me || x.b === me).map((x) => other(x, me)));
+    const title = r ? `${meC.first} and ${W.first}` : `New relationship for ${meC.first}`;
+    const pick = r ? "" : `
+      <div><div class="label">With</div><div class="picker">${CHARS.filter((c) => !c.archived && c.id !== me).map((c) =>
+        `<button type="button" data-pick="${c.id}" aria-pressed="${c.id === withId}" ${taken.has(c.id) ? 'disabled title="Already has a relationship with ' + esc(meC.first) + '"' : ""}>${avatar(c, true)}${esc(c.first)}</button>`).join("")}</div>
+        <div class="help">Greyed out: already tied to ${esc(meC.first)}. Archived characters aren't offered.</div></div>`;
+    const wn = W ? W.first : "them";
+    return `<div class="dlg" role="dialog" aria-modal="${live}" aria-label="${esc(title)}">
+      <div class="hd"><div class="eyebrow">${r ? "Relationship" : "Add relationship"}</div><div class="t">${esc(title)}</div></div>
+      <div class="bd">
+        ${pick}
+        <div><div class="label">Kind</div><div class="kinds">${KINDS.map(([k, n]) => `<button type="button" style="--kc:${kc(k)}" data-k="${k}" aria-pressed="${k === kind}">${n}</button>`).join("")}</div></div>
+        <div><label class="label" for="f-label">Label</label><input class="inp" id="f-label" value="${esc(r ? r.label : "")}" placeholder="e.g. sisters, former partners, uneasy truce"></div>
+        <div class="two">
+          <div><label class="label" for="f-a">How ${esc(meC.first)} sees ${esc(wn)}</label><textarea class="area" id="f-a" rows="3" placeholder="Optional">${esc(r ? r.aView : "")}</textarea></div>
+          <div><label class="label" for="f-b">How ${esc(wn)} sees ${esc(meC.first)}</label><textarea class="area" id="f-b" rows="3" placeholder="Optional">${esc(r ? r.bView : "")}</textarea></div>
+        </div>
+        <div><label class="label" for="f-n">Notes</label><textarea class="area" id="f-n" rows="2" placeholder="Anything else about the two of them">${esc(r ? r.notes : "")}</textarea></div>
+        <div class="arcbox" style="opacity:.7">
+          <div class="label" style="margin:0">Changes over the story <span class="flag q">Open question</span></div>
+          ${r && r.arc ? r.arc.map((s) => `<div class="arc"><div class="step"><span class="chch">Ch ${s.ch}</span><span>${esc(s.t)}: ${esc(s.note)}</span></div></div>`).join("") : '<div class="help" style="margin:0">Nothing yet.</div>'}
+          <button type="button" class="link" style="align-self:flex-start">+ Add a turn at a chapter</button>
+        </div>
+      </div>
+      <div class="ft">
+        ${r ? '<button type="button" class="btn big ghost danger first" data-act="remove">Remove relationship</button>' : '<span class="first"></span>'}
+        <button type="button" class="btn big" data-act="cancel">Cancel</button>
+        <button type="button" class="btn primary" data-act="save" ${!r && !withId ? "disabled style=\"opacity:.45;cursor:not-allowed\"" : ""}>${r ? "Save" : "Add"}</button>
+      </div>
+    </div>`;
+  }
+  const scrim = document.getElementById("scrim");
+  let dlgState = null, lastFocus = null;
+  function openDialog(d) {
+    dlgState = { ...d };
+    lastFocus = document.activeElement;
+    scrim.innerHTML = dialogHTML(dlgState, true);
+    scrim.hidden = false;
+    const f = scrim.querySelector("#f-label"); if (f) f.focus();
+  }
+  function closeDialog() { scrim.hidden = true; scrim.innerHTML = ""; dlgState = null; if (lastFocus) lastFocus.focus(); }
+  function readForm(root) {
+    return {
+      label: root.querySelector("#f-label").value.trim(),
+      aView: root.querySelector("#f-a").value.trim(),
+      bView: root.querySelector("#f-b").value.trim(),
+      notes: root.querySelector("#f-n").value.trim(),
+    };
+  }
+  scrim.addEventListener("click", (e) => {
+    if (e.target === scrim) return closeDialog();
+    const t = e.target.closest("button"); if (!t) return;
+    const keep = () => { const v = readForm(scrim); scrim.innerHTML = dialogHTML(dlgState, true); scrim.querySelector("#f-label").value = v.label; scrim.querySelector("#f-a").value = v.aView; scrim.querySelector("#f-b").value = v.bView; scrim.querySelector("#f-n").value = v.notes; };
+    if (t.dataset.k) {
+      dlgState.kind = t.dataset.k;
+      if (dlgState.id) RELS.find((x) => x.id === dlgState.id).kind = t.dataset.k;
+      keep();
+    } else if (t.dataset.pick) { dlgState.with = t.dataset.pick; keep(); }
+    else if (t.dataset.act === "cancel") closeDialog();
+    else if (t.dataset.act === "remove") { const i = RELS.findIndex((x) => x.id === dlgState.id); RELS.splice(i, 1); closeDialog(); refresh(); }
+    else if (t.dataset.act === "save") {
+      const v = readForm(scrim);
+      if (dlgState.id) Object.assign(RELS.find((x) => x.id === dlgState.id), v);
+      else if (dlgState.with) RELS.push({ id: "r" + uid++, a: dlgState.from, b: dlgState.with, kind: dlgState.kind || "friend", ...v });
+      closeDialog(); refresh();
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !scrim.hidden) closeDialog(); });
+  // Screen 3 shows a static copy of the editor, open on Sela and Wren.
+  document.getElementById("stage").innerHTML = dialogHTML({ id: "r1" }, false);
+
+  function refresh() {
+    const keepFocus = chart.st.focus, keepSel = RELS.some((r) => r.id === chart.st.sel) ? chart.st.sel : null;
+    chart.rebuild(); chart.st.focus = keepFocus; chart.st.sel = keepSel; chart.update(false);
+    chartArch.rebuild(); chartArch.st.focus = "bram"; chartArch.update(false);
+    renderRoster();
+    document.getElementById("stage").innerHTML = dialogHTML(RELS.some((r) => r.id === "r1") ? { id: "r1" } : { from: "wren" }, false);
+  }
+
+  /* ---------------- Tabs + theme ---------------- */
+  const tabs = document.querySelectorAll('[role="tab"]');
+  function show(name) {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.screen === name)));
+    document.querySelectorAll("section.screen").forEach((s) => { s.hidden = s.dataset.screen !== name; });
+    try { history.replaceState(null, "", "#" + name); } catch (_) {}
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => show(t.dataset.screen)));
+  document.addEventListener("click", (e) => { const g = e.target.closest("[data-goto]"); if (g) show(g.dataset.goto); });
+  const fromHash = (location.hash || "").slice(1);
+  if (["chart", "card", "edit", "edge", "data"].includes(fromHash)) show(fromHash);
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (["chart", "card", "edit", "edge", "data"].includes(h)) show(h); });
+
+  const themeBtns = document.querySelectorAll("[data-theme-btn]");
+  function setTheme(t) {
+    if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
+    themeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeBtn === t)));
+  }
+  themeBtns.forEach((b) => b.addEventListener("click", () => setTheme(b.getAttribute("aria-pressed") === "true" ? null : b.dataset.themeBtn)));
+  const cur = document.documentElement.getAttribute("data-theme"); if (cur) setTheme(cur);
+
+  renderRoster();
+})();
+</script>
