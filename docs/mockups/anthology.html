@@ -1,0 +1,526 @@
+<title>Estoria Anthology Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* Layout: a stepper of numbered screens across the top; each screen is one framed Estoria window, with a caption underneath. Tokens are Estoria's own. */
+  :root {
+    --desk: #d9cfba; --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+    --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+    --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+    --green: oklch(0.54 0.1 152); --red: oklch(0.55 0.15 33); --new: oklch(0.56 0.11 250);
+    --scrim: rgba(20,14,6,.5);
+    --serif: Spectral, Georgia, "Times New Roman", serif;
+    --sans: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --desk: oklch(0.2 0.012 75); --bg: oklch(0.235 0.012 75); --panel: oklch(0.265 0.013 75); --card: oklch(0.3 0.014 75);
+    --ink: oklch(0.9 0.012 75); --soft: oklch(0.71 0.013 75); --faint: oklch(0.56 0.013 75); --line: oklch(0.42 0.014 75);
+    --rule: oklch(0.36 0.013 75); --dot: oklch(0.33 0.013 75); --chip: oklch(0.33 0.013 75);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.25);
+    --green: oklch(0.64 0.1 152); --red: oklch(0.65 0.14 33); --new: oklch(0.68 0.11 250); --scrim: rgba(0,0,0,.55); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --desk: oklch(0.2 0.012 75); --bg: oklch(0.235 0.012 75); --panel: oklch(0.265 0.013 75); --card: oklch(0.3 0.014 75);
+    --ink: oklch(0.9 0.012 75); --soft: oklch(0.71 0.013 75); --faint: oklch(0.56 0.013 75); --line: oklch(0.42 0.014 75);
+    --rule: oklch(0.36 0.013 75); --dot: oklch(0.33 0.013 75); --chip: oklch(0.33 0.013 75);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.25);
+    --green: oklch(0.64 0.1 152); --red: oklch(0.65 0.14 33); --new: oklch(0.68 0.11 250); --scrim: rgba(0,0,0,.55); color-scheme: dark; }
+
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--desk); color: var(--ink); font-family: var(--sans); font-size: 14px;
+    padding-block: 24px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  button { font: inherit; color: inherit; }
+  button:focus-visible { outline: 2px solid var(--new); outline-offset: 2px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .intro h1 { font-family: var(--serif); font-size: 26px; font-weight: 500; text-wrap: balance; }
+  .intro p { color: var(--soft); font-size: 13.5px; margin-top: 6px; line-height: 1.55; max-width: 800px; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 14px; }
+  .steps button { font-size: 12.5px; font-weight: 600; border: 1px solid var(--line); background: var(--card); padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+  .steps button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .opts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .opts .lbl { font-size: 11.5px; color: var(--soft); margin-right: 2px; }
+  .opts button { font-size: 12px; font-weight: 500; border: 1px solid var(--line); background: var(--card); padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+  .opts button.on { border-color: var(--new); color: var(--new); font-weight: 600; }
+  .caption { margin-top: 14px; font-size: 13px; color: var(--soft); line-height: 1.6; max-width: 880px; }
+  .caption b { color: var(--ink); }
+  .caption .q { display: block; margin-top: 8px; padding: 8px 12px; border-left: 2px solid var(--new); color: var(--ink); background: color-mix(in oklch, var(--new) 7%, transparent); }
+  .newf { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); border: 1px solid var(--new); border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+
+  .frame { border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(40,28,10,.22); border: 1px solid var(--line); background: var(--bg); position: relative; }
+  .appbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--rule); background: var(--panel); flex-wrap: wrap; }
+  .logo { font-family: var(--serif); font-style: italic; font-size: 20px; font-weight: 600; margin-right: 6px; }
+  .ptitle { line-height: 1.15; margin-right: 6px; }
+  .ptitle b { font-size: 13px; font-weight: 700; display: block; }
+  .ptitle span { font-size: 10.5px; color: var(--soft); }
+  .btn { font-size: 12px; font-weight: 500; border: 1px solid var(--rule); background: var(--card); padding: 6px 11px; border-radius: 8px; white-space: nowrap; cursor: pointer; }
+  .btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+  .btn.newb { border-color: var(--new); color: var(--new); font-weight: 600; }
+  .btn.danger { color: var(--red); }
+  .spacer { flex: 1; }
+  .tagk { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: 99px; background: var(--chip); color: var(--soft); white-space: nowrap; }
+  .statusbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 7px 16px; border-top: 1px solid var(--rule); font-family: var(--mono); font-size: 10.5px; color: var(--faint); background: var(--panel); }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 7px; color: var(--soft); border: 0; background: transparent; cursor: pointer; }
+  .seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); font-weight: 600; }
+  .dotgrid { background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 22px 22px; }
+  .st { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .st.idea { color: var(--faint); } .st.draft { color: var(--soft); } .st.done { color: var(--green); }
+
+  /* dialogs */
+  .scrim { background: var(--scrim); padding: 44px 16px; display: flex; justify-content: center; min-height: 560px; align-items: flex-start; }
+  .dlg { width: min(600px,100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,.4); }
+  .dlg.wide { width: min(760px,100%); }
+  .dlg-h { padding: 18px 24px; border-bottom: 1px solid var(--rule); display: flex; gap: 12px; align-items: flex-start; }
+  .dlg-h .t { font-family: var(--serif); font-size: 19px; font-weight: 600; }
+  .dlg-h .s { font-size: 12.5px; color: var(--soft); margin-top: 3px; line-height: 1.45; }
+  .dlg-b { padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; line-height: 1.55; color: var(--soft); }
+  .dlg-b b { color: var(--ink); }
+  .dlg-b ul { padding-left: 18px; } .dlg-b li { margin-bottom: 3px; }
+  .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 24px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
+  .choices { display: grid; gap: 8px; }
+  .choice { text-align: left; border: 1px solid var(--rule); border-radius: 11px; padding: 11px 13px; background: var(--panel); cursor: pointer; }
+  .choice.on { border-color: var(--ink); background: var(--card); box-shadow: var(--shadow); }
+  .choice b { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .choice small { display: block; font-size: 11.5px; color: var(--soft); margin-top: 2px; line-height: 1.4; }
+  .note { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; font-size: 12px; }
+  .kindcards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .kcard { text-align: left; background: var(--card); border: 1px solid var(--rule); border-radius: 13px; padding: 13px; display: flex; flex-direction: column; gap: 6px; min-height: 118px; cursor: pointer; }
+  .kcard:hover { border-color: var(--line); box-shadow: var(--shadow); }
+  .kcard .t { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink); }
+  .kcard .b { font-size: 11.5px; color: var(--soft); line-height: 1.45; flex: 1; }
+  .tabsrow { display: flex; gap: 4px; border-bottom: 1px solid var(--rule); padding: 0 24px; background: var(--panel); }
+  .tabsrow button { border: 0; background: transparent; padding: 10px 12px; font-size: 12.5px; font-weight: 600; color: var(--soft); border-bottom: 2px solid transparent; cursor: pointer; }
+  .tabsrow button.on { color: var(--ink); border-color: var(--ink); }
+  .plist { display: flex; flex-direction: column; gap: 6px; }
+  .prow { display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; background: var(--card); border: 1px solid var(--rule); border-radius: 11px; padding: 11px 13px; cursor: pointer; }
+  .prow.on { border-color: var(--ink); box-shadow: var(--shadow); }
+  .prow.dis { opacity: .5; cursor: default; }
+  .prow .t { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink); }
+  .prow .m { font-family: var(--mono); font-size: 10.5px; color: var(--soft); margin-top: 2px; }
+
+  /* home: contents list */
+  .home { display: grid; grid-template-columns: minmax(0,1fr); }
+  .contents { max-width: 760px; margin: 0 auto; padding: 30px 28px 40px; width: 100%; }
+  .bookhead { text-align: center; margin-bottom: 24px; }
+  .bookhead h2 { font-family: var(--serif); font-size: 30px; font-weight: 500; }
+  .bookhead p { font-size: 12.5px; color: var(--soft); margin-top: 4px; }
+  .sect { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+  .sect .n { font-family: var(--serif); font-size: 17px; font-weight: 500; font-style: italic; }
+  .sect .c { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-left: auto; }
+  .crow { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--rule); border-radius: 11px; padding: 11px 14px; margin-bottom: 6px; cursor: pointer; transition: box-shadow .2s, border-color .2s; }
+  .crow:hover { box-shadow: var(--shadow); border-color: var(--line); }
+  .grip { color: var(--faint); font-size: 13px; letter-spacing: -2px; }
+  .crow .t { font-family: var(--serif); font-size: 16.5px; font-weight: 600; }
+  .crow .s { font-size: 12px; color: var(--soft); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crow .r { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .crow .w { font-family: var(--mono); font-size: 10.5px; color: var(--soft); white-space: nowrap; }
+  .crow .line1 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .addrow { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .ghostbtn { border: 1.5px dashed var(--line); border-radius: 11px; padding: 10px 14px; font-size: 12.5px; color: var(--soft); background: transparent; cursor: pointer; }
+
+  /* home: board */
+  .board { position: relative; padding: 22px 26px 34px; min-height: 520px; }
+  .band { border: 1px dashed var(--line); border-radius: 14px; padding: 30px 18px 18px; position: relative; margin-bottom: 18px; background: color-mix(in oklch, var(--panel) 45%, transparent); }
+  .band .bl { position: absolute; top: 9px; left: 14px; font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--soft); }
+  .cards { display: flex; gap: 18px; flex-wrap: wrap; }
+  .chcard { width: 230px; background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; text-align: left; border: 0; cursor: pointer; }
+  .chcard:nth-child(odd) { transform: rotate(-1deg); } .chcard:nth-child(even) { transform: rotate(.8deg); }
+  .chcard .top { display: flex; justify-content: space-between; align-items: center; }
+  .chcard .t { font-family: var(--serif); font-size: 16.5px; font-weight: 600; margin: 8px 0 4px; }
+  .chcard .s { font-size: 11.5px; color: var(--soft); line-height: 1.45; }
+  .chcard .f { font-family: var(--mono); font-size: 10.5px; color: var(--soft); display: flex; justify-content: space-between; margin-top: 12px; }
+
+  /* piece page */
+  .crumb { display: flex; align-items: center; gap: 8px; padding: 8px 26px; background: var(--panel); border-bottom: 1px solid var(--rule); font-size: 12px; color: var(--soft); flex-wrap: wrap; }
+  .crumb .link { color: var(--ink); font-weight: 600; cursor: pointer; border: 0; background: transparent; padding: 2px 0; }
+  .crumb .pn { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .ws-head { padding: 16px 26px 12px; background: var(--panel); border-bottom: 1px solid var(--rule); }
+  .ws-title { font-family: var(--serif); font-size: 27px; font-weight: 500; }
+  .ws-sum { font-size: 13px; color: var(--soft); margin-top: 2px; }
+  .meta { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .pill { font-family: var(--mono); font-size: 11px; background: var(--chip); border-radius: 7px; padding: 5px 9px; color: var(--soft); }
+  .pill b { color: var(--ink); font-weight: 600; margin-right: 5px; }
+  .kindsel { font-size: 11.5px; font-weight: 600; padding: 5px 9px; border: 1px solid var(--rule); border-radius: 7px; background: var(--card); }
+  .reftabs { display: flex; gap: 6px; padding: 10px 26px; background: var(--panel); border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+  .chipbtn { font-size: 11.5px; font-weight: 500; padding: 6px 11px; background: var(--chip); border-radius: 8px; }
+  .chipbtn em { font-style: normal; color: var(--faint); margin-left: 4px; }
+  .canvas { padding: 18px 26px 26px; min-height: 330px; }
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 34px 46px; }
+  .node { background: var(--card); border-radius: 10px; padding: 11px 13px 13px; box-shadow: var(--shadow); font-size: 12.5px; line-height: 1.45; position: relative; min-height: 82px; }
+  .node .n { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; color: var(--faint); margin-bottom: 6px; text-transform: uppercase; }
+  .node:not(:last-child)::after { content: ""; position: absolute; top: 50%; right: -46px; width: 46px; border-top: 1.5px solid var(--line); }
+  .node:nth-child(4n)::after { display: none; }
+  .write { display: grid; grid-template-columns: 240px minmax(0,1fr); min-height: 520px; }
+  .rail { background: var(--chip); border-right: 1px solid var(--rule); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .rail .node { min-height: 0; padding: 9px 11px; font-size: 11.5px; }
+  .rail .node::after { display: none; }
+  .prose { background: var(--card); padding: 34px 0; min-width: 0; }
+  .prose .col { max-width: 620px; margin: 0 auto; padding: 0 28px; font-family: var(--serif); font-size: 16.5px; line-height: 1.75; }
+  .prose p { margin-bottom: 14px; }
+  .prose.story p + p { text-indent: 1.5em; }
+  .prose .stanza { white-space: pre-line; margin-bottom: 22px; line-height: 1.65; }
+  .prose .brk { text-align: center; color: var(--faint); letter-spacing: .6em; margin: 18px 0; }
+  .wfoot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px; font-family: var(--mono); font-size: 10.5px; color: var(--faint); border-top: 1px solid var(--rule); background: var(--card); }
+  .lbk { font-family: var(--sans); font-size: 11px; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+  .tog { width: 26px; height: 15px; border-radius: 99px; background: var(--line); position: relative; border: 0; cursor: pointer; }
+  .tog::after { content: ""; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--card); transition: left .2s; }
+  .tog.on { background: var(--green); } .tog.on::after { left: 13px; }
+  .menu { position: absolute; right: 26px; top: 128px; width: 260px; background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; font-size: 12.5px; z-index: 3; }
+  .menu > div, .menu > button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 7px; border: 0; background: transparent; }
+  .menu > button { cursor: pointer; }
+  .menu > button:hover, .menu .hl { background: var(--chip); }
+  .menu small { display: block; color: var(--soft); font-size: 11px; margin-top: 2px; }
+  .menu .sep { padding: 0; height: 1px; background: var(--rule); margin: 5px 4px; }
+
+  /* export */
+  .pages { display: flex; gap: 18px; padding: 26px; overflow-x: auto; }
+  .page { flex: 0 0 230px; height: 300px; background: #fffefa; color: #222; border-radius: 3px; box-shadow: 0 2px 10px rgba(0,0,0,.18); padding: 22px 20px; font-family: "Times New Roman", Times, serif; font-size: 8.5px; line-height: 2; position: relative; overflow: hidden; }
+  .page .hdr { position: absolute; top: 9px; right: 14px; font-size: 7px; color: #666; }
+  .page .ct { text-align: center; }
+  .page .lbl { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-family: var(--sans); font-size: 9px; color: #888; letter-spacing: .06em; text-transform: uppercase; }
+  .page .ind { text-indent: 2em; }
+  .page .poem { white-space: pre-line; line-height: 2; }
+
+  /* projects */
+  .projects { padding: 22px 26px 30px; display: flex; flex-direction: column; gap: 8px; max-width: 760px; margin: 0 auto; }
+  .projects .row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--rule); border-radius: 13px; padding: 13px 14px; }
+  .projects .row.hl { border-color: var(--new); box-shadow: 0 0 0 3px color-mix(in oklch, var(--new) 16%, transparent); }
+  .projects .row .t { font-family: var(--serif); font-size: 16px; font-weight: 600; }
+  .projects .row .m { font-family: var(--mono); font-size: 11px; color: var(--soft); margin-top: 2px; }
+
+  /* phone */
+  .phonewrap { display: flex; gap: 26px; padding: 26px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 300px; border: 1px solid var(--line); border-radius: 30px; background: var(--panel); padding: 14px 12px 18px; box-shadow: var(--shadow); }
+  .phone .pt { font-family: var(--serif); font-size: 17px; font-weight: 600; padding: 4px 8px 10px; }
+  .phone .pc { background: var(--card); border-radius: 10px; padding: 10px 12px; margin-bottom: 7px; font-size: 12px; }
+  .phone .pc b { font-family: var(--serif); font-size: 14px; }
+  .phone .pc small { display: block; font-family: var(--mono); font-size: 10px; color: var(--soft); margin-top: 2px; }
+  .phone .pc .warn { color: var(--red); }
+  .phone .pp { background: var(--card); border-radius: 10px; padding: 12px; font-family: var(--serif); font-size: 13px; line-height: 1.6; }
+
+  @media (max-width: 860px) {
+    .flow { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .node::after { display: none; }
+    .write { grid-template-columns: minmax(0,1fr); }
+    .rail { display: none; }
+    .kindcards { grid-template-columns: 1fr 1fr; }
+    .menu { position: static; margin: 12px 26px; width: auto; }
+  }
+  @media (max-width: 520px) { .chcard { width: 100%; } .contents { padding: 22px 14px; } .crow { grid-template-columns: minmax(0,1fr) auto; } .grip { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <div class="eyebrow">Estoria · plan, not built</div>
+    <h1>Anthology: a book of pieces that stay pieces</h1>
+    <p>Expanding a piece into <b>a collection</b> today gives an ordinary book: numbered chapters, one kind and one line-break setting for everything. An <b>anthology</b> keeps each poem, story and essay as it is: its own kind, part names and line breaks, opening as its own page. The example is a made-up anthology of poems, stories and one essay. Everything is clickable. Items marked <span class="newf">new</span> are changes from today.</p>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="opts" id="opts"></div>
+  <div id="screen"></div>
+  <div class="caption" id="caption"></div>
+</div>
+
+<script>
+const PIECES = [
+  { id: "p1", sec: "One: Harbor", title: "Low Tide", kind: "poem", st: "done", words: 212, target: null, parts: 4,
+    sum: "The harbor at its lowest, and what the water leaves.",
+    beats: ["Mud flats at dawn, the boats tipped over", "A child counting crabs", "The tide table on the bait shop door", "Water coming back, not in a hurry"],
+    text: ["The boats lie down like tired dogs\nalong the harbor floor,\ntheir ropes gone slack, their bellies\nturned to the morning.", "A girl in red boots counts crabs\nout loud, and loses count,\nand starts again.", "Someone has written HIGH 4:12\nin pencil on the bait shop door,\nas if the sea\nneeded reminding.", "It does not. It comes back\nthe way my father did,\nslowly, and all at once."] },
+  { id: "p2", sec: "One: Harbor", title: "The Ferryman's Daughter", kind: "story", st: "draft", words: 4820, target: 6000, parts: 7,
+    sum: "Nell runs the last ferry the winter her father can't.",
+    beats: ["Nell takes the 6:40 crossing alone", "The regulars pretend not to notice", "Engine trouble halfway across", "A passenger who knew her mother", "She lies about the weather report", "Fog closes the far landing", "She brings them in by sound"],
+    text: ["The first thing Nell learned about the ferry was that it never felt the same twice. Her father said that was the water. She thought it was the people, who brought their moods aboard like luggage and set them down wherever there was room.", "On the morning of her first crossing alone, Mr. Abara was already waiting at the rail with his thermos, the way he had waited every weekday for eleven years. He looked at the wheelhouse, and then at her, and then out at the grey line of the far shore, and said nothing at all."] },
+  { id: "p3", sec: "One: Harbor", title: "Gulls", kind: "poem", st: "draft", words: 96, target: null, parts: 3,
+    sum: "Three gulls and an argument.",
+    beats: ["Three gulls on one post", "The argument", "One leaves, unbothered"],
+    text: ["Three gulls on one post\nand only room for two,\nso they have the argument\ngulls always have.", "Nobody wins.\nOne of them simply decides\nthe sky is bigger."] },
+  { id: "p4", sec: "One: Harbor", title: "Notes on Fog", kind: "essay", st: "draft", words: 1940, target: 2500, parts: 5,
+    sum: "What fog does to distance, and to the people who live in it.",
+    beats: ["How fog is made", "The foghorn and the town that hates it", "Distance as a feeling", "My grandmother's rule about fog", "Why I miss it inland"],
+    text: ["Fog is a cloud that has given up on height. That is the plainest way I know to say it, and it is still not quite right, because fog does not feel like something that has given up. It feels like something that has come to look.", "The town voted twice to silence the foghorn. Both times it lost, and both times the people who had voted against it said they would never have slept again."] },
+  { id: "p5", sec: "Two: Inland", title: "Inland", kind: "poem", st: "idea", words: 88, target: null, parts: 2,
+    sum: "The first night without the sound of water.",
+    beats: ["The new apartment, too quiet", "Listening for the sea anyway"],
+    text: ["The new rooms are so quiet\nI can hear the refrigerator\nthink.", "At night I leave the window open\nand listen for water\nthat isn't there."] },
+  { id: "p6", sec: "Two: Inland", title: "What the River Kept", kind: "story", st: "draft", words: 7310, target: 8000, parts: 9,
+    sum: "Two brothers drag the river for their father's boat.",
+    beats: ["The boat is found, upside down", "Teo wants to sell it", "Marco wants to fix it", "Their mother's silence", "The name painted under the hull", "A storm, the river rising", "They take it out anyway", "It holds", "Teo stays"],
+    text: ["The river gave the boat back on a Tuesday, the way it gave back everything, without explanation. It was upside down against the pilings below the mill, its blue hull gone the color of an old bruise.", "Teo saw it first and wished he hadn't."] },
+];
+const KIND = { poem: { label: "Poem", one: "stanza", many: "stanzas" }, story: { label: "Short story", one: "scene", many: "scenes" }, essay: { label: "Essay", one: "section", many: "sections" }, other: { label: "Other", one: "part", many: "parts" } };
+const PROJECTS = [
+  { id: "x1", title: "Salt Wind", kind: "poem", m: "Poem · 3 stanzas · 140 words · edited 2 days ago" },
+  { id: "x2", title: "The Lighthouse Keeper's Ledger", kind: "story", m: "Short story · 11 scenes · 6,210 words · 3 versions" },
+  { id: "x3", title: "Against Tidiness", kind: "essay", m: "Essay · 4 sections · 2,330 words" },
+  { id: "x4", title: "Harbor Lights", kind: null, m: "Book · 24 chapters · not offered: only single pieces come in" },
+];
+const S = { step: 1, expand: "collection", home: "list", pi: 0, mode: "write", menu: false, addTab: "new", pick: "x1", confirm: false, takeChoice: "move", takeDone: false, lbOverride: {} };
+const STEPS = ["Expand", "Home", "A piece", "Add a piece", "Sections", "Take one out", "Export", "Projects & File", "On the phone"];
+const fmt = (n) => n.toLocaleString("en-US");
+const total = () => PIECES.reduce((n, p) => n + p.words, 0);
+const lbOn = (p) => (p.id in S.lbOverride ? S.lbOverride[p.id] : p.kind === "poem");
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+function appbar(extra = "") {
+  return `<div class="appbar"><span class="logo">Estoria</span>
+    <div class="ptitle"><b>Salt and Lantern</b><span>Anthology · 6 pieces · ${fmt(total())} words</span></div>
+    <span class="tagk">Anthology</span><span class="newf">new</span>
+    <span class="btn">File ▾</span><span class="btn">Main version ▾</span>
+    <span class="spacer"></span>${extra}
+    <span class="btn">Characters</span><span class="btn">World</span><span class="btn">Notes</span><span class="btn">Settings ▾</span></div>`;
+}
+const statusbar = (left) => `<div class="statusbar"><span>${left}</span><span>Saved · Synced to Drive</span></div>`;
+
+function stepper() {
+  document.getElementById("steps").innerHTML = STEPS.map((s, i) => `<button class="${S.step === i + 1 ? "on" : ""}" data-step="${i + 1}">${i + 1} · ${s}</button>`).join("");
+}
+
+function screenExpand() {
+  const opt = (v, t, h) => `<button class="choice ${S.expand === v ? "on" : ""}" data-expand="${v}"><b>${t}</b><small>${h}</small></button>`;
+  const body = S.expand === "collection"
+    ? `<p><b>"Low Tide"</b> becomes the first piece. It stays a poem: its stanzas, its line breaks, its own page with Map and Write. Add more pieces of any kind, new or brought in from your other projects.</p>
+       <p>No chapter numbers, acts or chapter links. Pieces can be grouped into sections.</p>`
+    : `<p><b>"Low Tide"</b> becomes Chapter 1 of a book. Parts are still called stanzas, and line breaks are still kept. You can add chapters, acts and the Timeline.</p>`;
+  return `<div class="frame"><div class="scrim"><div class="dlg">
+    <div class="dlg-h"><div style="flex:1"><div class="t">Expand into a book?</div><div class="s">"Low Tide" grows into something longer.</div></div><span class="btn">✕</span></div>
+    <div class="dlg-b"><div><div class="eyebrow" style="margin-bottom:8px">Growing it into</div>
+      <div class="choices" style="grid-template-columns:1fr 1fr">${opt("work", "One longer work", "A long poem")}${opt("collection", 'An anthology <span class="newf">new</span>', "A collection of pieces, each kept as it is")}</div></div>
+      ${body}
+      <div class="note">A copy of "Low Tide" is saved first, under Projects › Saved copies.</div></div>
+    <div class="dlg-f"><span class="btn">Cancel</span><button class="btn dark" data-go="2">${S.expand === "collection" ? "Make an anthology" : "Expand into a book"}</button></div>
+  </div></div></div>`;
+}
+
+function contentsList() {
+  let html = `<div class="contents"><div class="bookhead"><div class="eyebrow">Anthology</div><h2>Salt and Lantern</h2><p>by R. L. · 6 pieces · ${fmt(total())} words</p></div>`;
+  let sec = null;
+  PIECES.forEach((p, i) => {
+    if (p.sec !== sec) {
+      sec = p.sec;
+      const n = PIECES.filter((q) => q.sec === sec).length;
+      html += `<div class="sect"><span class="n">${sec}</span><span class="c">${n} pieces</span></div>`;
+    }
+    const k = KIND[p.kind];
+    html += `<button class="crow" data-open="${i}"><span class="grip" aria-hidden="true">⋮⋮</span>
+      <span style="min-width:0"><span class="line1"><span class="t">${p.title}</span><span class="tagk">${k.label}</span></span><span class="s">${p.sum}</span></span>
+      <span class="r"><span class="st ${p.st}">${p.st}</span><span class="w">${fmt(p.words)}${p.target ? " / " + fmt(p.target) : ""} words · ${p.parts} ${k.many}</span></span></button>`;
+  });
+  html += `<div class="addrow"><button class="ghostbtn" data-go="4">+ Add piece</button><button class="ghostbtn" data-go="5">+ Add section</button></div></div>`;
+  return html;
+}
+
+function boardView() {
+  const secs = [...new Set(PIECES.map((p) => p.sec))];
+  return `<div class="board dotgrid">${secs.map((sec) => `<div class="band"><span class="bl">${sec}</span><div class="cards">${PIECES.map((p, i) => p.sec !== sec ? "" : `
+    <button class="chcard" data-open="${i}"><span class="top"><span class="tagk">${KIND[p.kind].label}</span><span class="st ${p.st}">${p.st}</span></span>
+    <div class="t">${p.title}</div><div class="s">${p.sum}</div>
+    <div class="f"><span>${p.parts} ${KIND[p.kind].many}</span><span>${fmt(p.words)}${p.target ? " / " + fmt(p.target) : ""} words</span></div></button>`).join("")}</div></div>`).join("")}
+    <div class="addrow"><button class="ghostbtn" data-go="4">+ Add piece</button><button class="ghostbtn" data-go="5">+ Add section</button></div></div>`;
+}
+
+function screenHome() {
+  return `<div class="frame">${appbar(`<button class="btn newb" data-go="4">+ Add piece</button><span class="btn">Export</span>`)}
+    ${S.home === "list" ? contentsList() : boardView()}${statusbar(`Anthology · 2 sections · 6 pieces · ${fmt(total())} words`)}</div>`;
+}
+
+function screenPiece() {
+  const p = PIECES[S.pi], k = KIND[p.kind], lb = lbOn(p);
+  const prev = PIECES[S.pi - 1], next = PIECES[S.pi + 1];
+  const head = `<div class="crumb"><button class="link" data-go="2">‹ Contents</button><span>·</span><span>${p.sec}</span><span>·</span><span>Piece ${S.pi + 1} of ${PIECES.length}</span><span class="newf">new</span>
+    <span class="pn"><button class="btn" data-pi="${S.pi - 1}" ${prev ? "" : "disabled style=\"opacity:.4\""}>‹ ${prev ? prev.title : ""}</button><button class="btn" data-pi="${S.pi + 1}" ${next ? "" : "disabled style=\"opacity:.4\""}>${next ? next.title : ""} ›</button></span></div>
+    <div class="ws-head"><div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="ws-title">${p.title}</div><div class="ws-sum">${p.sum}</div></div><button class="btn" data-menu="1">⋯</button></div>
+    <div class="meta"><span class="pill"><b>${fmt(p.words)}</b>${p.target ? "of " + fmt(p.target) + " " : ""}words</span><span class="pill"><b>${p.parts}</b>${k.many}</span><span class="st ${p.st}" style="padding:0 4px">${p.st}</span>
+      <div class="seg"><button class="${S.mode === "map" ? "on" : ""}" data-mode="map">Map</button><button class="${S.mode === "write" ? "on" : ""}" data-mode="write">Write</button></div>
+      <span class="kindsel">${k.label} ▾</span><span class="newf">per piece</span></div></div>
+    <div class="reftabs"><span class="chipbtn">Characters<em>${p.kind === "story" ? 3 : p.kind === "essay" ? 1 : ""}</em></span><span class="chipbtn">World<em>${p.kind === "poem" ? "" : 2}</em></span><span class="chipbtn">Piece notes</span><span class="chipbtn">Pinned<em>1</em></span><span class="newf">back for anthology pieces</span></div>`;
+  const menu = !S.menu ? "" : `<div class="menu"><div class="eyebrow" style="padding:6px 10px 4px">${p.title}</div>
+    <button>Move to section…<small>One: Harbor · Two: Inland</small></button>
+    <button data-go="6" class="hl">Make its own project… <span class="newf">new</span><small>Take this ${k.label.toLowerCase()} out as a single piece</small></button>
+    <div class="sep"></div><button style="color:var(--red)">Delete piece</button></div>`;
+  let body;
+  if (S.mode === "map") {
+    body = `<div class="canvas dotgrid"><div class="flow">${p.beats.map((b, i) => `<div class="node"><div class="n">${k.one} ${i + 1}</div>${esc(b)}</div>`).join("")}</div>
+      <div style="margin-top:18px;font-size:10.5px;color:var(--faint)">Same canvas as a single piece today. Parts named by this piece's kind.</div></div>`;
+  } else {
+    const prose = p.text.map((t) => lb ? `<div class="stanza">${esc(t)}</div>` : `<p>${esc(t.replace(/\n/g, " "))}</p>`).join("");
+    body = `<div class="write"><div class="rail"><div class="eyebrow">${p.parts} ${k.many} · ‹ Hide</div>${p.beats.map((b, i) => `<div class="node"><div class="n">${k.one} ${i + 1}</div>${esc(b)}</div>`).join("")}</div>
+      <div style="display:flex;flex-direction:column;min-width:0"><div class="prose ${p.kind === "story" ? "story" : ""}" style="flex:1"><div class="col">${prose}${p.kind !== "poem" ? '<div class="brk">…</div>' : ""}</div></div>
+      <div class="wfoot"><span>${fmt(p.words)} words${p.kind === "poem" ? " · " + p.text.join("\n").split("\n").length + " lines" : ""}</span>
+      <span class="lbk">Line breaks <button class="tog ${lb ? "on" : ""}" data-lb="${p.id}" aria-label="Keep line breaks"></button> <span class="newf">this piece only</span></span></div></div></div>`;
+  }
+  return `<div class="frame">${appbar()}${head}${menu}${body}${statusbar(`${p.title}: ${fmt(p.words)} words · Anthology ${fmt(total())} words`)}</div>`;
+}
+
+function screenAdd() {
+  let inner;
+  if (S.addTab === "new") {
+    const card = (kk, b) => `<button class="kcard" data-go="2"><span class="t">${KIND[kk].label}</span><span class="b">${b}</span><span class="eyebrow">Parts are ${KIND[kk].many}</span></button>`;
+    inner = `<div class="dlg-b"><p>A blank piece at the end of <b>Two: Inland</b>. It keeps its own kind and line breaks.</p>
+      <div class="kindcards">${card("story", "Scenes, characters, a world.")}${card("essay", "An argument or a reflection, in sections.")}${card("poem", "Stanzas, with line breaks kept.")}${card("other", "Anything else.")}</div></div>
+      <div class="dlg-f"><span class="btn">Cancel</span></div>`;
+  } else if (!S.confirm) {
+    inner = `<div class="dlg-b"><p>Your single-piece projects. Books and series can't come in.</p><div class="plist">${PROJECTS.map((x) => `<button class="prow ${x.kind ? (S.pick === x.id ? "on" : "") : "dis"}" ${x.kind ? `data-pick="${x.id}"` : "disabled"}>
+        <span style="flex:1;min-width:0"><span class="t">${x.title}</span><span class="m" style="display:block">${x.m}</span></span>${x.kind ? `<span class="tagk">${KIND[x.kind].label}</span>` : ""}</button>`).join("")}</div></div>
+      <div class="dlg-f"><span class="btn">Cancel</span><button class="btn dark" data-confirm="1">Bring in…</button></div>`;
+  } else {
+    const x = PROJECTS.find((y) => y.id === S.pick), k = KIND[x.kind];
+    const multi = x.id === "x2";
+    inner = `<div class="dlg-b"><p><b>"${x.title}"</b> moves into Salt and Lantern as a ${k.label.toLowerCase()}, at the end of <b>Two: Inland</b>.</p>
+      <div><div class="eyebrow" style="margin-bottom:6px">What happens</div><ul>
+        <li><b>Writing, map, notes, status, target:</b> come in as one piece, still a ${k.label.toLowerCase()}${x.kind === "poem" ? ", line breaks kept" : ""}</li>
+        <li><b>Characters, world, library:</b> added to the anthology's; ones it already has are matched, not doubled</li>
+        <li><b>Versions:</b> ${multi ? "its main version comes in; the other 2 stay in the saved copy" : "its one version comes in"}</li>
+        <li><b>Pace:</b> its writing days are added into the anthology's history</li>
+        <li><b>The project:</b> leaves your project list</li></ul></div>
+      <div class="note">A copy of "${x.title}" is saved first, under Projects › Saved copies. Opening it is how you undo this.</div></div>
+      <div class="dlg-f"><button class="btn" data-confirm="0">Back</button><button class="btn dark" data-go="2">Bring it in</button></div>`;
+  }
+  return `<div class="frame">${appbar()}<div class="scrim"><div class="dlg wide">
+    <div class="dlg-h"><div style="flex:1"><div class="t">Add a piece <span class="newf">new</span></div><div class="s">Start a new one, or bring in a piece you've already written.</div></div><span class="btn">✕</span></div>
+    <div class="tabsrow"><button class="${S.addTab === "new" ? "on" : ""}" data-tab="new">New piece</button><button class="${S.addTab === "bring" ? "on" : ""}" data-tab="bring">Bring in a project</button></div>
+    ${inner}</div></div></div>`;
+}
+
+function screenSections() {
+  return `<div class="frame">${appbar()}<div class="contents">
+    <div class="sect"><span class="n">One: Harbor</span><span class="c">4 pieces</span><span class="btn">Rename</span><span class="btn">⋯</span></div>
+    ${PIECES.slice(0, 2).map((p, i) => `<button class="crow" data-open="${i}"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">${p.title}</span><span class="tagk">${KIND[p.kind].label}</span></span></span><span class="w" style="font-family:var(--mono);font-size:10.5px;color:var(--soft)">${fmt(p.words)} words</span></button>`).join("")}
+    <div class="crow" style="opacity:.55;border-style:dashed;cursor:grabbing"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">Gulls</span><span class="tagk">Poem</span></span><span class="s">Dragging…</span></span><span></span></div>
+    <div style="height:2px;background:var(--new);border-radius:2px;margin:-2px 0 6px"></div>
+    <div class="crow"><span class="grip">⋮⋮</span><span><span class="line1"><span class="t">Notes on Fog</span><span class="tagk">Essay</span></span></span><span class="w" style="font-family:var(--mono);font-size:10.5px;color:var(--soft)">1,940 words</span></div>
+    <div class="sect" style="border-bottom-color:var(--new)"><span class="n" contenteditable="true" style="outline:none;border-bottom:1px dashed var(--new)">Two: Inland</span><span class="c">2 pieces</span></div>
+    <div style="font-size:12px;color:var(--soft);line-height:1.6;padding:6px 2px">
+      <b style="color:var(--ink)">+ Add section</b> puts a heading after the last piece; drag pieces under it. A section is only a heading: <b style="color:var(--ink)">⋯ › Remove section</b> leaves its pieces where they are, joined to the section above. Pieces with no section before the first heading are fine.</div>
+  </div>${statusbar("Anthology · 2 sections · 6 pieces")}</div>`;
+}
+
+function screenTakeOut() {
+  const p = PIECES[1];
+  if (S.takeDone) return screenProjects(true);
+  const opt = (v, t, h) => `<button class="choice ${S.takeChoice === v ? "on" : ""}" data-take="${v}"><b>${t}</b><small>${h}</small></button>`;
+  return `<div class="frame">${appbar()}<div class="scrim"><div class="dlg">
+    <div class="dlg-h"><div style="flex:1"><div class="t">Make "${p.title}" its own project? <span class="newf">new</span></div><div class="s">It becomes a single short story, as it was before it came in.</div></div><span class="btn">✕</span></div>
+    <div class="dlg-b"><div class="choices" style="grid-template-columns:1fr 1fr">${opt("move", "Move it out", "It leaves the anthology")}${opt("copy", "Copy it out", "The anthology keeps it too; the two then drift apart")}</div>
+      <div><div class="eyebrow" style="margin-bottom:6px">It takes with it</div><ul>
+        <li><b>Writing and map:</b> from the version you're viewing (Main version)</li>
+        <li><b>Its kind and line breaks:</b> short story, line breaks off</li>
+        <li><b>Notes, status, target, pins</b></li>
+        <li><b>Characters and world it uses:</b> Nell, Mr. Abara, the ferry, the far landing (copied; the anthology keeps its own)</li>
+        <li><b>Pace:</b> starts fresh; the anthology's history stays where it was written</li></ul></div>
+      ${S.takeChoice === "move" ? '<div class="note">A copy of Salt and Lantern is saved first, under Projects › Saved copies.</div>' : ""}</div>
+    <div class="dlg-f"><span class="btn">Cancel</span><button class="btn dark" data-takedone="1">${S.takeChoice === "move" ? "Move it out" : "Copy it out"}</button></div>
+  </div></div></div>`;
+}
+
+function screenExport() {
+  const pg = (inner, lbl, hdr = true) => `<div class="page">${hdr ? '<div class="hdr">L. / SALT AND LANTERN / 3</div>' : ""}${inner}<div class="lbl">${lbl}</div></div>`;
+  return `<div class="frame">${appbar()}<div class="dlg-h" style="background:var(--panel)"><div style="flex:1"><div class="t">Export · Manuscript</div><div class="s">.docx in standard manuscript format, also .md and .txt. Each piece on a new page, under its own title.</div></div></div>
+    <div class="pages dotgrid">
+      ${pg(`<div>R. L.</div><div>about 14,500 words</div><br><br><br><div class="ct">Salt and Lantern</div><div class="ct">by R. L.</div>`, "Title page", false)}
+      ${pg(`<div class="ct">Contents</div><br><div><i>One: Harbor</i></div><div>Low Tide</div><div>The Ferryman's Daughter</div><div>Gulls</div><div>Notes on Fog</div><div><i>Two: Inland</i></div><div>Inland</div><div>What the River Kept</div>`, "Contents · new")}
+      ${pg(`<br><br><br><br><div class="ct">One: Harbor</div>`, "Section · new")}
+      ${pg(`<div class="ct">Low Tide</div><br><div class="poem">The boats lie down like tired dogs
+along the harbor floor,
+their ropes gone slack, their bellies
+turned to the morning.
+
+A girl in red boots counts crabs
+out loud, and loses count,</div>`, "Poem · lines kept")}
+      ${pg(`<div class="ct">The Ferryman's Daughter</div><br><div>The first thing Nell learned about the ferry was that it never felt the same twice. Her father said that was the water.</div><div class="ind">On the morning of her first crossing alone, Mr. Abara was already waiting at the rail.</div>`, "Story · paragraphs")}
+    </div>
+    <div style="padding:0 26px 22px;font-size:12px;color:var(--soft);line-height:1.6">Today this book would print "Chapter 1. Low Tide" and either join every poem's lines or keep every story's stray breaks. The .md export uses <code>#</code> for the book, <code>##</code> for a section, <code>###</code> for a piece.</div></div>`;
+}
+
+function screenProjects(after) {
+  const rows = after
+    ? `<div class="row hl"><div style="flex:1"><div class="t">The Ferryman's Daughter <span class="tagk">Short story</span> <span class="newf">just made</span></div><div class="m">Short story · 7 scenes · 4,820 words · from Salt and Lantern</div></div><span class="btn dark">Open</span></div>
+       <div class="row"><div style="flex:1"><div class="t">Salt and Lantern <span class="tagk">Anthology</span></div><div class="m">Anthology · ${S.takeChoice === "move" ? "5 pieces · 9,646" : "6 pieces · 14,466"} words</div></div><span class="btn">Open</span></div>`
+    : `<div class="row"><div style="flex:1"><div class="t">Salt and Lantern <span class="tagk">Anthology</span> <span class="newf">new tag</span></div><div class="m">Anthology · 2 sections · 6 pieces · ${fmt(total())} words</div></div><span class="btn dark">Open</span></div>
+       <div class="row"><div style="flex:1"><div class="t">Salt Wind <span class="tagk">Poem</span></div><div class="m">Poem · 3 stanzas · 140 words</div></div><span class="btn">Open</span></div>
+       <div class="row"><div style="flex:1"><div class="t">Harbor Lights <span class="tagk">Poetry collection</span></div><div class="m">Book · 24 chapters · expanded as a collection before anthologies existed</div></div><span class="btn">Open</span></div>`;
+  const saved = after && S.takeChoice === "move"
+    ? `<div class="eyebrow" style="margin-top:14px">Saved copies</div><div class="row"><div style="flex:1"><div class="t">Salt and Lantern</div><div class="m">Before a piece was made its own project · today</div></div><span class="btn">Open as a project</span></div>`
+    : `<div class="eyebrow" style="margin-top:14px">Saved copies</div><div class="row"><div style="flex:1"><div class="t">Low Tide</div><div class="m">Before expanding into a book · 12 Nov</div></div><span class="btn">Open as a project</span></div>`;
+  const fileMenu = after ? "" : `<div class="menu" style="top:64px;left:300px;right:auto">
+      <div class="eyebrow" style="padding:6px 10px 4px">File, on "Harbor Lights"</div>
+      <div>Projects…</div><div class="sep"></div>
+      <div class="hl">Make this an anthology… <span class="newf">new</span><small>Each chapter becomes a poem; nothing is joined</small></div>
+      <div>Turn into single piece…<small>Joins every chapter into one</small></div>
+      <div>Make this a series…</div><div class="sep"></div><div>Import…</div><div>Author details…</div></div>`;
+  return `<div class="frame">${appbar()}<div style="position:relative">${fileMenu}<div class="projects"><div class="dlg-h" style="padding:0 0 8px;border:0"><div class="t">Projects</div></div>${rows}${saved}</div></div>
+    ${after ? statusbar("Done. The anthology's version of the piece is unchanged.") : ""}</div>`;
+}
+
+function screenPhone() {
+  return `<div class="frame"><div class="phonewrap dotgrid">
+    <div><div class="eyebrow" style="text-align:center;margin-bottom:8px">Phone today, before its update</div><div class="phone">
+      <div class="pt">Salt and Lantern</div>
+      <div class="pc"><b>1 · Low Tide</b><small>4 stanzas · 212 words</small></div>
+      <div class="pc"><b>2 · The Ferryman's Daughter</b><small class="warn">7 stanzas · 4,820 words</small></div>
+      <div class="pc"><b>3 · Gulls</b><small>3 stanzas · 96 words</small></div>
+      <div class="pc"><b>4 · Notes on Fog</b><small class="warn">5 stanzas · 1,940 words</small></div>
+      <div class="pc"><b>5 · Inland</b><small>no section headings</small></div></div></div>
+    <div><div class="eyebrow" style="text-align:center;margin-bottom:8px">After the phone update</div><div class="phone">
+      <div class="pt">Salt and Lantern <span class="tagk">Anthology</span></div>
+      <div class="eyebrow" style="padding:0 8px 6px">One: Harbor</div>
+      <div class="pc"><b>Low Tide</b> <span class="tagk">Poem</span><small>4 stanzas · 212 words</small></div>
+      <div class="pc"><b>The Ferryman's Daughter</b> <span class="tagk">Short story</span><small>7 scenes · 4,820 words</small></div>
+      <div class="pc"><b>Gulls</b> <span class="tagk">Poem</span><small>3 stanzas · 96 words</small></div>
+      <div class="eyebrow" style="padding:6px 8px">Two: Inland</div>
+      <div class="pc"><b>Inland</b> <span class="tagk">Poem</span><small>2 stanzas · 88 words</small></div></div></div>
+  </div></div>`;
+}
+
+const CAPTIONS = {
+  1: `<b>The Expand dialog you have today</b>, with "A collection" made real. Pick it and the piece becomes the first piece of an anthology, still a poem. "One longer work" is unchanged. Click <b>Make an anthology</b> to see the result.`,
+  2: `<b>The anthology's home.</b> Two options to choose between: a <b>contents list</b> (reads like the book's table of contents; drag the ⋮⋮ grip to reorder) or a <b>board of cards</b> (today's board, with kind tags in place of chapter numbers and sections as bands). Either way, no acts, no chapter links, no Timeline, and clicking a piece opens it as its own page. Try both, then click a piece.<span class="q">Question 1: contents list or board of cards?</span>`,
+  3: `<b>A piece opens exactly as a single piece does today</b>, plus a way back to the contents and ‹ › to the next piece. Step through them: the poems keep their line breaks, the stories and the essay read as paragraphs, and each counts its own parts (stanzas, scenes, sections). The kind and the Line breaks toggle belong to this piece only. Open <b>⋯</b> for Move to section and Make its own project.`,
+  4: `<b>+ Add piece</b> has two halves: a new blank piece (the same kind cards as New project) or <b>Bring in a project</b>, which lists only your single pieces. Pick one and click Bring in to see what moves. Your choice: it moves in, and a saved copy is kept first.`,
+  5: `<b>Sections</b> are headings between pieces (Part One, Harbor, Inland). Drag a piece to move it; the blue line is where it lands. A section is only a heading, so removing one never removes a piece.`,
+  6: `<b>Taking a piece out.</b> From the piece's ⋯ menu: <b>Make its own project…</b> Move it out (the default) or Copy it out. Click the button to see your project list afterwards.<span class="q">Question 2: is this how you picture it? Should Move or Copy be the default, or should it ask every time with neither picked?</span>`,
+  7: `<b>Export.</b> A title page, a contents page, a page per section, then each piece on a new page under its own title, with its own line breaks. No "Chapter 3".`,
+  8: `<b>Projects and the File menu.</b> The anthology carries an "Anthology" tag. A book that was expanded as a collection before this existed (or any standalone book) gets <b>Make this an anthology…</b>: each chapter becomes a piece, nothing is joined, a copy is saved first.`,
+  9: `<b>The phone, until it is updated</b> (web first was your call). Nothing in the file is lost and the phone writes it back untouched, but it shows an ordinary book: numbered chapters, every piece named by the anthology's part noun (the red ones are wrong), one line-break setting for all, and no section headings. The right-hand phone is the later update.`,
+};
+
+function render() {
+  stepper();
+  const o = document.getElementById("opts");
+  o.innerHTML = S.step === 2 ? `<span class="lbl">Option:</span><button class="${S.home === "list" ? "on" : ""}" data-home="list">A · Contents list</button><button class="${S.home === "board" ? "on" : ""}" data-home="board">B · Board of cards</button>`
+    : S.step === 3 ? `<span class="lbl">Piece:</span>${PIECES.map((p, i) => `<button class="${S.pi === i ? "on" : ""}" data-pi="${i}">${p.title} (${KIND[p.kind].label.toLowerCase()})</button>`).join("")}`
+    : S.step === 4 ? `<span class="lbl">Show:</span><button class="${S.addTab === "new" ? "on" : ""}" data-tab="new">New piece</button><button class="${S.addTab === "bring" && !S.confirm ? "on" : ""}" data-tab="bring">Bring in: pick</button><button class="${S.confirm ? "on" : ""}" data-tab="confirm">Bring in: confirm</button>`
+    : S.step === 6 ? `<span class="lbl">Show:</span><button class="${!S.takeDone ? "on" : ""}" data-takedone="0">Dialog</button><button class="${S.takeDone ? "on" : ""}" data-takedone="1">After</button>`
+    : "";
+  const fn = { 1: screenExpand, 2: screenHome, 3: screenPiece, 4: screenAdd, 5: screenSections, 6: screenTakeOut, 7: screenExport, 8: () => screenProjects(false), 9: screenPhone }[S.step];
+  document.getElementById("screen").innerHTML = fn();
+  document.getElementById("caption").innerHTML = CAPTIONS[S.step];
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button, [data-go]");
+  if (!t || t.disabled) return;
+  const d = t.dataset;
+  if (d.step) { S.step = +d.step; S.menu = false; }
+  else if (d.go) { S.step = +d.go; S.menu = false; S.confirm = false; S.takeDone = false; }
+  else if (d.expand) S.expand = d.expand;
+  else if (d.home) S.home = d.home;
+  else if (d.open !== undefined) { S.pi = +d.open; S.step = 3; S.menu = false; }
+  else if (d.pi !== undefined) { const n = +d.pi; if (n >= 0 && n < PIECES.length) { S.pi = n; S.menu = false; } }
+  else if (d.mode) S.mode = d.mode;
+  else if (d.menu) S.menu = !S.menu;
+  else if (d.lb) { const p = PIECES.find((q) => q.id === d.lb); S.lbOverride[p.id] = !lbOn(p); }
+  else if (d.tab) { if (d.tab === "confirm") { S.addTab = "bring"; S.confirm = true; } else { S.addTab = d.tab; S.confirm = false; } }
+  else if (d.pick) S.pick = d.pick;
+  else if (d.confirm !== undefined) S.confirm = d.confirm === "1";
+  else if (d.take) S.takeChoice = d.take;
+  else if (d.takedone !== undefined) S.takeDone = d.takedone === "1";
+  else return;
+  render();
+});
+render();
+</script>
