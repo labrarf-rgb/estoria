@@ -1,224 +1,281 @@
-# Plan: rearrange character and world cards
+# Plan: rearrange character and world cards (and the tiles that already reorder)
 
 Status: **PLAN ONLY**, waiting for Ray's go-ahead. No feature code.
 Branch: `claude/detail-cards-reorder-f20e90` (worktree), not pushed.
-Sibling plans it has to fit: `claude/detail-cards-style-5424f7`
-(`docs/PLAN-detail-cards.md`) and `claude/relationship-chart-4c8990`
-(`docs/PLAN-relationships.md`).
+Mockup: [`docs/mockups/detail-cards-reorder.html`](mockups/detail-cards-reorder.html)
+(clickable: drag, typed position, click to open, merge sketch).
+
+Built on the restyle, **option B everywhere** (`claude/detail-cards-style-5424f7`,
+commit 84b6b02, `docs/PLAN-detail-cards.md`): every card is a chapter-style
+tile, a click opens a window, the collapsed 460px drawer is one column of
+tiles and the expanded drawer is a grid. Also fits the relationship chart
+(`claude/relationship-chart-4c8990`, `docs/PLAN-relationships.md`).
+
+## Decisions proposed
+
+1. **A ⠿ grip starts a drag, nothing else does.** Grip first on the tile's
+   top row, before the badge. A click anywhere else opens the window, as the
+   restyle says.
+2. **A typed position number**, as pinned resources have today. Character and
+   world tiles show it at the end of the top row (where a chapter card has its
+   cast). Library and reference tiles already show their position as the badge
+   (`01`), so there **the badge is the input**, with no second number.
+3. **The other tiles make room live** while you drag, and a dashed space shows
+   where the card will land, in reading order (left to right, then down). The
+   collapsed column uses the same code. This is how the scene map already
+   reorders its grid.
+4. **One shared drag** for all five places (Characters, World, Notes library,
+   a world entry's references, a chapter's pinned references). It replaces
+   RefList's own grip code. The store actions for references don't change.
+5. **The order is the array** the file already keeps: no new field, no schema
+   bump. The phone shows the new order after sync with no update.
+6. **Compare and merge gets "Character order" and "World order"** items,
+   because today an order-only difference can't be seen or merged.
+7. **The restyle lands first**, then this, built on `DetailCard`.
 
 ## How it works today
 
 - **Order is array order.** The Characters and World drawers list
   `doc.characters` / `doc.world` as stored, minus archived items, with the
-  unsaved draft card drawn last. New items are appended. Nothing sorts them,
-  and neither drawer groups or filters (World is not grouped by category).
-- **The order is already in the project file**, and survives a round trip on
-  both apps: the web's `normalizeArchived` (`persistence.ts`) and Android's
-  (`Normalize.kt`) both map the array in place. The phone lists both screens
-  in file order too (`CharactersScreen.kt`, `WorldScreen.kt`).
-- **The closest precedent is `RefList`** (pinned notes, images, to-dos): a ⠿
-  grip is the only drag source, and a typed position number sits beside it
-  (SPECS §4 "Reorder pinned resources"). `reorderAsset` moves an item among the
-  visible (non-archived) items and leaves archived ones in their slots.
-- **Every drag in the app uses mouse events** (`mousemove` on `window`: board,
-  scene map, series map, RefList). None of them drag on a touchscreen.
-- **The board's rule** (`Board.tsx`, `CLICK_SLOP = 4`): every press on a card
-  starts a drag, and a release that moved less than 4px is a click that opens
-  the chapter. It exists because the whole chapter card is both the handle and
-  the button.
+  unsaved draft last. New items are appended. Nothing sorts, groups or filters
+  them (World is not grouped by category).
+- **The order is already in the project file** and survives a round trip on
+  both apps (`normalizeArchived` in `persistence.ts` and in `Normalize.kt`
+  both map the array in place). The phone lists both screens in file order.
+- **RefList already reorders** pinned notes, images and to-dos (library, world
+  entry, chapter): a ⠿ grip in list view only, a typed number in both views,
+  and "drop on a row to take its place". `reorderAsset` counts visible items
+  only and leaves archived ones in their slots; `reorderChapterRef` and
+  `reorderWorldRef` reorder one owner's pins.
+- **The scene map** (`ChapterDetail.tsx`) reorders a grid with a live preview:
+  the card follows the pointer and the others reflow (`sceneSlotAt`).
+- **Every drag in the app uses mouse events** (`mousemove` on `window`), so
+  none of them drag on a touchscreen.
+- **The board's rule** (`Board.tsx`, `CLICK_SLOP = 4`): a press that moves
+  more than 4px is a drag, one that doesn't is a click.
+
+## Interaction
+
+### The tile
+
+| Place | Top row, left to right |
+|---|---|
+| Character | ⠿ · initials badge · role tag · · · position `3` |
+| World entry | ⠿ · category badge · · · position `3` |
+| Library / reference | ⠿ · position badge `03` (typed into) · kind tag |
+
+- The grip is a 20 × 26px target around a 13px glyph, faint until hovered,
+  with a focus ring. The window's own header has no grip.
+- The position number is always visible, faint, in a small mono field
+  (question 8 asks whether it should only appear on hover).
+
+### Dragging
+
+- **Press the grip, move 4px, and the card lifts.** The board's slop, applied
+  to the grip: a still press on the grip does nothing at all.
+- The lifted card follows the pointer with a deeper shadow. The card's place
+  in the list becomes a dashed space, and the other tiles slide (200ms) to show
+  where it will land.
+- **Where the space goes:** before the first tile the pointer is "ahead of" in
+  reading order. In the grid that means above the tile's row, or in its row
+  and left of its middle. In the column it means above the tile's middle.
+  Moving past the last tile puts the space at the end, before "+ Add". No
+  separate end-of-list slot is needed.
+- **Release:** the card settles into the space (150ms) and the order is saved.
+- **Auto-scroll:** holding the card within 48px of the top or bottom of the
+  scrolling area scrolls it, faster the closer you get. The scrolling area is
+  the drawer for Characters, World and the library, the world entry's window
+  for its references, and the chapter modal for pinned references.
+- **Reduced motion:** no sliding, the tiles jump into place.
+
+### Pressing the grip never opens the window
+
+Three rules, all in the mockup:
+
+1. The grip and the number ignore the tile's click (the tile's handler skips
+   any click that starts on either).
+2. The grip's pointerdown calls `preventDefault` and `stopPropagation`.
+3. **After a drag, the next click is swallowed.** This is the case that would
+   slip through: drop a card back where it was, and the browser fires a click
+   on the tile itself, because the press and the release were both inside it.
+   A flag set on release and cleared on the next tick stops that click.
+
+### Keyboard and touch
+
+- **Typed number:** click or Tab to it, type, Enter to move (Escape cancels).
+  Out-of-range numbers clamp to first or last.
+- **Grip:** Tab to it, then ← or ↑ moves one place earlier, → or ↓ one place
+  later. Focus stays on the grip, and a screen reader hears "Mara Vell moved to
+  position 2 of 6".
+- **Touch (question 2):** the mockup uses pointer events, with
+  `touch-action: none` on the grip only, so a finger drags by the grip and the
+  rest of the list still scrolls. That would be the first touch drag in the
+  app. Without it, the typed number still works on touch.
+
+### Why not drag the whole tile
+
+Option B makes this possible: tiles no longer hold inputs, so the board's rule
+(press and move is a drag, press and release is a click) could apply to the
+whole tile. The grip is still recommended:
+
+- **One mechanism in five places.** References inside a window and a chapter
+  sit next to text and buttons; a grip is unambiguous everywhere.
+- **Touch scrolling.** A whole-tile drag on touch would fight the list's
+  scroll; a grip-only drag does not.
+- **Click to open stays instant** and never depends on how steady a hand is.
+
+If Ray prefers whole-tile drag (question 1), the same code works with the tile
+as the handle and the grip as a visual hint only.
+
+## RefList carries over to the tiles
+
+- RefList's grip (list view only) and "drop on a row to take its place" rule
+  are replaced by the shared tile drag, in both drawer sizes and inside
+  windows. Its typed number becomes the tile's badge.
+- **Its store actions don't change:** `reorderAsset` (library),
+  `reorderChapterRef` (chapter pins), `reorderWorldRef` (an entry's pins).
+  Each place keeps its own order; a chapter's pin order is not the library's.
+- The restyle's tile view keeps RefList's `onReorder` prop; this feature only
+  swaps the drag underneath it, so nothing changes for callers.
+- The draft tile (from "+ Note" etc.) still has no grip and no number.
 
 ## What moves when you reorder
-
-Reordering the roster changes more than the drawer, because these places read
-`doc.characters` / `doc.world` in array order:
 
 | Place | Follows the new order? |
 |---|---|
 | Characters / World drawers (web) | yes, the point of it |
 | Chapter modal: cast list and "add character" picker (`ChapterDetail.tsx:786–787`) | yes |
-| Chapter modal: world links picker | yes |
-| Board and timeline cast avatars | **no**: they follow each chapter's own `chars` order |
+| Chapter modal: world list and picker (`ChapterDetail.tsx:855–856`) | yes |
+| Board and timeline cast avatars | **no**: each chapter keeps its own `chars` order |
 | Markdown export, Characters and World sections (`markdown.ts:86`) | yes |
 | Phone: Characters / World screens, chapter pickers | yes, with no phone update |
-| Relationship chart ring (if built) | yes, if it lays characters out in roster order (proposed) |
-| Archive shelf | stays in array order, not reorderable (see below) |
+| Relationship chart ring (if built) | yes, if it lays characters out in roster order (question 5) |
+| Archive shelf | stays in array order, not reorderable |
 
 Characters and world entries are the series bible, so there is **one order
 for the whole project**, shared by every book and version.
 
-## Interaction (recommended: follow RefList)
-
-- **A grip handle, not whole-card drag.** A ⠿ grip at the left of the card's
-  top row is the only thing that starts a drag. An expanded card is full of
-  inputs and textareas, and whole-card drag would turn text selection into
-  drags. With grip-only, the board's press-that-moves rule is **not needed**:
-  a click anywhere else on the card opens or closes it, as the restyle plans.
-- **A typed position number** beside the grip, as in RefList: click it, type
-  `1`, press Enter, and the card moves to the top. This is the keyboard path and
-  the touch path, so no extra move-up / move-down buttons are needed. The number
-  counts the cards you can see (archived ones are not counted).
-- **Keyboard on the grip (small extra):** the grip is a focusable button, and
-  ↑ / ↓ move the card one place while it has focus. The number field covers this
-  already, so it is optional.
-- **While dragging:** the card being carried dims (as in RefList), a line shows
-  where it will land, and the drawer scrolls by itself when the pointer nears
-  its top or bottom edge, so a long roster can be reordered in one go.
-- **Drop rule: before or after by midpoint**, not RefList's "drop on a row to
-  take its place". An open card can be taller than the drawer, so "on it" would
-  be a huge target with no way to say above or below. A line between cards is
-  exact, and the top and the end of the list are both reachable without an
-  end-of-list slot.
-- **Open cards can be dragged** as they are. The open one stays open, since
-  which card is open is tracked by id (`selChar` / `selWorld`).
-- **The draft card** (from "+ Add character") has no grip and no number, and
-  stays last until it is saved, as in RefList.
-- **Touch (question 2):** with mouse events the grip will not drag on the iPad
-  or a touchscreen laptop; the number still works there. Switching this one
-  drag to pointer events (with `touch-action: none` on the grip only, so the
-  list still scrolls) makes it work on touch too, but it would be the first
-  touch drag in the app.
-
 ## Archived items, the draft, filters
 
-- **Archived items keep their slot.** The store actions are clones of
-  `reorderAsset`: the target index counts visible cards only, and archived
-  entries stay where they are in the array. So archiving a card never shuffles
-  the others, and **Restore puts a card back roughly where it was**, not at the
-  end (question 3).
-- **The archive shelf** stays a compact list in array order with no grip. Its
-  order is not something you would curate.
-- **No grouping or filtering exists** in either drawer today, so there is
-  nothing to reconcile. If World ever groups by category, the order within
-  each group would still be array order, and a drag across groups would need
-  a decision then.
+- **Archived items keep their slot.** The new store actions are clones of
+  `reorderAsset`: the index counts visible tiles only, archived entries stay
+  where they are. Archiving never shuffles the others, and **Restore puts a
+  card back near where it was**, not at the end (question 3).
+- **The archive shelf** stays a compact list in array order, no grip.
+- **The draft tile** has no grip or number and stays last until saved.
+- **No grouping or filtering exists** in either drawer. If World ever groups
+  by category, a drag across groups would need a decision then.
 
 ## Store and data (web)
 
 1. `useStore.ts`: `reorderCharacter(id, toIdx)` and
-   `reorderWorldEntry(id, toIdx)`, cloned from `reorderAsset` (visible index,
-   archived slots kept, no-op when nothing moves).
+   `reorderWorldEntry(id, toIdx)`, cloned from `reorderAsset`.
 2. **No `types.ts` change, no new field, no schema bump, no `normalizeDoc`
-   change.** The order is the array.
-3. Auto-save and Drive mirror it like any edit: a reorder changes the file's
+   change.**
+3. Auto-save and Drive carry it like any edit: a reorder changes the file's
    content hash (`sortKeysDeep` sorts object keys, never arrays), so it is
    written to the Estoria folder and the phone picks it up on its next pull.
 
 ## Compare and merge when two copies disagree on order
 
-This is where today's code falls short, and the feature would make it common.
-
 - **Today, an order-only difference is invisible.** The web diff matches
   characters and world entries by id (`sync.ts`), so a pure reorder produces no
   item. The dialog says "The versions differ only in details this report
-  doesn't name", and hides See full report and Merge, so the only choice is
-  keeping one whole copy. Asset (library) reorders already have this gap.
+  doesn't name" and hides See full report and Merge. The library already has
+  this gap.
 - **Worse, a merge drops the file's order silently.** `mergeDocs` starts from
-  this copy and swaps records in place (`upsert`), so if the copies differ in
-  order *and* in anything else, the merged result always keeps this copy's
-  order and nothing says so.
+  this copy and swaps records in place (`upsert`), so when copies differ in
+  order *and* anything else, the result keeps this copy's order without saying
+  so.
 
-Proposal: two new story-wide units in the diff, **Character order** and
-**World order**.
+Proposal: two story-wide units, **Character order** and **World order**
+(sketched at the bottom of the mockup).
 
-- **When it appears:** only when the ids present in *both* copies are in a
-  different relative order. Adding or deleting a card on one side changes its
-  own unit, not the order unit, so an add alone never shows an order
-  difference.
-- **What it shows:** "Character order differs", with a short line naming the
-  first few cards in each copy's order (visible ones only), for example
-  "Here: Mara, Ilse, Tomas … / In the file: Ilse, Mara, Tomas …".
-- **Merge, choosing the file's order:** the shared ids take the file's
-  sequence; a card only in this copy stays after the card it follows here, or
-  at the end. Choosing "this copy" is today's behaviour. It applies after
-  record choices, so taking a character from the file and taking the file's
-  order compose cleanly.
-- **Tests:** diff (order-only, add-only does not trigger, archived reorder),
-  merge (take order with records taken from both sides). `sync.test.ts` counts
-  the story-wide units (`total += 9`), so expected totals move to 11.
-- **Library (asset) order** has the same gap and could ride along as a third
-  unit at almost no cost (question 6).
-
-Where the conflict comes from in practice: two browsers (laptop and iPad)
-reordering offline, or reorder on one and edit on the other.
+- **When it appears:** only when ids present in *both* copies are in a
+  different relative order. An add or delete alone never shows it.
+- **What it shows:** the first few visible names in each copy's order, side by
+  side, and a choice of which to keep.
+- **Merge with the file's order:** shared ids take the file's sequence; a card
+  only in this copy stays after the card it follows here, or at the end.
+  Applied after record choices, so the two compose.
+- **Tests:** diff (order-only; add-only does not trigger; archived reorder),
+  merge (file's order with records from both sides). `sync.test.ts` counts the
+  story-wide units (`total += 9`), so totals move to 11.
+- **Library order** could ride along as a third unit at almost no cost
+  (question 6).
 
 ## Android
 
 - **No update needed for it to work.** The phone keeps the array as it is on
-  load, save and merge, and shows both screens and its chapter pickers in that
-  order. A web reorder simply appears on the phone after sync.
+  load, save and merge, and shows both screens and its pickers in that order.
 - **Known gaps until the phone learns it (not blockers):**
   - No way to reorder on the phone.
   - The phone's conflict summary (`DocDiff.kt`) also matches by id, so an
     order-only conflict reads **"No differences"** there, and a merge on the
-    phone keeps the phone's order. The web would carry the right order the next
-    time it compares.
-  - New items added on the phone are appended, as they are on the web.
-- If parity is wanted later, the phone needs the two order entries in
-  `DocDiff.kt` / `Merge.kt` and a reorder control (long-press drag in Compose,
-  or move up / move down). That is an Android session, not this one.
+    phone keeps the phone's order.
+  - Items added on the phone are appended, as on the web.
+- Parity later is an Android session: the two order entries in `DocDiff.kt` /
+  `Merge.kt`, and a reorder control.
 
-## Fitting with the two sibling features
+## Fitting with the sibling features
 
-**Detail-card restyle** (`DetailCard.tsx`, not merged yet):
+**Restyle, option B** (lands first):
 
-- `DetailCard` gets two optional props: `grip` (the handle node) and
-  `position` (the number field). Both sit at the head of the badge row, before
-  the initials / category badge, the same order RefList uses (grip, number,
-  icon). With neither passed, the card looks exactly as the restyle mocks it.
-- **The grip and the number must stop propagation** on mousedown and click,
-  so pressing them never toggles the card open. That is the only change to
-  the restyle's "click anywhere opens it" rule. The board's 4px click-slop rule
-  is not needed, because the grip is the only drag source.
-- The list stays a plain flex column in array order, which the restyle plan
-  already commits to.
-- **If this lands first**, the grip and number go into today's card row in
-  `CharactersPanel.tsx` / `WorldPanel.tsx`, and the restyle moves them into
-  `DetailCard`'s slots when it lands. Either order is a small, mechanical rebase.
+- `DetailCard` gets two optional props, `grip` and `position`. With neither
+  passed, the tile looks exactly as the restyle mocks it. For library and
+  reference tiles, `position` replaces the plain badge with the typed badge.
+- The tile's click handler must skip clicks that start on the grip or the
+  number, and honour the "swallow the click after a drag" flag.
+- The grid stays a plain CSS grid in array order, read row by row (never CSS
+  columns or masonry), so drag order maps straight onto array order. The
+  restyle already commits to this.
+- The restyle's tile view in RefList keeps `onReorder`; this feature swaps its
+  drag for the shared one.
 
-**Relationship chart** (`relationships[]`, not merged yet):
+**Relationship chart:**
 
-- No data overlap: relationships point at character ids, and order is the
-  array. Reordering never touches them.
-- Its new Relationships field sits inside the expanded card body; the grip is
-  on the top row. No overlap in the card either.
-- If the chart's ring places characters in roster order, reordering becomes
-  how you arrange the ring, with no stored layout. Worth deciding with that
-  feature (question 5).
-- Both features add a story-wide unit to the diff. Whichever lands second
-  bumps the expected unit count in `sync.test.ts`.
+- No data overlap: relationships point at ids, order is the array.
+- Its field lives in the character window; the grip is on the tile. No
+  overlap in the UI.
+- If the ring follows roster order, reordering arranges the chart, with no
+  stored layout (question 5).
+- Both features add story-wide diff units; whichever lands second updates
+  the unit count in `sync.test.ts`.
 
 ## Files
 
+- `src/components/ui/useTileReorder.ts` (new): the shared drag (4px lift,
+  floating card, live reflow by reading order, auto-scroll, click swallowing,
+  arrow keys, unmount cleanup).
+- `src/components/ui/PositionInput.tsx` (new, lifted out of `RefList.tsx`):
+  the typed number, plain and badge styles.
+- `src/components/ui/DetailCard.tsx`: `grip` and `position` props.
+- `src/components/ui/RefList.tsx`: drop `startGripDrag`, use the shared drag.
+- `src/components/panels/CharactersPanel.tsx`, `WorldPanel.tsx`: pass grip
+  and position; call the new store actions.
 - `src/store/useStore.ts`: `reorderCharacter`, `reorderWorldEntry`.
-- `src/components/ui/useListDrag.ts` (new): the grip drag for a vertical
-  list (hit test by midpoint, insertion line, edge auto-scroll, unmount
-  cleanup), so both drawers share one copy. RefList keeps its own for now.
-- `src/components/ui/PositionInput.tsx` (new, or exported from `RefList.tsx`):
-  the typed position number RefList already has.
-- `src/components/panels/CharactersPanel.tsx`, `WorldPanel.tsx`: grip,
-  number, insertion line, through `DetailCard` if the restyle has landed.
-- `src/lib/sync.ts`, `src/lib/merge.ts`: the two order units.
+- `src/lib/sync.ts`, `src/lib/merge.ts`, `src/components/modals/SyncConflictModal.tsx`:
+  the two order units.
 - `src/lib/sync.test.ts`, `merge.test.ts`: tests above.
-- `docs/SPECS.md` §4 rows (reorder, conflict order units), §8 Android note;
-  `docs/SESSIONS.md` entry.
+- `docs/SPECS.md` §4 rows (reorder, conflict order units, pinned resources
+  row updated), §8 Android note; `docs/SESSIONS.md` entry.
 
 ## Open questions for Ray
 
-1. **Grip or whole card?** Grip handle plus a typed position number, as on
-   pinned notes (proposed), or drag the whole collapsed card?
-2. **Touch:** should the grip drag on the iPad and touchscreens (pointer
-   events, the first touch drag in the app), or is the typed number enough
-   there for now?
+1. **Grip or whole tile?** Drag by the ⠿ grip (proposed, as mocked), or by
+   the whole tile now that option B makes it possible?
+2. **Touch:** should the grip drag with a finger on the iPad and touchscreens
+   (as mocked; the first touch drag in the app), or is the typed number
+   enough there for now?
 3. **Restore:** an archived card comes back near its old place (proposed), or
-   at the end of the list?
+   at the end?
 4. **Chapter cast:** the chapter modal's cast list and picker will follow your
    roster order. Fine? (Board avatars keep each chapter's own order.)
 5. **Relationship chart:** should its ring follow roster order, so reordering
    arranges the chart?
-6. **Conflict dialog:** add Character order and World order to compare and
-   merge (proposed)? Include the library's order too, which has the same gap
-   today?
+6. **Compare and merge:** add Character order and World order (proposed)?
+   Include the library's order too?
 7. **Phone:** fine for the phone to show the order but not change it for now,
-   with the "No differences" conflict wording as a known gap?
-8. **Landing order:** fine for this to land after the restyle, putting the
-   grip in `DetailCard`, or whichever is approved first?
+   with "No differences" on an order-only conflict as a known gap?
+8. **Position number** on character and world tiles: always visible, faint
+   (as mocked), or only on hover and focus?

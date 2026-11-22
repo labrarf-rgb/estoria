@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rearrange Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Tokens and tile styles copied from docs/mockups/detail-cards.html (restyle option B),
+   which copies them from src/index.css, so the three match. */
+:root {
+  --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+  --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+  --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+  --lift: 0 2px 4px rgba(70,52,20,.14), 0 18px 40px rgba(70,52,20,.24);
+  --therefore: oklch(0.54 0.1 152); --but: oklch(0.55 0.15 33);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+    --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+    --lift: 0 2px 6px rgba(0,0,0,.45), 0 22px 48px rgba(0,0,0,.55);
+    --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+  --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+  --lift: 0 2px 6px rgba(0,0,0,.45), 0 22px 48px rgba(0,0,0,.55);
+  --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 36px 16px 80px; }
+.eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--therefore); }
+h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 30px; margin: 6px 0 10px; }
+h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 24px; margin: 4px 0 8px; }
+.lede { color: var(--soft); font-size: 15px; line-height: 1.6; max-width: 780px; margin: 0; }
+.note { font-size: 13.5px; color: var(--soft); line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
+.rules { margin: 16px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 28px; font-size: 14px; line-height: 1.5; }
+.rules b { font-weight: 600; }
+section { padding: 40px 0; border-top: 1px solid var(--line); }
+.cap { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cap span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.grow { flex: 1; }
+.reset { all: unset; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; color: var(--soft); border: 1px solid var(--rule); border-radius: 7px; padding: 3px 9px; }
+.reset:hover { color: var(--ink); border-color: var(--faint); }
+.reset:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
+.filerow { margin-top: 10px; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--soft); line-height: 1.6; }
+.filerow b { color: var(--faint); font-weight: 500; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+
+/* Drawer */
+.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.dhead { display: flex; align-items: center; gap: 8px; padding: 18px 22px; border-bottom: 1px solid var(--rule); flex: none; }
+.dhead .t { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
+.dhead .s { font-size: 11.5px; color: var(--soft); font-weight: 500; margin-top: 2px; }
+.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; flex: none; }
+.scroll { overflow-y: auto; flex: 1; min-height: 0; }
+.list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px 22px; }
+.add { border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
+.grid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; }
+
+/* Collapsed frame: board behind, dimmed, side drawer on the right. */
+.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+.app > * { grid-area: 1 / 1; }
+.app.side { height: 620px; }
+.boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; }
+.dim { background: rgba(20,14,6,.46); }
+.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); min-height: 0; }
+.app .drawer.full { border: 0; border-radius: 0; }
+
+/* Tile */
+.tile { position: relative; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s; user-select: none; -webkit-user-select: none; }
+.tile:hover { border-color: var(--faint); }
+.grid .tile { min-height: 142px; }
+.top { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.title { font-family: Spectral, serif; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.title.untitled { color: var(--faint); }
+.sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sum.empty { color: var(--faint); }
+.meta { display: flex; justify-content: flex-end; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: var(--soft); }
+.meta .sep { color: var(--faint); }
+.pic { border-radius: 8px; min-height: 54px; flex: 1; max-height: 70px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
+
+/* New on the tile: the grip and the position number. */
+.grip { all: unset; flex: none; cursor: grab; width: 20px; height: 26px; margin: -3px -3px -3px -7px; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; line-height: 1; border-radius: 6px; touch-action: none; transition: color .2s, background-color .2s; }
+.grip:hover { color: var(--ink); background: var(--chip); }
+.grip:focus-visible { outline: 2px solid var(--therefore); outline-offset: 1px; color: var(--ink); }
+.pos { flex: none; width: 30px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); text-align: center; font: 500 11px "JetBrains Mono", monospace; color: var(--soft); cursor: text; transition: border-color .2s, color .2s; }
+.pos:hover { border-color: var(--faint); }
+.pos:focus { outline: none; border-color: var(--therefore); color: var(--ink); background: var(--card); }
+.pos.asbadge { width: 32px; background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
+.pos.asbadge:focus { background: var(--card); color: var(--ink); border-color: var(--therefore); }
+
+/* While dragging */
+.slot { border: 1.5px dashed var(--faint); border-radius: 12px; background: var(--chip); }
+.lifted { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--lift); border-color: var(--faint); cursor: grabbing; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
+
+/* Window (stand-in for the restyle's DetailWindow) */
+.winscrim { position: fixed; inset: 0; z-index: 80; background: rgba(20,14,6,.42); display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+.winscrim[hidden] { display: none; }
+.modal { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 16px 20px 20px; font-size: 13.5px; line-height: 1.55; color: var(--soft); }
+.closebtn { all: unset; cursor: pointer; width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; }
+.closebtn:hover { color: var(--ink); border-color: var(--faint); }
+.closebtn:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
+
+/* Anatomy */
+.anat { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 700px) { .anat { grid-template-columns: 1fr; } }
+.anat ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; display: flex; flex-direction: column; gap: 8px; }
+.anat .stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Merge sketch */
+.dialog { max-width: 640px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px 20px; }
+.dialog .h { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
+.dialog .mag { margin-top: 10px; font-size: 12.5px; font-weight: 600; }
+.dialog ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--soft); line-height: 1.5; }
+.unit { margin-top: 16px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 12px 14px; }
+.unit .lab { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
+.side-col { border: 1px solid var(--rule); border-radius: 8px; padding: 9px 11px; font-size: 12.5px; line-height: 1.6; color: var(--soft); cursor: pointer; background: var(--panel); transition: border-color .2s; }
+.side-col.on { border-color: var(--therefore); color: var(--ink); }
+.side-col:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
+.side-col .who { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.side-col.on .who { color: var(--therefore); }
+.side-col .n { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--faint); margin-right: 6px; }
+.today { margin-top: 14px; font-size: 12.5px; color: var(--faint); line-height: 1.5; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Estoria · rearrange cards, to confirm</div>
+  <h1>Move a card by its grip</h1>
+  <p class="lede">The tiles from the option B restyle, with two small additions: a grip to drag a card to a new place, and a position number you can type into. Everything below works. Drag by the ⠿, type a number and press Enter, or click a card anywhere else to open it.</p>
+  <ul class="rules">
+    <li><b>Drag by the grip.</b> The card lifts and follows the pointer. The others make room, and a dashed space shows where it will land.</li>
+    <li><b>Or type a position.</b> Click the number, type 1, press Enter: the card moves to the top. This also works with only a keyboard, and on a touchscreen.</li>
+    <li><b>A click still opens the card.</b> Pressing the grip or the number never opens it, even if you drop the card back where it was.</li>
+    <li><b>The order is saved in your file.</b> It's the order the project already keeps, so the phone shows it after the next sync, with no phone update.</li>
+  </ul>
+
+  <section>
+    <div class="eyebrow">The tile</div>
+    <h2>Where the grip and the number sit</h2>
+    <div class="anat">
+      <div class="stack" id="anat"></div>
+      <ol>
+        <li><b>Grip ⠿</b>, at the very start of the top row, before the badge. The only place a drag starts, so a click anywhere else always opens the card.</li>
+        <li><b>Position number</b>, at the end of the top row on character and world cards, where a chapter card shows its cast.</li>
+        <li><b>Library and reference cards</b> already show their position as the badge (01, 02, as a chapter shows its number), so there the badge itself is the number you type into. No second number.</li>
+        <li><b>Keyboard:</b> Tab to the grip and press the arrow keys to move the card one place at a time.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">1 · Collapsed drawer</div>
+    <h2>Characters, one column</h2>
+    <p class="note">The side panel is a single column. Drag Sefa Kaur up to the top: the panel scrolls on its own when you hold a card near its top or bottom edge.</p>
+    <div class="cap">Collapsed <button class="reset" data-reset="chars">Reset order</button></div>
+    <div class="app side">
+      <div class="boardbg"></div>
+      <div class="dim"></div>
+      <div class="drawer side">
+        <div class="dhead"><div><div class="t">Characters</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
+        <div class="scroll"><div class="list" id="chars"></div></div>
+      </div>
+    </div>
+    <div class="filerow" id="chars-file"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">2 · Expanded drawer</div>
+    <h2>World, a grid</h2>
+    <p class="note">Full screen, the cards sit in a grid and read left to right, then down, like text. Dragging works in both directions: the cards reflow around the space as you move.</p>
+    <div class="cap">Expanded <button class="reset" data-reset="world">Reset order</button></div>
+    <div class="app">
+      <div class="drawer full">
+        <div class="dhead"><div><div class="t">World</div><div class="s">Places, factions, lore &amp; references</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
+        <div class="grid" id="world"></div>
+      </div>
+    </div>
+    <div class="filerow" id="world-file"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">3 · Library and references</div>
+    <h2>The badge is the position</h2>
+    <p class="note">The Notes library, a world entry's references and a chapter's pinned references already have a grip and a number today. They carry over to the tiles unchanged in meaning: same store actions, and each place keeps its own order (a chapter's pin order isn't the library's).</p>
+    <div class="cap">Notes library, expanded <button class="reset" data-reset="lib">Reset order</button></div>
+    <div class="app">
+      <div class="drawer full">
+        <div class="dhead"><div><div class="t">Story notes</div><div class="s">Shared library · link these into any chapter</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
+        <div class="grid" id="lib"></div>
+      </div>
+    </div>
+    <div class="filerow" id="lib-file"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">4 · When two copies disagree</div>
+    <h2>Order in compare and merge</h2>
+    <p class="note">A sketch, not the final dialog. If you reorder on the laptop and the iPad before they sync, the compare dialog gets a new item for it, and the merge can take either order. Click a side to choose it.</p>
+    <div class="dialog">
+      <div class="h">This copy and the file differ</div>
+      <div class="mag">A small change · 1 item differs</div>
+      <ul><li>Character order differs</li></ul>
+      <div class="unit">
+        <div class="lab">Story-wide · Character order</div>
+        <div class="cols" id="merge"></div>
+      </div>
+      <div class="today">Today this case reads "The versions differ only in details this report doesn't name", with no way to merge.</div>
+    </div>
+  </section>
+</div>
+
+<div class="winscrim" id="win" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <div class="mhead"><span id="win-badge"></span><div class="title" id="win-title"></div><span class="grow"></span><button class="closebtn" id="win-close" aria-label="Close">✕</button></div>
+    <div class="mbody">You opened this by clicking the card. The fields are the restyle's window, unchanged, so they're left out of this mockup. Pressing the grip or the position number never opens it.</div>
+  </div>
+</div>
+<div class="sr" aria-live="polite" id="live"></div>
+
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sep = '<span class="sep">·</span>';
+const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
+const pad = (i) => String(i + 1).padStart(2, "0");
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const live = document.getElementById("live");
+
+// ---- Data (same story as the restyle mockup) ----
+const CHARS = [
+  { id: "mv", name: "Mara Vell", ini: "MV", color: "oklch(0.55 0.12 250)", role: "Protagonist", type: "Seeker", desc: "A cartographer's apprentice who can read water the way others read faces.", ch: 9 },
+  { id: "ot", name: "Oren Tal", ini: "OT", color: "oklch(0.55 0.12 30)", role: "Mentor", type: "Mentor", desc: "The harbourmaster who taught Mara to sound the channels, and lied about why.", ch: 4 },
+  { id: "il", name: "Ines Lorre", ini: "IL", color: "oklch(0.55 0.12 300)", role: "Antagonist", type: "Shadow", desc: "Guild factor. Wants the map burned, and Mara with it if need be.", ch: 6 },
+  { id: "pd", name: "Pell Durran", ini: "PD", color: "oklch(0.55 0.1 80)", role: "Ally", type: "Trickster", desc: "Runs the lantern market and owes everyone a favour except Mara.", ch: 3 },
+  { id: "aw", name: "Auntie Wren", ini: "AW", color: "oklch(0.55 0.08 200)", role: "Ally", type: "", desc: "Keeps the last working bell. Rings it for no one.", ch: 2 },
+  { id: "sk", name: "Sefa Kaur", ini: "SK", color: "oklch(0.55 0.1 150)", role: "", type: "", desc: "", ch: 0 },
+];
+const WORLD = [
+  { id: "dc", name: "The Drowned City", cat: "Place", desc: "What is left of Aster after the sea came in. The bell towers still stand at low tide.", ch: 6, refs: 3 },
+  { id: "sg", name: "The Soundings Guild", cat: "Faction", desc: "Keeps the only true charts of the channels and sells the false ones.", ch: 2, refs: 0 },
+  { id: "bc", name: "Bell Code", cat: "Lore", desc: "Harbour signals rung on the drowned towers. Few still know the full set.", ch: 2, refs: 1 },
+  { id: "lt", name: "The Long Tide", cat: "Event", desc: "", ch: 0, refs: 0 },
+  { id: "lm", name: "Lantern Market", cat: "Place", desc: "Night market on the old sea wall. Everything is for sale, including the truth.", ch: 3, refs: 2 },
+  { id: "ch", name: "The Channels", cat: "Place", desc: "Shifting water roads through the ruins. Sounded weekly, charted never.", ch: 5, refs: 0 },
+  { id: "gf", name: "Guild Factors", cat: "Faction", desc: "The guild's eyes in the market. Paid by the lie, not the hour.", ch: 4, refs: 1 },
+];
+const LIB = [
+  { id: "theme", kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
+  { id: "todo", kind: "TODO", label: "Revision pass 2", open: "Give Oren a reason to lie · Seed the bell code in Ch 2", done: "1 of 3 done", pins: 2 },
+  { id: "harbour", kind: "IMAGE", label: "Harbour at low tide", pins: 2 },
+  { id: "towers", kind: "NOTE", label: "Bell towers", body: "Seven towers. Only four still ring. The fifth is where Oren hid the chart.", pins: 2 },
+  { id: "blank", kind: "NOTE", label: "", body: "", pins: 0 },
+];
+const kindWord = { NOTE: "Note", TODO: "To-do", IMAGE: "Image" };
+
+// ---- Tiles ----
+const grip = (name) => `<button class="grip" type="button" aria-label="Move ${esc(name)}. Drag, or use the arrow keys" title="Drag to move">⠿</button>`;
+const posInput = (i, n, name, asBadge) =>
+  `<input class="pos${asBadge ? " asbadge" : ""}" inputmode="numeric" value="${asBadge ? pad(i) : i + 1}" data-shown="${asBadge ? pad(i) : i + 1}" aria-label="Position of ${esc(name)}, ${i + 1} of ${n}. Type a number to move it" title="Position ${i + 1} of ${n}, type a number to move it">`;
+
+const charTile = (c, i, n) => `<div class="tile" data-id="${c.id}">
+  <div class="top">${grip(c.name)}<span class="ini" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role || "No role")}</span><span class="grow"></span>${posInput(i, n, c.name)}</div>
+  <div class="title">${esc(c.name)}</div><div class="sum ${c.desc ? "" : "empty"}">${esc(c.desc || "No description yet")}</div><div class="grow"></div>
+  <div class="meta">${[c.type && `<span>${esc(c.type)}</span>`, `<span>in ${nch(c.ch)}</span>`].filter(Boolean).join(sep)}</div></div>`;
+const worldTile = (w, i, n) => `<div class="tile" data-id="${w.id}">
+  <div class="top">${grip(w.name)}<span class="badge">${esc(w.cat.toUpperCase())}</span><span class="grow"></span>${posInput(i, n, w.name)}</div>
+  <div class="title">${esc(w.name)}</div><div class="sum ${w.desc ? "" : "empty"}">${esc(w.desc || "No description yet")}</div><div class="grow"></div>
+  <div class="meta">${[`<span>on ${nch(w.ch)}</span>`, w.refs ? `<span>${w.refs} ref${w.refs === 1 ? "" : "s"}</span>` : ""].filter(Boolean).join(sep)}</div></div>`;
+const libName = (a) => a.label || (a.kind === "IMAGE" ? "Untitled image" : a.kind === "TODO" ? "Untitled list" : "Untitled note");
+const libTile = (a, i, n) => {
+  const body = a.kind === "IMAGE" ? `<div class="pic"></div>`
+    : a.kind === "TODO" ? `<div class="sum">${esc(a.open)}</div>`
+    : `<div class="sum ${a.body ? "" : "empty"}">${esc(a.body || "Empty note")}</div>`;
+  const meta = [a.kind === "TODO" ? `<span>${a.done}</span>` : "", `<span>${a.pins ? `${a.pins} pins` : "not pinned"}</span>`].filter(Boolean).join(sep);
+  return `<div class="tile" data-id="${a.id}">
+    <div class="top">${grip(libName(a))}${posInput(i, n, libName(a), true)}<span class="tag">${kindWord[a.kind]}</span></div>
+    <div class="title ${a.label ? "" : "untitled"}">${esc(libName(a))}</div>${body}<div class="grow"></div><div class="meta">${meta}</div></div>`;
+};
+
+// ---- The window a click opens ----
+const win = document.getElementById("win");
+let lastFocus = null;
+function openWindow(badgeHtml, title) {
+  lastFocus = document.activeElement;
+  document.getElementById("win-badge").innerHTML = badgeHtml;
+  document.getElementById("win-title").textContent = title;
+  win.hidden = false;
+  document.getElementById("win-close").focus();
+}
+function closeWindow() { win.hidden = true; lastFocus?.focus?.(); }
+document.getElementById("win-close").onclick = closeWindow;
+win.addEventListener("click", (e) => { if (e.target === win) closeWindow(); });
+addEventListener("keydown", (e) => { if (e.key === "Escape" && !win.hidden) closeWindow(); });
+
+// ---- One reorderable list. Same code for the column and the grid. ----
+function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl }) {
+  const initial = items.slice();
+  let order = items.slice();
+  let suppressClick = false;
+
+  const render = () => {
+    el.innerHTML = order.map((it, i) => tile(it, i, order.length)).join("") + `<div class="add">+ ${addLabel}</div>`;
+    fileEl.innerHTML = `<b>Order saved in the project file:</b> ${order.map((it) => esc(nameOf(it))).join(", ")}`;
+  };
+  const byId = (id) => order.find((it) => it.id === id);
+
+  /** Run `change`, then slide every tile from where it was to where it is now. */
+  const flip = (change) => {
+    const before = new Map();
+    el.querySelectorAll(".tile").forEach((t) => before.set(t.dataset.id, t.getBoundingClientRect()));
+    change();
+    if (reduced) return;
+    el.querySelectorAll(".tile").forEach((t) => {
+      const b = before.get(t.dataset.id);
+      if (!b) return;
+      const a = t.getBoundingClientRect();
+      const dx = b.left - a.left, dy = b.top - a.top;
+      if (dx || dy) t.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 200, easing: "ease-out" });
+    });
+  };
+
+  const moveTo = (id, to, focusSel) => {
+    const from = order.findIndex((it) => it.id === id);
+    to = Math.max(0, Math.min(order.length - 1, to));
+    if (from === -1 || from === to) { render(); return false; }
+    flip(() => {
+      const next = order.slice();
+      const [it] = next.splice(from, 1);
+      next.splice(to, 0, it);
+      order = next;
+      render();
+    });
+    live.textContent = `${nameOf(byId(id))} moved to position ${to + 1} of ${order.length}.`;
+    if (focusSel) el.querySelector(`.tile[data-id="${id}"] ${focusSel}`)?.focus();
+    return true;
+  };
+
+  // Click anywhere on a tile opens it, except on the grip or the number.
+  el.addEventListener("click", (e) => {
+    if (suppressClick) return;
+    if (e.target.closest(".grip, .pos")) return;
+    const t = e.target.closest(".tile");
+    if (t) { const it = byId(t.dataset.id); openWindow(badgeOf(it, order.indexOf(it)), nameOf(it)); }
+  });
+
+  // Typed position.
+  el.addEventListener("keydown", (e) => {
+    const pos = e.target.closest(".pos");
+    if (pos) {
+      if (e.key === "Enter") { e.preventDefault(); pos.blur(); }
+      if (e.key === "Escape") { pos.value = pos.dataset.shown; pos.blur(); }
+      return;
+    }
+    const g = e.target.closest(".grip");
+    if (!g) return;
+    const id = g.closest(".tile").dataset.id;
+    const i = order.findIndex((it) => it.id === id);
+    if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); moveTo(id, i - 1, ".grip"); }
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); moveTo(id, i + 1, ".grip"); }
+  });
+  el.addEventListener("input", (e) => {
+    if (e.target.classList.contains("pos")) e.target.value = e.target.value.replace(/[^0-9]/g, "");
+  });
+  el.addEventListener("focusout", (e) => {
+    const pos = e.target.closest(".pos");
+    if (!pos || pos.value === pos.dataset.shown) return;
+    const n = parseInt(pos.value, 10);
+    const id = pos.closest(".tile").dataset.id;
+    if (!Number.isFinite(n)) { pos.value = pos.dataset.shown; return; }
+    // Defer so the blur finishes before the list re-renders under it.
+    setTimeout(() => moveTo(id, n - 1), 0);
+  });
+
+  // Grip drag. Pointer events, so it works with a finger as well as a mouse.
+  el.addEventListener("pointerdown", (e) => {
+    const g = e.target.closest(".grip");
+    if (!g || e.button > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tileEl = g.closest(".tile");
+    const id = tileEl.dataset.id;
+    const r = tileEl.getBoundingClientRect();
+    const off = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const start = { x: e.clientX, y: e.clientY };
+    let lifted = null, slot = null;
+    let ptr = { x: e.clientX, y: e.clientY };
+    let raf = 0;
+    const scroller = el.closest(".scroll");
+
+    const lift = () => {
+      // The press only becomes a drag once it moves, so a still press on the
+      // grip does nothing at all (it never opens the card).
+      lifted = tileEl.cloneNode(true);
+      lifted.classList.add("lifted");
+      Object.assign(lifted.style, { width: r.width + "px", height: r.height + "px", left: r.left + "px", top: r.top + "px" });
+      document.body.appendChild(lifted);
+      slot = document.createElement("div");
+      slot.className = "slot";
+      slot.style.height = r.height + "px";
+      tileEl.replaceWith(slot);
+      document.body.classList.add("dragging");
+      tick();
+    };
+
+    /** Where the space should go: before the first tile the pointer is "ahead of", reading order. */
+    const place = () => {
+      const tiles = [...el.querySelectorAll(".tile")];
+      let ref = el.querySelector(".add");
+      for (const t of tiles) {
+        const b = t.getBoundingClientRect();
+        const ahead = mode === "column"
+          ? ptr.y < b.top + b.height / 2
+          : ptr.y < b.top || (ptr.y <= b.bottom && ptr.x < b.left + b.width / 2);
+        if (ahead) { ref = t; break; }
+      }
+      if (slot.nextElementSibling !== ref) flip(() => el.insertBefore(slot, ref));
+    };
+
+    // Auto-scroll near the edges of a scrolling panel.
+    const tick = () => {
+      if (!lifted) return;
+      if (scroller) {
+        const b = scroller.getBoundingClientRect();
+        const edge = 48;
+        let v = 0;
+        if (ptr.y < b.top + edge) v = -Math.ceil((b.top + edge - ptr.y) / 4);
+        else if (ptr.y > b.bottom - edge) v = Math.ceil((ptr.y - (b.bottom - edge)) / 4);
+        if (v) { scroller.scrollTop += v; place(); }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    const onMove = (ev) => {
+      ptr = { x: ev.clientX, y: ev.clientY };
+      if (!lifted) {
+        if (Math.abs(ptr.x - start.x) < 4 && Math.abs(ptr.y - start.y) < 4) return;
+        lift();
+      }
+      lifted.style.left = ptr.x - off.x + "px";
+      lifted.style.top = ptr.y - off.y + "px";
+      place();
+    };
+    const onUp = () => {
+      removeEventListener("pointermove", onMove);
+      removeEventListener("pointerup", onUp);
+      removeEventListener("pointercancel", onUp);
+      cancelAnimationFrame(raf);
+      if (!lifted) return;
+      // The click that follows this release must not open a card, even when the
+      // card is dropped back on itself.
+      suppressClick = true;
+      setTimeout(() => (suppressClick = false), 0);
+      document.body.classList.remove("dragging");
+      const before = [...el.querySelectorAll(".tile, .slot")];
+      const to = before.indexOf(slot);
+      slot.replaceWith(tileEl);
+      const land = tileEl.getBoundingClientRect();
+      const from = lifted.getBoundingClientRect();
+      const ghost = lifted;
+      lifted = null;
+      if (!reduced) {
+        tileEl.style.visibility = "hidden";
+        ghost.animate([{ left: from.left + "px", top: from.top + "px" }, { left: land.left + "px", top: land.top + "px" }], { duration: 150, easing: "ease-out" }).onfinish = () => { ghost.remove(); tileEl.style.visibility = ""; finish(); };
+      } else { ghost.remove(); finish(); }
+      function finish() {
+        const next = order.slice();
+        const from = next.findIndex((it) => it.id === id);
+        const [it] = next.splice(from, 1);
+        next.splice(to, 0, it);
+        const changed = next.some((x, i) => x !== order[i]);
+        order = next;
+        render();
+        if (changed) live.textContent = `${nameOf(it)} moved to position ${to + 1} of ${order.length}.`;
+      }
+    };
+    addEventListener("pointermove", onMove);
+    addEventListener("pointerup", onUp);
+    addEventListener("pointercancel", onUp);
+  });
+
+  render();
+  return { reset: () => flip(() => { order = initial.slice(); render(); }) };
+}
+
+const lists = {
+  chars: reorderable({
+    el: document.getElementById("chars"), fileEl: document.getElementById("chars-file"),
+    items: CHARS, tile: charTile, addLabel: "Add character", mode: "column",
+    nameOf: (c) => c.name, badgeOf: (c) => `<span class="ini" style="background:${c.color}">${esc(c.ini)}</span>`,
+  }),
+  world: reorderable({
+    el: document.getElementById("world"), fileEl: document.getElementById("world-file"),
+    items: WORLD, tile: worldTile, addLabel: "Add world entry", mode: "grid",
+    nameOf: (w) => w.name, badgeOf: (w) => `<span class="badge">${esc(w.cat.toUpperCase())}</span>`,
+  }),
+  lib: reorderable({
+    el: document.getElementById("lib"), fileEl: document.getElementById("lib-file"),
+    items: LIB, tile: libTile, addLabel: "Add note, to-do or image", mode: "grid",
+    nameOf: libName, badgeOf: (a, i) => `<span class="badge">${pad(i)}</span><span class="tag">${kindWord[a.kind]}</span>`,
+  }),
+};
+document.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => lists[b.dataset.reset].reset()));
+
+// ---- Anatomy: one static character tile and one library tile ----
+document.getElementById("anat").innerHTML = charTile(CHARS[0], 0, 6).replace('class="tile"', 'class="tile" style="cursor:default"') + libTile(LIB[0], 0, 5).replace('class="tile"', 'class="tile" style="cursor:default"');
+document.getElementById("anat").addEventListener("pointerdown", (e) => e.preventDefault());
+
+// ---- Merge sketch ----
+const here = ["Mara Vell", "Oren Tal", "Ines Lorre", "Pell Durran"];
+const file = ["Ines Lorre", "Mara Vell", "Oren Tal", "Pell Durran"];
+let pick = "mine";
+const merge = document.getElementById("merge");
+const drawMerge = () => {
+  const col = (key, who, names) => `<div class="side-col ${pick === key ? "on" : ""}" role="radio" tabindex="0" aria-checked="${pick === key}" data-k="${key}">
+    <div class="who">${who}${pick === key ? " · kept" : ""}</div>${names.map((n, i) => `<div><span class="n">${i + 1}</span>${n}</div>`).join("")}<div style="color:var(--faint)">and 2 more</div></div>`;
+  merge.innerHTML = col("mine", "This copy", here) + col("theirs", "The file", file);
+};
+merge.setAttribute("role", "radiogroup");
+merge.setAttribute("aria-label", "Which character order to keep");
+merge.addEventListener("click", (e) => { const c = e.target.closest(".side-col"); if (c) { pick = c.dataset.k; drawMerge(); merge.querySelector(".on").focus(); } });
+merge.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.k) { e.preventDefault(); pick = e.target.dataset.k; drawMerge(); merge.querySelector(".on").focus(); } });
+drawMerge();
+</script>
+</body>
+</html>
