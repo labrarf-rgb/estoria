@@ -14,11 +14,14 @@ Characters drawer.
 
 ## Data model
 
-Two new optional top-level fields on `StoryDoc`, beside `characters`:
+Three new optional top-level fields on `StoryDoc`, beside `characters`:
 
 ```ts
 relationships?: Relationship[];
 relationshipKinds?: RelationshipKind[];   // absent = the starter set
+relationshipLayout?: Record<string, { x: number; y: number }>;
+                     // character id -> where it was dragged on the chart,
+                     // as fractions (0-1) of the chart's width and height
 
 export interface RelationshipKind {
   id: string;          // starter kinds keep fixed ids; new ones get a fresh id
@@ -86,7 +89,12 @@ Why this shape:
     isn't in the default stay, shown as "No kind"; if any would, it asks first
     and says how many. Kind ids carry over from the default, so projects started
     from the same default share ids.
-- **No schema bump.** Optional field, same precedent as `manuscript`, `author`,
+- **Chart positions are saved in the project** (Ray, 2026-11-21: "I want the
+  characters movable"), the way chapter positions on the board are. Only a
+  character that has been dragged has an entry; everyone else sits on the ring
+  in roster order. Fractions rather than pixels, so the layout fits any drawer
+  width and both drawer sizes.
+- **No schema bump.** Optional fields, same precedent as `manuscript`, `author`,
   `pace`.
 
 ## UI
@@ -96,12 +104,27 @@ detail-card plans" below): characters are tiles, and clicking one opens the
 character in a window.
 
 - **Chart:** a Roster / Chart switch in the Characters drawer header. Chart opens
-  the drawer at its expanded size. Characters sit on a ring **in roster order**
-  (clockwise from the top); clicking one puts them in the middle with their ties
-  around them; clicking a line shows both points of view in a side panel with
-  Edit. A centered character's panel has "Open <name>'s card", which opens the
-  character window. Kind filters; "Show archived" off by default. **No stored
-  layout**, so nothing to sync or merge for positions.
+  the drawer at its expanded size.
+  - **Drag characters anywhere**; positions are saved (`relationshipLayout`).
+    A press that moves more than 4px is a drag, one that doesn't is a click
+    (the board's `CLICK_SLOP` rule). Pointer events with `touch-action: none` on
+    the character, so it drags on touch too. Arrow keys move a focused
+    character 12 units, the keyboard path.
+  - **Characters not yet moved sit on a ring in roster order** (clockwise from
+    the top). **Arrange in a ring** (shown once anything has been moved) clears
+    the saved positions, with a short animation.
+  - **Clicking a character highlights their ties** and dims the rest; nothing
+    moves, so the arrangement is kept. Its panel lists the ties and has
+    "Open <name>'s card", which opens the character window. Clicking a line
+    shows both points of view in the side panel, with Edit.
+  - **Labels never overlap.** Each label tries spots along its line from the
+    middle outwards, then just beside the line, and takes the first that clears
+    every character (disc and name) and every label already placed; short lines
+    are placed first. Labels draw above characters. They are re-placed on every
+    move. If nothing is fully clear (a very crowded chart), the spot with the
+    least overlap wins.
+  - Kind filters; "Show archived" off by default (archived characters sit apart
+    from the ring unless moved).
 - **Character window:** a new "Relationships" field under "Appears in", listing
   ties (other character, kind, label, both views). Click a row to edit,
   "+ Add relationship" to add, "See on chart" to close the window and jump to the
@@ -148,11 +171,11 @@ Ray chose option B, everywhere):
 - The grip and typed position number sit at the head of the tile's top row,
   before the badge. Nothing here touches them; the mockup shows them so the
   tile matches.
-- **The chart ring follows roster order** (the array order of
-  `doc.characters`, non-archived only). That answers the rearrange plan's
-  question 5 with a yes, if Ray agrees: dragging a card moves its place on the
-  ring, and the chart still stores no layout. Archived characters, when shown,
-  sit apart from the ring.
+- **The ring follows roster order** (the array order of `doc.characters`,
+  non-archived only), but only for characters that haven't been dragged, and
+  for Arrange in a ring. Now that positions are saved, rearranging cards no
+  longer moves anyone already placed on the chart. That is the answer to the
+  rearrange plan's question 5.
 - No data overlap: relationships point at ids, order is the array.
 - Both features add story-wide units to the conflict diff; whichever lands
   second updates the unit count in `sync.test.ts`.
@@ -168,7 +191,8 @@ Ray chose option B, everywhere):
    self-tie, or a duplicate pair (the pair is unordered: (a,b) and (b,a) are
    the same pair; keep the first); a `kind` that names no kind is cleared (the
    tie is kept, as "No kind"); blank strings dropped; omit `relationships` when
-   empty. Kinds: drop entries without an id, dedupe ids, clamp `color` to 1-10,
+   empty. Layout: drop positions for characters that don't exist and any
+   non-finite value, clamp to 0-1, omit when empty. Kinds: drop entries without an id, dedupe ids, clamp `color` to 1-10,
    keep a blank name (shown as "Unnamed kind"). An empty list `[]` is kept and
    means "no kinds", which is different from absent (the starters).
 3. `useStore.ts`: `relationshipKindsDefault` (+ `partialize`),
@@ -177,7 +201,8 @@ Ray chose option B, everywhere):
    `removeRelationship`;
    `addKind`, `updateKind`, `removeKind` (the first kind edit writes the
    starters out as the stored list; `removeKind` clears `kind` on the
-   relationships that used it).
+   relationships that used it); `moveOnChart(id, x, y)` and `arrangeChart()`
+   (clears the layout). `deleteCharacter` also drops the character's position.
    `deleteCharacter` removes that character's relationships (no dangling ids,
    §9 item 5's bug class) and its confirm text counts them. Archive keeps them.
    Project merge (`dedupeById` for characters) unions relationships too.
@@ -186,6 +211,8 @@ Ray chose option B, everywhere):
    story-wide `doc:relationshipKinds` unit ("Relationship kinds") for the list,
    taken whole like chapter connections (per-kind merging could pair one copy's
    name with the other's color). Absent and the starter list compare equal.
+   And one `doc:relationshipLayout` unit ("Chart layout"), also taken whole,
+   like board view settings.
 5. `merge.ts`: take/keep per relationship, plus **reference closure** (a kept
    relationship brings in both characters it points at, reported first, and
    its kind if the kept kind list lacks it).
@@ -200,7 +227,8 @@ Ray chose option B, everywhere):
 - **The phone keeps it without an update.** Checked in `Estoria-aa`:
   `Normalize.kt` builds the doc from `d.toMutableMap()` and overwrites only
   known keys, and `StoryDoc` has the `ExtrasSerializer` passthrough. So
-  `relationships` and `relationshipKinds` round-trip untouched.
+  `relationships`, `relationshipKinds` and `relationshipLayout` round-trip
+  untouched.
 - **Known gaps until the phone learns it (not blockers):**
   - Deleting a character on the phone leaves its relationships behind; the web
     drops them on read (step 2).
@@ -219,7 +247,8 @@ See the report in the session; repeated here so they stay with the plan.
    (decided). Is Family, Friend, Romance, Mentor, Rival, Other the right
    starter set for when no default is saved?
 3. Chart in the drawer (proposed), or a third main view beside Board / Timeline?
-4. Ring in roster order with no saved layout (proposed; rearranging cards then
-   arranges the ring), or drag characters on the chart and remember where?
+4. (Decided: characters are draggable and positions are saved in the project.)
+   Should the layout be shared by every device through the file (proposed, like
+   the board), or kept per browser?
 5. Tie count in the tile footer: yes or no?
 6. Phone: leave it carrying the data silently, or plan a read-only list there?

@@ -150,7 +150,13 @@
   }
 
   svg text { font-family: var(--sans); }
-  .node { cursor: pointer; }
+  .node { cursor: grab; touch-action: none; }
+  .node.dragging { cursor: grabbing; }
+  .node:focus, .edge:focus { outline: none; }
+  .node:focus-visible .ring { opacity: .6; }
+  .edge:focus-visible .ln { stroke-width: 3.6; }
+  .node.dragging .disc { filter: drop-shadow(0 4px 8px rgba(40,28,10,.35)); }
+  .ringbtn { position: absolute; top: 12px; right: 12px; }
   .node .ring { fill: none; stroke: var(--ink); stroke-width: 2; opacity: 0; transition: opacity .2s; }
   .node.sel .ring { opacity: 1; }
   .node .nm { font-family: var(--serif); font-size: 13.5px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
@@ -366,15 +372,19 @@
       <div class="chartbody">
         <div class="canvas">
           <svg id="chartMain" viewBox="0 0 640 470" role="img" aria-label="Relationship chart"></svg>
-          <div class="hint">Click a character to put them in the middle. Click a line to read it.</div>
+          <button class="btn ringbtn" id="ringBtn" hidden>Arrange in a ring</button>
+          <div class="hint">Drag characters to arrange them. Click one to see their ties, or a line to read it.</div>
         </div>
         <aside class="side" id="sideMain" aria-live="polite"></aside>
       </div>
     </div>
     <div class="caption">
-      <b>The chart is the Characters drawer's second view.</b> A Roster / Chart switch sits in the drawer header, and Chart opens the drawer full width (the existing Expand size), because a chart does not fit in 460px. One line per pair, colored by kind and always labeled, so color is never the only cue.
+      <b>The chart is the Characters drawer's second view.</b> A Roster / Chart switch sits in the drawer header, and Chart opens the drawer full width (the existing Expand size), because a chart does not fit in 460px. One line per pair, colored by kind and always labeled, so color is never the only cue. Try dragging Pip into the middle.
       <ul>
-        <li><b>No saved layout.</b> Everyone sits on a ring in roster order, clockwise from the top (Wren, Bram, Ione, Sela, Pip, the same order as the tiles). Clicking a character moves them to the middle with their ties around them. There are no positions to store or sync. If cards become rearrangeable, moving a card moves its place on the ring.</li>
+        <li><b>Drag characters anywhere.</b> Where you put them is saved in the project, like chapter cards on the board, so the chart looks the same on your other devices. Arrow keys move a selected character too. A press that doesn't move is a click, so clicking still works.</li>
+        <li><b>Start from a ring.</b> Anyone you haven't moved sits on a ring in roster order (Wren, Bram, Ione, Sela, Pip, the same order as the tiles). <b>Arrange in a ring</b> (top right, once you've moved someone) puts everyone back.</li>
+        <li><b>Clicking a character highlights their ties</b> and dims the rest. Nothing moves, so your arrangement stays put.</li>
+        <li><b>Labels never overlap.</b> Each label takes the first free spot along its line, then just beside it, clear of every character and every other label. They re-place as you drag.</li>
         <li><b>Kind filters</b> in the side panel hide whole kinds of tie. Archived characters are off by default (screen 4).</li>
         <li><b>Kinds are yours.</b> "Edit kinds" (side panel, or in the editor) opens the project's list: rename, recolor, add or remove. The six here are only the starter set. Try renaming Rival, or adding "Debt". "Save as default" keeps your list for new projects, the way Author details does.</li>
         <li><b>The side panel</b> shows the selected pair or character. Each pair has a line for how each one sees the other, because feelings are rarely mutual.</li>
@@ -491,10 +501,13 @@
     <div class="pairgrid">
       <div class="paper">
         <div class="eyebrow">In the project file</div>
-        <h2>Two new lists, next to characters</h2>
+        <h2>Three new fields, next to characters</h2>
 <pre><span class="c">// StoryDoc gains two optional top-level fields</span>
 relationships?: Relationship[]
 relationshipKinds?: RelationshipKind[]  <span class="c">// absent = the starter six</span>
+relationshipLayout?: Record&lt;string, { x: number; y: number }&gt;
+                     <span class="c">// character id: where you dragged them,
+                     // 0-1 across and down the chart</span>
 
 interface RelationshipKind {
   id: string;        <span class="c">// starter kinds keep fixed ids: "family", "rival", ...</span>
@@ -526,9 +539,10 @@ interface Relationship {
           <li><b>No schema bump.</b> The field is optional, like manuscript, author and pace before it. A file without it is a project with no relationships.</li>
           <li><b>Series-wide.</b> It sits beside characters, not on a book or version board, so every book in a series shares it and the phone needs no update first.</li>
           <li><b>The phone keeps it.</b> Android's normalize starts from the raw file and only overwrites keys it knows, so the list round-trips untouched. It just isn't shown there.</li>
+          <li><b>Chart positions live in the project,</b> like chapter positions on the board. Only characters you've moved have one; the rest sit on the ring. Positions are fractions of the chart, so they fit any drawer width. Positions for deleted characters are dropped on read.</li>
           <li><b>Kinds live in the project.</b> Absent means the starter six. The first edit writes the whole list. Starter kinds keep fixed ids, so two devices that never edited agree.</li>
           <li><b>Read defensively.</b> A tie whose character is gone (deleted on the phone, say) is dropped on read, as is a tie to itself or a second record for the same pair. A tie whose kind was removed is kept and shows as No kind.</li>
-          <li><b>Conflicts and merge.</b> Each relationship becomes its own row in the compare and merge dialog, and the kind list is one more row, taken whole. Taking a relationship from the file brings in both characters it points at, and its kind if this copy lacks it.</li>
+          <li><b>Conflicts and merge.</b> Each relationship becomes its own row in the compare and merge dialog, and the kind list and the chart layout are one row each, taken whole. Taking a relationship from the file brings in both characters it points at, and its kind if this copy lacks it.</li>
           <li><b>Delete cleans up.</b> Deleting a character removes its relationships; archiving keeps them.</li>
         </ul>
       </div>
@@ -599,38 +613,36 @@ interface Relationship {
   const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
 
   /* ---------------- Chart ---------------- */
+  // Saved positions for the main chart, the way chapter cards keep theirs on the board.
+  // A character with no saved position sits on the ring, in roster order.
+  const LAYOUT = {};
   function makeChart(svg, opts) {
     const st = { focus: null, sel: null, hidden: new Set(), showArch: !!opts.showArch, pos: {} };
-    const CX = 320, CY = 222, R = 165;
+    const layout = opts.layout || {};
+    const VW = 640, VH = 470, CX = 320, CY = 222, R = 165, PAD = 34;
     const nodes = {}, edges = {};
     const shownKind = (k) => !st.hidden.has(kindOf(k) ? k : "_none");
-    const gEdges = el("g", {}), gNodes = el("g", {});
-    svg.append(gEdges, gNodes);
+    const gEdges = el("g", {}), gLabels = el("g", {}), gNodes = el("g", {});
+    svg.append(gEdges, gNodes, gLabels);
 
     function visibleChars() { return CHARS.filter((c) => !c.archived || st.showArch); }
-    function active() { return CHARS.filter((c) => !c.archived); }
-    function targetPos() {
-      const out = {};
-      const act = active();
-      if (!st.focus) {
-        act.forEach((c, i) => {
-          const ang = -Math.PI / 2 + (i * 2 * Math.PI) / act.length;
-          out[c.id] = [CX + R * Math.cos(ang), CY + R * Math.sin(ang)];
-        });
-      } else {
-        out[st.focus] = [CX, CY];
-        const rest = act.filter((c) => c.id !== st.focus);
-        rest.forEach((c, i) => {
-          const ang = -Math.PI / 2 + (i * 2 * Math.PI) / rest.length;
-          out[c.id] = [CX + R * Math.cos(ang), CY + R * Math.sin(ang)];
-        });
-      }
+    function ringPos() {
+      const out = {}, act = CHARS.filter((c) => !c.archived);
+      act.forEach((c, i) => {
+        const ang = -Math.PI / 2 + (i * 2 * Math.PI) / act.length;
+        out[c.id] = [CX + R * Math.cos(ang), CY + R * Math.sin(ang)];
+      });
       CHARS.filter((c) => c.archived).forEach((c, i) => { out[c.id] = [580 - i * 70, 405]; });
+      return out;
+    }
+    function targetPos() {
+      const ring = ringPos(), out = {};
+      for (const id in ring) out[id] = layout[id] ? [...layout[id]] : ring[id];
       return out;
     }
 
     function build() {
-      gEdges.textContent = ""; gNodes.textContent = "";
+      gEdges.textContent = ""; gLabels.textContent = ""; gNodes.textContent = "";
       for (const k in nodes) delete nodes[k];
       for (const k in edges) delete edges[k];
       RELS.forEach((r) => {
@@ -638,36 +650,118 @@ interface Relationship {
         g.style.color = kc(r.kind);
         const ln = el("line", { class: "ln", stroke: kc(r.kind) });
         const hit = el("line", { class: "hit" });
+        g.append(ln, hit);
+        // The label sits in its own layer above the characters, so it is never hidden under one.
+        const lg = el("g", { class: "edge lab" });
+        lg.style.color = kc(r.kind);
         const pill = el("rect", { class: "pill", rx: "7", ry: "7", height: "20" });
         const tx = el("text", { class: "tx", fill: kc(r.kind) });
         tx.textContent = r.label || kname(r.kind);
-        g.append(ln, hit, pill, tx);
+        lg.append(pill, tx);
         const A = byId(r.a), B = byId(r.b);
         g.setAttribute("aria-label", `${A.first} and ${B.first}: ${kname(r.kind)}, ${r.label || ""}`);
-        g.addEventListener("click", (e) => { e.stopPropagation(); selectEdge(r.id); });
+        for (const t of [g, lg]) {
+          t.addEventListener("click", (e) => { e.stopPropagation(); selectEdge(r.id); });
+        }
         g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEdge(r.id); } });
-        gEdges.append(g);
-        edges[r.id] = { g, ln, hit, pill, tx, r, w: 0 };
+        gEdges.append(g); gLabels.append(lg);
+        edges[r.id] = { g, lg, ln, hit, pill, tx, r, w: 0, labOn: true };
       });
       CHARS.forEach((c) => {
-        const g = el("g", { class: "node" + (c.archived ? " arch" : ""), tabindex: "0", role: "button", "aria-label": c.name });
+        const g = el("g", { class: "node" + (c.archived ? " arch" : ""), tabindex: "0", role: "button",
+          "aria-label": `${c.name}. Drag to move, or use the arrow keys.` });
         const ring = el("circle", { class: "ring", r: "28" });
         const disc = el("circle", { class: "disc", r: "23", fill: c.color });
         const ini = el("text", { class: "ini" }); ini.textContent = c.ini;
         const nm = el("text", { class: "nm", y: "43" }); nm.textContent = c.first;
         g.append(ring, disc, ini, nm);
         if (c.archived) { const t = el("text", { class: "arch-tag", y: "57" }); t.textContent = "ARCHIVED"; g.append(t); }
-        g.addEventListener("click", (e) => { e.stopPropagation(); selectNode(c.id); });
-        g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectNode(c.id); } });
+        g.addEventListener("click", (e) => e.stopPropagation()); // selection happens on pointerup, so a drag never selects
+        g.addEventListener("pointerdown", (e) => startDrag(e, c.id));
+        g.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectNode(c.id); return; }
+          const d = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[e.key];
+          if (d) { e.preventDefault(); const p = st.pos[c.id]; moveTo(c.id, p[0] + d[0], p[1] + d[1]); }
+        });
         gNodes.append(g);
         nodes[c.id] = { g, c };
       });
-      // measure label widths once they are in the DOM
       requestAnimationFrame(() => {
         for (const id in edges) { const e = edges[id]; let w = 0; try { w = e.tx.getComputedTextLength(); } catch (_) {} e.w = (w || e.tx.textContent.length * 6.2) + 16; }
         place(st.pos);
       });
-      svg.onclick = () => { st.focus = null; st.sel = null; update(true); };
+      svg.onclick = () => { st.focus = null; st.sel = null; update(false); };
+    }
+
+    /* Dragging: a press that moves more than 4px is a drag, one that doesn't is a click (the board's rule). */
+    let drag = null;
+    function svgPoint(e) {
+      const m = svg.getScreenCTM(); if (!m) return [0, 0];
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+      return [p.x, p.y];
+    }
+    function moveTo(id, x, y) {
+      x = Math.max(PAD, Math.min(VW - PAD, x)); y = Math.max(PAD, Math.min(VH - PAD - 18, y));
+      layout[id] = [x, y]; st.pos[id] = [x, y]; place(st.pos);
+      if (opts.onMove) opts.onMove();
+    }
+    function startDrag(e, id) {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      const [x, y] = svgPoint(e);
+      drag = { id, sx: e.clientX, sy: e.clientY, ox: st.pos[id][0] - x, oy: st.pos[id][1] - y, moved: false };
+      svg.setPointerCapture(e.pointerId);
+    }
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+      if (!drag.moved) { drag.moved = true; nodes[drag.id].g.classList.add("dragging"); }
+      const [x, y] = svgPoint(e);
+      moveTo(drag.id, x + drag.ox, y + drag.oy);
+    });
+    const endDrag = (e) => {
+      if (!drag) return;
+      const d = drag; drag = null;
+      nodes[d.id].g.classList.remove("dragging");
+      try { svg.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (!d.moved) selectNode(d.id);
+      svg.dataset.justDragged = d.moved ? "1" : "";
+    };
+    svg.addEventListener("pointerup", endDrag);
+    svg.addEventListener("pointercancel", endDrag);
+    // A drag that ends over empty canvas must not count as a background click.
+    svg.addEventListener("click", (e) => { if (svg.dataset.justDragged) { e.stopImmediatePropagation(); svg.dataset.justDragged = ""; } }, true);
+
+    /* Labels: try spots along each line, then just off it, and take the first that clears every
+       character and every label already placed. Short lines go first, since they have the least room. */
+    const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    function placeLabels(pos) {
+      const vis = visibleChars().filter((c) => nodes[c.id].g.style.display !== "none");
+      const blocks = vis.map((c) => { const p = pos[c.id]; return p ? [{ x: p[0] - 28, y: p[1] - 28, w: 56, h: 56 }, { x: p[0] - 32, y: p[1] + 30, w: 64, h: c.archived ? 32 : 20 }] : []; }).flat();
+      const todo = Object.values(edges).filter((e) => e.labOn && pos[e.r.a] && pos[e.r.b])
+        .map((e) => ({ e, p: pos[e.r.a], q: pos[e.r.b] }))
+        .sort((a, b) => Math.hypot(a.q[0] - a.p[0], a.q[1] - a.p[1]) - Math.hypot(b.q[0] - b.p[0], b.q[1] - b.p[1]));
+      const placed = [];
+      for (const { e, p, q } of todo) {
+        const w = e.w || 80, h = 20, dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        const cands = [];
+        for (const t of [0.5, 0.42, 0.58, 0.34, 0.66, 0.27, 0.73]) cands.push([p[0] + dx * t, p[1] + dy * t]);
+        for (const off of [16, -16, 30, -30]) for (const t of [0.5, 0.38, 0.62]) cands.push([p[0] + dx * t + nx * off, p[1] + dy * t + ny * off]);
+        let best = null, bestScore = Infinity;
+        for (const [cx, cy] of cands) {
+          const r = { x: cx - w / 2 - 3, y: cy - h / 2 - 3, w: w + 6, h: h + 6 };
+          let score = 0;
+          for (const b of blocks) score += overlap(r, b) * 3;
+          for (const b of placed) score += overlap(r, b) * 2;
+          if (r.x < 0 || r.x + r.w > VW || r.y < 0 || r.y + r.h > VH) score += 500;
+          if (score < bestScore) { bestScore = score; best = [cx, cy, r]; if (score === 0) break; }
+        }
+        const [cx, cy, r] = best;
+        placed.push(r);
+        e.pill.setAttribute("x", cx - w / 2); e.pill.setAttribute("y", cy - h / 2); e.pill.setAttribute("width", w);
+        e.tx.setAttribute("x", cx); e.tx.setAttribute("y", cy + 0.5);
+      }
     }
 
     function place(pos) {
@@ -679,18 +773,15 @@ interface Relationship {
         const e = edges[id], p = pos[e.r.a], q = pos[e.r.b];
         if (!p || !q) continue;
         for (const l of [e.ln, e.hit]) { l.setAttribute("x1", p[0]); l.setAttribute("y1", p[1]); l.setAttribute("x2", q[0]); l.setAttribute("y2", q[1]); }
-        const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, w = e.w || 80;
-        e.pill.setAttribute("x", mx - w / 2); e.pill.setAttribute("y", my - 10); e.pill.setAttribute("width", w);
-        e.tx.setAttribute("x", mx); e.tx.setAttribute("y", my + 0.5);
       }
+      placeLabels(pos);
     }
 
     function styleAll() {
       const vis = new Set(visibleChars().map((c) => c.id));
       for (const id in nodes) {
         const n = nodes[id];
-        const shown = vis.has(id);
-        n.g.style.display = shown ? "" : "none";
+        n.g.style.display = vis.has(id) ? "" : "none";
         let dim = false;
         if (st.focus && id !== st.focus) dim = !RELS.some((r) => shownKind(r.kind) && ((r.a === st.focus && r.b === id) || (r.b === st.focus && r.a === id)));
         if (st.sel) { const r = RELS.find((x) => x.id === st.sel); dim = r && id !== r.a && id !== r.b; }
@@ -707,9 +798,11 @@ interface Relationship {
         if (st.focus) { const on = r.a === st.focus || r.b === st.focus; o = on ? 1 : 0.12; lab = on ? 1 : 0; }
         if (st.sel) { o = id === st.sel ? 1 : 0.15; lab = id === st.sel ? 1 : 0; }
         if (archived) o = Math.min(o, 0.55);
-        e.ln.style.opacity = o; e.pill.style.opacity = lab; e.tx.style.opacity = lab;
+        e.ln.style.opacity = o;
+        e.labOn = shown && !!lab;
+        e.lg.style.display = e.labOn ? "" : "none";
         e.g.style.pointerEvents = lab ? "" : "none";
-        e.g.classList.toggle("sel", id === st.sel);
+        e.g.classList.toggle("sel", id === st.sel); e.lg.classList.toggle("sel", id === st.sel);
       }
     }
 
@@ -719,9 +812,9 @@ interface Relationship {
       const from = Object.keys(st.pos).length ? { ...st.pos } : to;
       styleAll();
       cancelAnimationFrame(anim);
-      if (!animate || reduce || from === to) { st.pos = to; place(to); }
+      if (!animate || reduce) { st.pos = to; place(to); }
       else {
-        const t0 = performance.now(), D = 260;
+        const t0 = performance.now(), D = 280;
         const step = (t) => {
           const k = Math.min(1, (t - t0) / D), ease = 1 - Math.pow(1 - k, 3);
           const cur = {};
@@ -733,7 +826,8 @@ interface Relationship {
       }
       if (opts.onChange) opts.onChange(st);
     }
-    function selectNode(id) { st.sel = null; st.focus = st.focus === id ? null : id; update(true); }
+    // Clicking a character highlights their ties; nothing moves, so your arrangement stays put.
+    function selectNode(id) { st.sel = null; st.focus = st.focus === id ? null : id; update(false); }
     function selectEdge(id) { st.sel = st.sel === id ? null : id; update(false); }
 
     build();
@@ -744,6 +838,8 @@ interface Relationship {
       rebuild() { build(); st.pos = targetPos(); update(false); },
       toggleKind(key) { st.hidden.has(key) ? st.hidden.delete(key) : st.hidden.add(key); update(false); },
       setArch(v) { st.showArch = v; update(false); },
+      arrangeRing() { for (const k in layout) delete layout[k]; update(true); },
+      moved: () => Object.keys(layout).length > 0,
     };
   }
 
@@ -807,7 +903,9 @@ interface Relationship {
     else if (t.id === "archToggle") chart.setArch(t.checked);
   });
 
-  const chart = makeChart(document.getElementById("chartMain"), { onChange: renderSide });
+  const ringBtn = document.getElementById("ringBtn");
+  const chart = makeChart(document.getElementById("chartMain"), { onChange: renderSide, layout: LAYOUT, onMove: () => { ringBtn.hidden = false; } });
+  ringBtn.addEventListener("click", () => { chart.arrangeRing(); ringBtn.hidden = true; });
   const chartArch = makeChart(document.getElementById("chartArch"), { showArch: true });
   chartArch.selectNode("bram");
 
