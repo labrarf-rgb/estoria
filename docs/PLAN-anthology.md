@@ -121,7 +121,9 @@ poem's Write view keeps its line breaks; the next piece, a story, does not. A
 piece's own menu (⋯): Move to section, Make its own project…, Delete piece.
 
 The reference tab strip (cast, world, notes, pins) **comes back** for a piece in
-an anthology, because unlike a single piece it is not the whole project.
+an anthology, because unlike a single piece it is not the whole project. This
+reverses the 2026-10-13 call for single pieces *inside an anthology only*, and
+is Claude's proposal, not yet Ray's (open question 9).
 
 ### 4.4 Adding a piece
 
@@ -133,7 +135,10 @@ an anthology, because unlike a single piece it is not the whole project.
   offered). Confirm says what happens:
   - the piece's writing, map, notes, status and target come in as one piece;
   - its characters, world entries and library assets are added to the
-    anthology's, matched by id the way Merge does (`lib/merge.ts`);
+    anthology's the way **Merge into a series** does it (`mergeProjectIntoSeries`
+    in the store: `dedupeById`). Two separate projects have different ids, so
+    in practice everything is appended; a character typed in both shows twice
+    (open question 8);
   - its **main version** comes in; other versions stay in the saved copy;
   - its Pace history is **added into** the anthology's (per day, per device
     cell summed, since both logs may hold the same device);
@@ -179,7 +184,7 @@ where it was written, because the log is grow-only).
 | `lib/piece.ts` | `isAnthology`, `toAnthology`, `fromAnthology`, `bringIn`, `takeOut`; `partNouns` / `countParts` / `keepsLineBreaks` take a chapter; `expandToBook("collection")` sets the form. |
 | `lib/paceLog.ts` | An *add* merge for bringing a piece in (today's merge is for two copies of one log). |
 | `lib/manuscriptExport.ts` | Piece headings, contents page, section pages, per-chapter `keepLineBreaks` in `chapterParagraphs` and `hardBreaks`. |
-| `lib/sync.ts`, `lib/merge.ts` | New chapter fields get `FIELD_LABELS` ("kind", "line breaks", "section"); `doc:form` already compares `form`. |
+| `lib/sync.ts`, `lib/merge.ts` | New chapter fields get `FIELD_LABELS` ("kind", "line breaks", "section"); `doc:form` already compares `form`. **`mergeBlocked`** (SPECS §8: set when `form` differs, piece vs book) needs a rule for `"anthology"`: blocked against a piece (one device expanded while the other kept the piece); against a plain book with the same chapters, Compare & merge can stay open, since the chapters line up and only the form differs. |
 | Components | New `AnthologyView` (contents or board), `AddPieceModal`, take-out dialog; `PieceView` gains back / prev / next; `Toolbar`, `FormChangeModal`, `ProjectsModal` (tag "Anthology"). |
 | Tests | Round-trip of the new keys, expand / make / unmake, bring-in (bible dedupe, Pace add, versions), take-out, export headings and line breaks. |
 
@@ -201,7 +206,10 @@ headings do not show.
 **Hazards on an old phone build:** *Turn into single piece* on the phone would
 collapse the anthology into one piece (it saves a copy first, so it can be
 walked back). *Make this a series* would put it in a series the web does not
-expect. Both are reasons to keep the gap short.
+expect. And the phone's own **Expand → A collection** keeps making the old
+label-only book (`grownInto: "collection"`, no `form`), which the web then
+shows as a book waiting for *Make this an anthology*. All three are reasons to
+keep the gap short.
 
 **Phone update, later:** read `form: "anthology"`, per-chapter kind and line
 breaks, a contents screen, the piece page with back / next, and the new export
@@ -235,3 +243,9 @@ headings. Recorded for the Android SPECS §7 when the web lands.
    rest kept in the saved copy. OK?
 7. **Pace on bring-in:** add the piece's history into the anthology's, so the
    streak and totals include it. OK, or start the piece's history fresh?
+8. **Same character in two projects:** bringing a piece in appends its
+   characters and world entries (ids never match across projects). Fine for
+   v1, or offer to match same-name entries during bring-in?
+9. **Reference tabs on an anthology piece:** bring back Characters / World /
+   Piece notes / Pinned on the piece page (mockup step 3), or keep the piece
+   page exactly as a single piece today (no tabs)?

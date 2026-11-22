@@ -373,7 +373,7 @@ function screenAdd() {
     inner = `<div class="dlg-b"><p><b>"${x.title}"</b> moves into Salt and Lantern as a ${k.label.toLowerCase()}, at the end of <b>Two: Inland</b>.</p>
       <div><div class="eyebrow" style="margin-bottom:6px">What happens</div><ul>
         <li><b>Writing, map, notes, status, target:</b> come in as one piece, still a ${k.label.toLowerCase()}${x.kind === "poem" ? ", line breaks kept" : ""}</li>
-        <li><b>Characters, world, library:</b> added to the anthology's; ones it already has are matched, not doubled</li>
+        <li><b>Characters, world, library:</b> added to the anthology's lists. A character typed separately in both (two Nells) shows up twice until you archive one</li>
         <li><b>Versions:</b> ${multi ? "its main version comes in; the other 2 stay in the saved copy" : "its one version comes in"}</li>
         <li><b>Pace:</b> its writing days are added into the anthology's history</li>
         <li><b>The project:</b> leaves your project list</li></ul></div>
