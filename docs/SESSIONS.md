@@ -6449,4 +6449,10 @@ Plan and mockup: `docs/PLAN-detail-cards-reorder.md`,
   elsewhere, chip drag in a chapter's Pinned tab, library tile drag. The
   conflict rows are covered by unit tests, not tried in the dialog.
   Typecheck, 302 tests, production build. Not pushed or deployed.
+- **Shipped** on Ray's /ship: main fast-forwarded to c2321ea, pushed, and
+  deployed with `npm run deploy` (v4 build 94, verified live at
+  labrarf.com/estoria). SPECS brought in line afterwards (docs only): the
+  cross-reference to "Rearrange cards", the restyle row's grip and position
+  slots now filled, the `ui/` file tree, and the finger-drag caveat on the
+  pinned-resources row.
 
