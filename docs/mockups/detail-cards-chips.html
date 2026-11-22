@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter Chips Open</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Colour values copied from src/index.css so the mock matches the app. */
+:root {
+  --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+  --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+  --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+  --therefore: oklch(0.54 0.1 152); --but: oklch(0.55 0.15 33);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+    --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+    --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+  --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+  --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 36px 16px 80px; }
+.eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--therefore); }
+h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 30px; margin: 6px 0 10px; }
+h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 24px; margin: 4px 0 8px; }
+h3 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 18px; margin: 30px 0 4px; }
+.lede { color: var(--soft); font-size: 15px; line-height: 1.6; max-width: 780px; margin: 0; }
+.note { font-size: 13.5px; color: var(--soft); line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
+.rules { margin: 16px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 28px; font-size: 14px; line-height: 1.5; }
+.rules b { font-weight: 600; }
+
+section { padding: 40px 0; border-top: 1px solid var(--line); }
+.frames { display: flex; flex-direction: column; gap: 24px; }
+.cap { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; }
+.cap span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.grow { flex: 1; }
+
+/* Drawer */
+.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.dhead { display: flex; align-items: center; gap: 8px; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
+.dhead .t { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
+.dhead .s { font-size: 11.5px; color: var(--soft); font-weight: 500; margin-top: 2px; }
+.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; flex: none; }
+.list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px 22px; }
+.add { border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
+.grid .add, .tgrid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; }
+.tgrid .add { min-height: 120px; font-size: 12px; }
+
+/* App frames. Layers share one grid cell, so a frame grows to its tallest layer. */
+.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+.app > * { grid-area: 1 / 1; }
+.boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start; }
+.appbar { align-self: start; height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
+.dim { background: rgba(20,14,6,.46); }
+.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
+.app .drawer.full { border: 0; border-radius: 0; }
+.winscrim { background: rgba(20,14,6,.38); display: flex; align-items: center; justify-content: center; padding: 28px 24px; }
+.modal { width: min(600px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 16px 20px 20px; }
+
+/* Chapter modal */
+.chmodal { margin: 28px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); align-self: start; }
+.chhead { padding: 18px 26px 12px; }
+.chhead .row { display: flex; align-items: center; gap: 10px; }
+.chhead .title { font-size: 22px; }
+.chmeta { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); margin-top: 6px; }
+.tabs { display: flex; gap: 6px; padding: 4px 26px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.tabs span { font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--rule); border-radius: 8px; padding: 5px 10px; }
+.tabs span.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; opacity: .7; margin-left: 4px; }
+.chbody { padding: 16px 26px 22px; }
+.flowph { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; font-size: 12px; color: var(--faint); }
+
+/* Chapter card */
+.chap { width: 244px; min-height: 142px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.cast { display: flex; padding-right: 6px; }
+.cast span { margin-right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--card); color: #fff; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.top { display: flex; align-items: center; gap: 8px; }
+.title { font-family: Spectral, serif; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.title.untitled { color: var(--faint); }
+.sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sum.empty { color: var(--faint); }
+.meta { display: flex; justify-content: flex-end; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: var(--soft); }
+.meta .sep { color: var(--faint); }
+
+/* Tile (the new card) */
+.tile { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.grid .tile { min-height: 142px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tgrid .tile { min-height: 120px; }
+.ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.pic { border-radius: 8px; min-height: 54px; flex: 1; max-height: 70px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
+.pic.big { max-height: none; min-height: 200px; }
+
+/* Fields */
+.fields { display: flex; flex-direction: column; gap: 12px; }
+.lab { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+.inp { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
+.inp.ta { min-height: 48px; }
+.inp.ph { color: var(--faint); }
+.pair { display: flex; gap: 12px; } .pair > * { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips span { border: 1px solid var(--rule); border-radius: 6px; padding: 2px 8px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
+.more { font-size: 11.5px; color: var(--faint); font-style: italic; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ghost { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--soft); }
+.hint { font-size: 11.5px; color: var(--faint); }
+.todo { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.todo .done { text-decoration: line-through; color: var(--faint); }
+.addrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 7px; }
+.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+
+/* Notes drawer */
+.nbody { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
+.drawer.full .nbody { padding: 18px 22px 22px; }
+.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; min-height: 110px; }
+.liblist { display: flex; flex-direction: column; gap: 11px; }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.libgrid .tile { min-height: 142px; }
+
+/* Changes table */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.45; }
+th { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+</style>
+<style>
+.cols3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
+.colh { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; }
+.colh span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.colh.now { color: var(--therefore); }
+.pg { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pgtitle { padding: 14px 18px 4px; font-family: Spectral, serif; font-size: 20px; font-weight: 600; }
+.pgmeta { padding: 0 18px 8px; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--soft); }
+.tabs2 { display: flex; gap: 5px; padding: 8px 18px 10px; flex-wrap: wrap; }
+.tabs2 span { font-size: 11.5px; font-weight: 500; color: var(--soft); background: var(--chip); border-radius: 8px; padding: 5px 9px; }
+.tabs2 span.on { background: var(--ink); color: var(--bg); }
+.tabs2 i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10px; margin-left: 5px; opacity: .7; }
+.tb { padding: 0 18px 14px; border-bottom: 1px solid var(--rule); }
+.flow { padding: 10px 18px 16px; display: flex; gap: 10px; }
+.flow div { flex: 1; border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 7px 9px; font-size: 11px; color: var(--soft); line-height: 1.4; }
+.flow b { display: block; font-size: 9px; letter-spacing: .1em; color: var(--faint); }
+.chiprow { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.cchip { display: flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 7px 5px 8px; font-size: 12px; font-weight: 500; color: #fff; }
+.cchip .ci { width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.25); font-size: 8.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.wchip { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 7px 5px 10px; font-size: 12px; font-weight: 500; background: var(--ink); color: var(--bg); }
+.wchip small { font-size: 9px; text-transform: uppercase; opacity: .7; }
+.rchip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--card); border-radius: 999px; padding: 4px 9px 4px 5px; font-size: 12px; font-weight: 500; color: var(--ink); box-shadow: var(--shadow); }
+.rchip .n { background: var(--ink); color: var(--bg); border-radius: 999px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; font-weight: 600; padding: 1px 6px; }
+.rchip small { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.dashchip { border: 1px dashed var(--line); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--soft); }
+.tg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tg .tile { min-height: 118px; padding: 10px 12px; }
+.tg .title { font-size: 14.5px; }
+.tg .sum { font-size: 11.5px; }
+.tg .add { min-height: 118px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 12px; }
+.addrow { margin-top: 9px; }
+.notebox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.55; min-height: 70px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 14px; font-size: 13.5px; }
+.legend b { font-weight: 600; }
+</style>
+<style>
+.sbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 24px; align-items: start; }
+.stage { display: grid; border-radius: 12px; overflow: hidden; }
+.stage > * { grid-area: 1 / 1; }
+.stage .pg { border-radius: 12px; }
+.winscrim { border-radius: 12px; }
+.modal { width: min(440px, 100%); }
+.cchip, .wchip, .rchip { cursor: pointer; }
+.cchip.hl, .wchip.hl, .rchip.hl { outline: 2px solid var(--therefore); outline-offset: 2px; }
+.rchip .g { color: var(--faint); font-size: 11px; }
+.foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--rule); padding: 11px 18px; }
+.mbody { padding: 14px 18px 16px; }
+.mhead { padding: 13px 18px; }
+.mhead .title { font-size: 18px; }
+.todo { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.pic { min-height: 150px; max-height: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Estoria · for review before building</div>
+  <h1>Chapter tabs as chips that open</h1>
+  <p class="lede">Every list inside a chapter (and on an anthology piece's page, which uses the same tabs) is chips. Click a chip and its details open in a window over the chapter, the same window the drawers use. The ✕ on a chip still takes it off this chapter. Left: the tab. Right: after clicking the outlined chip.</p>
+  <div id="rows"></div>
+</div>
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const inp = (v, ph) => `<div class="inp ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+const area = (v, ph) => `<div class="inp ta ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+const CAST = [
+  { name: "Wren Calloway", ini: "WC", color: "oklch(0.55 0.1 220)", role: "Protagonist", type: "Hero", desc: "A cartographer who can chart any coast but her own way home.", bio: "Grew up on the tide flats, apprenticed to the harbour's last chart-maker." },
+  { name: "Pip", ini: "P", color: "oklch(0.52 0.12 300)" },
+];
+const flow = `<div class="flow"><div><b>SCENE 1</b>Wren haggles for a chart.</div><div><b>SCENE 2</b>Her mother's hand.</div><div><b>SCENE 3</b>The coast rearranges.</div></div>`;
+const page = (on, body) => `<div class="pg"><div class="pgtitle">The Drowned Map</div><div class="pgmeta">3,200 words · 3 scenes · Done</div>
+  <div class="tabs2"><span class="${on === "c" ? "on" : ""}">Characters<i>2</i></span><span class="${on === "w" ? "on" : ""}">World details<i>1</i></span><span>Notes</span><span class="${on === "r" ? "on" : ""}">Pinned references<i>3</i></span></div>
+  <div class="tb">${body}</div>${flow}</div>`;
+const win = (badge, title, fields, foot) => `<div class="winscrim"><div class="modal"><div class="mhead">${badge}<div class="title">${esc(title)}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody"><div class="fields">${fields}</div></div><div class="foot">${foot}</div></div></div>`;
+const removeFoot = (keep) => `<span class="ghost">Remove from this chapter</span><span class="hint">${keep}</span>`;
+
+const charChips = (hl) => `<div class="chiprow">${CAST.map((c, i) => `<span class="cchip ${hl && i === 0 ? "hl" : ""}" style="background:${c.color}"><span class="ci">${c.ini}</span>${esc(c.name)} ✕</span>`).join("")}<span class="dashchip">+ Add character</span></div>`;
+const worldChips = (hl) => `<div class="chiprow"><span class="wchip ${hl ? "hl" : ""}">The Lower City<small>Place</small> ✕</span><span class="dashchip">+ Add world detail</span></div>`;
+const REFS = [["Tide-chart sketch", "Image"], ["Map symbology key", "Note"], ["Revision pass", "To-do"]];
+const refChips = (hl) => `<div class="chiprow">${REFS.map((r, i) => `<span class="rchip ${hl === i ? "hl" : ""}"><span class="g">⠿</span><span class="n">0${i + 1}</span>${r[0]}<small>${r[1]}</small></span>`).join("")}</div><div class="chiprow" style="margin-top:8px"><span class="dashchip">+ Note</span><span class="dashchip">+ To-do</span><span class="dashchip">+ Image</span><span class="dashchip">Link book asset</span></div>`;
+
+const c = CAST[0];
+const charWin = win(`<span class="ini" style="background:${c.color}">${c.ini}</span><span class="tag">${c.role}</span>`, c.name,
+  `<div class="pair"><div><div class="lab">Name</div>${inp(c.name)}</div><div style="flex:0 0 64px"><div class="lab">Initials</div>${inp(c.ini)}</div></div>
+   <div class="pair"><div><div class="lab">Role</div>${inp(c.role)}</div><div><div class="lab">Archetype</div>${inp(c.type)}</div></div>
+   <div><div class="lab">Description</div>${area(c.desc)}</div>
+   <div class="more">Bio, Traits, Goals, Motivations, Wants, Needs, Notes, Appears in (scrolls)</div>`,
+  removeFoot("They stay in your cast."));
+const worldWin = win(`<span class="badge">PLACE</span>`, "The Lower City",
+  `<div class="pair"><div><div class="lab">Name</div>${inp("The Lower City")}</div><div style="flex:0 0 100px"><div class="lab">Category</div>${inp("Place  ▾")}</div></div>
+   <div><div class="lab">Description</div>${area("A tide-flooded port built on the drowned bones of an older one.")}</div>
+   <div class="more">Notes, Appears in, References (scrolls)</div>`,
+  removeFoot("It stays in your world list."));
+const noteWin = win(`<span class="badge">02</span><span class="tag">Note</span>`, "Map symbology key",
+  `<div><div class="lab">Title</div>${inp("Map symbology key")}</div>
+   <div><div class="lab">Note</div><div class="inp ta" style="min-height:90px">Anchor = safe; gull = warning. Wren's mother added a third mark nobody can read.</div></div>`,
+  removeFoot("It stays in the shared library."));
+const todoWin = win(`<span class="badge">03</span><span class="tag">To-do</span>`, "Revision pass",
+  `<div><div class="lab">Title</div>${inp("Revision pass")}</div>
+   <div><div class="lab">Tasks</div><div class="todo"><span style="text-decoration:line-through;color:var(--faint)">☑ Cut the second market scene</span><span>☐ Seed the watermark clue</span><span style="color:var(--faint)">+ Add task</span></div></div>`,
+  removeFoot("It stays in the shared library."));
+
+const ROWS = [
+  { t: "Characters", on: "c", tab: charChips(false), click: charChips(true), win: charWin, what: "Wren's window: every field, editable here. Archive and Delete stay in the Characters drawer." },
+  { t: "World details", on: "w", tab: worldChips(false), click: worldChips(true), win: worldWin, what: "The entry's window, with its own references inside." },
+  { t: "Pinned references: a note", on: "r", tab: refChips(-1), click: refChips(1), win: noteWin, what: "The note opens to read and edit. Pinned chips keep their order number and grip, so you can still reorder them." },
+  { t: "Pinned references: a to-do list", on: "r", tab: refChips(-1), click: refChips(2), win: todoWin, what: "Tick tasks off right in the window." },
+];
+document.getElementById("rows").innerHTML = ROWS.map((r, i) => `<section>
+  <div class="eyebrow">${i + 1} · ${r.t}</div><h2>${r.t}</h2><p class="note">${r.what}</p>
+  <div class="sbs">
+    <div><div class="colh">The tab</div>${page(r.on, r.tab)}</div>
+    <div><div class="colh">After clicking the outlined chip</div><div class="stage">${page(r.on, r.click)}${r.win}</div></div>
+  </div></section>`).join("");
+</script>
+</body>
+</html>
