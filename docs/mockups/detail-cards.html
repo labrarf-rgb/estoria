@@ -121,6 +121,46 @@ section:first-of-type { border-top: 0; }
 .mhead .title { font-size: 20px; }
 .mbody { padding: 16px 20px 20px; }
 
+h3.sub { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 19px; margin: 34px 0 4px; }
+.subnote { font-size: 13.5px; color: var(--soft); margin: 0 0 14px; }
+/* Collapsed app frame: board, scrim and drawer share one grid cell. */
+.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+.app > * { grid-area: 1 / 1; }
+.app .boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start; }
+.app .appbar { align-self: start; height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
+.app .dim { background: rgba(20,14,6,.46); }
+.app .drawer { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
+.app .winscrim { background: rgba(20,14,6,.3); }
+
+/* Notes drawer */
+.nbody { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
+.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; min-height: 120px; }
+.libhead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.libhead .lab { margin: 0; }
+.vt { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; font-size: 11px; font-weight: 600; color: var(--soft); }
+.vt span { padding: 3px 8px; } .vt span.on { background: var(--chip); color: var(--ink); }
+.lrow { display: flex; align-items: center; gap: 10px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 9px 12px; }
+.lrow .grip { color: var(--faint); font-size: 12px; }
+.lrow .pos { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--faint); }
+.lrow .ic { font-size: 13px; }
+.lrow .lt { font-size: 12.5px; font-weight: 600; }
+.lrow .ls { font-size: 11.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrows { display: flex; flex-direction: column; gap: 7px; }
+.ocards { display: flex; flex-wrap: wrap; gap: 12px; }
+.ocard { width: 164px; height: 150px; border: 1px solid var(--rule); background: var(--card); border-radius: 11px; padding: 11px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.ocard .lt { font-size: 12.5px; font-weight: 600; }
+.ocard .ls { font-size: 12px; color: var(--soft); line-height: 1.45; flex: 1; overflow: hidden; }
+.ocard .cp { font-size: 10.5px; color: var(--faint); }
+.ocard.img { padding: 0; box-shadow: none; border: 0; background: none; }
+.pic { border-radius: 10px; flex: 1; min-height: 60px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.liblist { display: flex; flex-direction: column; gap: 11px; }
+.new .pic { min-height: 54px; max-height: 64px; }
+.todo { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--soft); }
+.todo .done { text-decoration: line-through; color: var(--faint); }
+.addrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+
 /* Comparison table */
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
@@ -133,7 +173,7 @@ td:first-child { color: var(--soft); font-weight: 500; white-space: nowrap; }
 <div class="wrap">
   <div class="eyebrow">Estoria · cards mockup</div>
   <h1>Character and world cards: three options</h1>
-  <p class="lede">Scroll down. First, what a chapter card looks like. Then the Characters and World drawers three ways: as they are today, option A, and option B. In each one, one card is shown opened so you can see what editing looks like. A comparison is at the bottom.</p>
+  <p class="lede">Scroll down. First, what a chapter card looks like. Then the drawers three ways: as they are today, option A, and option B. Option B is shown at both drawer sizes (collapsed side panel and expanded full screen) and for all three drawers: Characters, World and Notes. A comparison is at the bottom.</p>
 
   <section>
     <div class="sechead"><div>
@@ -177,6 +217,8 @@ td:first-child { color: var(--soft); font-weight: 500; white-space: nowrap; }
     <div class="frames">
       <div class="frame"><div class="cap">Characters drawer <span>(side panel)</span></div><div id="today-chars"></div></div>
       <div class="frame"><div class="cap">World drawer <span>(side panel)</span></div><div id="today-world"></div></div>
+      <div class="frame"><div class="cap">Notes drawer <span>(side panel, library as a list)</span></div><div id="today-notes"></div></div>
+      <div class="frame"><div class="cap">Notes drawer <span>(side panel, library as cards)</span></div><div id="today-notes-cards"></div></div>
     </div>
   </section>
 
@@ -209,9 +251,25 @@ td:first-child { color: var(--soft); font-weight: 500; white-space: nowrap; }
       <li><b>Editing moves.</b> You edit in the window, not in the list.</li>
       <li><b>Bigger change,</b> and it overlaps with the later "rearrange the cards" work.</li>
     </ul></div>
+    <h3 class="sub">Collapsed: the side panel</h3>
+    <p class="subnote">The drawer's normal size, over the dimmed board. Tiles stack in one column.</p>
     <div class="frames">
-      <div class="frame wide"><div class="cap">Characters drawer <span>(full screen)</span></div><div id="b-grid"></div></div>
-      <div class="frame wide"><div class="cap">After clicking Mara Vell</div><div id="b-window"></div></div>
+      <div class="frame wide"><div class="cap">Characters drawer <span>(collapsed)</span></div><div id="b-side"></div></div>
+      <div class="frame wide"><div class="cap">After clicking Mara Vell <span>(collapsed)</span></div><div id="b-side-window"></div></div>
+    </div>
+    <h3 class="sub">Expanded: full screen</h3>
+    <p class="subnote">After clicking ⤢. The drawer fills the window and the tiles sit in a grid.</p>
+    <div class="frames">
+      <div class="frame wide"><div class="cap">Characters drawer <span>(expanded)</span></div><div id="b-grid"></div></div>
+      <div class="frame wide"><div class="cap">After clicking Mara Vell <span>(expanded)</span></div><div id="b-window"></div></div>
+      <div class="frame wide"><div class="cap">World drawer <span>(expanded)</span></div><div id="b-world"></div></div>
+    </div>
+    <h3 class="sub">Notes, the same way</h3>
+    <p class="subnote">The story notes box stays at the top. The shared library below it (notes, to-do lists, images) turns into the same tiles. The library already has an order, so its position number takes the chapter number's place in the badge. The list/cards switch goes away, because the tiles replace both.</p>
+    <div class="frames">
+      <div class="frame wide"><div class="cap">Notes drawer <span>(collapsed)</span></div><div id="b-notes-side"></div></div>
+      <div class="frame wide"><div class="cap">Notes drawer <span>(expanded)</span></div><div id="b-notes"></div></div>
+      <div class="frame wide"><div class="cap">After clicking "Revision pass 2" <span>(expanded)</span></div><div id="b-notes-window"></div></div>
     </div>
   </section>
 
@@ -300,10 +358,66 @@ put("today-chars", drawer(true, CHARS.map((c) => todayCard(c, true, c.id === "ot
 put("today-world", drawer(false, WORLD.map((w) => todayCard(w, false, w.id === "dc")).join("")));
 put("a-chars", drawer(true, CHARS.map((c) => aCard(c, true, c.id === "ot")).join("")));
 put("a-world", drawer(false, WORLD.map((w) => aCard(w, false, w.id === "dc")).join("")));
-put("b-grid", drawer(true, CHARS.map(tile).join(""), true));
+const worldTile = (w) => `<div class="new">${face(w, false, "", true)}</div>`;
 const mv = CHARS[0];
-put("b-window", `<div class="winstage">${drawer(true, CHARS.map(tile).join(""), true)}
-  <div class="winscrim"><div class="modal"><div class="mhead"><span class="ini" style="background:${mv.color}">${mv.ini}</span><div class="title">${mv.name}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody">${charFields(mv)}</div></div></div></div>`);
+const win = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="ini" style="background:${mv.color}">${mv.ini}</span><div class="title">${mv.name}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody">${charFields(mv)}</div></div></div>`;
+// The board's two chapter cards, reused as the backdrop behind the collapsed drawer.
+const boardCards = [...document.querySelectorAll(".board .chap")].map((e) => e.outerHTML).join("");
+const app = (extra) => `<div class="app"><div class="boardbg">${boardCards}</div><div class="appbar">The Drowned Map</div><div class="dim"></div>${drawer(true, CHARS.map(tile).join(""))}${extra}</div>`;
+put("b-side", app(""));
+put("b-side-window", app(win));
+put("b-grid", drawer(true, CHARS.map(tile).join(""), true));
+put("b-window", `<div class="winstage">${drawer(true, CHARS.map(tile).join(""), true)}${win}</div>`);
+put("b-world", drawer(false, WORLD.map(worldTile).join(""), true));
+
+// ---- Notes ----
+const ASSETS = [
+  { kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
+  { kind: "TODO", label: "Revision pass 2", items: [["Cut the second market scene", true], ["Give Oren a reason to lie", false], ["Seed the bell code in Ch 2", false]], pins: 1, where: [3, 7] },
+  { kind: "IMAGE", label: "Harbour at low tide", pins: 2 },
+  { kind: "NOTE", label: "", body: "", pins: 0 },
+];
+const kindWord = { NOTE: "Note", TODO: "To-do", IMAGE: "Image" };
+const icon = { NOTE: "📝", TODO: "☑", IMAGE: "🖼" };
+const pad = (i) => String(i + 1).padStart(2, "0");
+const untitled = (a) => a.label || (a.kind === "IMAGE" ? "Untitled image" : a.kind === "TODO" ? "Untitled list" : "Untitled note");
+const progress = (a) => `${a.items.filter((x) => x[1]).length} of ${a.items.length} done`;
+const snippet = (a) => (a.kind === "IMAGE" ? "Image" : a.kind === "TODO" ? progress(a) : a.body || "Empty note");
+const pinCap = (a) => (a.pins ? `${a.pins} pin${a.pins === 1 ? "" : "s"} across versions & books` : "Not pinned yet");
+const notesHead = `<div class="dhead"><div><div class="t">Story notes</div><div class="s">The Drowned Map · themes, questions &amp; reminders</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>`;
+const storyBox = `<div class="storybox">The map is the antagonist's argument: that the past can be owned. Mara's arc ends when she gives the true chart away.</div>`;
+const addRow = `<div class="addrow" style="grid-template-columns:repeat(3,1fr)"><span>+ Note</span><span>+ To-do</span><span>+ Image</span></div>`;
+const notesDrawer = (lib, toggle = true) => `<div class="drawer">${notesHead}<div class="nbody">${storyBox}<div>
+  <div class="libhead"><div class="lab">Shared library · link these into any chapter</div><span class="grow"></span>${toggle ? `<span class="vt"><span class="${toggle === "list" ? "on" : ""}">List</span><span class="${toggle === "cards" ? "on" : ""}">Cards</span></span>` : ""}</div>
+  ${lib}</div></div></div>`;
+
+const listRow = (a, i) => `<div class="lrow"><span class="grip">⠿</span><span class="pos">${pad(i)}</span><span class="ic">${icon[a.kind]}</span><div style="min-width:0;flex:1"><div class="lt" style="${a.label ? "" : "color:var(--faint)"}">${esc(untitled(a))}</div><div class="ls">${esc(snippet(a))}</div><div class="ls" style="color:var(--faint)">${pinCap(a)}</div></div><span class="chev">▾</span></div>`;
+const oldCard = (a, i) => a.kind === "IMAGE"
+  ? `<div class="ocard img"><div class="pic"></div><div class="lt" style="margin-top:5px"><span class="pos mono" style="color:var(--faint);font-size:10.5px">${pad(i)}</span> ${esc(untitled(a))}</div><div class="cp">${pinCap(a)}</div></div>`
+  : `<div class="ocard"><div class="lt" style="${a.label ? "" : "color:var(--faint)"}"><span class="mono" style="color:var(--faint);font-size:10.5px">${pad(i)}</span> ${esc(untitled(a))}</div><div class="ls">${a.kind === "TODO" ? `<div class="todo">${a.items.map((x) => `<span class="${x[1] ? "done" : ""}">${x[1] ? "☑" : "☐"} ${esc(x[0])}</span>`).join("")}</div>` : esc(a.body || "Note...")}</div><div class="cp">${pinCap(a)}</div></div>`;
+put("today-notes", notesDrawer(`<div class="lrows">${ASSETS.map(listRow).join("")}</div><div style="margin-top:9px">${addRow}</div>`, "list"));
+put("today-notes-cards", notesDrawer(`<div class="ocards">${ASSETS.map(oldCard).join("")}</div><div style="margin-top:9px">${addRow}</div>`, "cards"));
+
+const assetTile = (a, i) => {
+  const body = a.kind === "IMAGE" ? `<div class="pic"></div>`
+    : a.kind === "TODO" ? `<div class="sum">${esc(a.items.filter((x) => !x[1]).map((x) => x[0]).join(" · "))}</div>`
+    : `<div class="sum ${a.body ? "" : "empty"}">${esc(a.body || "Empty note")}</div>`;
+  const meta = [a.kind === "TODO" ? `<span>${progress(a)}</span>` : "", `<span>${a.pins ? `${a.pins} pin${a.pins === 1 ? "" : "s"}` : "not pinned"}</span>`].filter(Boolean).join(sep);
+  return `<div class="new"><div class="top"><span class="badge">${pad(i)}</span><span class="tag">${kindWord[a.kind]}</span><span class="grow"></span></div>
+    <div class="title" style="${a.label ? "" : "color:var(--faint)"}">${esc(untitled(a))}</div>${body}<div class="grow"></div><div class="meta">${meta}</div></div>`;
+};
+const libTiles = (grid) => `<div class="${grid ? "libgrid" : "liblist"}">${ASSETS.map(assetTile).join("")}${grid ? `<div class="add" style="display:flex;align-items:center;justify-content:center;min-height:142px;border-radius:12px">+ Add note, to-do or image</div>` : ""}</div>${grid ? "" : `<div style="margin-top:11px">${addRow}</div>`}`;
+const notesFull = (grid) => notesDrawer(libTiles(grid), false);
+put("b-notes-side", `<div class="app"><div class="boardbg">${boardCards}</div><div class="appbar">The Drowned Map</div><div class="dim"></div>${notesFull(false)}</div>`);
+put("b-notes", notesFull(true));
+const td = ASSETS[1];
+const todoWin = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="badge">02</span><span class="tag">To-do</span><div class="title">${td.label}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody"><div class="fields">
+  <div><div class="lab">Title</div>${inp(td.label)}</div>
+  <div><div class="lab">Items</div><div class="todo" style="gap:7px;font-size:13px">${td.items.map((x) => `<span class="${x[1] ? "done" : ""}">${x[1] ? "☑" : "☐"} ${esc(x[0])}</span>`).join("")}<span style="color:var(--faint)">+ Add item</span></div></div>
+  <div><div class="lab">Pinned in</div><div class="chips">${td.where.map((n) => `<span>Ch ${n} ↗</span>`).join("")}</div></div>
+  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete</span></div>
+</div></div></div></div>`;
+put("b-notes-window", `<div class="winstage">${notesFull(true)}${todoWin}</div>`);
 </script>
 </body>
 </html>

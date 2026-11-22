@@ -50,6 +50,26 @@ Option B (tiles in a grid at the expanded size, click opens a modal editor like
 the chapter modal) is shown at the bottom of the mockup for comparison only. It
 is a much larger change and overlaps with the rearrange feature; see questions.
 
+## Update 2026-11-21: Ray is leaning to option B, and wants Notes included
+
+The mockup now shows option B at both drawer sizes (collapsed side panel,
+expanded full screen) for Characters, World and Notes.
+
+**Notes drawer under B.** The story notes box stays on top. The shared library
+below it (notes, to-dos, images) becomes the same tiles: the position number
+goes in the badge (the library already has an order), the kind sits beside it,
+then title, a two-line body (to-do: open items; image: the picture), and a
+footer with progress and pin count. Clicking opens the item in a window with
+its editor and "Pinned in" chips. The List/Cards switch goes away.
+
+**Catch: `RefList` is shared.** It draws the Notes library, a world entry's
+References and a chapter's Pinned references, and it already has a card view,
+drag-to-reorder (grip) and position numbers. If the library becomes tiles,
+the other two surfaces either follow (consistent everywhere, larger change,
+and the chapter modal's refs tab changes too) or keep today's list/cards
+(the library alone changes). That is a question for Ray. RefList's reorder
+also overlaps directly with the "rearrangeable cards" session.
+
 ## Files
 
 - `src/components/ui/DetailCard.tsx` (new): the shared shell and face
