@@ -6341,3 +6341,22 @@ prompt), and try Draft done on a copy of a book first.
 - **Shipped** on Ray's OK: main fast-forwarded to this branch, pushed, and
   deployed with `npm run deploy`.
 
+
+### 2026-11-22 — Map export counts an anthology's pieces; the phone catches up
+
+- **Map export** (`lib/markdown.ts` `buildMarkdown`): an anthology's summary
+  line reads "… words across 4 pieces." instead of "chapters". The rest keeps
+  the book layout (Act headings, numbered `###` entries) on purpose:
+  `parseImportMarkdown` reads only `## Act` sections and `### N.` entries, so
+  section headings in their place would drop every piece on re-import. Test in
+  `anthology.test.ts` checks the wording and that every piece re-imports.
+- **The phone followed** (Android Session 38, Android SPECS §7
+  "Anthologies"): section bands with drag between them, each piece's own kind,
+  line breaks and part names, Move to section, Add a piece, Make this an
+  anthology / a book, Expand → An anthology. Turn into single piece, series and
+  templates blocked. Its tests check it against this repo's own anthology
+  functions, bundled with esbuild. SPECS anthology row and PLAN-anthology §6 /
+  §9 updated.
+- **Verified:** typecheck, 294 tests. Built on `feature/anthology-map-export`
+  (worktree), merged into main on Ray's OK, pushed, then shipped with
+  `npm run deploy`.
