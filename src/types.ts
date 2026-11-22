@@ -133,6 +133,45 @@ export interface Character {
   archived?: boolean;
 }
 
+/**
+ * How two characters relate (`lib/relationships.ts`). One record per pair, in
+ * the series bible beside `characters`, so it is shared by every book and
+ * version. The pair is unordered: (a, b) and (b, a) are the same pair, and a
+ * second record for it is dropped on read.
+ */
+export interface Relationship {
+  id: string;
+  /** Character ids, a !== b. Which is `a` only decides which view is which. */
+  a: string;
+  b: string;
+  /** A `RelationshipKind` id. Missing, or naming no kind, reads as "No kind". */
+  kind?: string;
+  /** The writer's words for it: "former mentor", "sisters". */
+  label?: string;
+  /** How a sees b. */
+  aView?: string;
+  /** How b sees a. */
+  bView?: string;
+  notes?: string;
+}
+
+/**
+ * A kind of relationship. The project's own list: it starts as the starter set
+ * (`STARTER_KINDS`) and the writer renames, recolors, adds and removes.
+ */
+export interface RelationshipKind {
+  id: string;
+  name: string;
+  /** One of the ten chart swatches, 1-10 (`--sw-1`... in index.css). */
+  color: number;
+}
+
+/** Where a character was dragged on the relationship chart: fractions (0-1) of its width and height. */
+export interface ChartPos {
+  x: number;
+  y: number;
+}
+
 export type WorldCategory = "Place" | "Faction" | "Lore" | "Event";
 export interface WorldEntry {
   id: string;
@@ -431,6 +470,18 @@ export interface StoryDoc {
   characters: Character[];
   world: WorldEntry[];
   assets: Asset[];
+
+  /**
+   * Character relationships and their chart (`lib/relationships.ts`). All
+   * optional, no schema bump: a file without them has no relationships, the
+   * starter kinds and nobody moved on the chart. The Android app carries them
+   * untouched (top-level extras) without showing them.
+   */
+  relationships?: Relationship[];
+  /** Absent means the starter kinds; an empty list means no kinds at all. */
+  relationshipKinds?: RelationshipKind[];
+  /** Character id to where it was dragged. Only moved characters have one; the rest sit on the ring. */
+  relationshipLayout?: Record<string, ChartPos>;
 
   // Books.
   books: BookMeta[];

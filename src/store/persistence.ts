@@ -1,3 +1,4 @@
+import { readRelationshipFields } from "@/lib/relationships";
 import { readPaceLog } from "@/lib/paceLog";
 import {
   MAIN_DRAFT_ID,
@@ -1625,6 +1626,8 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     };
   }
 
+  const characters = normalizeArchived<Character>(d.characters);
+
   const normalized: StoryDoc = {
     schemaVersion: SCHEMA_VERSION,
     id: typeof d.id === "string" && d.id ? d.id : `story-${Date.now().toString(36)}`,
@@ -1662,9 +1665,13 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     // Absent in files written before the marker was movable; there the seed
     // version was always main, which is what the resolver falls back to.
     mainDraftId: resolveMainDraftId(drafts, typeof d.mainDraftId === "string" ? d.mainDraftId : undefined),
-    characters: normalizeArchived<Character>(d.characters),
+    characters,
     world: normalizeArchived<WorldEntry>(d.world),
     assets: normalizeAssets(d.assets),
+    // Relationships, their kinds and the chart layout (`lib/relationships.ts`).
+    // Whitelisted here like every top-level field, or a file round trip would
+    // drop them. Ties to a character that is gone are dropped on the way in.
+    ...readRelationshipFields(d, new Set(characters.map((c) => c.id))),
     books,
     bookLinks: Array.isArray(d.bookLinks) ? d.bookLinks : [],
     activeBookId,

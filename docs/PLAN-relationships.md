@@ -1,9 +1,16 @@
-# Plan: character relationships (proposal, NOT STARTED)
+# Plan: character relationships (BUILT 2026-11-22, not shipped)
 
-> Drafted 2026-11-21 for review. Nothing here is built or decided. The mockup is
-> [`mockups/relationship-chart.html`](mockups/relationship-chart.html). When Ray
-> approves a version of this, the decisions move into SPECS (§1 core concepts,
-> §4 feature status, §8 cross-app notes) and this file is archived.
+> Built on `claude/relationship-chart-4c8990`, rebased onto `8084767`. What
+> exists is described in SPECS §4 ("Relationships and the relationship
+> chart") and §8; the record is in SESSIONS (2026-11-22). This plan is kept
+> for the reasoning and is archived once shipped. Mockup:
+> [`mockups/relationship-chart.html`](mockups/relationship-chart.html).
+>
+> **Where the build differs from this plan:** the phone's conflict dialog
+> does name a relationship difference, as one "Other story settings" row
+> (checked on Android main `0f27338`), so the "won't name it" gap below no
+> longer holds. The add/edit and Edit kinds dialogs are `DetailWindow`s
+> (the restyle's window) rather than confirm-style dialogs.
 
 ## What it is
 

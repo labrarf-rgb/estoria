@@ -6456,3 +6456,46 @@ Plan and mockup: `docs/PLAN-detail-cards-reorder.md`,
   slots now filled, the `ui/` file tree, and the finger-drag caveat on the
   pinned-resources row.
 
+### 2026-11-22 — Character relationships and the relationship chart
+
+Plan and mockup: `docs/PLAN-relationships.md`, `docs/mockups/relationship-chart.html`
+(reviewed by Ray over several rounds on 2026-11-21: editable kinds with a saved
+default, draggable chart, labels that never overlap). Built on the shipped
+detail-card restyle and card rearranging (branch rebased onto `8084767`).
+
+- **Data** (`src/lib/relationships.ts`, `types.ts`): optional top-level
+  `relationships`, `relationshipKinds` (absent = the starter six, fixed ids)
+  and `relationshipLayout` (fractions). No schema bump. `normalizeDoc`
+  whitelists and reads all three defensively.
+- **Store:** add / update / remove relationship (one per unordered pair),
+  `setRelationshipKinds` (removed kinds clear their ties' kind),
+  `relationshipKindsDefault` + `fillKindsFromDefault` (Author details'
+  pattern, copied into new projects), `moveOnChart`, `arrangeChart`,
+  `charsView`, `chartFocus`. `deleteCharacterDoc` drops the character's ties
+  and chart position.
+- **UI** (`src/components/relationships/`): the Relationships field in
+  `CharacterWindow` under Appears in, the editor and Edit kinds as stacked
+  `DetailWindow`s, the Roster / Chart switch, and `RelationshipChart` (drag
+  with saved positions, ring in roster order for undragged characters,
+  Arrange in a ring, highlight on click, label placement that avoids every
+  character and label). Tiles show "N ties". Ten swatch tokens in
+  `index.css` for both themes.
+- **Compare and merge:** a Relationships section (one row per relationship),
+  story-wide `Relationship kinds` and `Chart layout` (12 → 14 units); taking a
+  relationship from the file closes over its characters and kind. Tests in
+  `src/lib/relationships.test.ts`; `merge.test.ts` count updated.
+- **Markdown export** lists relationships per character (export only).
+- **Android** (checked on `Estoria-aa` main `0f27338`): carries the three
+  fields untouched as top-level extras and shows them in its conflict dialog
+  as "Other story settings". No phone change needed.
+- **Decisions taken from the plan's recommendations** (no direct answer):
+  a fixed map, not changes over the story; chart inside the Characters drawer;
+  layout shared through the file like the board; tie count on tiles; starter
+  kinds as mocked.
+- **Verified** in the in-app browser on the sample: adding a tie from Wren's
+  window (dialog stacked on the window), a duplicate pair refused, "See on
+  chart" opening the chart with Wren highlighted, a real drag saving Bram's
+  position with no overlapping labels and no selection on drop, the position
+  surviving a reload, Edit kinds with the remove confirmation. Typecheck,
+  314 tests, production build. Not pushed or deployed.
+

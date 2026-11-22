@@ -8,7 +8,8 @@ import type {
   TodoItem,
 } from "@/types";
 import { keepPaceHistory, withoutPace } from "@/lib/paceLog";
-import type { PaceLog } from "@/types";
+import type { PaceLog, Relationship } from "@/types";
+import { kindName, kindsOf } from "@/lib/relationships";
 import { normalizeDoc, SchemaTooNewError, slugify, stampModified } from "@/store/persistence";
 import { countWords } from "@/lib/manuscript";
 import { AUTHOR_FIELDS, AUTHOR_LABELS, authorOf } from "@/lib/author";
@@ -623,7 +624,12 @@ export type DocUnit =
   // records both copies have, so adding or deleting one is never an order change.
   | "charOrder"
   | "worldOrder"
-  | "libraryOrder";
+  | "libraryOrder"
+  // Relationships (`lib/relationships.ts`): the kind list and the chart layout,
+  // each taken whole, so a merge never pairs one copy's kind name with the
+  // other's color, or half of one arrangement with half of the other.
+  | "relKinds"
+  | "relLayout";
 
 /**
  * Where a difference lives, structurally — everything a merge needs to apply a
@@ -640,6 +646,7 @@ export type DiffAddress =
   | { kind: "world"; id: string }
   | { kind: "asset"; id: string }
   | { kind: "book"; id: string }
+  | { kind: "relationship"; id: string }
   | { kind: "doc"; unit: DocUnit };
 
 /** Stable string form of an address, for `Record` and React keys. */
@@ -800,6 +807,9 @@ const FIELD_LABELS: Record<string, string> = {
   cat: "category",
   // Anthology pieces (`lib/anthology.ts`).
   keepLineBreaks: "line breaks",
+  // Relationships (`lib/relationships.ts`).
+  aView: "first one's view",
+  bView: "second one's view",
 };
 
 /**
@@ -810,6 +820,9 @@ const FIELD_LABELS: Record<string, string> = {
 function describeValue(key: string, v: unknown, doc: StoryDoc): string {
   if (v === undefined || v === null) return "not set";
   switch (key) {
+    case "kind":
+      // A relationship's kind is an id into that copy's own kind list.
+      return typeof v === "string" ? kindName(doc, v) : String(v);
     case "x":
     case "y":
     case "rot":
@@ -1041,6 +1054,13 @@ function bookTitle(id: string, mine: StoryDoc, theirs: StoryDoc): string {
   return b?.title || "Untitled book";
 }
 
+/** "Wren and Sela", named from whichever copy has each character. */
+function tieName(r: Relationship, mine: StoryDoc, theirs: StoryDoc): string {
+  const name = (id: string) =>
+    (mine.characters.find((c) => c.id === id) ?? theirs.characters.find((c) => c.id === id))?.name || "Unnamed";
+  return `${name(r.a)} and ${name(r.b)}`;
+}
+
 function wordsLine(text: string): string {
   const t = text.trim();
   if (!t) return "empty";
@@ -1125,6 +1145,19 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
         nameOf: (w) => w.name || "Untitled",
         summaryOf: (w) => `${w.cat} · ${quoted(w.desc, 70)}`,
         address: (id) => ({ kind: "world", id }),
+      },
+      mine,
+      theirs
+    ),
+    diffCollection(
+      {
+        label: "Relationships",
+        unit: "relationship",
+        mine: byId(mine.relationships ?? []),
+        theirs: byId(theirs.relationships ?? []),
+        nameOf: (r) => tieName(r, mine, theirs),
+        summaryOf: (r, d) => [kindName(d, r.kind), r.label].filter(Boolean).join(" · "),
+        address: (id) => ({ kind: "relationship", id }),
       },
       mine,
       theirs
@@ -1327,8 +1360,27 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
     orderItem("libraryOrder", "Library order", mine.assets, theirs.assets, (a) => a.label || "Untitled")
   );
 
+  // Relationship kinds and the chart layout. Absent kinds mean the starter set,
+  // so a copy that never edited them equals one that wrote the starters out.
+  const kindsLine = (d: StoryDoc) => kindsOf(d).map((k) => k.name || "Unnamed kind").join(", ") || "none";
+  storyWide.push(
+    docItem("relKinds", "Relationship kinds", kindsOf(mine), kindsOf(theirs), [
+      { label: "kinds", mine: kindsLine(mine), theirs: kindsLine(theirs) },
+    ], "names and colors, taken as one list")
+  );
+  const placed = (d: StoryDoc) => Object.keys(d.relationshipLayout ?? {}).length;
+  storyWide.push(
+    docItem("relLayout", "Chart layout", mine.relationshipLayout ?? {}, theirs.relationshipLayout ?? {}, [
+      {
+        label: "characters placed",
+        mine: `${placed(mine)} moved on the chart`,
+        theirs: `${placed(theirs)} moved on the chart`,
+      },
+    ], "where characters sit on the relationship chart")
+  );
+
   const storyItems = storyWide.filter((i): i is DiffItem => i !== null);
-  total += 12; // the twelve story-wide units above, differing or not
+  total += 14; // the fourteen story-wide units above, differing or not
   if (storyItems.length) {
     sections.push({ label: "Story-wide", items: storyItems });
     for (const it of storyItems) {

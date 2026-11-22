@@ -1,3 +1,4 @@
+import { withoutCharacter } from "@/lib/relationships";
 import type { Chapter, StoryDoc, VersionData } from "@/types";
 
 /**
@@ -69,7 +70,9 @@ export function deleteCharacterDoc(doc: StoryDoc, id: string): StoryDoc {
   const dropped = mapEveryChapter(doc, (c) =>
     c.chars.includes(id) ? { ...c, chars: c.chars.filter((x) => x !== id) } : c
   );
-  return { ...dropped, characters: doc.characters.filter((c) => c.id !== id) };
+  // Their relationships and chart position go too: a tie to nobody is the
+  // dangling-id bug class (SPECS §9 item 5). Archiving, by contrast, keeps them.
+  return withoutCharacter({ ...dropped, characters: doc.characters.filter((c) => c.id !== id) }, id);
 }
 
 /** Drop a world entry and clear its id from every chapter's `worldRefs`, everywhere. */

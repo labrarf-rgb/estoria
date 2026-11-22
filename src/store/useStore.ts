@@ -7,6 +7,7 @@ import {
   type AuthorDetails,
   type BookData,
   type Chapter,
+  type ChartPos,
   type Character,
   type ConnType,
   type GrownInto,
@@ -14,6 +15,8 @@ import {
   type PaceSettings,
   type PieceKind,
   type RefKind,
+  type Relationship,
+  type RelationshipKind,
   type SavedCopyInfo,
   type SavedCopyReason,
   type StoryDoc,
@@ -52,6 +55,7 @@ import {
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
+import { pairKey } from "@/lib/relationships";
 import { isCharacterEmpty, isWorldEntryEmpty, pruneEmptyEntries } from "@/lib/prune";
 import { uid } from "@/lib/ids";
 import { syncChapterWords, withManuscript, withoutProse } from "@/lib/manuscript";
@@ -182,6 +186,18 @@ interface UiState {
    * project file carries its own copy to Drive and Android. See `lib/author.ts`.
    */
   authorDefault: AuthorDetails;
+  /**
+   * The writer's saved relationship kinds (persisted, global, this browser
+   * only), the same pattern as `authorDefault`: copied into each new project,
+   * and into a project with no kinds and no relationships yet the first time
+   * the chart or Edit kinds opens. `null` = none saved (new projects get the
+   * starter kinds). See `lib/relationships.ts`.
+   */
+  relationshipKindsDefault: RelationshipKind[] | null;
+  /** The Characters drawer's view: the roster of tiles, or the relationship chart. Persisted. */
+  charsView: "roster" | "chart";
+  /** A character to highlight when the chart opens ("See on chart"). Transient. */
+  chartFocus: string | null;
   selChar: string | null;
   selWorld: string | null;
   selBook: string | null;
@@ -487,6 +503,23 @@ interface StoreState extends UiState {
   discardCharDraft: () => void;
   updateCharacter: (id: string, patch: Partial<Character>) => void;
   deleteCharacter: (id: string) => void;
+
+  // ---- relationships (`lib/relationships.ts`) ----
+  /** Add a tie between two characters; returns its id. A pair that already has one is left alone. */
+  addRelationship: (r: Omit<Relationship, "id">) => string | null;
+  updateRelationship: (id: string, patch: Partial<Omit<Relationship, "id" | "a" | "b">>) => void;
+  removeRelationship: (id: string) => void;
+  /** Replace the project's kinds. Ties whose kind is gone become "No kind". */
+  setRelationshipKinds: (kinds: RelationshipKind[]) => void;
+  setRelationshipKindsDefault: (kinds: RelationshipKind[] | null) => void;
+  /** Copy the saved default into a project with no kinds and no relationships yet. */
+  fillKindsFromDefault: () => void;
+  /** Where a character was dragged on the chart, as fractions of its size. */
+  moveOnChart: (id: string, pos: ChartPos) => void;
+  /** Forget every chart position: everyone goes back on the ring. */
+  arrangeChart: () => void;
+  setCharsView: (v: "roster" | "chart") => void;
+  setChartFocus: (id: string | null) => void;
   /** Retire from the roster, keeping every casting. See the archive rule in `types.ts`. */
   /** Move a character among the roster. `toIdx` counts non-archived characters. */
   reorderCharacter: (id: string, toIdx: number) => void;
@@ -598,6 +631,21 @@ export type PanelKey =
 const ZOOM_MIN = 0.34;
 const ZOOM_MAX = 1.8;
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+
+/** A copy of the saved default kinds put into a new project, or the project as it was. */
+function withKindsDefault(doc: StoryDoc, def: RelationshipKind[] | null): StoryDoc {
+  return def ? { ...doc, relationshipKinds: def.map((k) => ({ ...k })) } : doc;
+}
+
+/** Drop blank optional fields from a tie, so the file only carries what was written. */
+function cleanTie(r: Relationship): Relationship {
+  const out: Relationship = { id: r.id, a: r.a, b: r.b };
+  if (r.kind) out.kind = r.kind;
+  for (const k of ["label", "aView", "bView", "notes"] as const) {
+    if (r[k] && r[k]!.trim()) out[k] = r[k];
+  }
+  return out;
+}
 
 const CHAR_PALETTE = [
   "oklch(0.60 0.12 145)",
@@ -855,6 +903,9 @@ const initialUi: UiState = {
   showAuthor: false,
   showPace: false,
   authorDefault: {},
+  relationshipKindsDefault: null,
+  charsView: "roster",
+  chartFocus: null,
   selChar: null,
   selWorld: null,
   selBook: null,
@@ -1009,7 +1060,10 @@ export const useStore = create<StoreState>()(
 
       newProject: ({ series, keepCurrent, piece }) =>
         set((s) => {
-          const fresh = withAuthor(piece ? newPiece(piece) : emptyStory(), s.authorDefault);
+          const fresh = withKindsDefault(
+            withAuthor(piece ? newPiece(piece) : emptyStory(), s.authorDefault),
+            s.relationshipKindsDefault
+          );
           if (series && !piece) {
             fresh.seriesMode = true;
           }
@@ -2411,7 +2465,74 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           doc: deleteCharacterDoc(s.doc, id),
           selChar: s.selChar === id ? null : s.selChar,
+          chartFocus: s.chartFocus === id ? null : s.chartFocus,
         })),
+
+      // ---- relationships ----
+      addRelationship: (r) => {
+        const s = get();
+        const list = s.doc.relationships ?? [];
+        if (r.a === r.b || list.some((x) => pairKey(x.a, x.b) === pairKey(r.a, r.b))) return null;
+        const id = uid("rel");
+        set({ doc: { ...s.doc, relationships: [...list, cleanTie({ ...r, id })] } });
+        return id;
+      },
+      updateRelationship: (id, patch) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            relationships: (s.doc.relationships ?? []).map((r) => (r.id === id ? cleanTie({ ...r, ...patch }) : r)),
+          },
+        })),
+      removeRelationship: (id) =>
+        set((s) => {
+          const kept = (s.doc.relationships ?? []).filter((r) => r.id !== id);
+          const doc: StoryDoc = { ...s.doc, relationships: kept };
+          if (!kept.length) delete doc.relationships;
+          return { doc };
+        }),
+      setRelationshipKinds: (kinds) =>
+        set((s) => {
+          const ids = new Set(kinds.map((k) => k.id));
+          // A removed kind never deletes a tie: it just stops naming one.
+          const relationships = s.doc.relationships?.map((r) =>
+            r.kind && !ids.has(r.kind) ? cleanTie({ ...r, kind: undefined }) : r
+          );
+          return {
+            doc: {
+              ...s.doc,
+              relationshipKinds: kinds.map((k) => ({ ...k })),
+              ...(relationships ? { relationships } : {}),
+            },
+          };
+        }),
+      setRelationshipKindsDefault: (kinds) =>
+        set({ relationshipKindsDefault: kinds ? kinds.map((k) => ({ ...k })) : null }),
+      fillKindsFromDefault: () =>
+        set((s) =>
+          s.doc.relationshipKinds || s.doc.relationships?.length || !s.relationshipKindsDefault
+            ? s
+            : { doc: withKindsDefault(s.doc, s.relationshipKindsDefault) }
+        ),
+      moveOnChart: (id, pos) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            relationshipLayout: {
+              ...s.doc.relationshipLayout,
+              [id]: { x: Math.min(1, Math.max(0, pos.x)), y: Math.min(1, Math.max(0, pos.y)) },
+            },
+          },
+        })),
+      arrangeChart: () =>
+        set((s) => {
+          if (!s.doc.relationshipLayout) return s;
+          const doc = { ...s.doc };
+          delete doc.relationshipLayout;
+          return { doc };
+        }),
+      setCharsView: (v) => set({ charsView: v }),
+      setChartFocus: (id) => set({ chartFocus: id }),
 
       // Retire from the roster without touching a single `chapter.chars` — the
       // castings are the record of who was in the scene, and keeping them is
@@ -2891,7 +3012,7 @@ export const useStore = create<StoreState>()(
       startFresh: () =>
         guardReplace(get, "Start a new, empty project?", () =>
           set((s) => ({
-            doc: withAuthor(emptyStory(), s.authorDefault),
+            doc: withKindsDefault(withAuthor(emptyStory(), s.authorDefault), s.relationshipKindsDefault),
             onboarded: true,
             level: "book",
             view: "board",
@@ -2912,6 +3033,8 @@ export const useStore = create<StoreState>()(
         projectStash: s.projectStash,
         theme: s.theme,
         authorDefault: s.authorDefault,
+        relationshipKindsDefault: s.relationshipKindsDefault,
+        charsView: s.charsView,
         view: s.view,
         timelineOrient: s.timelineOrient,
         timelinePane: s.timelinePane,

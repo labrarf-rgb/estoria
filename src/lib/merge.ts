@@ -11,6 +11,7 @@ import type {
 } from "@/types";
 import { MAIN_DRAFT_ID } from "@/types";
 import { normalizeDoc } from "@/store/persistence";
+import { STARTER_KINDS } from "@/lib/relationships";
 import type { DiffItem, DocDiff, Side } from "@/lib/sync";
 
 /**
@@ -153,7 +154,7 @@ export type MergeChoices = Record<string, Side>;
 
 /** A record brought in so a kept entity's reference doesn't dangle. */
 export interface CarriedRef {
-  kind: "character" | "world entry" | "shared asset";
+  kind: "character" | "world entry" | "shared asset" | "relationship kind";
   name: string;
 }
 
@@ -236,6 +237,9 @@ export function mergeDocs(
     savedCopy: mine.savedCopy,
   };
   let keepLineBreaks = mine.keepLineBreaks;
+  let relationships = mine.relationships ?? [];
+  let relationshipKinds = mine.relationshipKinds;
+  let relationshipLayout = mine.relationshipLayout;
   // Order units are applied last, once every record taken or carried in is in
   // the lists, so the file's order can place those too.
   const takeOrder = { characters: false, world: false, assets: false };
@@ -260,6 +264,12 @@ export function mergeDocs(
           a.bookId,
           incoming ? upsert(into, incoming) : removeById(into, a.id)
         );
+        continue;
+      }
+
+      if (a.kind === "relationship") {
+        const incoming = (theirs.relationships ?? []).find((r) => r.id === a.id);
+        relationships = incoming ? upsert(relationships, incoming) : removeById(relationships, a.id);
         continue;
       }
 
@@ -329,6 +339,12 @@ export function mergeDocs(
         case "libraryOrder":
           takeOrder.assets = true;
           break;
+        case "relKinds":
+          relationshipKinds = theirs.relationshipKinds;
+          break;
+        case "relLayout":
+          relationshipLayout = theirs.relationshipLayout;
+          break;
       }
     }
   }
@@ -378,6 +394,11 @@ export function mergeDocs(
     for (const r of c.refs) needAsset.add(r.assetId);
   }
   for (const w of world) for (const r of w.refs) needAsset.add(r.assetId);
+  // A kept relationship needs both its characters, whichever copy it came from.
+  for (const r of relationships) {
+    needChar.add(r.a);
+    needChar.add(r.b);
+  }
 
   for (const id of needChar) {
     if (characters.some((c) => c.id === id)) continue;
@@ -403,6 +424,18 @@ export function mergeDocs(
     carried.push({ kind: "shared asset", name: rec.label || "Untitled" });
   }
 
+  // ...and its kind. A kind only the other copy has is brought into the kept list
+  // rather than leaving the tie pointing at nothing (normalize would clear it).
+  for (const r of relationships) {
+    if (!r.kind) continue;
+    const kept = relationshipKinds ?? STARTER_KINDS;
+    if (kept.some((k) => k.id === r.kind)) continue;
+    const rec = pickFrom(r.kind, mine.relationshipKinds ?? STARTER_KINDS, theirs.relationshipKinds ?? STARTER_KINDS);
+    if (!rec) continue;
+    relationshipKinds = [...kept, rec];
+    carried.push({ kind: "relationship kind", name: rec.name || "Unnamed kind" });
+  }
+
   if (takeOrder.characters) characters = followOrder(characters, theirs.characters);
   if (takeOrder.world) world = followOrder(world, theirs.world);
   if (takeOrder.assets) assets = followOrder(assets, theirs.assets);
@@ -420,11 +453,23 @@ export function mergeDocs(
     bookLinks,
     ...form,
     keepLineBreaks,
+    relationships,
+    relationshipKinds,
+    relationshipLayout,
   };
   if (!author) delete shell.author;
   if (!authorContact) delete shell.authorContact;
   // Optional fields: absent on the chosen side means absent in the merge.
-  for (const k of ["form", "kind", "grownInto", "savedCopy", "keepLineBreaks"] as const) {
+  for (const k of [
+    "form",
+    "kind",
+    "grownInto",
+    "savedCopy",
+    "keepLineBreaks",
+    "relationships",
+    "relationshipKinds",
+    "relationshipLayout",
+  ] as const) {
     if (shell[k] === undefined) delete shell[k];
   }
 

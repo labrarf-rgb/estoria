@@ -6,6 +6,9 @@ import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
 import { PositionInput } from "@/components/ui/PositionInput";
 import { Grip, ReorderItem, ReorderLive, useTileReorder } from "@/components/ui/useTileReorder";
 import { countCharacterCastings } from "@/lib/entities";
+import { otherEnd, tiesOf } from "@/lib/relationships";
+import { RelationshipsField } from "@/components/relationships/RelationshipsField";
+import { RelationshipChart } from "@/components/relationships/RelationshipChart";
 import type { Character } from "@/types";
 
 export function CharactersPanel() {
@@ -28,6 +31,9 @@ export function CharactersPanel() {
   const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
   const reorderCharacter = useStore((s) => s.reorderCharacter);
+  const charsView = useStore((s) => s.charsView);
+  const setCharsView = useStore((s) => s.setCharsView);
+  const setChartFocus = useStore((s) => s.setChartFocus);
   // Grip-drag ordering of the roster (archived characters keep their slots).
   const reorder = useTileReorder({
     ids: doc.characters.filter((c) => !c.archived).map((c) => c.id),
@@ -38,6 +44,12 @@ export function CharactersPanel() {
 
   if (!show) return null;
   const close = () => setPanel("showChars", false);
+  // The chart needs the full-screen drawer; collapsing it shows the roster.
+  const view = panelExpanded ? charsView : "roster";
+  const showView = (v: "roster" | "chart") => {
+    setCharsView(v);
+    if (v === "chart") setPanelExpanded(true);
+  };
 
   // Archived characters keep every casting, so they stay on the board (dimmed)
   // but leave the roster and the chapter picker. The shelf below is the only
@@ -54,6 +66,9 @@ export function CharactersPanel() {
   /** Chapters of the loaded board this character is cast in: same scope as the
    *  "in N chapters" line on the tile. */
   const appearsIn = (id: string) => doc.chapters.filter((c) => c.chars.includes(id));
+  /** Relationships with someone still on the roster (archived partners aren't counted on the tile). */
+  const tieCount = (id: string) =>
+    tiesOf(doc, id).filter((r) => !doc.characters.find((c) => c.id === otherEnd(r, id))?.archived).length;
   /** Closing the window on an untouched draft drops it: there's nothing to keep. */
   const closeWindow = () => (openIsDraft ? discardDraft() : sel && selectChar(sel));
   /** Leave for a chapter: the window and the panel close on the way. */
@@ -99,7 +114,15 @@ export function CharactersPanel() {
               <EmptyBody>No description yet</EmptyBody>
             )
           }
-          meta={isDraft ? [] : [p.type, `in ${n} chapter${n === 1 ? "" : "s"}`]}
+          meta={
+            isDraft
+              ? []
+              : [
+                  p.type,
+                  `in ${n} chapter${n === 1 ? "" : "s"}`,
+                  tieCount(p.id) ? `${tieCount(p.id)} tie${tieCount(p.id) === 1 ? "" : "s"}` : null,
+                ]
+          }
         />
       </div>
     );
@@ -112,6 +135,21 @@ export function CharactersPanel() {
       header={
         <div className="flex items-center px-[22px] py-5">
           <div className="font-serif text-[18px] font-semibold text-ink">Characters</div>
+          <div className="ml-[14px] flex rounded-lg bg-chip p-[3px]" role="group" aria-label="Characters view">
+            {(["roster", "chart"] as const).map((v) => (
+              <button
+                key={v}
+                aria-pressed={view === v}
+                onClick={() => showView(v)}
+                title={v === "chart" ? "Relationship chart" : "Character cards"}
+                className={`rounded-md px-[10px] py-[3px] text-[11.5px] font-medium capitalize ${
+                  view === v ? "bg-card text-ink" : "text-soft hover:bg-card"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           <div className="flex-1" />
           <div className="flex items-center gap-[8px]">
             <SizeButton expanded={panelExpanded} onClick={() => setPanelExpanded(!panelExpanded)} />
@@ -120,6 +158,9 @@ export function CharactersPanel() {
         </div>
       }
     >
+      {view === "chart" ? (
+        <RelationshipChart onOpenCard={(id) => selectChar(id)} />
+      ) : (
       <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
         <div {...reorder.containerProps}>
           <TileGrid min={panelExpanded ? 230 : undefined}>
@@ -177,6 +218,7 @@ export function CharactersPanel() {
           }}
         />
       </div>
+      )}
 
       {open && (
         <CharacterWindow
@@ -186,6 +228,12 @@ export function CharactersPanel() {
           appearsIn={appearsIn(open.id)}
           onJump={jumpTo}
           onClose={closeWindow}
+          onSeeChart={() => {
+            const id = open.id;
+            closeWindow();
+            setChartFocus(id);
+            showView("chart");
+          }}
           footer={
             <DrawerFooter
               isDraft={openIsDraft}
@@ -282,6 +330,7 @@ export function CharacterWindow({
   appearsIn,
   onJump,
   onClose,
+  onSeeChart,
   footer,
 }: {
   p: Character;
@@ -290,6 +339,8 @@ export function CharacterWindow({
   appearsIn: { id: string; num: number; title: string }[];
   onJump: (chapterId: string) => void;
   onClose: () => void;
+  /** Close the window and show this character on the relationship chart (drawer only). */
+  onSeeChart?: () => void;
   footer: React.ReactNode;
 }) {
   return (
@@ -380,8 +431,8 @@ export function CharacterWindow({
             </div>
           </Field>
         )}
-        {/* The relationship chart's "Relationships" field goes here, under
-            "Appears in" (docs/PLAN-relationships.md). */}
+        {/* A draft isn't a character yet, so there's no one to tie it to. */}
+        {!isDraft && <RelationshipsField id={p.id} onSeeChart={onSeeChart} />}
       </div>
     </DetailWindow>
   );

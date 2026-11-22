@@ -1,3 +1,4 @@
+import { kindName, kindOf, otherEnd, tiesOf } from "@/lib/relationships";
 import { isAnthology } from "@/lib/anthology";
 import {
   MAIN_DRAFT_ID,
@@ -97,6 +98,12 @@ export function buildMarkdown(doc: StoryDoc): string {
     if (c.goals.length) md += `  - Goals: ${c.goals.join(", ")}\n`;
     if (c.motivations) md += `  - Motivations: ${c.motivations}\n`;
     if (c.want || c.need) md += `  - Wants: ${c.want}  | Needs: ${c.need}\n`;
+    // Relationships, as wikilinks. Export only: the import doesn't read them back.
+    const ties = tiesOf(doc, c.id).map((r) => {
+      const what = [kindOf(doc, r.kind) ? kindName(doc, r.kind) : "", r.label ?? ""].filter(Boolean).join(": ");
+      return `[[${charName(otherEnd(r, c.id))}]]${what ? ` (${what})` : ""}`;
+    });
+    if (ties.length) md += `  - Relationships: ${ties.join("; ")}\n`;
   });
 
   if (doc.world.length) {
