@@ -6293,3 +6293,38 @@ follow-up: once the phone build with the port ships (Estoria-aa, uncommitted),
 the Android sentence in §8 should say the phone keeps the block and pauses
 booking while done. **Next:** reload the installed app (accept the Reload
 prompt), and try Draft done on a copy of a book first.
+
+## 2026-11-21 — Anthology mode (built, local test pending), on `claude/anthology-f37dea`
+
+- **What:** a collection of poems, stories and essays becomes a book while each
+  piece keeps its own form. Plan, decisions and open questions:
+  [`PLAN-anthology.md`](PLAN-anthology.md); mockup `mockups/anthology.html`.
+- **Phone check first** (Android `Estoria-aa`, read-only): `Normalize.kt` keeps
+  unknown chapter keys (`p.toMutableMap()`), `Chapter` carries them in `extra`
+  via `ChapterSerializer`, and `form` rides in `StoryDoc.extra`; `isPiece` is
+  `form == "piece"`, so an anthology loads, saves and round-trips on the phone
+  as a plain book. Display gaps only (numbered chapters, one part noun and one
+  line-break setting for all). Its merge-blocked wording calls an anthology a
+  "book"; its Expand → A collection still makes the old label-only book.
+- **Built:** `lib/anthology.ts` (per-piece lookups, sections as runs of
+  `Chapter.section`, move / rename / move / remove section, make / unmake,
+  bring in, take out, additive Pace merge) with 16 tests;
+  `AnthologyView` (board of piece cards in section bands, drag to reorder or
+  move between sections, + Add piece per band, + Add section, the piece page
+  with ‹ Board, ‹ › and its ⋯ menu); `AnthologyModals` (Add a piece: new or
+  bring in; Make its own project: move or copy); Expand → *An anthology*;
+  File → *Make this an anthology* / *Make this a book*; per-piece kind picker,
+  line-break toggle, part names and reference tabs on the piece page; export
+  with piece titles, sections, a contents page (.docx) and per-piece line
+  breaks. A poem's longer-work choice reads *An epic*, tag *Epic*.
+- **Regular books unchanged** (PLAN §4.8): every per-piece lookup falls back to
+  the project's setting outside an anthology; a book only gains the File entry.
+- **Verified:** typecheck, 291 tests; in the dev server: poem → anthology, add a
+  story, per-piece Write view and line breaks, add / rename a section, drag a
+  piece into it, take a piece out (move), bring it back in, export preview,
+  Make this a book (found and fixed: every card at one spot; now laid out in a
+  grid), Make this an anthology (kinds survive the round trip).
+- **Not done here:** the map export (`markdown.ts`) still says chapters; the
+  phone update (Android SPECS §7); drag on touch screens (HTML5 drag, mouse
+  only, as the board's own drag is).
+

@@ -46,7 +46,7 @@ export const KINDS: KindInfo[] = [
     many: "scenes",
     grow: {
       work: { label: "One longer work", hint: "A novella or a novel", tag: "Novel" },
-      collection: { label: "A collection", hint: "A story collection", tag: "Story collection" },
+      collection: { label: "An anthology", hint: "A collection of pieces, each kept as it is", tag: "Story collection" },
     },
   },
   {
@@ -56,7 +56,7 @@ export const KINDS: KindInfo[] = [
     many: "sections",
     grow: {
       work: { label: "One longer work", hint: "A long essay or a book", tag: "Long essay" },
-      collection: { label: "A collection", hint: "An essay collection", tag: "Essay collection" },
+      collection: { label: "An anthology", hint: "A collection of pieces, each kept as it is", tag: "Essay collection" },
     },
   },
   {
@@ -65,8 +65,10 @@ export const KINDS: KindInfo[] = [
     one: "stanza",
     many: "stanzas",
     grow: {
-      work: { label: "One longer work", hint: "A long poem", tag: "Long poem" },
-      collection: { label: "A collection", hint: "A poetry collection", tag: "Poetry collection" },
+      // "Epic" (Ray, 2026-11-21): one poem that keeps growing, like the Divine
+      // Comedy. The tag also names books expanded this way before the rename.
+      work: { label: "An epic", hint: "Or any book-length poem, in cantos or parts", tag: "Epic" },
+      collection: { label: "An anthology", hint: "A collection of pieces, each kept as it is", tag: "Poetry collection" },
     },
   },
   {
@@ -76,7 +78,7 @@ export const KINDS: KindInfo[] = [
     many: "parts",
     grow: {
       work: { label: "One longer work", hint: "A book", tag: "Book" },
-      collection: { label: "A collection", hint: "A collection of pieces", tag: "Collection" },
+      collection: { label: "An anthology", hint: "A collection of pieces, each kept as it is", tag: "Collection" },
     },
   },
 ];
@@ -109,6 +111,7 @@ export const countParts = (doc: Pick<StoryDoc, "kind">, n: number): string => {
  * ("Other" reads as "Piece"); an expanded piece names what it grew into.
  */
 export function formLabel(doc: Pick<StoryDoc, "form" | "kind" | "grownInto">): string | null {
+  if (doc.form === "anthology") return "Anthology";
   if (doc.form === "piece") return doc.kind === "other" ? "Piece" : kindInfo(doc.kind).label;
   if (doc.grownInto) return kindInfo(doc.kind).grow[doc.grownInto].tag;
   return null;
@@ -178,6 +181,10 @@ export const SAVED_REASON: Record<SavedCopyReason, string> = {
   collapse: "Before turning into a single piece",
   series: "Before becoming a series",
   merge: "Before a merge into a series",
+  anthology: "Before becoming an anthology",
+  book: "Before turning back into a book",
+  bringin: "Before moving into an anthology",
+  takeout: "Before a piece was taken out",
 };
 
 /** "4 Oct", or "4 Oct 2025" when it isn't this year. */
@@ -195,14 +202,29 @@ export function shortDate(iso: string): string {
  * Nothing moves, because the piece already was that chapter. Its title, which
  * the piece kept on the project, is written onto the chapter. Seams stay
  * unlabeled until the writer labels one; nothing is invented for them.
+ *
+ * **"A collection" makes an anthology** (2026-11-21, `lib/anthology.ts`): the
+ * piece's kind and line breaks are written onto its chapter too, so it stays a
+ * poem (or story) beside whatever pieces join it. "One longer work" is the
+ * ordinary book it always was.
  */
 export function expandToBook(doc: StoryDoc, grownInto: GrownInto): StoryDoc {
+  const anthology = grownInto === "collection";
   const titled = mapVersions(doc, (v) => ({
     ...v,
-    chapters: v.chapters.map((c, i) => (i === 0 ? { ...c, num: 1, title: doc.projectTitle || c.title } : c)),
+    chapters: v.chapters.map((c, i) =>
+      i === 0
+        ? {
+            ...c,
+            num: 1,
+            title: doc.projectTitle || c.title,
+            ...(anthology ? { kind: doc.kind ?? "story", keepLineBreaks: !!doc.keepLineBreaks } : {}),
+          }
+        : c
+    ),
   }));
   const { form: _form, ...rest } = titled;
-  return { ...rest, grownInto };
+  return anthology ? { ...rest, grownInto, form: "anthology" } : { ...rest, grownInto };
 }
 
 // ---- Book → piece ----------------------------------------------------------
@@ -213,7 +235,8 @@ export type ChapterJoin = "break" | "heading" | "none";
 const STATUS_RANK: Record<ChapterStatus, number> = { idea: 0, draft: 1, done: 2 };
 
 /** Whether this project can be turned into a single piece: a standalone book only. */
-export const canCollapse = (doc: StoryDoc): boolean => !isPiece(doc) && !doc.seriesMode;
+/** An anthology goes back to a book first (File › Make this a book), so its pieces are never joined by accident. */
+export const canCollapse = (doc: StoryDoc): boolean => !doc.form && !doc.seriesMode;
 
 /**
  * Collapse one version's chapters into the single chapter a piece is.

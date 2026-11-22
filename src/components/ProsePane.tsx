@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { inlineTokens, type InlineToken } from "@/lib/inline";
 import { parseBlocks, taskItem, type Block } from "@/lib/manuscript";
+import { pieceLineBreaks } from "@/lib/anthology";
 import type { Chapter } from "@/types";
 
 /**
@@ -42,7 +43,8 @@ export function ProseChapter({
 
   const text = ch.manuscript ?? "";
   const blocks = useMemo(() => parseBlocks(text), [text]);
-  const keepLines = useStore((s) => !!s.doc.keepLineBreaks);
+  // Per piece in an anthology, the project's anywhere else.
+  const keepLines = useStore((s) => pieceLineBreaks(s.doc, ch));
 
   /**
    * A press that doesn't move is a click; a press that moves is a text

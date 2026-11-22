@@ -793,6 +793,8 @@ const FIELD_LABELS: Record<string, string> = {
   storyNotes: "story notes",
   desc: "description",
   cat: "category",
+  // Anthology pieces (`lib/anthology.ts`).
+  keepLineBreaks: "line breaks",
 };
 
 /**
@@ -1244,7 +1246,7 @@ export function diffDocs(mine: StoryDoc, theirs: StoryDoc): DocDiff {
     savedCopy: d.savedCopy ?? null,
   });
   const formName = (d: StoryDoc) =>
-    d.form === "piece" ? "single piece" : d.seriesMode ? "series" : "book";
+    d.form === "piece" ? "single piece" : d.form === "anthology" ? "anthology" : d.seriesMode ? "series" : "book";
   const savedCopyLine = (d: StoryDoc) =>
     d.savedCopy ? `saved before ${d.savedCopy.reason}` : "no";
   storyWide.push(

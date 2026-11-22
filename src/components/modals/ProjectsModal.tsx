@@ -23,7 +23,9 @@ import { activeTarget } from "@/lib/syncTarget";
 /** "Short story · 7 scenes · 4.3k words", "Series · 3 books · 8 chapters". */
 function metaLine(p: ProjectMeta): string {
   if (p.isPiece) return `${p.label} · ${countParts(p, p.parts)} · ${shortCount(p.words)} words`;
-  const chapters = `${p.chapters} ${p.chapters === 1 ? "chapter" : "chapters"}`;
+  const chapters = p.isAnthology
+    ? `${p.chapters} ${p.chapters === 1 ? "piece" : "pieces"}`
+    : `${p.chapters} ${p.chapters === 1 ? "chapter" : "chapters"}`;
   return `${p.isSeries ? `Series · ${p.books} books` : p.label ? `${p.label}` : "Standalone"} · ${chapters}`;
 }
 
@@ -262,7 +264,8 @@ export function ProjectsModal() {
             {projects.map((p) => {
               const isActive = p.id === activeId;
               // A piece has no books to move into a series; expand it first.
-              const canMerge = !p.isPiece && projects.some((q) => q.isSeries && q.id !== p.id);
+              // An anthology stays standalone (PLAN-anthology §3): in a series it would be a plain book.
+              const canMerge = !p.isPiece && !p.isAnthology && projects.some((q) => q.isSeries && q.id !== p.id);
               return (
                 <div
                   key={p.id}

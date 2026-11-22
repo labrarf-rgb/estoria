@@ -1,6 +1,7 @@
 # Anthology: plan (NOT BUILT)
 
-> Status: **plan and mockup only, waiting for Ray's go-ahead.** No feature code.
+> Status: **built on this branch 2026-11-21, waiting on Ray's local test in Chrome.**
+> Not pushed, not deployed, not merged. Build notes: §9.
 > Branch `claude/anthology-f37dea`. Mockup: [`mockups/anthology.html`](mockups/anthology.html)
 > (private artifact: https://claude.ai/artifact/UUT7734mz17ke7Y2CBwbFo).
 >
@@ -284,3 +285,27 @@ headings. Recorded for the Android SPECS §7 when the web lands.
 9. **Reference tabs on an anthology piece:** bring back Characters / World /
    Piece notes / Pinned on the piece page (mockup step 3), or keep the piece
    page exactly as a single piece today (no tabs)?
+
+## 9. Build notes (2026-11-21)
+
+Approved by Ray via the coordinator ("the rest looks ok"). Built as planned,
+with these calls made during the build:
+
+- **Sections are set on every piece of the section**, not only the first
+  (§3 said first). A section is a run of consecutive pieces sharing the name,
+  so moving one piece never changes another's section. An empty section
+  (+ Add section) is held on screen only until a piece is added or dragged
+  into it; it is not saved on its own.
+- **Turn into single piece is not offered on an anthology**: it would join
+  every piece. Make this a book first.
+- **Make this a series and Merge into a series are not offered** (§3, v1).
+- **Making a book from an anthology lays the chapters out in a grid** in
+  reading order (pieces have no board positions).
+- **Bringing a piece in** joins the version being viewed; a fresh chapter id
+  is minted. Its Drive file, if any, stays in the folder, as with Merge.
+- **Pace add-merge** (`addPace`) sums a day's cells and stamps them now.
+- **Compare & merge**: an anthology vs a book or piece is still merge-blocked
+  (keep one), now named "anthology" in the message.
+- **Not built:** the map export (`markdown.ts`) still says chapters; drag on
+  touch screens (mouse drag only, like the board); the phone update.
+

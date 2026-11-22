@@ -504,9 +504,12 @@ export function Footer() {
           : "Saved in this browser") + mirrorSuffix;
 
   const pieceKind = useStore((s) => (s.doc.form === "piece" ? s.doc.kind ?? "story" : null));
+  const anthology = useStore((s) => s.doc.form === "anthology");
   const hint = pieceKind
     ? `Map the ${partNouns({ kind: pieceKind }).many} · switch to Write to draft beside them`
-    : view === "timeline"
+    : anthology
+      ? "Click a piece to open it · drag to reorder it or move it to another section"
+      : view === "timeline"
       ? "Read the story straight through · click a chapter to jump, a scene to edit it · use the arrows to flip orientation"
       : "Click a chapter to map its scenes · drag to rearrange · scroll to zoom";
 

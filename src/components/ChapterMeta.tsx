@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useStore } from "@/store/useStore";
 import { hasProse } from "@/lib/manuscript";
 import type { Chapter, ChapterStatus } from "@/types";
-import { partNouns } from "@/lib/piece";
+import { pieceNouns } from "@/lib/anthology";
 
 const STATUSES: { value: ChapterStatus; label: string }[] = [
   { value: "idea", label: "Idea" },
@@ -35,8 +35,8 @@ export function ChapterMetaRow({
   trail?: ReactNode;
 }) {
   const patchChapter = useStore((s) => s.patchChapter);
-  const kind = useStore((s) => s.doc.kind);
-  const nouns = partNouns({ kind });
+  const doc = useStore((s) => s.doc);
+  const nouns = pieceNouns(doc, ch);
 
   // Does this chapter's count come from its prose rather than from the keyboard?
   const counted = hasProse(ch.manuscript);
@@ -143,7 +143,8 @@ export function ChapterModeTabs() {
   const setMode = useStore((s) => s.setChapterMode);
   // Same control, same place; a single piece names its two faces in plainer
   // words than a book's chapter does.
-  const piece = useStore((s) => s.doc.form === "piece");
+  // A single piece and an anthology piece both read Map / Write.
+  const piece = useStore((s) => s.doc.form === "piece" || s.doc.form === "anthology");
 
   const seg = (m: "map" | "manuscript", label: string, hint: string) => (
     <button

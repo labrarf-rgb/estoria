@@ -29,6 +29,8 @@ export function FormChangeModal() {
   const close = () => setFormDialog(null);
   if (which === "expand") return <ExpandDialog close={close} />;
   if (which === "collapse") return <CollapseDialog close={close} />;
+  if (which === "anthology") return <AnthologyDialog close={close} />;
+  if (which === "book") return <BookDialog close={close} />;
   return <SeriesDialog close={close} />;
 }
 
@@ -44,8 +46,12 @@ function ExpandDialog({ close }: { close: () => void }) {
     <Dialog
       close={close}
       title="Expand into a book?"
-      sub={`"${doc.projectTitle}" becomes a book, with this ${k.label.toLowerCase()} as Chapter 1.`}
-      confirm="Expand into a book"
+      sub={
+        grow === "collection"
+          ? `"${doc.projectTitle}" becomes an anthology, with this ${k.label.toLowerCase()} as its first piece.`
+          : `"${doc.projectTitle}" becomes a book, with this ${k.label.toLowerCase()} as Chapter 1.`
+      }
+      confirm={grow === "collection" ? "Make an anthology" : "Expand into a book"}
       onConfirm={() => {
         expand(grow);
         close();
@@ -63,12 +69,23 @@ function ExpandDialog({ close }: { close: () => void }) {
           }))}
         />
       </Section>
-      <p>
-        Everything comes along: the writing, all {parts} {parts === 1 ? nouns.one : nouns.many} and their
-        layout, characters, world, notes, pins, and every version. Parts are still called {nouns.many}
-        {doc.keepLineBreaks ? ", and line breaks are still kept" : ""}. You can add chapters, acts and the
-        Timeline.
-      </p>
+      {grow === "collection" ? (
+        <>
+          <p>
+            <b className="text-ink">"{doc.projectTitle}"</b> becomes the first piece. It stays a{" "}
+            {k.label.toLowerCase()}: its {nouns.many}, {doc.keepLineBreaks ? "its line breaks, " : ""}its own page
+            with Map and Write. Add more pieces of any kind, new or brought in from your other projects.
+          </p>
+          <p>No chapter numbers, acts or chapter links. Pieces can be grouped into sections.</p>
+        </>
+      ) : (
+        <p>
+          Everything comes along: the writing, all {parts} {parts === 1 ? nouns.one : nouns.many} and their
+          layout, characters, world, notes, pins, and every version. Parts are still called {nouns.many}
+          {doc.keepLineBreaks ? ", and line breaks are still kept" : ""}. You can add chapters, acts and the
+          Timeline.
+        </p>
+      )}
       <CopyNote />
     </Dialog>
   );
@@ -86,7 +103,11 @@ function CollapseDialog({ close }: { close: () => void }) {
   if (!canCollapse(doc)) {
     return (
       <Dialog close={close} title="Turn into a single piece" sub="Only a standalone book can become a single piece.">
-        <p>A book inside a series would have to leave the series first.</p>
+        <p>
+          {doc.form === "anthology"
+            ? "An anthology would join every piece into one. Make it a book first (File › Make this a book) if that is what you want."
+            : "A book inside a series would have to leave the series first."}
+        </p>
       </Dialog>
     );
   }
@@ -182,6 +203,65 @@ function SeriesDialog({ close }: { close: () => void }) {
   );
 }
 
+function AnthologyDialog({ close }: { close: () => void }) {
+  const doc = useStore((s) => s.doc);
+  const makeAnthology = useStore((s) => s.makeAnthology);
+  const k = kindInfo(doc.kind);
+  const n = doc.chapters.length;
+  return (
+    <Dialog
+      close={close}
+      title="Make this an anthology?"
+      sub={`"${doc.projectTitle}" becomes an anthology of ${n} ${n === 1 ? "piece" : "pieces"}.`}
+      confirm="Make an anthology"
+      onConfirm={() => {
+        makeAnthology();
+        close();
+      }}
+    >
+      <ul className="list-disc pl-[18px] [&>li]:mb-[3px]">
+        <li>
+          <b className="text-ink">Each chapter becomes a piece</b>, in board order, under its own title. Nothing is
+          joined.
+        </li>
+        <li>
+          <b className="text-ink">Each piece starts as a {k.label.toLowerCase()}</b>
+          {doc.keepLineBreaks ? ", line breaks kept" : ""} (a chapter that was a piece in an anthology before
+          keeps what it was). Change any piece's kind on its page.
+        </li>
+        <li>
+          <b className="text-ink">Not shown:</b> chapter numbers, acts, chapter links and the Timeline. They stay in
+          the file.
+        </li>
+      </ul>
+      <CopyNote />
+    </Dialog>
+  );
+}
+
+function BookDialog({ close }: { close: () => void }) {
+  const doc = useStore((s) => s.doc);
+  const makeBook = useStore((s) => s.makeBook);
+  return (
+    <Dialog
+      close={close}
+      title="Make this a book?"
+      sub={`"${doc.projectTitle}" becomes an ordinary book. Its pieces become numbered chapters.`}
+      confirm="Make it a book"
+      onConfirm={() => {
+        makeBook();
+        close();
+      }}
+    >
+      <p>
+        Nothing is joined or lost. The book uses one kind and one line-break setting for every chapter, so a poem
+        beside a story reads the book's way. Sections are no longer shown. You get the board, acts and the Timeline.
+      </p>
+      <CopyNote />
+    </Dialog>
+  );
+}
+
 /** The line every change of form carries. */
 export function CopyNote({ what }: { what?: string }) {
   return (
@@ -195,7 +275,7 @@ export function CopyNote({ what }: { what?: string }) {
   );
 }
 
-function Dialog({
+export function Dialog({
   close,
   title,
   sub,
@@ -248,7 +328,7 @@ function Dialog({
   );
 }
 
-function Section({ label, children }: { label: string; children: ReactNode }) {
+export function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <div className="mb-[8px] text-[10.5px] font-semibold uppercase tracking-wide text-faint">{label}</div>

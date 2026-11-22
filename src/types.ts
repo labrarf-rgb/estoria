@@ -147,14 +147,16 @@ export interface WorldEntry {
 
 export type BookStatus = "drafting" | "planned" | "idea";
 
-/** A project that is not a book. See `StoryDoc.form`. */
-export type ProjectForm = "piece";
+/** A project that is not a plain book. See `StoryDoc.form`. */
+export type ProjectForm = "piece" | "anthology";
 /** What a single piece is. See `StoryDoc.kind`. */
 export type PieceKind = "story" | "essay" | "poem" | "other";
 /** What an expanded piece became. See `StoryDoc.grownInto`. */
 export type GrownInto = "work" | "collection";
 /** The change of form a saved copy was taken before. */
-export type SavedCopyReason = "expand" | "collapse" | "series" | "merge";
+// Lower-case letters only: the reason is written into the saved copy's file
+// name, and the Android app matches `-saved-[a-z]+-`.
+export type SavedCopyReason = "expand" | "collapse" | "series" | "merge" | "anthology" | "book" | "bringin" | "takeout";
 export interface SavedCopyInfo {
   reason: SavedCopyReason;
   /** ISO 8601. */
@@ -266,6 +268,23 @@ export interface Chapter {
    * Android app's unknown-key passthrough untouched (SPECS.md §6).
    */
   manuscript?: string;
+  /**
+   * **Anthology pieces only** (`StoryDoc.form === "anthology"`; see
+   * `lib/piece.ts`). This piece's kind, read instead of the project's. Absent
+   * means the project's `kind`. Ignored in an ordinary book, so a book's
+   * chapters never carry it.
+   */
+  kind?: PieceKind;
+  /** Anthology pieces only: this piece's line breaks. Absent means the project's. */
+  keepLineBreaks?: boolean;
+  /**
+   * Anthology pieces only: the section this piece sits in ("One: Harbor"). Set
+   * on **every** piece of the section, so moving a piece never changes another
+   * piece's section. A section is a run of consecutive pieces sharing the name;
+   * absent means no section. Lives on the chapter, not on `VersionData`, because
+   * the phone only passes new board-level keys through after an update.
+   */
+  section?: string;
   /** Scene beats, in order. */
   scenes: string[];
   /**

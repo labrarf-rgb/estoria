@@ -7,6 +7,8 @@ import { SeriesMap } from "@/components/SeriesMap";
 import { Footer } from "@/components/Footer";
 import { ChapterModal } from "@/components/ChapterModal";
 import { PieceView } from "@/components/PieceView";
+import { AnthologyView } from "@/components/AnthologyView";
+import { AddPieceModal, TakeOutModal } from "@/components/modals/AnthologyModals";
 import { FormChangeModal, SavedNotice } from "@/components/modals/FormChangeModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ChapterCrash } from "@/components/CrashScreen";
@@ -40,6 +42,8 @@ export function App() {
   const chapterMode = useStore((s) => s.chapterMode);
   // A single piece has no board: it is its own page. See `PieceView`.
   const piece = useStore((s) => s.doc.form === "piece");
+  // An anthology has its own board, and opens a piece as a page. See `AnthologyView`.
+  const anthology = useStore((s) => s.doc.form === "anthology");
   const onSeriesMap = seriesMode && level === "series";
   // The book-level timeline is its own surface (a scrolling rail + scene pane),
   // not a mode of the board's canvas. The series map still renders its own
@@ -61,14 +65,14 @@ export function App() {
       className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
     >
       <Toolbar />
-      {piece ? <PieceView /> : onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
+      {piece ? <PieceView /> : anthology ? <AnthologyView /> : onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
       <Footer />
 
       {/* The chapter modal catches its own errors, because the board behind it
           is still perfectly good: a chapter that won't draw should cost you the
           chapter, not the session. Keyed on which chapter and which face of it,
           so closing it or stepping to the next one re-arms the boundary. */}
-      {openCh && !onSeriesMap && !piece && (
+      {openCh && !onSeriesMap && !piece && !anthology && (
         <ErrorBoundary
           resetKey={`${openCh}:${chapterMode}`}
           fallback={(error, retry) => <ChapterCrash error={error} retry={retry} />}
@@ -87,6 +91,8 @@ export function App() {
       <NewBookModal />
       <ProjectsModal />
       <FormChangeModal />
+      <AddPieceModal />
+      <TakeOutModal />
       <SavedNotice />
       <BackupsModal />
       <DriveChooserModal />

@@ -1497,6 +1497,23 @@ function normalizeAssets(raw: unknown): Asset[] {
  * the input isn't recognizably an Estoria project, or (`SchemaTooNewError`)
  * if it comes from a newer app.
  */
+const PIECE_KINDS = ["story", "essay", "poem", "other"] as const;
+
+/**
+ * An anthology piece's own fields (`lib/anthology.ts`), checked rather than
+ * copied: a stray value is dropped, so the piece falls back to the project's
+ * setting instead of showing nonsense. Unknown chapter keys are otherwise kept
+ * as they are (the spread above), which is what the phone relies on too.
+ */
+function pieceFields(p: Partial<Chapter>): Pick<Chapter, "kind" | "keepLineBreaks" | "section"> {
+  const { kind, keepLineBreaks, section } = p;
+  const out: Pick<Chapter, "kind" | "keepLineBreaks" | "section"> = {};
+  if (PIECE_KINDS.includes(kind as (typeof PIECE_KINDS)[number])) out.kind = kind;
+  if (typeof keepLineBreaks === "boolean") out.keepLineBreaks = keepLineBreaks;
+  if (typeof section === "string" && section.trim()) out.section = section;
+  return out;
+}
+
 export function normalizeDoc(raw: unknown): StoryDoc {
   const d = raw as Partial<StoryDoc> | null;
   if (!d || typeof d !== "object" || !Array.isArray(d.chapters)) {
@@ -1511,8 +1528,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
   const chapters: Chapter[] = d.chapters.map((c, i) => {
     const p = (c ?? {}) as Partial<Chapter>;
     const scenes = Array.isArray(p.scenes) && p.scenes.length ? p.scenes : ["New scene."];
+    const { kind: _k, keepLineBreaks: _l, section: _s, ...known } = p;
     return {
-      ...p,
+      ...known,
       id: p.id || `c-file-${i}`,
       num: typeof p.num === "number" ? p.num : i + 1,
       act: typeof p.act === "number" ? p.act : 1,
@@ -1525,6 +1543,7 @@ export function normalizeDoc(raw: unknown): StoryDoc {
       scenes,
       sceneLinks: normalizeSceneLinks(p.sceneLinks, scenes.length),
       refs: Array.isArray(p.refs) ? p.refs : [],
+      ...pieceFields(p),
     };
   });
 
@@ -1627,6 +1646,9 @@ export function normalizeDoc(raw: unknown): StoryDoc {
     // is a book exactly as before; each is checked rather than copied, because a
     // stray value here would change what the whole project looks like.
     ...(d.form === "piece" && !d.seriesMode ? { form: "piece" as const } : {}),
+    // An anthology (`lib/anthology.ts`) is a standalone book whose chapters keep
+    // their own kind and line breaks; never inside a series.
+    ...(d.form === "anthology" && !d.seriesMode ? { form: "anthology" as const } : {}),
     ...(d.kind === "story" || d.kind === "essay" || d.kind === "poem" || d.kind === "other"
       ? { kind: d.kind }
       : {}),

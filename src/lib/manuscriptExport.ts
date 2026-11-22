@@ -4,6 +4,7 @@ import { countWords, parseBlocks, taskItem, type Block } from "@/lib/manuscript"
 import { inlineTokens } from "@/lib/inline";
 import { zipStore } from "@/lib/zip";
 import { isPiece } from "@/lib/piece";
+import { inOrder, isAnthology, pieceLineBreaks } from "@/lib/anthology";
 
 /**
  * Manuscript export — **a second export with a different purpose** from the one
@@ -19,8 +20,27 @@ import { isPiece } from "@/lib/piece";
 
 /** Chapters that have something written in them, in order. */
 export function writtenChapters(doc: StoryDoc): Chapter[] {
-  return doc.chapters.filter((c) => c.manuscript && countWords(c.manuscript) > 0);
+  // An anthology's order is its pieces' `num` (the board order), whatever the array says.
+  const chs = isAnthology(doc) ? inOrder(doc.chapters) : doc.chapters;
+  return chs.filter((c) => c.manuscript && countWords(c.manuscript) > 0);
 }
+
+/**
+ * An anthology's pieces as the reader meets them: each written piece with the
+ * section heading it opens, if any (only the first written piece of a section
+ * carries it, so an empty piece never swallows its section's heading).
+ */
+function anthologyEntries(doc: StoryDoc): { c: Chapter; opens: string | null; keepLines: boolean }[] {
+  let last = "";
+  return writtenChapters(doc).map((c) => {
+    const s = c.section?.trim() ?? "";
+    const opens = s && s !== last ? s : null;
+    last = s;
+    return { c, opens, keepLines: pieceLineBreaks(doc, c) };
+  });
+}
+
+const pieceTitle = (c: Chapter): string => c.title.trim() || "Untitled";
 
 export const manuscriptWordCount = (doc: StoryDoc): number =>
   doc.chapters.reduce((n, c) => n + (c.manuscript ? countWords(c.manuscript) : 0), 0);
@@ -42,6 +62,17 @@ const hardBreaks = (text: string): string => text.replace(/([^\n])[ \t]*\n(?=[^\
  */
 export function buildManuscriptMarkdown(doc: StoryDoc): string {
   const parts = [`# ${doc.projectTitle}`, ""];
+  if (isAnthology(doc)) {
+    // Sections are `##`, pieces `###`; with no sections a piece is `##`.
+    const entries = anthologyEntries(doc);
+    const level = entries.some((e) => e.c.section?.trim()) ? "###" : "##";
+    for (const { c, opens, keepLines } of entries) {
+      if (opens) parts.push(`## ${opens}`, "");
+      const body = (c.manuscript ?? "").trim();
+      parts.push(`${level} ${pieceTitle(c)}`, "", keepLines ? hardBreaks(body) : body, "");
+    }
+    return `${parts.join("\n").replace(/\n{4,}/g, "\n\n\n").trim()}\n`;
+  }
   // A single piece is one text under its title: no chapter heading to add.
   const piece = isPiece(doc);
   for (const c of writtenChapters(doc)) {
@@ -56,9 +87,17 @@ export function buildManuscriptMarkdown(doc: StoryDoc): string {
 export function buildManuscriptText(doc: StoryDoc): string {
   const parts = [doc.projectTitle.toUpperCase(), ""];
   const piece = isPiece(doc);
-  const join = (t: string) => (doc.keepLineBreaks ? t : t.replace(/\n/g, " "));
+  const anthology = isAnthology(doc);
+  const opensAt = new Map(anthology ? anthologyEntries(doc).map((e) => [e.c.id, e.opens]) : []);
   for (const c of writtenChapters(doc)) {
-    if (!piece) parts.push("", chapterHeading(c).toUpperCase(), "");
+    // Line breaks are per piece in an anthology, the project's anywhere else.
+    const keep = anthology ? pieceLineBreaks(doc, c) : !!doc.keepLineBreaks;
+    const join = (t: string) => (keep ? t : t.replace(/\n/g, " "));
+    if (anthology) {
+      const opens = opensAt.get(c.id);
+      if (opens) parts.push("", "", opens.toUpperCase(), "");
+      parts.push("", pieceTitle(c).toUpperCase(), "");
+    } else if (!piece) parts.push("", chapterHeading(c).toUpperCase(), "");
     for (const b of parseBlocks(c.manuscript ?? "")) {
       if (b.kind === "hr") parts.push("#", "");
       else if (b.kind === "ul" || b.kind === "ol") parts.push(...b.items.map(plain), "");
@@ -255,6 +294,23 @@ export function buildDocx(doc: StoryDoc, author: AuthorDetails): Uint8Array {
   if (byline) body.push(para(plainRun(`by ${byline}`), { align: "center" }));
 
   const piece = isPiece(doc);
+  if (isAnthology(doc)) {
+    // An anthology: a contents page, a page for each section heading, and each
+    // piece on a new page under its own title, with its own line breaks.
+    const entries = anthologyEntries(doc);
+    body.push(para(plainRun("Contents"), { align: "center", pageBreakBefore: true }));
+    body.push(para(""));
+    for (const { c, opens } of entries) {
+      if (opens) body.push(para(runsFor(opens)));
+      body.push(para(runsFor(pieceTitle(c)), { indent: !!c.section?.trim() }));
+    }
+    for (const { c, opens, keepLines } of entries) {
+      if (opens) body.push(para(runsFor(opens), { align: "center", pageBreakBefore: true }));
+      body.push(para(runsFor(pieceTitle(c)), { align: "center", pageBreakBefore: true }));
+      body.push(para(""));
+      body.push(...chapterParagraphs(c.manuscript ?? "", keepLines));
+    }
+  } else
   for (const c of writtenChapters(doc)) {
     // A piece starts its text under its own title rather than a chapter heading.
     body.push(para(runsFor(piece ? title : chapterHeading(c)), { align: "center", pageBreakBefore: true }));

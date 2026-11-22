@@ -31,6 +31,22 @@ import {
   type ChapterJoin,
 } from "@/lib/piece";
 import { writeSavedCopyFile } from "@/lib/sync";
+import {
+  bringIn,
+  canBringIn,
+  canMakeAnthology,
+  fromAnthology,
+  insertPiece,
+  isAnthology,
+  movePiece as movePieceIn,
+  moveSection as moveSectionIn,
+  newPieceChapter,
+  removeSection as removeSectionIn,
+  renameSection as renameSectionIn,
+  sectionNames,
+  takeOut,
+  toAnthology,
+} from "@/lib/anthology";
 import { activeVersionData, cloneVersionData, resolveMainDraftId, withMainDraft } from "@/lib/drafts";
 import { removeAssetLinks } from "@/lib/refs";
 import { deleteCharacterDoc, deleteWorldEntryDoc } from "@/lib/entities";
@@ -251,10 +267,20 @@ interface UiState {
   savedNotice: { title: string; reason: SavedCopyReason } | null;
   /** Which change-of-form dialog is open, if any. Transient. */
   formDialog: FormDialog | null;
+  /**
+   * Anthology sections added on the board that have no piece yet. Transient:
+   * a section is the name its pieces carry (`Chapter.section`), so an empty one
+   * exists only until a piece is added or dragged into it.
+   */
+  pendingSections: string[];
+  /** The Add a piece dialog, and the section it adds into. Transient. */
+  addPieceDialog: { section: string } | null;
+  /** The piece whose "Make its own project" dialog is open. Transient. */
+  takeOutDialog: string | null;
 }
 
 /** The three change-of-form dialogs. See `components/modals/FormChangeModal.tsx`. */
-export type FormDialog = "expand" | "collapse" | "series";
+export type FormDialog = "expand" | "collapse" | "series" | "anthology" | "book";
 
 /** A pending confirmation prompt (e.g. before a destructive delete). */
 export interface ConfirmRequest {
@@ -283,6 +309,8 @@ export interface ProjectMeta {
   isSeries: boolean;
   /** A single piece rather than a book. */
   isPiece: boolean;
+  /** An anthology: its chapters are pieces (`lib/anthology.ts`). */
+  isAnthology: boolean;
   /** "Short story", "Poetry collection" — see `formLabel`. `null` for a plain book. */
   label: string | null;
   books: number;
@@ -333,6 +361,27 @@ interface StoreState extends UiState {
   openDoc: (doc: StoryDoc) => void;
   deleteProject: (id: string) => void;
   mergeProjectIntoSeries: (sourceId: string, targetId: string) => void;
+
+  // ---- anthology (lib/anthology.ts, docs/PLAN-anthology.md) ----
+  /** Standalone book → anthology. Saves a copy first. */
+  makeAnthology: () => void;
+  /** Anthology → ordinary book. Saves a copy first. */
+  makeBook: () => void;
+  /** A blank piece of this kind at the end of `section`, then open it. */
+  addPiece: (kind: PieceKind, section: string) => void;
+  /** Move a single-piece project in as a piece. Saves a copy of it first. */
+  bringInPiece: (projectId: string, section: string) => void;
+  /** A piece as its own single-piece project; "move" saves a copy of the anthology first. */
+  takeOutPiece: (chId: string, how: "move" | "copy") => void;
+  movePiece: (id: string, targetId: string | null, after: boolean, section: string) => void;
+  renameSection: (from: string, to: string) => void;
+  moveSection: (name: string, dir: -1 | 1) => void;
+  removeSection: (name: string) => void;
+  addPendingSection: () => void;
+  setChapterKind: (chId: string, kind: PieceKind) => void;
+  setChapterLineBreaks: (chId: string, keep: boolean) => void;
+  setAddPieceDialog: (d: { section: string } | null) => void;
+  setTakeOutDialog: (chId: string | null) => void;
 
   // ---- confirmation ----
   confirm: ConfirmRequest | null;
@@ -686,7 +735,8 @@ const scenePosBoth = (
  * switches to its compact layout because a book's chapter was collapsed.
  */
 const wideScenes = (s: { sceneFlowExpanded: boolean; doc: StoryDoc }): boolean =>
-  s.sceneFlowExpanded || isPiece(s.doc);
+  // An anthology piece is a page too (`AnthologyView`), so it is always wide.
+  s.sceneFlowExpanded || isPiece(s.doc) || isAnthology(s.doc);
 
 /**
  * Take an ordered subset of a chapter's scenes, keeping each link that joined
@@ -798,6 +848,9 @@ const initialUi: UiState = {
   manuscriptUndo: null,
   panelExpanded: false,
   savedNotice: null,
+  pendingSections: [],
+  addPieceDialog: null,
+  takeOutDialog: null,
   formDialog: null,
 };
 
@@ -898,6 +951,7 @@ export const useStore = create<StoreState>()(
           title: d.projectTitle || "Untitled",
           isSeries: d.seriesMode,
           isPiece: isPiece(d),
+          isAnthology: isAnthology(d),
           label: formLabel(d),
           books: d.books.length,
           chapters:
@@ -1141,6 +1195,153 @@ export const useStore = create<StoreState>()(
             showProjects: false,
           };
         }),
+
+      // ---- anthology ----
+      makeAnthology: () => {
+        const before = get().doc;
+        if (!canMakeAnthology(before)) return;
+        const copy = makeSavedCopy(before, "anthology");
+        set((s) => ({
+          doc: toAnthology(s.doc),
+          projectStash: { ...s.projectStash, [copy.id]: copy },
+          savedNotice: { title: before.projectTitle, reason: "anthology" as SavedCopyReason },
+          level: "book" as Level,
+          view: "board" as View,
+          openCh: null,
+          pendingSections: [],
+          newMenu: false,
+        }));
+        void writeSavedCopyFile(copy);
+      },
+
+      makeBook: () => {
+        const before = get().doc;
+        if (!isAnthology(before)) return;
+        const copy = makeSavedCopy(before, "book");
+        set((s) => ({
+          doc: fromAnthology(s.doc),
+          projectStash: { ...s.projectStash, [copy.id]: copy },
+          savedNotice: { title: before.projectTitle, reason: "book" as SavedCopyReason },
+          view: "board" as View,
+          openCh: null,
+          pendingSections: [],
+          arrangeN: 0,
+          newMenu: false,
+        }));
+        void writeSavedCopyFile(copy);
+      },
+
+      addPiece: (kind, section) => {
+        if (!isAnthology(get().doc)) return;
+        const piece = newPieceChapter(kind, section);
+        set((s) => ({
+          doc: { ...s.doc, chapters: insertPiece(s.doc.chapters, piece) },
+          pendingSections: s.pendingSections.filter((n) => n !== section),
+          addPieceDialog: null,
+          openCh: piece.id,
+          chapterMode: "map" as ChapterMode,
+          focusScene: null,
+        }));
+      },
+
+      bringInPiece: (projectId, section) => {
+        const s0 = get();
+        const source = s0.projectStash[projectId];
+        if (!isAnthology(s0.doc) || !source || !canBringIn(source)) return;
+        const copy = makeSavedCopy(source, "bringin");
+        set((s) => {
+          const stash = { ...s.projectStash, [copy.id]: copy };
+          delete stash[projectId];
+          return {
+            doc: reconcileWords(bringIn(s.doc, source, section)),
+            projectStash: stash,
+            pendingSections: s.pendingSections.filter((n) => n !== section),
+            savedNotice: { title: source.projectTitle, reason: "bringin" as SavedCopyReason },
+            addPieceDialog: null,
+          };
+        });
+        void writeSavedCopyFile(copy);
+      },
+
+      takeOutPiece: (chId, how) => {
+        const before = get().doc;
+        if (!isAnthology(before)) return;
+        // An anthology keeps at least one piece; the last one can only be copied out.
+        if (how === "move" && before.chapters.length <= 1) return;
+        const out = takeOut(before, chId);
+        if (!out) return;
+        const project = reconcileWords(out);
+        const copy = how === "move" ? makeSavedCopy(before, "takeout") : null;
+        set((s) => {
+          const stash = { ...s.projectStash, [project.id]: project, ...(copy ? { [copy.id]: copy } : {}) };
+          const chapters = how === "move" ? renumber(s.doc.chapters.filter((c) => c.id !== chId)) : s.doc.chapters;
+          return {
+            doc: { ...s.doc, chapters },
+            projectStash: stash,
+            takeOutDialog: null,
+            openCh: how === "move" && s.openCh === chId ? null : s.openCh,
+            ...(copy ? { savedNotice: { title: before.projectTitle, reason: "takeout" as SavedCopyReason } } : {}),
+            // The list is where the new project shows up, so show it.
+            showProjects: true,
+          };
+        });
+        if (copy) void writeSavedCopyFile(copy);
+      },
+
+      movePiece: (id, targetId, after, section) =>
+        set((s) => ({
+          doc: { ...s.doc, chapters: movePieceIn(s.doc.chapters, id, targetId, after, section) },
+          pendingSections: s.pendingSections.filter((n) => n !== section),
+        })),
+
+      renameSection: (from, to) =>
+        set((s) => {
+          const name = to.trim();
+          if (s.pendingSections.includes(from)) {
+            if (!name || sectionNames(s.doc.chapters).includes(name) || s.pendingSections.includes(name)) return s;
+            return { pendingSections: s.pendingSections.map((n) => (n === from ? name : n)) };
+          }
+          if (s.pendingSections.includes(name)) return s;
+          return { doc: { ...s.doc, chapters: renameSectionIn(s.doc.chapters, from, to) } };
+        }),
+
+      moveSection: (name, dir) =>
+        set((s) => ({ doc: { ...s.doc, chapters: moveSectionIn(s.doc.chapters, name, dir) } })),
+
+      removeSection: (name) =>
+        set((s) =>
+          s.pendingSections.includes(name)
+            ? { pendingSections: s.pendingSections.filter((n) => n !== name) }
+            : { doc: { ...s.doc, chapters: removeSectionIn(s.doc.chapters, name) } }
+        ),
+
+      addPendingSection: () =>
+        set((s) => {
+          const taken = new Set([...sectionNames(s.doc.chapters), ...s.pendingSections]);
+          let n = taken.size + 1;
+          while (taken.has(`Section ${n}`)) n++;
+          return { pendingSections: [...s.pendingSections, `Section ${n}`] };
+        }),
+
+      setChapterKind: (chId, kind) =>
+        set((s) => ({
+          doc: {
+            ...s.doc,
+            // As with a single piece: moving to a poem turns line breaks on;
+            // moving away leaves whatever the writer had.
+            chapters: s.doc.chapters.map((c) =>
+              c.id === chId ? { ...c, kind, ...(kind === "poem" ? { keepLineBreaks: true } : {}) } : c
+            ),
+          },
+        })),
+
+      setChapterLineBreaks: (chId, keep) =>
+        set((s) => ({
+          doc: { ...s.doc, chapters: s.doc.chapters.map((c) => (c.id === chId ? { ...c, keepLineBreaks: keep } : c)) },
+        })),
+
+      setAddPieceDialog: (d) => set({ addPieceDialog: d, newMenu: false }),
+      setTakeOutDialog: (chId) => set({ takeOutDialog: chId }),
 
       // ---- confirmation ----
       confirm: null,
@@ -1950,7 +2151,8 @@ export const useStore = create<StoreState>()(
       // Series" for them to rename.
       makeSeries: () =>
         set((s) => {
-          if (s.doc.seriesMode || isPiece(s.doc)) return s;
+          // A piece or an anthology never goes straight into a series.
+          if (s.doc.seriesMode || s.doc.form) return s;
           const copy = makeSavedCopy(s.doc, "series");
           void writeSavedCopyFile(copy);
           const books = s.doc.books.map((b) =>

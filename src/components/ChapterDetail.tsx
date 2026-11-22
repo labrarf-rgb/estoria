@@ -12,7 +12,8 @@ import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { type ChapterTab } from "@/store/useStore";
 import { type Vec2 } from "@/types";
-import { KINDS, partNouns } from "@/lib/piece";
+import { KINDS } from "@/lib/piece";
+import { isAnthology, pieceKind, pieceNouns } from "@/lib/anthology";
 import type { ReactNode } from "react";
 
 /** The reference tabs, in order. See `ChapterTab` in the store. */
@@ -35,7 +36,13 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const doc = useStore((s) => s.doc);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
   const setPieceKind = useStore((s) => s.setPieceKind);
-  const nouns = partNouns(doc);
+  const setChapterKind = useStore((s) => s.setChapterKind);
+  // An anthology piece (`lib/anthology.ts`) is a page like a single piece, but
+  // it is one of many: its title and kind are its own, not the project's, and
+  // it keeps the reference tabs, because its cast is not the whole project's.
+  const anth = isAnthology(doc);
+  const titleIsProject = page && !anth;
+  const nouns = pieceNouns(doc, doc.chapters.find((c) => c.id === openCh));
   // What "this chapter" is called in the copy around the canvas.
   const unit = page ? "piece" : "chapter";
   const closeChapter = useStore((s) => s.closeChapter);
@@ -657,9 +664,9 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             {/* A piece's title is the project's: one name, not a project name
                 and a chapter name that could drift apart. */}
             <input
-              value={page ? doc.projectTitle : ch.title}
+              value={titleIsProject ? doc.projectTitle : ch.title}
               onChange={(e) =>
-                page ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
+                titleIsProject ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
               }
               placeholder={page ? "Title" : "Chapter title"}
               className={`w-full bg-transparent font-serif font-semibold leading-tight text-ink outline-none placeholder:text-faint ${
@@ -684,7 +691,13 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 stepper is a planning control and goes only here. */}
             <ChapterMetaRow
               ch={ch}
-              lead={page ? <KindPicker value={doc.kind ?? "story"} onChange={setPieceKind} /> : undefined}
+              lead={
+                !page ? undefined : anth ? (
+                  <KindPicker value={pieceKind(doc, ch)} onChange={(k) => setChapterKind(ch.id, k)} />
+                ) : (
+                  <KindPicker value={doc.kind ?? "story"} onChange={setPieceKind} />
+                )
+              }
               act={
                 page ? undefined : 
                 <div className="flex items-center gap-[8px]">
@@ -748,7 +761,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             A piece has none of it: the piece is the whole project, so casting
             it, linking world entries to it or pinning notes to it would only
             repeat Characters, World and Notes in the toolbar above. */}
-        {!page && (
+        {(!page || anth) && (
         <div className="border-b border-rule">
           <div className="flex flex-wrap items-center gap-[6px] px-[26px] pb-[12px] pt-[14px]">
             {TABS.map((t) => {
@@ -763,7 +776,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                     on ? "bg-ink text-bg" : "bg-chip text-soft hover:text-ink"
                   }`}
                 >
-                  {t.label}
+                  {anth && t.key === "notes" ? "Piece notes" : t.label}
                   {n !== undefined && (
                     <span
                       className={`font-mono text-[10.5px] font-semibold ${on ? "opacity-70" : "text-faint"}`}

@@ -6,7 +6,7 @@ import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { countWords, shortCount } from "@/lib/manuscript";
 import { ProseChapter } from "@/components/ProsePane";
 import type { Chapter } from "@/types";
-import { partNouns } from "@/lib/piece";
+import { isAnthology, pieceLineBreaks, pieceNouns } from "@/lib/anthology";
 import type { ReactNode } from "react";
 
 /**
@@ -59,8 +59,13 @@ const RAIL_W = 284;
 export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: boolean }) {
   const doc = useStore((s) => s.doc);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
-  const setKeepLineBreaks = useStore((s) => s.setKeepLineBreaks);
-  const keepLines = !!doc.keepLineBreaks;
+  const setDocLineBreaks = useStore((s) => s.setKeepLineBreaks);
+  const setChapterLineBreaks = useStore((s) => s.setChapterLineBreaks);
+  // In an anthology the title, and the line breaks, are this piece's own.
+  const anth = isAnthology(doc);
+  const titleIsProject = page && !anth;
+  const keepLines = pieceLineBreaks(doc, ch);
+  const setKeepLineBreaks = (keep: boolean) => (anth ? setChapterLineBreaks(ch.id, keep) : setDocLineBreaks(keep));
   const closeChapter = useStore((s) => s.closeChapter);
   const openChapter = useStore((s) => s.openChapter);
   const editChapterText = useStore((s) => s.editChapterText);
@@ -228,9 +233,9 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
               header wraps its buttons rather than clipping the chapter name. */}
           <div className="min-w-0">
             <input
-              value={page ? doc.projectTitle : ch.title}
+              value={titleIsProject ? doc.projectTitle : ch.title}
               onChange={(e) =>
-                page ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
+                titleIsProject ? setProjectTitle(e.target.value) : editChapterText(ch.id, { title: e.target.value })
               }
               placeholder={page ? "Title" : "Chapter title"}
               className="w-full bg-transparent font-serif text-[24px] font-semibold leading-tight text-ink outline-none placeholder:text-faint"
@@ -314,7 +319,7 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
         {/* Rail beside prose, each scrolling on its own. `min-h-0` on both is
             what lets a flex child scroll rather than grow the row. */}
         <div className="flex min-h-0 flex-1">
-          {railHidden ? <FoldedRail count={ch.scenes.length} /> : <BeatRail ch={ch} />}
+          {railHidden ? <FoldedRail count={ch.scenes.length} ch={ch} /> : <BeatRail ch={ch} />}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {view === "read" ? (
               <div
@@ -427,8 +432,8 @@ function Shell({
 function BeatRail({ ch }: { ch: Chapter }) {
   const openAtScene = useStore((s) => s.openChapterAtScene);
   const setRailHidden = useStore((s) => s.setBeatRailHidden);
-  const kind = useStore((s) => s.doc.kind);
-  const nouns = partNouns({ kind });
+  const doc = useStore((s) => s.doc);
+  const nouns = pieceNouns(doc, ch);
 
   return (
     <aside className="flex shrink-0 flex-col border-r border-rule bg-bg" style={{ width: RAIL_W }}>
@@ -480,10 +485,10 @@ function BeatRail({ ch }: { ch: Chapter }) {
  * The rail, folded: a strip that keeps its place on the left, so the prose does
  * not jump sideways when it comes back, and says how many beats are behind it.
  */
-function FoldedRail({ count }: { count: number }) {
+function FoldedRail({ count, ch }: { count: number; ch: Chapter }) {
   const setRailHidden = useStore((s) => s.setBeatRailHidden);
-  const kind = useStore((s) => s.doc.kind);
-  const nouns = partNouns({ kind });
+  const doc = useStore((s) => s.doc);
+  const nouns = pieceNouns(doc, ch);
   return (
     <aside className="flex w-[38px] shrink-0 flex-col items-center gap-[12px] border-r border-rule bg-bg pt-[14px]">
       <button

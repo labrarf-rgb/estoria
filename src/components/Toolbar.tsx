@@ -8,6 +8,7 @@ import { driveAuth } from "@/lib/driveAuth";
 import { openDriveChooser } from "@/lib/driveSession";
 import { isStandalone } from "@/lib/install";
 import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
+import { canMakeAnthology, isAnthology } from "@/lib/anthology";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -46,6 +47,11 @@ export function Toolbar() {
   // A single piece has no board, chapters or timeline, so none of their
   // controls; it switches Scene flow / Manuscript where a chapter does.
   const piece = isPiece(doc);
+  // An anthology has a board of its own (`AnthologyBoard`): pieces in sections,
+  // no chapters, acts, timeline, templates or zoom.
+  const anth = isAnthology(doc);
+  const noBoard = piece || anth;
+  const setAddPieceDialog = useStore((s) => s.setAddPieceDialog);
 
   const [versionMenu, setVersionMenu] = useState(false);
   // "+ Add version" expands into the prose question rather than acting at once.
@@ -97,11 +103,13 @@ export function Toolbar() {
   const onSeriesMap = doc.seriesMode && level === "series";
   // The book timeline is a scrolling surface with no camera, so a zoom readout
   // there would report a number that controls nothing.
-  const showZoom = !piece && !onSeriesMap && view !== "timeline";
+  const showZoom = !noBoard && !onSeriesMap && view !== "timeline";
   const wordStat = words >= 1000 ? `${(words / 1000).toFixed(1).replace(/\.0$/, "")}k words` : `${words} words`;
   const bookStat = piece
     ? `${formLabel(doc)} · ${wordStat} · ${countParts(doc, doc.chapters[0]?.scenes.length ?? 0)}`
-    : `${formLabel(doc) ? `${formLabel(doc)} · ` : ""}${wordStat} · ${doc.chapters.length} chapters`;
+    : anth
+      ? `Anthology · ${wordStat} · ${doc.chapters.length} ${doc.chapters.length === 1 ? "piece" : "pieces"}`
+      : `${formLabel(doc) ? `${formLabel(doc)} · ` : ""}${wordStat} · ${doc.chapters.length} chapters`;
 
   const seg = "px-3 py-[6px] rounded-[7px] text-[12px] font-medium cursor-pointer whitespace-nowrap";
   const segOn = `${seg} bg-card text-ink`;
@@ -299,7 +307,15 @@ export function Toolbar() {
           with no positions to arrange; a new chapter would be appended somewhere
           off screen. Both dropped drag-to-reorder when the timeline became a
           reading surface (§4), and this is the same rule applied to the toolbar. */}
-      {!piece && !onSeriesMap && view === "board" && (
+      {anth && (
+        <>
+          <button onClick={() => setAddPieceDialog({ section: "" })} className={action}>
+            <span className="-mt-px text-[15px] font-normal leading-none">+</span> Add piece
+          </button>
+          <span className="h-[22px] w-px shrink-0 bg-rule" />
+        </>
+      )}
+      {!noBoard && !onSeriesMap && view === "board" && (
         <>
           <button onClick={addChapter} className={action}>
             <span className="-mt-px text-[15px] font-normal leading-none">+</span> New chapter
@@ -325,7 +341,7 @@ export function Toolbar() {
       )}
 
       {/* View toggle: Board/Map vs Timeline */}
-      {!piece && (
+      {!noBoard && (
       <div className="flex shrink-0 items-center gap-[6px]">
         <div className="flex rounded-[9px] bg-chip p-[3px]">
           <button className={view === "board" ? segOn : segOff} onClick={() => setView("board")}>
@@ -441,14 +457,28 @@ export function Toolbar() {
               onClick={() => setFormDialog("collapse")}
             />
           )}
-          {!piece && !doc.seriesMode && (
+          {canMakeAnthology(doc) && (
+            <MenuItem
+              title="Make this an anthology"
+              sub="Each chapter becomes a piece. Nothing is joined. A copy is saved first."
+              onClick={() => setFormDialog("anthology")}
+            />
+          )}
+          {anth && (
+            <MenuItem
+              title="Make this a book"
+              sub="The pieces become numbered chapters. A copy is saved first."
+              onClick={() => setFormDialog("book")}
+            />
+          )}
+          {!doc.form && !doc.seriesMode && (
             <MenuItem
               title="Make this a series"
               sub="This becomes Book One. A copy is saved first."
               onClick={() => setFormDialog("series")}
             />
           )}
-          {!piece && !onSeriesMap && (
+          {!noBoard && !onSeriesMap && (
             <MenuItem
               title="Use a template"
               sub="Three-act, Hero's Journey, Save the Cat..."
