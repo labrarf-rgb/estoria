@@ -42,17 +42,20 @@ h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 24px; m
 .note { font-size: 13.5px; color: var(--soft); line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
 .rules { margin: 16px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 28px; font-size: 14px; line-height: 1.5; }
 .rules b { font-weight: 600; }
+.jump { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+.jump a { font-size: 12.5px; font-weight: 500; color: var(--soft); text-decoration: none; border: 1px solid var(--rule); border-radius: 7px; padding: 4px 10px; }
+.jump a:hover { color: var(--ink); border-color: var(--faint); }
+.jump a:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
 section { padding: 40px 0; border-top: 1px solid var(--line); }
+.frames { display: flex; flex-direction: column; gap: 26px; }
 .cap { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cap span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
 .grow { flex: 1; }
 .reset { all: unset; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; color: var(--soft); border: 1px solid var(--rule); border-radius: 7px; padding: 3px 9px; }
 .reset:hover { color: var(--ink); border-color: var(--faint); }
 .reset:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
-.filerow { margin-top: 10px; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--soft); line-height: 1.6; }
+.filerow { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--soft); line-height: 1.6; margin: 0 0 16px; }
 .filerow b { color: var(--faint); font-weight: 500; }
-.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
 
 /* Drawer */
 .drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
@@ -63,17 +66,48 @@ section { padding: 40px 0; border-top: 1px solid var(--line); }
 .scroll { overflow-y: auto; flex: 1; min-height: 0; }
 .list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px 22px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tgrid .tile { min-height: 120px; }
 .add { border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
 .grid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; }
+.addrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 7px; }
+.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
 
-/* Collapsed frame: board behind, dimmed, side drawer on the right. */
+/* Frames: layers share one grid cell. Collapsed = board behind, dimmed, side drawer right. */
 .app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
-.app > * { grid-area: 1 / 1; }
+.app > * { grid-area: 1 / 1; min-height: 0; }
 .app.side { height: 620px; }
+.app.fullh { height: 640px; }
 .boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; }
 .dim { background: rgba(20,14,6,.46); }
-.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); min-height: 0; }
+.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
 .app .drawer.full { border: 0; border-radius: 0; }
+.inwin { display: flex; align-items: flex-start; justify-content: center; padding: 28px 20px; background: rgba(20,14,6,.38); overflow: auto; }
+
+/* Windows drawn in place (world entry, chapter) */
+.modal { width: min(600px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.modal.wide { width: min(1000px, 100%); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 16px 20px 20px; font-size: 13.5px; line-height: 1.55; color: var(--soft); }
+.fields { display: flex; flex-direction: column; gap: 12px; }
+.lab { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+.inp { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
+.inp.ta { min-height: 48px; }
+.pair { display: flex; gap: 12px; } .pair > * { flex: 1; min-width: 0; }
+.chhead { padding: 18px 26px 12px; }
+.chhead .row { display: flex; align-items: center; gap: 10px; }
+.chhead .title { font-size: 22px; }
+.chmeta { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); margin-top: 6px; }
+.tabs { display: flex; gap: 6px; padding: 4px 26px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.tabs span { font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--rule); border-radius: 8px; padding: 5px 10px; }
+.tabs span.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; opacity: .7; margin-left: 4px; }
+.chbody { padding: 16px 26px 22px; }
+.flowph { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; font-size: 12px; color: var(--faint); }
+.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; }
+.nbody { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.nbody .list, .nbody .grid { padding: 0; }
 
 /* Tile */
 .tile { position: relative; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s; user-select: none; -webkit-user-select: none; }
@@ -91,37 +125,37 @@ section { padding: 40px 0; border-top: 1px solid var(--line); }
 .meta .sep { color: var(--faint); }
 .pic { border-radius: 8px; min-height: 54px; flex: 1; max-height: 70px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
 
-/* New on the tile: the grip and the position number. */
+/* New on the tile: the grip, and the position number. */
 .grip { all: unset; flex: none; cursor: grab; width: 20px; height: 26px; margin: -3px -3px -3px -7px; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; line-height: 1; border-radius: 6px; touch-action: none; transition: color .2s, background-color .2s; }
 .grip:hover { color: var(--ink); background: var(--chip); }
 .grip:focus-visible { outline: 2px solid var(--therefore); outline-offset: 1px; color: var(--ink); }
-.pos { flex: none; width: 30px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); text-align: center; font: 500 11px "JetBrains Mono", monospace; color: var(--soft); cursor: text; transition: border-color .2s, color .2s; }
+.pos { flex: none; width: 30px; height: 22px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); text-align: center; font: 500 11px "JetBrains Mono", monospace; color: var(--soft); cursor: text; transition: border-color .2s, color .2s, opacity .2s; }
 .pos:hover { border-color: var(--faint); }
 .pos:focus { outline: none; border-color: var(--therefore); color: var(--ink); background: var(--card); }
 .pos.asbadge { width: 32px; background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
 .pos.asbadge:focus { background: var(--card); color: var(--ink); border-color: var(--therefore); }
+/* Character and world numbers appear only while rearranging. */
+.pos.reveal { opacity: 0; pointer-events: none; }
+.arranging .pos.reveal, .lifted .pos.reveal, .pos.reveal:focus { opacity: 1; pointer-events: auto; }
 
 /* While dragging */
 .slot { border: 1.5px dashed var(--faint); border-radius: 12px; background: var(--chip); }
-.lifted { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--lift); border-color: var(--faint); cursor: grabbing; }
+.lifted { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--lift); border-color: var(--faint); }
 body.dragging, body.dragging * { cursor: grabbing !important; }
 
-/* Window (stand-in for the restyle's DetailWindow) */
+/* The window a click opens (stand-in for the restyle's DetailWindow) */
 .winscrim { position: fixed; inset: 0; z-index: 80; background: rgba(20,14,6,.42); display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
 .winscrim[hidden] { display: none; }
-.modal { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
-.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
-.mhead .title { font-size: 20px; }
-.mbody { padding: 16px 20px 20px; font-size: 13.5px; line-height: 1.55; color: var(--soft); }
 .closebtn { all: unset; cursor: pointer; width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; }
 .closebtn:hover { color: var(--ink); border-color: var(--faint); }
 .closebtn:focus-visible { outline: 2px solid var(--therefore); outline-offset: 2px; }
 
 /* Anatomy */
-.anat { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; align-items: start; }
+.anat { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 28px; align-items: start; }
 @media (max-width: 700px) { .anat { grid-template-columns: 1fr; } }
 .anat ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; display: flex; flex-direction: column; gap: 8px; }
-.anat .stack { display: flex; flex-direction: column; gap: 14px; }
+.anat .stack { display: flex; flex-direction: column; gap: 8px; }
+.anat .stack .cap { margin: 8px 0 0; }
 
 /* Merge sketch */
 .dialog { max-width: 640px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px 20px; }
@@ -129,7 +163,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .dialog .mag { margin-top: 10px; font-size: 12.5px; font-weight: 600; }
 .dialog ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--soft); line-height: 1.5; }
 .unit { margin-top: 16px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 12px 14px; }
-.unit .lab { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
 .side-col { border: 1px solid var(--rule); border-radius: 8px; padding: 9px 11px; font-size: 12.5px; line-height: 1.6; color: var(--soft); cursor: pointer; background: var(--panel); transition: border-color .2s; }
 .side-col.on { border-color: var(--therefore); color: var(--ink); }
@@ -145,76 +178,100 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 <div class="wrap">
   <div class="eyebrow">Estoria · rearrange cards, to confirm</div>
   <h1>Move a card by its grip</h1>
-  <p class="lede">The tiles from the option B restyle, with two small additions: a grip to drag a card to a new place, and a position number you can type into. Everything below works. Drag by the ⠿, type a number and press Enter, or click a card anywhere else to open it.</p>
+  <p class="lede">The tiles from the option B restyle, with a grip to drag a card to a new place. Every place is shown with the drawer collapsed and expanded, and everything works: drag by the ⠿, or click a card anywhere else to open it. The two sizes of each drawer share one order, so moving a card in one moves it in the other.</p>
   <ul class="rules">
-    <li><b>Drag by the grip.</b> The card lifts and follows the pointer. The others make room, and a dashed space shows where it will land.</li>
-    <li><b>Or type a position.</b> Click the number, type 1, press Enter: the card moves to the top. This also works with only a keyboard, and on a touchscreen.</li>
+    <li><b>Drag by the grip.</b> The card lifts and follows the pointer, with a mouse or a finger. The others make room, and a dashed space shows where it will land.</li>
+    <li><b>Numbers while you rearrange.</b> Press or Tab to a grip and every card shows its position. Type a number and press Enter to send a card straight there. Click away or press Escape and they hide.</li>
     <li><b>A click still opens the card.</b> Pressing the grip or the number never opens it, even if you drop the card back where it was.</li>
     <li><b>The order is saved in your file.</b> It's the order the project already keeps, so the phone shows it after the next sync, with no phone update.</li>
   </ul>
+  <nav class="jump" aria-label="Sections">
+    <a href="#s-tile">The tile</a><a href="#s-chars">Characters</a><a href="#s-world">World</a><a href="#s-lib">Notes library</a><a href="#s-refs">References</a><a href="#s-merge">Compare and merge</a>
+  </nav>
 
-  <section>
+  <section id="s-tile">
     <div class="eyebrow">The tile</div>
     <h2>Where the grip and the number sit</h2>
     <div class="anat">
       <div class="stack" id="anat"></div>
       <ol>
         <li><b>Grip ⠿</b>, at the very start of the top row, before the badge. The only place a drag starts, so a click anywhere else always opens the card.</li>
-        <li><b>Position number</b>, at the end of the top row on character and world cards, where a chapter card shows its cast.</li>
-        <li><b>Library and reference cards</b> already show their position as the badge (01, 02, as a chapter shows its number), so there the badge itself is the number you type into. No second number.</li>
+        <li><b>Position number</b> on character and world cards, at the end of the top row (where a chapter card shows its cast). Hidden until you rearrange: pressing or focusing a grip shows it on every card in that list.</li>
+        <li><b>Library and reference cards</b> already show their position as the badge (01, 02, as a chapter shows its number), so there the badge itself is the number you type into. Nothing extra appears.</li>
         <li><b>Keyboard:</b> Tab to the grip and press the arrow keys to move the card one place at a time.</li>
       </ol>
     </div>
   </section>
 
-  <section>
-    <div class="eyebrow">1 · Collapsed drawer</div>
-    <h2>Characters, one column</h2>
-    <p class="note">The side panel is a single column. Drag Sefa Kaur up to the top: the panel scrolls on its own when you hold a card near its top or bottom edge.</p>
-    <div class="cap">Collapsed <button class="reset" data-reset="chars">Reset order</button></div>
-    <div class="app side">
-      <div class="boardbg"></div>
-      <div class="dim"></div>
-      <div class="drawer side">
-        <div class="dhead"><div><div class="t">Characters</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
-        <div class="scroll"><div class="list" id="chars"></div></div>
-      </div>
-    </div>
+  <section id="s-chars">
+    <div class="eyebrow">1 · Characters drawer</div>
+    <h2>Characters</h2>
+    <p class="note">Collapsed, the cards stack in one column; the panel scrolls on its own when you hold a card near its top or bottom edge. Expanded, they sit in a grid and read left to right, then down.</p>
     <div class="filerow" id="chars-file"></div>
+    <div class="frames">
+      <div><div class="cap">Collapsed <button class="reset" data-reset="chars">Reset order</button></div>
+        <div class="app side"><div class="boardbg"></div><div class="dim"></div>
+          <div class="drawer side">${HEAD:Characters:}<div class="scroll"><div class="list" id="chars-side"></div></div></div></div></div>
+      <div><div class="cap">Expanded <button class="reset" data-reset="chars">Reset order</button></div>
+        <div class="app"><div class="drawer full">${HEAD:Characters:}<div class="grid" id="chars-full"></div></div></div></div>
+    </div>
   </section>
 
-  <section>
-    <div class="eyebrow">2 · Expanded drawer</div>
-    <h2>World, a grid</h2>
-    <p class="note">Full screen, the cards sit in a grid and read left to right, then down, like text. Dragging works in both directions: the cards reflow around the space as you move.</p>
-    <div class="cap">Expanded <button class="reset" data-reset="world">Reset order</button></div>
-    <div class="app">
-      <div class="drawer full">
-        <div class="dhead"><div><div class="t">World</div><div class="s">Places, factions, lore &amp; references</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
-        <div class="grid" id="world"></div>
-      </div>
-    </div>
+  <section id="s-world">
+    <div class="eyebrow">2 · World drawer</div>
+    <h2>World</h2>
+    <p class="note">Same as characters, with the category as the badge.</p>
     <div class="filerow" id="world-file"></div>
-  </section>
-
-  <section>
-    <div class="eyebrow">3 · Library and references</div>
-    <h2>The badge is the position</h2>
-    <p class="note">The Notes library, a world entry's references and a chapter's pinned references already have a grip and a number today. They carry over to the tiles unchanged in meaning: same store actions, and each place keeps its own order (a chapter's pin order isn't the library's).</p>
-    <div class="cap">Notes library, expanded <button class="reset" data-reset="lib">Reset order</button></div>
-    <div class="app">
-      <div class="drawer full">
-        <div class="dhead"><div><div class="t">Story notes</div><div class="s">Shared library · link these into any chapter</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
-        <div class="grid" id="lib"></div>
-      </div>
+    <div class="frames">
+      <div><div class="cap">Collapsed <button class="reset" data-reset="world">Reset order</button></div>
+        <div class="app side"><div class="boardbg"></div><div class="dim"></div>
+          <div class="drawer side">${HEAD:World:Places, factions, lore &amp; references}<div class="scroll"><div class="list" id="world-side"></div></div></div></div></div>
+      <div><div class="cap">Expanded <button class="reset" data-reset="world">Reset order</button></div>
+        <div class="app"><div class="drawer full">${HEAD:World:Places, factions, lore &amp; references}<div class="grid" id="world-full"></div></div></div></div>
     </div>
-    <div class="filerow" id="lib-file"></div>
   </section>
 
-  <section>
-    <div class="eyebrow">4 · When two copies disagree</div>
+  <section id="s-lib">
+    <div class="eyebrow">3 · Notes drawer</div>
+    <h2>The shared library</h2>
+    <p class="note">The story notes box stays on top. Library cards already had a grip and a number before the restyle; they carry over to the tiles with the same meaning. The badge is the position: press it to type a new one.</p>
+    <div class="filerow" id="lib-file"></div>
+    <div class="frames">
+      <div><div class="cap">Collapsed <button class="reset" data-reset="lib">Reset order</button></div>
+        <div class="app side"><div class="boardbg"></div><div class="dim"></div>
+          <div class="drawer side">${HEAD:Story notes:The Drowned Map · themes, questions &amp; reminders}<div class="scroll"><div class="nbody">${STORY}<div><div class="lab">Shared library · link these into any chapter</div><div class="list" id="lib-side"></div>
+            <div class="addrow" style="margin-top:11px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span></div></div></div></div></div></div></div>
+      <div><div class="cap">Expanded <button class="reset" data-reset="lib">Reset order</button></div>
+        <div class="app"><div class="drawer full">${HEAD:Story notes:The Drowned Map · themes, questions &amp; reminders}<div class="nbody" style="padding:18px 22px 22px">${STORY}<div><div class="lab">Shared library · link these into any chapter</div><div class="grid" id="lib-full"></div></div></div></div></div></div>
+    </div>
+  </section>
+
+  <section id="s-refs">
+    <div class="eyebrow">4 · References inside windows</div>
+    <h2>A world entry's references, and a chapter's pins</h2>
+    <p class="note">These cards live inside a window, not a drawer. Each place keeps its own order: moving a pin on this chapter doesn't move it in the library.</p>
+    <div class="frames">
+      <div><div class="filerow" id="wref-file"></div><div class="cap">World entry window, drawer collapsed <span>(the window opens in the middle of the screen)</span> <button class="reset" data-reset="wref">Reset order</button></div>
+        <div class="app fullh"><div class="boardbg"></div><div class="dim"></div>
+          <div class="drawer side">${HEAD:World:Places, factions, lore &amp; references}</div>
+          <div class="inwin">${WWIN:wref-side}</div></div></div>
+      <div><div class="cap">World entry window, drawer expanded <button class="reset" data-reset="wref">Reset order</button></div>
+        <div class="app fullh"><div class="drawer full">${HEAD:World:Places, factions, lore &amp; references}</div>
+          <div class="inwin">${WWIN:wref-full}</div></div></div>
+      <div><div class="filerow" id="cref-file"></div><div class="cap">Chapter window, Pinned references tab <button class="reset" data-reset="cref">Reset order</button></div>
+        <div class="app"><div class="boardbg"></div><div class="dim"></div>
+          <div class="inwin"><div class="modal wide">
+            <div class="chhead"><div class="row"><span class="badge">03</span><div class="title">The Lantern Market</div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div><div class="chmeta">2,410 words · 4 scenes · Drafting</div></div>
+            <div class="tabs"><span>Characters<i>2</i></span><span>World details<i>1</i></span><span>Chapter notes</span><span class="on">Pinned references<i>3</i></span></div>
+            <div class="chbody"><div class="tgrid" id="cref"></div><div class="addrow" style="margin-top:10px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span><span>+ Link book asset</span></div>
+              <div class="flowph">Scene flow continues below (unchanged)</div></div></div></div></div></div>
+    </div>
+  </section>
+
+  <section id="s-merge">
+    <div class="eyebrow">5 · When two copies disagree</div>
     <h2>Order in compare and merge</h2>
-    <p class="note">A sketch, not the final dialog. If you reorder on the laptop and the iPad before they sync, the compare dialog gets a new item for it, and the merge can take either order. Click a side to choose it.</p>
+    <p class="note">A sketch, not the final dialog. If you reorder on the laptop and the iPad before they sync, the compare dialog gets an item for it (Character order, World order or Library order), and the merge can take either one. Click a side to choose it.</p>
     <div class="dialog">
       <div class="h">This copy and the file differ</div>
       <div class="mag">A small change · 1 item differs</div>
@@ -244,6 +301,21 @@ const pad = (i) => String(i + 1).padStart(2, "0");
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const live = document.getElementById("live");
 
+// ---- Fill the repeated frame parts (drawer headers, story box, world window) ----
+const STORY = `<div class="storybox">The map is the antagonist's argument: that the past can be owned. Mara's arc ends when she gives the true chart away.</div>`;
+const head = (t, s) => `<div class="dhead"><div><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>`;
+const wwin = (id) => `<div class="modal"><div class="mhead"><span class="badge">PLACE</span><div class="title">The Drowned City</div><span class="grow"></span><span class="iconbtn">✕</span></div>
+  <div class="mbody"><div class="fields">
+    <div class="pair"><div><div class="lab">Name</div><div class="inp">The Drowned City</div></div><div style="flex:0 0 120px"><div class="lab">Category</div><div class="inp">Place ▾</div></div></div>
+    <div><div class="lab">Description</div><div class="inp ta">What is left of Aster after the sea came in. The bell towers still stand at low tide.</div></div>
+    <div><div class="lab">References</div><div class="tgrid" id="${id}"></div>
+      <div class="addrow" style="margin-top:9px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span><span>+ Link book asset</span></div></div>
+  </div></div></div>`;
+document.querySelector(".wrap").innerHTML = document.querySelector(".wrap").innerHTML
+  .replace(/\$\{HEAD:([^:}]*):([^}]*)\}/g, (_, t, s) => head(t, s))
+  .replace(/\$\{STORY\}/g, STORY)
+  .replace(/\$\{WWIN:([^}]*)\}/g, (_, id) => wwin(id));
+
 // ---- Data (same story as the restyle mockup) ----
 const CHARS = [
   { id: "mv", name: "Mara Vell", ini: "MV", color: "oklch(0.55 0.12 250)", role: "Protagonist", type: "Seeker", desc: "A cartographer's apprentice who can read water the way others read faces.", ch: 9 },
@@ -259,23 +331,24 @@ const WORLD = [
   { id: "bc", name: "Bell Code", cat: "Lore", desc: "Harbour signals rung on the drowned towers. Few still know the full set.", ch: 2, refs: 1 },
   { id: "lt", name: "The Long Tide", cat: "Event", desc: "", ch: 0, refs: 0 },
   { id: "lm", name: "Lantern Market", cat: "Place", desc: "Night market on the old sea wall. Everything is for sale, including the truth.", ch: 3, refs: 2 },
-  { id: "ch", name: "The Channels", cat: "Place", desc: "Shifting water roads through the ruins. Sounded weekly, charted never.", ch: 5, refs: 0 },
+  { id: "cn", name: "The Channels", cat: "Place", desc: "Shifting water roads through the ruins. Sounded weekly, charted never.", ch: 5, refs: 0 },
   { id: "gf", name: "Guild Factors", cat: "Faction", desc: "The guild's eyes in the market. Paid by the lie, not the hour.", ch: 4, refs: 1 },
 ];
-const LIB = [
-  { id: "theme", kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
-  { id: "todo", kind: "TODO", label: "Revision pass 2", open: "Give Oren a reason to lie · Seed the bell code in Ch 2", done: "1 of 3 done", pins: 2 },
-  { id: "harbour", kind: "IMAGE", label: "Harbour at low tide", pins: 2 },
-  { id: "towers", kind: "NOTE", label: "Bell towers", body: "Seven towers. Only four still ring. The fifth is where Oren hid the chart.", pins: 2 },
-  { id: "blank", kind: "NOTE", label: "", body: "", pins: 0 },
-];
+const A = {
+  theme: { id: "theme", kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
+  todo: { id: "todo", kind: "TODO", label: "Revision pass 2", open: "Give Oren a reason to lie · Seed the bell code in Ch 2", done: "1 of 3 done", pins: 2 },
+  harbour: { id: "harbour", kind: "IMAGE", label: "Harbour at low tide", pins: 2 },
+  towers: { id: "towers", kind: "NOTE", label: "Bell towers", body: "Seven towers. Only four still ring. The fifth is where Oren hid the chart.", pins: 2 },
+  blank: { id: "blank", kind: "NOTE", label: "", body: "", pins: 0 },
+};
 const kindWord = { NOTE: "Note", TODO: "To-do", IMAGE: "Image" };
 
 // ---- Tiles ----
 const grip = (name) => `<button class="grip" type="button" aria-label="Move ${esc(name)}. Drag, or use the arrow keys" title="Drag to move">⠿</button>`;
-const posInput = (i, n, name, asBadge) =>
-  `<input class="pos${asBadge ? " asbadge" : ""}" inputmode="numeric" value="${asBadge ? pad(i) : i + 1}" data-shown="${asBadge ? pad(i) : i + 1}" aria-label="Position of ${esc(name)}, ${i + 1} of ${n}. Type a number to move it" title="Position ${i + 1} of ${n}, type a number to move it">`;
-
+const posInput = (i, n, name, asBadge) => {
+  const shown = asBadge ? pad(i) : String(i + 1);
+  return `<input class="pos ${asBadge ? "asbadge" : "reveal"}" inputmode="numeric" value="${shown}" data-shown="${shown}" aria-label="Position of ${esc(name)}, ${i + 1} of ${n}. Type a number to move it" title="Position ${i + 1} of ${n}, type a number to move it">`;
+};
 const charTile = (c, i, n) => `<div class="tile" data-id="${c.id}">
   <div class="top">${grip(c.name)}<span class="ini" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role || "No role")}</span><span class="grow"></span>${posInput(i, n, c.name)}</div>
   <div class="title">${esc(c.name)}</div><div class="sum ${c.desc ? "" : "empty"}">${esc(c.desc || "No description yet")}</div><div class="grow"></div>
@@ -308,22 +381,41 @@ function openWindow(badgeHtml, title) {
 function closeWindow() { win.hidden = true; lastFocus?.focus?.(); }
 document.getElementById("win-close").onclick = closeWindow;
 win.addEventListener("click", (e) => { if (e.target === win) closeWindow(); });
-addEventListener("keydown", (e) => { if (e.key === "Escape" && !win.hidden) closeWindow(); });
 
-// ---- One reorderable list. Same code for the column and the grid. ----
-function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl }) {
-  const initial = items.slice();
-  let order = items.slice();
-  let suppressClick = false;
+// ---- "Rearranging": shown while a grip or number is pressed, focused, or a drag is on ----
+const stopArranging = () => document.querySelectorAll(".arranging").forEach((v) => v.classList.remove("arranging"));
+document.addEventListener("pointerdown", (e) => {
+  document.querySelectorAll(".arranging").forEach((v) => {
+    if (!v.contains(e.target) || !e.target.closest(".grip, .pos")) v.classList.remove("arranging");
+  });
+}, true);
+addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!win.hidden) closeWindow();
+  else if (!e.target.closest?.(".pos")) stopArranging();
+});
 
-  const render = () => {
-    el.innerHTML = order.map((it, i) => tile(it, i, order.length)).join("") + `<div class="add">+ ${addLabel}</div>`;
-    fileEl.innerHTML = `<b>Order saved in the project file:</b> ${order.map((it) => esc(nameOf(it))).join(", ")}`;
+// ---- A store holds one order; each view (collapsed, expanded) draws it ----
+function makeStore({ items, nameOf, badgeOf, fileEl, addLabel }) {
+  const s = { initial: items.slice(), order: items.slice(), views: [], nameOf, badgeOf, addLabel };
+  s.drawFile = () => (fileEl.innerHTML = `<b>Order saved in the project file:</b> ${s.order.map((it) => esc(nameOf(it))).join(", ")}`);
+  s.commit = (next, view) => {
+    const apply = () => { s.order = next; s.views.forEach((v) => v.render()); s.drawFile(); };
+    view ? view.flip(apply) : apply();
   };
-  const byId = (id) => order.find((it) => it.id === id);
+  s.reset = () => s.commit(s.initial.slice(), null);
+  return s;
+}
 
-  /** Run `change`, then slide every tile from where it was to where it is now. */
-  const flip = (change) => {
+function view({ el, store, tile, mode, addTile }) {
+  let suppressClick = false;
+  const v = {};
+  v.render = () => {
+    const o = store.order;
+    el.innerHTML = o.map((it, i) => tile(it, i, o.length)).join("") + (addTile ? `<div class="add">+ ${store.addLabel}</div>` : "");
+  };
+  /** Run `change`, then slide this view's tiles from where they were to where they are. */
+  v.flip = (change) => {
     const before = new Map();
     el.querySelectorAll(".tile").forEach((t) => before.set(t.dataset.id, t.getBoundingClientRect()));
     change();
@@ -336,32 +428,38 @@ function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl 
       if (dx || dy) t.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 200, easing: "ease-out" });
     });
   };
-
   const moveTo = (id, to, focusSel) => {
-    const from = order.findIndex((it) => it.id === id);
-    to = Math.max(0, Math.min(order.length - 1, to));
-    if (from === -1 || from === to) { render(); return false; }
-    flip(() => {
-      const next = order.slice();
-      const [it] = next.splice(from, 1);
-      next.splice(to, 0, it);
-      order = next;
-      render();
-    });
-    live.textContent = `${nameOf(byId(id))} moved to position ${to + 1} of ${order.length}.`;
+    const o = store.order;
+    const from = o.findIndex((it) => it.id === id);
+    to = Math.max(0, Math.min(o.length - 1, to));
+    if (from === -1 || from === to) { v.render(); return; }
+    const next = o.slice();
+    const [it] = next.splice(from, 1);
+    next.splice(to, 0, it);
+    store.commit(next, v);
+    live.textContent = `${store.nameOf(it)} moved to position ${to + 1} of ${o.length}.`;
     if (focusSel) el.querySelector(`.tile[data-id="${id}"] ${focusSel}`)?.focus();
-    return true;
   };
 
   // Click anywhere on a tile opens it, except on the grip or the number.
   el.addEventListener("click", (e) => {
-    if (suppressClick) return;
-    if (e.target.closest(".grip, .pos")) return;
+    if (suppressClick || e.target.closest(".grip, .pos")) return;
     const t = e.target.closest(".tile");
-    if (t) { const it = byId(t.dataset.id); openWindow(badgeOf(it, order.indexOf(it)), nameOf(it)); }
+    if (!t) return;
+    const it = store.order.find((x) => x.id === t.dataset.id);
+    openWindow(store.badgeOf(it, store.order.indexOf(it)), store.nameOf(it));
   });
-
-  // Typed position.
+  el.addEventListener("focusin", (e) => { if (e.target.closest(".grip, .pos")) el.classList.add("arranging"); });
+  el.addEventListener("focusout", (e) => {
+    const pos = e.target.closest(".pos");
+    if (!e.relatedTarget || !el.contains(e.relatedTarget) || !e.relatedTarget.closest(".grip, .pos")) el.classList.remove("arranging");
+    if (!pos || pos.value === pos.dataset.shown) return;
+    const n = parseInt(pos.value, 10);
+    const id = pos.closest(".tile").dataset.id;
+    if (!Number.isFinite(n)) { pos.value = pos.dataset.shown; return; }
+    setTimeout(() => moveTo(id, n - 1), 0); // let the blur finish before re-rendering
+  });
+  el.addEventListener("input", (e) => { if (e.target.classList.contains("pos")) e.target.value = e.target.value.replace(/[^0-9]/g, ""); });
   el.addEventListener("keydown", (e) => {
     const pos = e.target.closest(".pos");
     if (pos) {
@@ -372,42 +470,39 @@ function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl 
     const g = e.target.closest(".grip");
     if (!g) return;
     const id = g.closest(".tile").dataset.id;
-    const i = order.findIndex((it) => it.id === id);
+    const i = store.order.findIndex((it) => it.id === id);
     if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); moveTo(id, i - 1, ".grip"); }
     if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); moveTo(id, i + 1, ".grip"); }
   });
-  el.addEventListener("input", (e) => {
-    if (e.target.classList.contains("pos")) e.target.value = e.target.value.replace(/[^0-9]/g, "");
-  });
-  el.addEventListener("focusout", (e) => {
-    const pos = e.target.closest(".pos");
-    if (!pos || pos.value === pos.dataset.shown) return;
-    const n = parseInt(pos.value, 10);
-    const id = pos.closest(".tile").dataset.id;
-    if (!Number.isFinite(n)) { pos.value = pos.dataset.shown; return; }
-    // Defer so the blur finishes before the list re-renders under it.
-    setTimeout(() => moveTo(id, n - 1), 0);
-  });
 
-  // Grip drag. Pointer events, so it works with a finger as well as a mouse.
+  // Grip drag. Pointer events, so a finger works as well as a mouse.
   el.addEventListener("pointerdown", (e) => {
     const g = e.target.closest(".grip");
     if (!g || e.button > 0) return;
     e.preventDefault();
     e.stopPropagation();
+    el.classList.add("arranging");
     const tileEl = g.closest(".tile");
     const id = tileEl.dataset.id;
     const r = tileEl.getBoundingClientRect();
     const off = { x: e.clientX - r.left, y: e.clientY - r.top };
     const start = { x: e.clientX, y: e.clientY };
-    let lifted = null, slot = null;
+    let lifted = null, slot = null, raf = 0;
     let ptr = { x: e.clientX, y: e.clientY };
-    let raf = 0;
-    const scroller = el.closest(".scroll");
+    const scroller = el.closest(".scroll, .inwin");
 
+    // Show every card's new number as the space moves.
+    const renumber = () => {
+      let i = 0;
+      for (const c of el.children) {
+        if (!c.classList.contains("tile") && c !== slot) continue;
+        const p = (c === slot ? lifted : c).querySelector(".pos");
+        if (p) p.value = p.classList.contains("asbadge") ? pad(i) : String(i + 1);
+        i++;
+      }
+    };
     const lift = () => {
-      // The press only becomes a drag once it moves, so a still press on the
-      // grip does nothing at all (it never opens the card).
+      // A press only becomes a drag once it moves 4px, so a still press does nothing.
       lifted = tileEl.cloneNode(true);
       lifted.classList.add("lifted");
       Object.assign(lifted.style, { width: r.width + "px", height: r.height + "px", left: r.left + "px", top: r.top + "px" });
@@ -419,35 +514,30 @@ function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl 
       document.body.classList.add("dragging");
       tick();
     };
-
-    /** Where the space should go: before the first tile the pointer is "ahead of", reading order. */
+    /** The space goes before the first tile the pointer is "ahead of", in reading order. */
     const place = () => {
-      const tiles = [...el.querySelectorAll(".tile")];
       let ref = el.querySelector(".add");
-      for (const t of tiles) {
+      for (const t of el.querySelectorAll(".tile")) {
         const b = t.getBoundingClientRect();
         const ahead = mode === "column"
           ? ptr.y < b.top + b.height / 2
           : ptr.y < b.top || (ptr.y <= b.bottom && ptr.x < b.left + b.width / 2);
         if (ahead) { ref = t; break; }
       }
-      if (slot.nextElementSibling !== ref) flip(() => el.insertBefore(slot, ref));
+      if (slot.nextElementSibling !== ref) { v.flip(() => el.insertBefore(slot, ref)); renumber(); }
     };
-
-    // Auto-scroll near the edges of a scrolling panel.
     const tick = () => {
       if (!lifted) return;
       if (scroller) {
         const b = scroller.getBoundingClientRect();
         const edge = 48;
-        let v = 0;
-        if (ptr.y < b.top + edge) v = -Math.ceil((b.top + edge - ptr.y) / 4);
-        else if (ptr.y > b.bottom - edge) v = Math.ceil((ptr.y - (b.bottom - edge)) / 4);
-        if (v) { scroller.scrollTop += v; place(); }
+        let s = 0;
+        if (ptr.y < b.top + edge) s = -Math.ceil((b.top + edge - ptr.y) / 4);
+        else if (ptr.y > b.bottom - edge) s = Math.ceil((ptr.y - (b.bottom - edge)) / 4);
+        if (s) { scroller.scrollTop += s; place(); }
       }
       raf = requestAnimationFrame(tick);
     };
-
     const onMove = (ev) => {
       ptr = { x: ev.clientX, y: ev.clientY };
       if (!lifted) {
@@ -464,79 +554,97 @@ function reorderable({ el, items, tile, addLabel, mode, nameOf, badgeOf, fileEl 
       removeEventListener("pointercancel", onUp);
       cancelAnimationFrame(raf);
       if (!lifted) return;
-      // The click that follows this release must not open a card, even when the
-      // card is dropped back on itself.
+      // The click that follows this release must not open a card, even one dropped back on itself.
       suppressClick = true;
       setTimeout(() => (suppressClick = false), 0);
       document.body.classList.remove("dragging");
-      const before = [...el.querySelectorAll(".tile, .slot")];
-      const to = before.indexOf(slot);
+      const to = [...el.querySelectorAll(".tile, .slot")].indexOf(slot);
       slot.replaceWith(tileEl);
       const land = tileEl.getBoundingClientRect();
-      const from = lifted.getBoundingClientRect();
+      const at = lifted.getBoundingClientRect();
       const ghost = lifted;
       lifted = null;
-      if (!reduced) {
-        tileEl.style.visibility = "hidden";
-        ghost.animate([{ left: from.left + "px", top: from.top + "px" }, { left: land.left + "px", top: land.top + "px" }], { duration: 150, easing: "ease-out" }).onfinish = () => { ghost.remove(); tileEl.style.visibility = ""; finish(); };
-      } else { ghost.remove(); finish(); }
-      function finish() {
-        const next = order.slice();
-        const from = next.findIndex((it) => it.id === id);
-        const [it] = next.splice(from, 1);
+      const finish = () => {
+        ghost.remove();
+        tileEl.style.visibility = "";
+        const next = store.order.slice();
+        const [it] = next.splice(next.findIndex((x) => x.id === id), 1);
         next.splice(to, 0, it);
-        const changed = next.some((x, i) => x !== order[i]);
-        order = next;
-        render();
-        if (changed) live.textContent = `${nameOf(it)} moved to position ${to + 1} of ${order.length}.`;
-      }
+        const changed = next.some((x, i) => x !== store.order[i]);
+        store.commit(next, null);
+        if (changed) live.textContent = `${store.nameOf(it)} moved to position ${to + 1} of ${next.length}.`;
+      };
+      if (reduced) return finish();
+      tileEl.style.visibility = "hidden";
+      ghost.animate([{ left: at.left + "px", top: at.top + "px" }, { left: land.left + "px", top: land.top + "px" }], { duration: 150, easing: "ease-out" }).onfinish = finish;
     };
     addEventListener("pointermove", onMove);
     addEventListener("pointerup", onUp);
     addEventListener("pointercancel", onUp);
   });
 
-  render();
-  return { reset: () => flip(() => { order = initial.slice(); render(); }) };
+  store.views.push(v);
+  v.render();
+  return v;
 }
 
-const lists = {
-  chars: reorderable({
-    el: document.getElementById("chars"), fileEl: document.getElementById("chars-file"),
-    items: CHARS, tile: charTile, addLabel: "Add character", mode: "column",
-    nameOf: (c) => c.name, badgeOf: (c) => `<span class="ini" style="background:${c.color}">${esc(c.ini)}</span>`,
-  }),
-  world: reorderable({
-    el: document.getElementById("world"), fileEl: document.getElementById("world-file"),
-    items: WORLD, tile: worldTile, addLabel: "Add world entry", mode: "grid",
-    nameOf: (w) => w.name, badgeOf: (w) => `<span class="badge">${esc(w.cat.toUpperCase())}</span>`,
-  }),
-  lib: reorderable({
-    el: document.getElementById("lib"), fileEl: document.getElementById("lib-file"),
-    items: LIB, tile: libTile, addLabel: "Add note, to-do or image", mode: "grid",
-    nameOf: libName, badgeOf: (a, i) => `<span class="badge">${pad(i)}</span><span class="tag">${kindWord[a.kind]}</span>`,
-  }),
+const stores = {
+  chars: makeStore({ items: CHARS, nameOf: (c) => c.name, addLabel: "Add character", fileEl: document.getElementById("chars-file"),
+    badgeOf: (c) => `<span class="ini" style="background:${c.color}">${esc(c.ini)}</span>` }),
+  world: makeStore({ items: WORLD, nameOf: (w) => w.name, addLabel: "Add world entry", fileEl: document.getElementById("world-file"),
+    badgeOf: (w) => `<span class="badge">${esc(w.cat.toUpperCase())}</span>` }),
+  lib: makeStore({ items: [A.theme, A.todo, A.harbour, A.towers, A.blank], nameOf: libName, addLabel: "Add note, to-do or image", fileEl: document.getElementById("lib-file"),
+    badgeOf: (a, i) => `<span class="badge">${pad(i)}</span>` }),
+  wref: makeStore({ items: [A.harbour, A.towers, A.todo], nameOf: libName, fileEl: document.getElementById("wref-file"),
+    badgeOf: (a, i) => `<span class="badge">${pad(i)}</span>` }),
+  cref: makeStore({ items: [A.todo, A.harbour, A.theme], nameOf: libName, fileEl: document.getElementById("cref-file"),
+    badgeOf: (a, i) => `<span class="badge">${pad(i)}</span>` }),
 };
-document.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => lists[b.dataset.reset].reset()));
+// The file rows for references say whose pin order it is.
+const fileLabel = { wref: "The Drowned City's pin order", cref: "Chapter 3's pin order" };
+for (const k of ["wref", "cref"]) {
+  const s = stores[k], el = document.getElementById(`${k}-file`);
+  s.drawFile = () => (el.innerHTML = `<b>${fileLabel[k]}, saved in the project file:</b> ${s.order.map((it) => esc(libName(it))).join(", ")}`);
+}
 
-// ---- Anatomy: one static character tile and one library tile ----
-document.getElementById("anat").innerHTML = charTile(CHARS[0], 0, 6).replace('class="tile"', 'class="tile" style="cursor:default"') + libTile(LIB[0], 0, 5).replace('class="tile"', 'class="tile" style="cursor:default"');
-document.getElementById("anat").addEventListener("pointerdown", (e) => e.preventDefault());
+view({ el: document.getElementById("chars-side"), store: stores.chars, tile: charTile, mode: "column", addTile: true });
+view({ el: document.getElementById("chars-full"), store: stores.chars, tile: charTile, mode: "grid", addTile: true });
+view({ el: document.getElementById("world-side"), store: stores.world, tile: worldTile, mode: "column", addTile: true });
+view({ el: document.getElementById("world-full"), store: stores.world, tile: worldTile, mode: "grid", addTile: true });
+view({ el: document.getElementById("lib-side"), store: stores.lib, tile: libTile, mode: "column", addTile: false });
+view({ el: document.getElementById("lib-full"), store: stores.lib, tile: libTile, mode: "grid", addTile: true });
+view({ el: document.getElementById("wref-side"), store: stores.wref, tile: libTile, mode: "grid", addTile: false });
+view({ el: document.getElementById("wref-full"), store: stores.wref, tile: libTile, mode: "grid", addTile: false });
+view({ el: document.getElementById("cref"), store: stores.cref, tile: libTile, mode: "grid", addTile: false });
+Object.values(stores).forEach((s) => s.drawFile());
+document.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = () => stores[b.dataset.reset].reset()));
+
+// ---- Anatomy: a character tile at rest and while rearranging, and a library tile ----
+const still = (html) => html.replace('class="tile"', 'class="tile" style="cursor:default"');
+document.getElementById("anat").innerHTML =
+  `<div class="cap">At rest</div>` + still(charTile(CHARS[0], 0, 6)) +
+  `<div class="cap">While rearranging</div><div class="arranging">${still(charTile(CHARS[0], 0, 6))}</div>` +
+  `<div class="cap">Library card <span>(the badge is the number)</span></div>` + still(libTile(A.theme, 0, 5));
+const anat = document.getElementById("anat");
+anat.addEventListener("pointerdown", (e) => e.preventDefault());
+anat.querySelectorAll("input, button").forEach((x) => (x.tabIndex = -1));
+anat.querySelectorAll("input").forEach((x) => (x.readOnly = true));
 
 // ---- Merge sketch ----
 const here = ["Mara Vell", "Oren Tal", "Ines Lorre", "Pell Durran"];
 const file = ["Ines Lorre", "Mara Vell", "Oren Tal", "Pell Durran"];
 let pick = "mine";
 const merge = document.getElementById("merge");
+merge.setAttribute("role", "radiogroup");
+merge.setAttribute("aria-label", "Which character order to keep");
 const drawMerge = () => {
   const col = (key, who, names) => `<div class="side-col ${pick === key ? "on" : ""}" role="radio" tabindex="0" aria-checked="${pick === key}" data-k="${key}">
     <div class="who">${who}${pick === key ? " · kept" : ""}</div>${names.map((n, i) => `<div><span class="n">${i + 1}</span>${n}</div>`).join("")}<div style="color:var(--faint)">and 2 more</div></div>`;
   merge.innerHTML = col("mine", "This copy", here) + col("theirs", "The file", file);
 };
-merge.setAttribute("role", "radiogroup");
-merge.setAttribute("aria-label", "Which character order to keep");
-merge.addEventListener("click", (e) => { const c = e.target.closest(".side-col"); if (c) { pick = c.dataset.k; drawMerge(); merge.querySelector(".on").focus(); } });
-merge.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.k) { e.preventDefault(); pick = e.target.dataset.k; drawMerge(); merge.querySelector(".on").focus(); } });
+const choose = (k) => { pick = k; drawMerge(); merge.querySelector(".on").focus(); };
+merge.addEventListener("click", (e) => { const c = e.target.closest(".side-col"); if (c) choose(c.dataset.k); });
+merge.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset?.k) { e.preventDefault(); choose(e.target.dataset.k); } });
 drawMerge();
 </script>
 </body>

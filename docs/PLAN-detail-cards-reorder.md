@@ -1,9 +1,30 @@
 # Plan: rearrange character and world cards (and the tiles that already reorder)
 
-Status: **PLAN ONLY**, waiting for Ray's go-ahead. No feature code.
+Status: **PLAN ONLY.** Ray answered the questions on 2026-11-21 (below); build
+order to be chosen once all four features are planned. No feature code.
 Branch: `claude/detail-cards-reorder-f20e90` (worktree), not pushed.
 Mockup: [`docs/mockups/detail-cards-reorder.html`](mockups/detail-cards-reorder.html)
-(clickable: drag, typed position, click to open, merge sketch).
+(clickable: every place shown with the drawer collapsed and expanded, drag,
+typed position, click to open, merge sketch).
+
+## Ray's answers (2026-11-21)
+
+1. **Drag by the grip**, not the whole tile.
+2. **Touch: yes.** The grip drags with a finger (pointer events), the first
+   touch drag in the app.
+3. **Restore near the old place**, as proposed.
+4. **The chapter cast follows roster order**: fine.
+5. **Relationship ring order** is for the relationship session to define.
+   Handed over to it on 2026-11-21.
+6. **Compare and merge order units: yes**, Character order, World order and,
+   read as included, Library order.
+7. **Phone shows the order but can't change it** for now: fine.
+8. **Position numbers on character and world tiles only while rearranging.**
+   Read as: hidden at rest; they appear on every tile in that list when you
+   press or Tab to a grip, stay up through a drag (updating live as the space
+   moves), and hide when you click away, open a card or press Escape. No
+   separate Rearrange mode. Library and reference tiles are unchanged: their
+   badge is always their position.
 
 Built on the restyle, **option B everywhere** (`claude/detail-cards-style-5424f7`,
 commit 84b6b02, `docs/PLAN-detail-cards.md`): every card is a chapter-style
@@ -29,7 +50,7 @@ tiles and the expanded drawer is a grid. Also fits the relationship chart
    RefList's own grip code. The store actions for references don't change.
 5. **The order is the array** the file already keeps: no new field, no schema
    bump. The phone shows the new order after sync with no update.
-6. **Compare and merge gets "Character order" and "World order"** items,
+6. **Compare and merge gets "Character order", "World order" and "Library order"** items,
    because today an order-only difference can't be seen or merged.
 7. **The restyle lands first**, then this, built on `DetailCard`.
 
@@ -66,8 +87,12 @@ tiles and the expanded drawer is a grid. Also fits the relationship chart
 
 - The grip is a 20 × 26px target around a 13px glyph, faint until hovered,
   with a focus ring. The window's own header has no grip.
-- The position number is always visible, faint, in a small mono field
-  (question 8 asks whether it should only appear on hover).
+- The position number on character and world tiles shows **only while
+  rearranging** (answer 8): pressing or focusing any grip in a list puts that
+  list in "rearranging", which shows every tile's number; clicking outside the
+  grips and numbers, opening a card, or Escape ends it. While a card is
+  carried, every number (the carried card's too) updates as the space moves.
+  It is a CSS class on the list, not stored anywhere.
 
 ### Dragging
 
@@ -107,10 +132,10 @@ Three rules, all in the mockup:
 - **Grip:** Tab to it, then ← or ↑ moves one place earlier, → or ↓ one place
   later. Focus stays on the grip, and a screen reader hears "Mara Vell moved to
   position 2 of 6".
-- **Touch (question 2):** the mockup uses pointer events, with
-  `touch-action: none` on the grip only, so a finger drags by the grip and the
-  rest of the list still scrolls. That would be the first touch drag in the
-  app. Without it, the typed number still works on touch.
+- **Touch (answer 2: yes):** pointer events, with `touch-action: none` on
+  the grip only, so a finger drags by the grip and the rest of the list still
+  scrolls. The first touch drag in the app; the board and other drags keep
+  mouse events for now.
 
 ### Why not drag the whole tile
 
@@ -124,8 +149,7 @@ whole tile. The grip is still recommended:
   scroll; a grip-only drag does not.
 - **Click to open stays instant** and never depends on how steady a hand is.
 
-If Ray prefers whole-tile drag (question 1), the same code works with the tile
-as the handle and the grip as a visual hint only.
+Ray chose the grip (answer 1).
 
 ## RefList carries over to the tiles
 
@@ -149,7 +173,7 @@ as the handle and the grip as a visual hint only.
 | Board and timeline cast avatars | **no**: each chapter keeps its own `chars` order |
 | Markdown export, Characters and World sections (`markdown.ts:86`) | yes |
 | Phone: Characters / World screens, chapter pickers | yes, with no phone update |
-| Relationship chart ring (if built) | yes, if it lays characters out in roster order (question 5) |
+| Relationship chart ring (if built) | the relationship session decides (answer 5) |
 | Archive shelf | stays in array order, not reorderable |
 
 Characters and world entries are the series bible, so there is **one order
@@ -160,7 +184,7 @@ for the whole project**, shared by every book and version.
 - **Archived items keep their slot.** The new store actions are clones of
   `reorderAsset`: the index counts visible tiles only, archived entries stay
   where they are. Archiving never shuffles the others, and **Restore puts a
-  card back near where it was**, not at the end (question 3).
+  card back near where it was**, not at the end (answer 3).
 - **The archive shelf** stays a compact list in array order, no grip.
 - **The draft tile** has no grip or number and stays last until saved.
 - **No grouping or filtering exists** in either drawer. If World ever groups
@@ -188,7 +212,7 @@ for the whole project**, shared by every book and version.
   order *and* anything else, the result keeps this copy's order without saying
   so.
 
-Proposal: two story-wide units, **Character order** and **World order**
+Proposal: three story-wide units, **Character order**, **World order** and **Library order**
 (sketched at the bottom of the mockup).
 
 - **When it appears:** only when ids present in *both* copies are in a
@@ -200,9 +224,8 @@ Proposal: two story-wide units, **Character order** and **World order**
   Applied after record choices, so the two compose.
 - **Tests:** diff (order-only; add-only does not trigger; archived reorder),
   merge (file's order with records from both sides). `sync.test.ts` counts the
-  story-wide units (`total += 9`), so totals move to 11.
-- **Library order** could ride along as a third unit at almost no cost
-  (question 6).
+  story-wide units (`total += 9`), so totals move to 12.
+- **Library order** rides along as a third unit (answer 6), same helper.
 
 ## Android
 
@@ -238,7 +261,7 @@ Proposal: two story-wide units, **Character order** and **World order**
 - Its field lives in the character window; the grip is on the tile. No
   overlap in the UI.
 - If the ring follows roster order, reordering arranges the chart, with no
-  stored layout (question 5).
+  stored layout. Ray left this to the relationship session (answer 5).
 - Both features add story-wide diff units; whichever lands second updates
   the unit count in `sync.test.ts`.
 
@@ -260,22 +283,11 @@ Proposal: two story-wide units, **Character order** and **World order**
 - `docs/SPECS.md` §4 rows (reorder, conflict order units, pinned resources
   row updated), §8 Android note; `docs/SESSIONS.md` entry.
 
-## Open questions for Ray
+## Still open
 
-1. **Grip or whole tile?** Drag by the ⠿ grip (proposed, as mocked), or by
-   the whole tile now that option B makes it possible?
-2. **Touch:** should the grip drag with a finger on the iPad and touchscreens
-   (as mocked; the first touch drag in the app), or is the typed number
-   enough there for now?
-3. **Restore:** an archived card comes back near its old place (proposed), or
-   at the end?
-4. **Chapter cast:** the chapter modal's cast list and picker will follow your
-   roster order. Fine? (Board avatars keep each chapter's own order.)
-5. **Relationship chart:** should its ring follow roster order, so reordering
-   arranges the chart?
-6. **Compare and merge:** add Character order and World order (proposed)?
-   Include the library's order too?
-7. **Phone:** fine for the phone to show the order but not change it for now,
-   with "No differences" on an order-only conflict as a known gap?
-8. **Position number** on character and world tiles: always visible, faint
-   (as mocked), or only on hover and focus?
+1. **"Only while rearranging"** is read as above (press or Tab to a grip, no
+   separate mode). If Ray meant a Rearrange button in the drawer header that
+   shows grips and numbers, the drag code is the same; only the trigger moves.
+2. **Library order** in compare and merge was read as included in "ok".
+3. **Build order** across the four features: Ray decides once all are planned.
+   This one assumes the restyle lands first.
