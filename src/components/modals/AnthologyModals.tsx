@@ -121,7 +121,7 @@ function AddPiece({ section, close }: { section: string; close: () => void }) {
             </div>
           )}
           {doc.drafts.length > 1 && (
-            <p className="text-[12px]">It joins the version you're viewing.</p>
+            <p className="text-[12px]">It joins every version of this anthology.</p>
           )}
         </>
       )}
@@ -170,6 +170,7 @@ function BringInConfirm({
           <li>
             <b className="text-ink">Versions:</b>{" "}
             {versions > 1 ? `its main version comes in; the other ${versions - 1} stay in the saved copy` : "its one version comes in"}
+            , into every version of this anthology
           </li>
           <li>
             <b className="text-ink">Pace:</b> its writing days are added into the anthology's history
