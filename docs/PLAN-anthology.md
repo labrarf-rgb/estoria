@@ -308,4 +308,8 @@ with these calls made during the build:
   (keep one), now named "anthology" in the message.
 - **Not built:** the map export (`markdown.ts`) still says chapters; drag on
   touch screens (mouse drag only, like the board); the phone update.
+- **After Ray's first test (2026-11-21):** the way back from a piece is a
+  **Board** button in the toolbar, where a book's Board / Timeline switch is
+  (the ‹ Board link under the toolbar is gone); and each section heading has a
+  **Sections ▾** dropdown after its ⋯ that scrolls the board to any section.
 

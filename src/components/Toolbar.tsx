@@ -52,6 +52,8 @@ export function Toolbar() {
   const anth = isAnthology(doc);
   const noBoard = piece || anth;
   const setAddPieceDialog = useStore((s) => s.setAddPieceDialog);
+  const openCh = useStore((s) => s.openCh);
+  const closeChapter = useStore((s) => s.closeChapter);
 
   const [versionMenu, setVersionMenu] = useState(false);
   // "+ Add version" expands into the prose question rather than acting at once.
@@ -313,6 +315,17 @@ export function Toolbar() {
             <span className="-mt-px text-[15px] font-normal leading-none">+</span> Add piece
           </button>
           <span className="h-[22px] w-px shrink-0 bg-rule" />
+          {/* Board sits where a book's Board / Timeline switch does, so the way
+              back from a piece is in the same place as in a book. */}
+          <div className="flex shrink-0 rounded-[9px] bg-chip p-[3px]">
+            <button
+              className={openCh ? segOff : segOn}
+              onClick={closeChapter}
+              title={openCh ? "Back to the board" : "The board of pieces"}
+            >
+              Board
+            </button>
+          </div>
         </>
       )}
       {!noBoard && !onSeriesMap && view === "board" && (
