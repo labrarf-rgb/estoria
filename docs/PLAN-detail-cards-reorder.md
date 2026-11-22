@@ -14,8 +14,11 @@ typed position, click to open, merge sketch).
    touch drag in the app.
 3. **Restore near the old place**, as proposed.
 4. **The chapter cast follows roster order**: fine.
-5. **Relationship ring order** is for the relationship session to define.
-   Handed over to it on 2026-11-21.
+5. **Relationship ring order:** answered by the relationship plan
+   (`claude/relationship-chart-4c8990`, commit 169a2ac). The ring uses roster
+   order for characters nobody has dragged and for "Arrange in a ring";
+   dragged positions are saved separately (`relationshipLayout`, keyed by id),
+   so reordering never moves a character already placed on the chart.
 6. **Compare and merge order units: yes**, Character order, World order and,
    read as included, Library order.
 7. **Phone shows the order but can't change it** for now: fine.
@@ -173,7 +176,7 @@ Ray chose the grip (answer 1).
 | Board and timeline cast avatars | **no**: each chapter keeps its own `chars` order |
 | Markdown export, Characters and World sections (`markdown.ts:86`) | yes |
 | Phone: Characters / World screens, chapter pickers | yes, with no phone update |
-| Relationship chart ring (if built) | the relationship session decides (answer 5) |
+| Relationship chart ring (if built) | only characters not yet dragged on the chart, and "Arrange in a ring" (answer 5) |
 | Archive shelf | stays in array order, not reorderable |
 
 Characters and world entries are the series bible, so there is **one order
@@ -260,10 +263,12 @@ Proposal: three story-wide units, **Character order**, **World order** and **Lib
 - No data overlap: relationships point at ids, order is the array.
 - Its field lives in the character window; the grip is on the tile. No
   overlap in the UI.
-- If the ring follows roster order, reordering arranges the chart, with no
-  stored layout. Ray left this to the relationship session (answer 5).
-- Both features add story-wide diff units; whichever lands second updates
-  the unit count in `sync.test.ts`.
+- The ring follows roster order only for undragged characters and for
+  "Arrange in a ring"; dragged positions live in `relationshipLayout`, keyed
+  by id. No data overlap: order stays the `doc.characters` array.
+- Diff units: this adds three story-wide units, relationships adds two
+  ("Relationship kinds", "Chart layout"). With both landed, `sync.test.ts`
+  goes from `total += 9` to `total += 14`; whichever lands second makes it.
 
 ## Files
 
