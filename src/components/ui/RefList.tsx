@@ -193,6 +193,15 @@ export function RefList({
     const onUp = (e: MouseEvent) => {
       const targetId = rowAt(e.clientX, e.clientY);
       detach();
+      // The whole tile opens on click, and a press on the grip released
+      // anywhere on the same tile fires a click on the tile (the common
+      // ancestor of the two targets). Swallow that one click.
+      const swallow = (ev: MouseEvent) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
       setDragId(null);
       setOverId(null);
       if (!onReorder || !targetId || targetId === id) return;
@@ -637,7 +646,11 @@ function PositionInput({
           e.preventDefault();
           (e.target as HTMLInputElement).blur();
         }
-        if (e.key === "Escape") setTyped(null);
+        // Cancels the typing only: the window this sits in stays open.
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          setTyped(null);
+        }
       }}
       onFocus={(e) => e.target.select()}
       onBlur={commit}
