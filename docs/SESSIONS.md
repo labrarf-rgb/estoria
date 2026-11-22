@@ -6294,7 +6294,7 @@ the Android sentence in §8 should say the phone keeps the block and pauses
 booking while done. **Next:** reload the installed app (accept the Reload
 prompt), and try Draft done on a copy of a book first.
 
-## 2026-11-21 — Anthology mode (built, local test pending), on `claude/anthology-f37dea`
+## 2026-11-21 — Anthology mode, built, tested by Ray, shipped (from `claude/anthology-f37dea`)
 
 - **What:** a collection of poems, stories and essays becomes a book while each
   piece keeps its own form. Plan, decisions and open questions:
@@ -6327,4 +6327,17 @@ prompt), and try Draft done on a copy of a book first.
 - **Not done here:** the map export (`markdown.ts`) still says chapters; the
   phone update (Android SPECS §7); drag on touch screens (HTML5 drag, mouse
   only, as the board's own drag is).
+- **Ray's local test, three rounds of changes:** (1) the way back from a piece
+  is a **Board** button in the toolbar, where a book's Board / Timeline switch
+  is; (2) a **Sections ▾** jump list on a piece's page, after its ⋯, to go to
+  another section or piece (first tried on the board; Ray wanted it on the
+  piece page only); (3) the first **+ Add section** puts existing pieces into
+  "Section 1" instead of a "Before the first section" band, and **Shift /
+  Cmd / Ctrl-click** picks several pieces to move (Move to section ▾, or drag
+  one) or delete together (`movePieces`).
+- **Verified before ship:** typecheck, 293 tests, production build. The
+  in-app browser's localhost:5173 storage kept being reset by another session,
+  so later checks ran on a second dev server (5199).
+- **Shipped** on Ray's OK: main fast-forwarded to this branch, pushed, and
+  deployed with `npm run deploy`.
 

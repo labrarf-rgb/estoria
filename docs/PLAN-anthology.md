@@ -1,7 +1,7 @@
 # Anthology: plan (NOT BUILT)
 
-> Status: **built on this branch 2026-11-21, waiting on Ray's local test in Chrome.**
-> Not pushed, not deployed, not merged. Build notes: §9.
+> Status: **built and shipped 2026-11-21** after Ray's local test in Chrome.
+> Build notes and the changes from that test: §9. The phone update is still to do (§6).
 > Branch `claude/anthology-f37dea`. Mockup: [`mockups/anthology.html`](mockups/anthology.html)
 > (private artifact: https://claude.ai/artifact/UUT7734mz17ke7Y2CBwbFo).
 >
