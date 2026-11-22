@@ -3,119 +3,162 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Detail Cards Restyle</title>
+<title>Detail Cards Options</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* Values copied from src/index.css so the mock matches the app. */
+/* Colour values copied from src/index.css so the mock matches the app. */
 :root {
   --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
-  --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --chip: #ece3d0;
+  --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
   --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
   --therefore: oklch(0.54 0.1 152); --but: oklch(0.55 0.15 33);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
-    --faint: #79746d; --line: #4c4740; --rule: #605a52; --chip: #272320;
+    --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
     --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
     --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
   }
 }
 :root[data-theme="dark"] {
   --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
-  --faint: #79746d; --line: #4c4740; --rule: #605a52; --chip: #272320;
+  --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
   --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
   --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
 .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--therefore); }
-h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 28px; margin: 6px 0 8px; }
-h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 20px; margin: 40px 0 6px; }
-p.lede { color: var(--soft); font-size: 14px; line-height: 1.55; max-width: 720px; margin: 0; }
-.cols { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 18px; }
-.col { flex: 1 1 380px; min-width: 0; max-width: 460px; }
-.colhead { margin-bottom: 8px; }
-.colhead .eyebrow { color: var(--soft); }
-.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
+h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 26px; margin: 6px 0 8px; }
+.lede { color: var(--soft); font-size: 14px; line-height: 1.55; max-width: 760px; margin: 0; }
 .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
-.serif { font-family: Spectral, Georgia, serif; }
 
-/* BEFORE: the current accordion card (CharactersPanel / WorldPanel). */
-.old { border: 1px solid var(--rule); background: var(--card); border-radius: 13px; padding: 14px; }
-.old .row { display: flex; align-items: center; gap: 11px; }
-.old .av { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
-.old .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
-.old .name { font-family: Spectral, serif; font-size: 15px; font-weight: 600; }
-.old .sub { font-size: 11.5px; font-weight: 500; color: var(--soft); }
-.old .cat { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
-.chev { color: var(--faint); font-size: 13px; margin-left: auto; }
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; margin: 20px 0 12px; align-items: flex-end; }
+.ctl .eyebrow { color: var(--soft); margin-bottom: 6px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--panel); }
+.seg button { font: inherit; font-size: 13px; font-weight: 600; color: var(--soft); background: none; border: 0; padding: 8px 14px; cursor: pointer; transition: background .2s, color .2s; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--therefore); outline-offset: -2px; }
+.explain { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 16px; font-size: 13.5px; line-height: 1.55; color: var(--ink); max-width: 860px; margin-bottom: 14px; }
+.explain b { font-weight: 600; }
+.explain ul { margin: 6px 0 0; padding-left: 18px; color: var(--soft); }
 
-/* The board's chapter card, for reference (Board.tsx). */
+/* Stage: a fake app window with the drawer open */
+.stage { position: relative; height: 680px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg); background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; }
+.toolbar { height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; gap: 12px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
+.toolbar .pill { font-family: "Hanken Grotesk"; font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--rule); border-radius: 7px; padding: 3px 9px; }
+.toolbar .pill.on { color: var(--ink); border-color: var(--faint); }
+.bgcards { position: absolute; top: 80px; left: 40px; display: flex; gap: 40px; flex-wrap: wrap; width: 900px; }
+.scrim { position: absolute; inset: 0; background: rgba(20,14,6,.46); }
+.drawer { position: absolute; top: 0; bottom: 0; right: 0; width: min(460px, 100%); background: var(--panel); border-left: 1px solid var(--rule); box-shadow: -20px 0 60px rgba(0,0,0,.3); display: flex; flex-direction: column; }
+.drawer.full { width: 100%; border-left: 0; box-shadow: none; }
+.dhead { flex: none; border-bottom: 1px solid var(--rule); }
+.dhead .in, .dbody .in { width: 100%; }
+.drawer.full .dhead .in, .drawer.full .dbody .in { max-width: 1180px; margin: 0 auto; }
+.dhead .in { display: flex; align-items: center; padding: 18px 22px; gap: 8px; }
+.dhead .t { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
+.dhead .s { font-size: 11.5px; color: var(--soft); font-weight: 500; margin-top: 2px; }
+.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; }
+.dbody { flex: 1; min-height: 0; overflow: auto; }
+.list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px; }
+.add { border: 1.5px dashed var(--line); border-radius: 13px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
+.grid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; border-radius: 12px; }
+
+/* Board chapter card (reference face) */
 .chap { width: 244px; min-height: 142px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
 .badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; }
 .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .cast { display: flex; padding-right: 6px; }
 .cast span { margin-right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--card); color: #fff; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.top { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; }
 .title { font-family: Spectral, serif; font-size: 16px; font-weight: 600; line-height: 1.2; }
 .sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sum.empty { color: var(--faint); }
 .meta { display: flex; justify-content: flex-end; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: var(--soft); }
 .meta .sep { color: var(--faint); }
-.top { display: flex; align-items: center; gap: 8px; }
-.grow { flex: 1; }
 
-/* AFTER: the restyled detail card, the chapter face in a list. */
-.new { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s; }
-.new:hover { border-color: var(--faint); }
-.new.open { border-color: var(--faint); cursor: default; }
+/* TODAY card */
+.old { border: 1px solid var(--rule); background: var(--card); border-radius: 13px; padding: 14px; }
+.old .row { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+.old .av { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
+.old .wdot { width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
+.old .name { font-family: Spectral, serif; font-size: 15px; font-weight: 600; }
+.old .sub { font-size: 11.5px; font-weight: 500; color: var(--soft); }
+.old .cat { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+.chev { color: var(--faint); font-size: 13px; margin-left: auto; }
+
+/* NEW card face (option A and B) */
+.new { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s; text-align: left; }
+.new:hover, .new.open { border-color: var(--faint); }
+.grid .new { min-height: 142px; }
 .ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; }
 .tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
-.fields { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 12px; }
+
+/* Fields (expanded body or modal) */
+.fields { display: flex; flex-direction: column; gap: 12px; cursor: default; }
+.old .fields, .new .fields { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--rule); }
 .lab { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
-.inp { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); min-height: 29px; }
-.inp.ta { min-height: 46px; line-height: 1.5; }
-.pair { display: flex; gap: 12px; } .pair > * { flex: 1; }
+.inp { width: 100%; font: inherit; border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); outline: none; resize: none; line-height: 1.5; }
+.inp:focus { border-color: var(--faint); }
+.pair { display: flex; gap: 12px; } .pair > * { flex: 1; min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chips span { border: 1px solid var(--rule); border-radius: 6px; padding: 2px 8px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
 .slot { border: 1.5px dashed var(--line); border-radius: 8px; padding: 8px 10px; font-size: 11.5px; color: var(--faint); }
-.add { border: 1.5px dashed var(--line); border-radius: 13px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
-.draft .title, .draft .sum { color: var(--faint); }
+.btnrow { display: flex; gap: 8px; }
+.ghost { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--soft); background: none; }
 
-/* Option B strip. */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(244px, 1fr)); gap: 16px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; margin-top: 18px; }
-.grid .new { min-height: 142px; }
+/* Option B modal */
+.mscrim { position: absolute; inset: 0; background: rgba(20,14,6,.46); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 5; }
+.modal { width: min(620px, 100%); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 18px 22px; }
 
-table { border-collapse: collapse; margin-top: 14px; font-size: 13px; width: 100%; max-width: 900px; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-th { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
-.note { font-size: 12px; color: var(--soft); margin-top: 8px; line-height: 1.5; max-width: 720px; }
-.tablewrap { overflow-x: auto; }
+.foot { font-size: 12px; color: var(--soft); margin-top: 10px; }
+@media (max-width: 640px) { .stage { height: 600px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">Estoria · plan mockup</div>
-  <h1>Detail cards, styled like chapter cards</h1>
-  <p class="lede">Characters and World drawers, side-panel width (460px). Left is today, middle is the board's chapter card for reference, right is the proposed card. Option A keeps the list and the expand-in-place editing; only the card itself changes.</p>
+  <div class="eyebrow">Estoria · mockup to decide</div>
+  <h1>Character and world cards, three ways</h1>
+  <p class="lede">A pretend Estoria with the Characters drawer open. Pick a version, then click the cards to see how each one opens. Switch to full screen to see the drawer's big size. Nothing here saves.</p>
 
-  <h2>Characters</h2>
-  <div class="cols">
-    <div class="col">
-      <div class="colhead"><div class="eyebrow">Before</div></div>
-      <div class="panel">
-        <div class="old"><div class="row"><span class="av" style="background:oklch(0.55 0.12 250)">MV</span><div><div class="name">Mara Vell</div><div class="sub">Protagonist · in 9 chapters</div></div><span class="chev">▾</span></div></div>
-        <div class="old"><div class="row"><span class="av" style="background:oklch(0.55 0.12 30)">OT</span><div><div class="name">Oren Tal</div><div class="sub">Mentor · in 4 chapters</div></div><span class="chev">▾</span></div></div>
-        <div class="old"><div class="row"><span class="av" style="background:oklch(0.55 0.1 150)">SK</span><div><div class="name">Sefa Kaur</div><div class="sub">No role · in 0 chapters</div></div><span class="chev">▾</span></div></div>
-        <div class="add">+ Add character</div>
+  <div class="controls">
+    <div class="ctl"><div class="eyebrow">Version</div>
+      <div class="seg" id="seg-mode">
+        <button data-v="today">Today</button>
+        <button data-v="a">A · Same look, opens in place</button>
+        <button data-v="b">B · Tiles, open in a window</button>
       </div>
     </div>
+    <div class="ctl"><div class="eyebrow">Drawer size</div>
+      <div class="seg" id="seg-size">
+        <button data-v="side">Side panel</button>
+        <button data-v="full">Full screen</button>
+      </div>
+    </div>
+    <div class="ctl"><div class="eyebrow">Drawer</div>
+      <div class="seg" id="seg-kind">
+        <button data-v="chars">Characters</button>
+        <button data-v="world">World</button>
+      </div>
+    </div>
+  </div>
 
-    <div class="col" style="flex:0 0 260px">
-      <div class="colhead"><div class="eyebrow">Chapter card (board)</div></div>
-      <div class="chap">
+  <div class="explain" id="explain"></div>
+
+  <div class="stage" id="stage">
+    <div class="toolbar">The Drowned Map <span class="grow"></span><span class="pill">Map</span><span class="pill on" id="tb-kind">Characters</span><span class="pill">World</span><span class="pill">Notes</span></div>
+    <div class="bgcards">
+      <div class="chap" id="refchap">
         <div class="top"><span class="badge">03</span><span class="sdot" style="background:var(--therefore)"></span><span class="grow"></span>
           <div class="cast"><span style="background:oklch(0.55 0.12 250)">MV</span><span style="background:oklch(0.55 0.12 30)">OT</span></div></div>
         <div class="title">The Lantern Market</div>
@@ -123,106 +166,144 @@ th { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: 
         <div class="grow"></div>
         <div class="meta"><span>4 scenes</span><span class="sep">·</span><span>2,410 words</span></div>
       </div>
-    </div>
-
-    <div class="col">
-      <div class="colhead"><div class="eyebrow">After (option A)</div></div>
-      <div class="panel">
-        <div class="new">
-          <div class="top"><span class="ini" style="background:oklch(0.55 0.12 250)">MV</span><span class="tag">Protagonist</span><span class="grow"></span><span class="chev">▾</span></div>
-          <div class="title">Mara Vell</div>
-          <div class="sum">A cartographer's apprentice who can read water the way others read faces.</div>
-          <div class="meta"><span>Seeker</span><span class="sep">·</span><span>in 9 chapters</span></div>
-        </div>
-        <div class="new open">
-          <div class="top"><span class="ini" style="background:oklch(0.55 0.12 30)">OT</span><span class="tag">Mentor</span><span class="grow"></span><span class="chev">▴</span></div>
-          <div class="title">Oren Tal</div>
-          <div class="sum">The harbourmaster who taught Mara to sound the channels, and lied about why.</div>
-          <div class="meta"><span>Mentor</span><span class="sep">·</span><span>in 4 chapters</span></div>
-          <div class="fields">
-            <div class="pair"><div><div class="lab">Name</div><div class="inp">Oren Tal</div></div><div style="flex:0 0 70px"><div class="lab">Initials</div><div class="inp">OT</div></div></div>
-            <div class="pair"><div><div class="lab">Role</div><div class="inp">Mentor</div></div><div><div class="lab">Archetype</div><div class="inp">Mentor</div></div></div>
-            <div><div class="lab">Description</div><div class="inp ta">The harbourmaster who taught Mara to sound the channels, and lied about why.</div></div>
-            <div><div class="lab">Bio · Traits · Goals · Wants / Needs · Notes</div><div class="inp" style="color:var(--faint)">(unchanged fields, same order as today)</div></div>
-            <div><div class="lab">Appears in</div><div class="chips"><span>Ch 1 ↗</span><span>Ch 3 ↗</span><span>Ch 7 ↗</span><span>Ch 12 ↗</span></div></div>
-            <div class="slot">Relationships field lands here (relationship-chart session)</div>
-          </div>
-        </div>
-        <div class="new">
-          <div class="top"><span class="ini" style="background:oklch(0.55 0.1 150)">SK</span><span class="tag" style="color:var(--faint)">No role</span><span class="grow"></span><span class="chev">▾</span></div>
-          <div class="title">Sefa Kaur</div>
-          <div class="sum empty">No description yet</div>
-          <div class="meta"><span>in 0 chapters</span></div>
-        </div>
-        <div class="new draft">
-          <div class="top"><span class="ini" style="background:var(--faint)">?</span><span class="grow"></span><span class="chev">▴</span></div>
-          <div class="title">New character</div>
-          <div class="sum">Nothing saved yet, type anything to add them</div>
-        </div>
-        <div class="add">+ Add character</div>
+      <div class="chap">
+        <div class="top"><span class="badge">04</span><span class="sdot" style="background:var(--but)"></span><span class="grow"></span>
+          <div class="cast"><span style="background:oklch(0.55 0.12 300)">IL</span></div></div>
+        <div class="title">Low Water</div>
+        <div class="sum">The guild closes the channels. Ines makes Mara an offer she cannot read.</div>
+        <div class="grow"></div>
+        <div class="meta"><span>3 scenes</span><span class="sep">·</span><span>1,880 words</span></div>
       </div>
     </div>
-  </div>
-
-  <h2>World</h2>
-  <div class="cols">
-    <div class="col">
-      <div class="colhead"><div class="eyebrow">Before</div></div>
-      <div class="panel">
-        <div class="old"><div class="row"><span class="dot"></span><div><div class="name">The Drowned City</div><div class="cat">Place</div></div><span class="chev">▾</span></div></div>
-        <div class="old"><div class="row"><span class="dot"></span><div><div class="name">The Soundings Guild</div><div class="cat">Faction</div></div><span class="chev">▾</span></div></div>
-        <div class="old"><div class="row"><span class="dot"></span><div><div class="name">The Long Tide</div><div class="cat">Event</div></div><span class="chev">▾</span></div></div>
-        <div class="add">+ Add world entry</div>
-      </div>
+    <div class="scrim"></div>
+    <div class="drawer" id="drawer">
+      <div class="dhead"><div class="in"><div><div class="t" id="dtitle">Characters</div><div class="s" id="dsub"></div></div><span class="grow"></span><span class="iconbtn" title="Size">⤢</span><span class="iconbtn" title="Close">✕</span></div></div>
+      <div class="dbody"><div class="in" id="body"></div></div>
     </div>
-    <div class="col">
-      <div class="colhead"><div class="eyebrow">After (option A)</div></div>
-      <div class="panel">
-        <div class="new">
-          <div class="top"><span class="badge">PLACE</span><span class="grow"></span><span class="chev">▾</span></div>
-          <div class="title">The Drowned City</div>
-          <div class="sum">What is left of Aster after the sea came in. The bell towers still stand at low tide.</div>
-          <div class="meta"><span>on 6 chapters</span><span class="sep">·</span><span>3 refs</span></div>
-        </div>
-        <div class="new">
-          <div class="top"><span class="badge">FACTION</span><span class="grow"></span><span class="chev">▾</span></div>
-          <div class="title">The Soundings Guild</div>
-          <div class="sum">Keeps the only true charts of the channels and sells the false ones.</div>
-          <div class="meta"><span>on 2 chapters</span></div>
-        </div>
-        <div class="new">
-          <div class="top"><span class="badge">EVENT</span><span class="grow"></span><span class="chev">▾</span></div>
-          <div class="title">The Long Tide</div>
-          <div class="sum empty">No description yet</div>
-          <div class="meta"><span>on 0 chapters</span></div>
-        </div>
-        <div class="add">+ Add world entry</div>
-      </div>
-    </div>
+    <div id="modal"></div>
   </div>
-
-  <h2>Option B, for comparison: tiles at the expanded size</h2>
-  <p class="lede">Only if "behave like chapter cards" means a grid of fixed tiles that open an editor, the way a chapter card opens the chapter. Two 244px tiles do not fit side by side in the 460px panel, so this works at the full-screen size only; the side panel would stay a single column.</p>
-  <div class="grid">
-    <div class="new"><div class="top"><span class="ini" style="background:oklch(0.55 0.12 250)">MV</span><span class="tag">Protagonist</span></div><div class="title">Mara Vell</div><div class="sum">A cartographer's apprentice who can read water the way others read faces.</div><div class="grow"></div><div class="meta"><span>Seeker</span><span class="sep">·</span><span>in 9 chapters</span></div></div>
-    <div class="new"><div class="top"><span class="ini" style="background:oklch(0.55 0.12 30)">OT</span><span class="tag">Mentor</span></div><div class="title">Oren Tal</div><div class="sum">The harbourmaster who taught Mara to sound the channels, and lied about why.</div><div class="grow"></div><div class="meta"><span>Mentor</span><span class="sep">·</span><span>in 4 chapters</span></div></div>
-    <div class="new"><div class="top"><span class="ini" style="background:oklch(0.55 0.1 150)">SK</span><span class="tag">No role</span></div><div class="title">Sefa Kaur</div><div class="sum empty">No description yet</div><div class="grow"></div><div class="meta"><span>in 0 chapters</span></div></div>
-    <div class="new"><div class="top"><span class="ini" style="background:oklch(0.55 0.12 300)">IL</span><span class="tag">Antagonist</span></div><div class="title">Ines Lorre</div><div class="sum">Guild factor. Wants the map burned, and Mara with it if need be.</div><div class="grow"></div><div class="meta"><span>Shadow</span><span class="sep">·</span><span>in 6 chapters</span></div></div>
-  </div>
-
-  <h2>Slot mapping</h2>
-  <div class="tablewrap">
-  <table>
-    <tr><th>Chapter card slot</th><th>Character card</th><th>World card</th></tr>
-    <tr><td>Number badge (ink, mono)</td><td>Initials, in the character's colour</td><td>Category, ink badge</td></tr>
-    <tr><td>Status dot</td><td>Role, as a small uppercase tag</td><td>Nothing (no per-category colour today)</td></tr>
-    <tr><td>Cast avatars (right)</td><td>▾ / ▴ toggle</td><td>▾ / ▴ toggle</td></tr>
-    <tr><td>Title (serif 16)</td><td>Name</td><td>Name</td></tr>
-    <tr><td>2-line summary</td><td>Description</td><td>Description</td></tr>
-    <tr><td>Mono footer, right</td><td>Archetype · in N chapters</td><td>on N chapters · N refs</td></tr>
-  </table>
-  </div>
-  <p class="note">Empty values read faint, like "Untitled chapter": "Unnamed character", "No description yet". The draft card keeps its faint "Nothing saved yet" line.</p>
+  <p class="foot">The two chapter cards behind the drawer are the board's real card design, for comparison. In the app the drawer covers the board while it's open.</p>
 </div>
+
+<script>
+const CHARS = [
+  { id: "mv", name: "Mara Vell", ini: "MV", color: "oklch(0.55 0.12 250)", role: "Protagonist", type: "Seeker", desc: "A cartographer's apprentice who can read water the way others read faces.", bio: "Raised on the tide flats below Aster.", traits: "stubborn, observant, guarded", want: "To find the true chart", need: "To trust someone with it", ch: [1, 2, 3, 5, 7, 8, 9, 11, 12] },
+  { id: "ot", name: "Oren Tal", ini: "OT", color: "oklch(0.55 0.12 30)", role: "Mentor", type: "Mentor", desc: "The harbourmaster who taught Mara to sound the channels, and lied about why.", bio: "Former guild surveyor.", traits: "patient, secretive", want: "To keep Mara out of it", need: "To tell the truth", ch: [1, 3, 7, 12] },
+  { id: "il", name: "Ines Lorre", ini: "IL", color: "oklch(0.55 0.12 300)", role: "Antagonist", type: "Shadow", desc: "Guild factor. Wants the map burned, and Mara with it if need be.", bio: "", traits: "precise, charming, cold", want: "Control of the channels", need: "", ch: [4, 6, 8, 10, 11, 12] },
+  { id: "sk", name: "Sefa Kaur", ini: "SK", color: "oklch(0.55 0.1 150)", role: "", type: "", desc: "", bio: "", traits: "", want: "", need: "", ch: [] },
+];
+const WORLD = [
+  { id: "dc", name: "The Drowned City", cat: "Place", desc: "What is left of Aster after the sea came in. The bell towers still stand at low tide.", notes: "Who rang the bells the night it flooded?", ch: [1, 3, 5, 7, 9, 12], refs: 3 },
+  { id: "sg", name: "The Soundings Guild", cat: "Faction", desc: "Keeps the only true charts of the channels and sells the false ones.", notes: "", ch: [4, 6], refs: 0 },
+  { id: "lt", name: "The Long Tide", cat: "Event", desc: "", notes: "", ch: [], refs: 0 },
+  { id: "bc", name: "Bell Code", cat: "Lore", desc: "Harbour signals rung on the drowned towers. Few still know the full set.", notes: "", ch: [9, 12], refs: 1 },
+];
+
+const S = { mode: "a", size: "side", kind: "chars", open: "ot" };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
+
+const EXPLAIN = {
+  today: `<b>Today.</b> One line per card: a round avatar, the name, one small line under it. Click the name or ▾ to open the card, and you edit it right there in the list.`,
+  a: `<b>A · Same look, opens in place.</b> Each card wears the chapter card's design: a badge, the name in big serif type, two lines of description, and a small count line at the bottom. Click anywhere on the card to open it, and you edit it right there in the list, just like today.
+    <ul><li>You can read who someone is without opening their card.</li><li>The cards are taller, so fewer fit on screen at once.</li><li>Small change. Editing works exactly as it does now.</li></ul>`,
+  b: `<b>B · Tiles, open in a window.</b> Each card is a fixed-size tile, like a chapter on the board. Clicking one opens its details in a window on top, the way clicking a chapter opens the chapter. Tiles sit in a grid when the drawer is full screen; the side panel is too narrow for two, so there they stack in one column.
+    <ul><li>Looks and acts the most like the board.</li><li>Editing moves out of the list and into a window.</li><li>Bigger change, and it overlaps with the later "rearrange the cards" work.</li></ul>`,
+};
+
+function charFace(c) {
+  const role = c.role ? `<span class="tag">${esc(c.role)}</span>` : `<span class="tag">No role</span>`;
+  const meta = [c.type && `<span>${esc(c.type)}</span>`, `<span>in ${nch(c.ch.length)}</span>`].filter(Boolean).join('<span class="sep">·</span>');
+  return `<div class="top"><span class="ini" style="background:${c.color}">${esc(c.ini)}</span>${role}<span class="grow"></span>${S.mode === "a" ? `<span class="chev">${S.open === c.id ? "▴" : "▾"}</span>` : ""}</div>
+    <div class="title">${esc(c.name)}</div>
+    <div class="sum ${c.desc ? "" : "empty"}">${esc(c.desc || "No description yet")}</div>
+    ${S.mode === "b" ? '<div class="grow"></div>' : ""}
+    <div class="meta">${meta}</div>`;
+}
+function worldFace(w) {
+  const meta = [`<span>on ${nch(w.ch.length)}</span>`, w.refs ? `<span>${w.refs} ref${w.refs === 1 ? "" : "s"}</span>` : ""].filter(Boolean).join('<span class="sep">·</span>');
+  return `<div class="top"><span class="badge">${esc(w.cat.toUpperCase())}</span><span class="grow"></span>${S.mode === "a" ? `<span class="chev">${S.open === w.id ? "▴" : "▾"}</span>` : ""}</div>
+    <div class="title">${esc(w.name)}</div>
+    <div class="sum ${w.desc ? "" : "empty"}">${esc(w.desc || "No description yet")}</div>
+    ${S.mode === "b" ? '<div class="grow"></div>' : ""}
+    <div class="meta">${meta}</div>`;
+}
+const inp = (v, ph = "") => `<input class="inp" value="${esc(v)}" placeholder="${esc(ph)}">`;
+const area = (v, ph = "", r = 2) => `<textarea class="inp" rows="${r}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
+const chips = (ch) => ch.length ? `<div><div class="lab">Appears in</div><div class="chips">${ch.map((n) => `<span>Ch ${n} ↗</span>`).join("")}</div></div>` : "";
+
+function charFields(c) {
+  return `<div class="fields">
+    <div class="pair"><div><div class="lab">Name</div>${inp(c.name, "Character name")}</div><div style="flex:0 0 70px"><div class="lab">Initials</div>${inp(c.ini, "AB")}</div></div>
+    <div class="pair"><div><div class="lab">Role</div>${inp(c.role, "e.g. Protagonist")}</div><div><div class="lab">Archetype</div>${inp(c.type, "e.g. Mentor")}</div></div>
+    <div><div class="lab">Description</div>${area(c.desc, "A one-line description of this character")}</div>
+    <div><div class="lab">Bio</div>${area(c.bio, "Backstory and background")}</div>
+    <div><div class="lab">Traits (comma separated)</div>${inp(c.traits, "brave, guarded, curious")}</div>
+    <div class="pair"><div><div class="lab">Wants</div>${area(c.want, "What they want")}</div><div><div class="lab">Needs</div>${area(c.need, "What they need")}</div></div>
+    ${chips(c.ch)}
+    <div class="slot">Relationships (coming in the relationship chart work) would sit here</div>
+    <div class="btnrow"><button class="ghost">Archive</button><button class="ghost">Delete character</button></div>
+  </div>`;
+}
+function worldFields(w) {
+  return `<div class="fields">
+    <div class="pair"><div><div class="lab">Name</div>${inp(w.name, "e.g. The Drowned City")}</div><div style="flex:0 0 120px"><div class="lab">Category</div><select class="inp">${["Place", "Faction", "Lore", "Event"].map((c) => `<option ${c === w.cat ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
+    <div><div class="lab">Description</div>${area(w.desc, "Describe this piece of the world", 3)}</div>
+    <div><div class="lab">Notes</div>${area(w.notes, "Extra notes, connections, open questions")}</div>
+    ${chips(w.ch)}
+    <div><div class="lab">References</div><div class="slot">Pinned notes, images and to-dos (unchanged)</div></div>
+    <div class="btnrow"><button class="ghost">Archive</button><button class="ghost">Delete entry</button></div>
+  </div>`;
+}
+
+function todayCard(x, isChar) {
+  const open = S.open === x.id;
+  const head = isChar
+    ? `<span class="av" style="background:${x.color}">${esc(x.ini)}</span><div><div class="name">${esc(x.name)}</div><div class="sub">${esc(x.role || "No role")} · in ${nch(x.ch.length)}</div></div>`
+    : `<span class="wdot"></span><div><div class="name">${esc(x.name)}</div><div class="cat">${esc(x.cat)}</div></div>`;
+  return `<div class="old"><div class="row" data-toggle="${x.id}">${head}<span class="chev">${open ? "▴" : "▾"}</span></div>${open ? (isChar ? charFields(x) : worldFields(x)) : ""}</div>`;
+}
+function newCard(x, isChar) {
+  const open = S.mode === "a" && S.open === x.id;
+  return `<div class="new ${open ? "open" : ""}" data-toggle="${x.id}">${isChar ? charFace(x) : worldFace(x)}${open ? (isChar ? charFields(x) : worldFields(x)) : ""}</div>`;
+}
+
+function render() {
+  for (const [id, key] of [["seg-mode", "mode"], ["seg-size", "size"], ["seg-kind", "kind"]])
+    document.querySelectorAll(`#${id} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === S[key]));
+  document.getElementById("explain").innerHTML = EXPLAIN[S.mode];
+  const isChar = S.kind === "chars";
+  const items = isChar ? CHARS : WORLD;
+  document.getElementById("drawer").classList.toggle("full", S.size === "full");
+  document.getElementById("dtitle").textContent = isChar ? "Characters" : "World";
+  document.getElementById("tb-kind").textContent = isChar ? "Characters" : "World";
+  document.getElementById("dsub").textContent = isChar ? "" : "Places, factions, lore & references";
+  const grid = S.mode === "b" && S.size === "full";
+  const cards = items.map((x) => (S.mode === "today" ? todayCard(x, isChar) : newCard(x, isChar))).join("");
+  document.getElementById("body").innerHTML = `<div class="${grid ? "grid" : "list"}">${cards}<div class="add">+ Add ${isChar ? "character" : "world entry"}</div></div>`;
+  const m = document.getElementById("modal");
+  const sel = items.find((x) => x.id === S.open);
+  if (S.mode === "b" && sel) {
+    const badge = isChar ? `<span class="ini" style="background:${sel.color}">${esc(sel.ini)}</span>` : `<span class="badge">${esc(sel.cat.toUpperCase())}</span>`;
+    m.innerHTML = `<div class="mscrim" data-close="1"><div class="modal"><div class="mhead">${badge}<div class="title">${esc(sel.name)}</div><span class="grow"></span><button class="iconbtn" data-close="1" title="Close">✕</button></div><div class="mbody">${isChar ? charFields(sel) : worldFields(sel)}</div></div></div>`;
+  } else m.innerHTML = "";
+}
+
+document.addEventListener("click", (e) => {
+  const seg = e.target.closest(".seg button");
+  if (seg) {
+    const key = { "seg-mode": "mode", "seg-size": "size", "seg-kind": "kind" }[seg.parentElement.id];
+    S[key] = seg.dataset.v;
+    if (key === "kind") S.open = null;
+    if (key === "mode") S.open = S.mode === "b" ? null : S.kind === "chars" ? "ot" : "dc";
+    return render();
+  }
+  if (e.target.closest("[data-close]") && (e.target.dataset.close || e.target.closest("button[data-close]"))) { S.open = null; return render(); }
+  if (e.target.closest(".fields, .modal")) return;
+  const t = e.target.closest("[data-toggle]");
+  if (t) { S.open = S.open === t.dataset.toggle && S.mode !== "b" ? null : t.dataset.toggle; render(); }
+});
+render();
+</script>
 </body>
 </html>
