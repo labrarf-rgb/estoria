@@ -314,4 +314,13 @@ with these calls made during the build:
   **Sections ▾** dropdown after the piece's ⋯ lists each section with its
   pieces, to jump to another section (its first piece) or straight to a piece.
   Not on the board, where every section is already in view.
+- **After Ray's second test (2026-11-21):** the first **+ Add section** puts the
+  pieces already there into "Section 1" (they used to sit under a "Before the
+  first section" label) and adds an empty "Section 2"; a band with no section
+  now only appears for pieces that arrive without one (from the phone) and is
+  labelled "No section". **Several pieces at once:** Shift-, Cmd- or Ctrl-click
+  picks pieces; a bar shows the count, **Move to section ▾** (any section, or a
+  new one at the end), **Delete** and **Clear**; dragging a picked piece moves
+  them all, in their order (`movePieces`). A section that a move leaves empty
+  disappears, since a section is the name its pieces carry.
 

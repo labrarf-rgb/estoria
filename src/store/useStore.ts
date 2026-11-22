@@ -39,11 +39,13 @@ import {
   insertPiece,
   isAnthology,
   movePiece as movePieceIn,
+  movePieces as movePiecesIn,
   moveSection as moveSectionIn,
   newPieceChapter,
   removeSection as removeSectionIn,
   renameSection as renameSectionIn,
   sectionNames,
+  startSections,
   takeOut,
   toAnthology,
 } from "@/lib/anthology";
@@ -374,6 +376,8 @@ interface StoreState extends UiState {
   /** A piece as its own single-piece project; "move" saves a copy of the anthology first. */
   takeOutPiece: (chId: string, how: "move" | "copy") => void;
   movePiece: (id: string, targetId: string | null, after: boolean, section: string) => void;
+  /** Several pieces as one block, in their current order. */
+  movePieces: (ids: string[], targetId: string | null, after: boolean, section: string) => void;
   renameSection: (from: string, to: string) => void;
   moveSection: (name: string, dir: -1 | 1) => void;
   removeSection: (name: string) => void;
@@ -1294,6 +1298,12 @@ export const useStore = create<StoreState>()(
           pendingSections: s.pendingSections.filter((n) => n !== section),
         })),
 
+      movePieces: (ids, targetId, after, section) =>
+        set((s) => ({
+          doc: { ...s.doc, chapters: movePiecesIn(s.doc.chapters, ids, targetId, after, section) },
+          pendingSections: s.pendingSections.filter((n) => n !== section),
+        })),
+
       renameSection: (from, to) =>
         set((s) => {
           const name = to.trim();
@@ -1317,6 +1327,14 @@ export const useStore = create<StoreState>()(
 
       addPendingSection: () =>
         set((s) => {
+          // The first section takes the pieces already there as "Section 1",
+          // so they never sit in a band with no heading; the new one follows.
+          if (!sectionNames(s.doc.chapters).length && s.doc.chapters.length && !s.pendingSections.length) {
+            return {
+              doc: { ...s.doc, chapters: startSections(s.doc.chapters, "Section 1") },
+              pendingSections: ["Section 2"],
+            };
+          }
           const taken = new Set([...sectionNames(s.doc.chapters), ...s.pendingSections]);
           let n = taken.size + 1;
           while (taken.has(`Section ${n}`)) n++;

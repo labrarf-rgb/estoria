@@ -112,17 +112,44 @@ export function movePiece(
   after: boolean,
   section: string
 ): Chapter[] {
+  return movePieces(chs, [id], targetId, after, section);
+}
+
+/**
+ * Move several pieces as one block, keeping the order they are in now. The
+ * same drop rules as `movePiece`; a drop onto one of the moving pieces lands
+ * the block at the end of that piece's section.
+ */
+export function movePieces(
+  chs: Chapter[],
+  ids: string[],
+  targetId: string | null,
+  after: boolean,
+  section: string
+): Chapter[] {
+  const moving = new Set(ids);
   const ordered = inOrder(chs);
-  const from = ordered.findIndex((c) => c.id === id);
-  if (from < 0 || id === targetId) return chs;
-  const [moved] = ordered.splice(from, 1);
-  const target = targetId ? ordered.find((c) => c.id === targetId) : undefined;
-  const name = target ? sec(target) : section.trim();
-  const piece = { ...moved, section: name || undefined };
-  let at = target ? ordered.indexOf(target) + (after ? 1 : 0) : endOfSection(ordered, name);
-  if (at < 0) at = ordered.length;
-  ordered.splice(at, 0, piece);
-  return renumber(ordered);
+  const block = ordered.filter((c) => moving.has(c.id));
+  if (!block.length) return chs;
+  const onSelf = targetId !== null && moving.has(targetId);
+  const target = targetId && !onSelf ? ordered.find((c) => c.id === targetId) : undefined;
+  const name = target ? sec(target) : onSelf ? sec(ordered.find((c) => c.id === targetId)!) : section.trim();
+  const rest = ordered.filter((c) => !moving.has(c.id));
+  const placed = block.map((c) => ({ ...c, section: name || undefined }));
+  let at = target ? rest.indexOf(target) + (after ? 1 : 0) : endOfSection(rest, name);
+  if (at < 0) at = rest.length;
+  rest.splice(at, 0, ...placed);
+  return renumber(rest);
+}
+
+/**
+ * The first section of an anthology: the pieces already there become `first`,
+ * rather than being left in a band with no heading. Only when nothing has a
+ * section yet; otherwise returns `chs` unchanged.
+ */
+export function startSections(chs: Chapter[], first: string): Chapter[] {
+  if (!chs.length || chs.some((c) => sec(c))) return chs;
+  return chs.map((c) => ({ ...c, section: first }));
 }
 
 /** Rename a section: every piece under it. A clash with another name is refused. */

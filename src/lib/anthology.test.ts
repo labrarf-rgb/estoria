@@ -13,8 +13,10 @@ import {
   pieceKind,
   pieceLineBreaks,
   pieceNouns,
+  movePieces,
   removeSection,
   renameSection,
+  startSections,
   takeOut,
   toAnthology,
 } from "@/lib/anthology";
@@ -125,6 +127,23 @@ describe("sections", () => {
     expect(bands(toEnd)[1].pieces.map((p) => p.id)).toEqual(["c", "d", "a"]);
     const fresh = movePiece(d.chapters, "b", null, false, "Coda");
     expect(bands(fresh).map((b) => b.section)).toEqual(["Harbor", "Inland", "Coda"]);
+  });
+
+  it("moves several pieces as one block, in their order, into another section", () => {
+    const moved = movePieces(d.chapters, ["b", "a"], "d", false, "");
+    expect(bands(moved).map((x) => [x.section, x.pieces.map((p) => p.id)])).toEqual([["Inland", ["c", "a", "b", "d"]]]);
+    const toNew = movePieces(d.chapters, ["a", "c"], null, false, "Coda");
+    expect(bands(toNew).map((x) => [x.section, x.pieces.map((p) => p.id)])).toEqual([
+      ["Harbor", ["b"]],
+      ["Inland", ["d"]],
+      ["Coda", ["a", "c"]],
+    ]);
+  });
+
+  it("the first section takes the pieces already there", () => {
+    const plain = book([ch("a", 1), ch("b", 2)]);
+    expect(bands(startSections(plain.chapters, "Section 1")).map((x) => x.section)).toEqual(["Section 1"]);
+    expect(startSections(d.chapters, "Section 1")).toBe(d.chapters);
   });
 
   it("rename, move and remove change headings, never pieces", () => {

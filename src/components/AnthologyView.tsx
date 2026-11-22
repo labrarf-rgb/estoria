@@ -39,9 +39,22 @@ function AnthologyBoard() {
   const doc = useStore((s) => s.doc);
   const pending = useStore((s) => s.pendingSections);
   const openChapter = useStore((s) => s.openChapter);
-  const movePiece = useStore((s) => s.movePiece);
+  const movePieces = useStore((s) => s.movePieces);
   const setAddPieceDialog = useStore((s) => s.setAddPieceDialog);
   const addPendingSection = useStore((s) => s.addPendingSection);
+  // Several pieces picked at once (Shift, Cmd or Ctrl and click), to move or
+  // delete together. Dragging a picked piece takes all of them along.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  // A piece that left (deleted, taken out) leaves the selection too.
+  const live = new Set(doc.chapters.map((c) => c.id));
+  const picked = [...selected].filter((id) => live.has(id));
   const [dragId, setDragIdState] = useState<string | null>(null);
   const [over, setOverState] = useState<{ band: string; id: string | null; after: boolean } | null>(null);
   // Mirrored in refs: drag events can arrive before React has re-rendered with
@@ -79,7 +92,10 @@ function AnthologyBoard() {
     e.stopPropagation();
     const id = dragRef.current;
     const o = overRef.current;
-    if (id && o) movePiece(id, o.id === id ? null : o.id, o.after, o.band);
+    if (id && o) {
+      const ids = selected.has(id) ? picked : [id];
+      movePieces(ids, o.id && ids.includes(o.id) ? null : o.id, o.after, o.band);
+    }
     setDragId(null);
     setOver(null);
   };
@@ -97,7 +113,8 @@ function AnthologyBoard() {
             {hasSections ? ` · ${all.filter((b) => b.section).length} sections` : ""}
           </div>
           <div className="text-[11.5px] text-faint">
-            Drag a piece to reorder it{hasSections ? ", or into another section" : ""}. Click to open it.
+            Drag a piece to reorder it{hasSections ? ", or into another section" : ""}. Click to open it. Shift-click
+            to pick several.
           </div>
         </div>
 
@@ -116,7 +133,7 @@ function AnthologyBoard() {
               <SectionHead name={b.section} count={b.pieces.length} index={bi} total={all.length} pending={!b.pieces.length} />
             ) : hasSections ? (
               <div className="mb-[12px] text-[11px] font-semibold uppercase tracking-wider text-faint">
-                Before the first section
+                No section
               </div>
             ) : null}
             <div className="flex flex-wrap gap-[18px]">
@@ -124,9 +141,10 @@ function AnthologyBoard() {
                 <PieceCard
                   key={c.id}
                   c={c}
-                  dragging={dragId === c.id}
+                  picked={selected.has(c.id)}
+                  dragging={dragId === c.id || (!!dragId && selected.has(dragId) && selected.has(c.id))}
                   mark={over?.id === c.id && dragId !== c.id ? (over.after ? "after" : "before") : null}
-                  onOpen={() => openChapter(c.id)}
+                  onOpen={(e) => (e.shiftKey || e.metaKey || e.ctrlKey ? toggle(c.id) : openChapter(c.id))}
                   onDragStart={(e) => {
                     setDragId(c.id);
                     e.dataTransfer.effectAllowed = "move";
@@ -158,12 +176,101 @@ function AnthologyBoard() {
           + Add section
         </button>
       </div>
+      {picked.length > 0 && (
+        <SelectionBar ids={picked} sections={all.map((b) => b.section)} clear={() => setSelected(new Set())} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * While pieces are picked: how many, Move to section, Delete, Clear. Floats
+ * over the board as the book board's selection bar does.
+ */
+function SelectionBar({ ids, sections, clear }: { ids: string[]; sections: string[]; clear: () => void }) {
+  const doc = useStore((s) => s.doc);
+  const movePieces = useStore((s) => s.movePieces);
+  const deleteChapters = useStore((s) => s.deleteChapters);
+  const askConfirm = useStore((s) => s.askConfirm);
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const n = ids.length;
+  const names = [...new Set(sections)];
+  const taken = new Set(names);
+  let k = names.filter(Boolean).length + 1;
+  while (taken.has(`Section ${k}`)) k++;
+  const fresh = `Section ${k}`;
+  const btnCls = "rounded-lg border border-rule bg-card px-[12px] py-[6px] text-[12px] font-medium hover:border-faint";
+  const move = (section: string) => {
+    setOpen(false);
+    movePieces(ids, null, false, section);
+    clear();
+  };
+  return (
+    <div className="fixed bottom-[46px] left-1/2 z-[40] flex w-max max-w-[94vw] -translate-x-1/2 flex-wrap items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]">
+      <span className="text-[12.5px] font-medium text-ink">
+        {n} {n === 1 ? "piece" : "pieces"} selected
+      </span>
+      <span className="text-[11.5px] text-faint">drag one to move them all</span>
+      <span className="mx-[2px] h-[20px] w-px bg-rule" />
+      <button ref={btn} onClick={() => setOpen((o) => !o)} className={`${btnCls} text-ink`}>
+        Move to section <span className="text-[9px] text-faint">▾</span>
+      </button>
+      <Popover anchorRef={btn} open={open} onClose={() => setOpen(false)} align="left" side="above" width={240}>
+        <div className="flex flex-col p-[6px]">
+          {names.map((name) => (
+            <button
+              key={name || "(none)"}
+              onClick={() => move(name)}
+              className={`truncate rounded-lg px-[11px] py-[7px] text-left text-[12.5px] text-ink hover:bg-chip ${name ? "font-serif italic" : ""}`}
+            >
+              {name || "No section"}
+            </button>
+          ))}
+          <div className="mx-[6px] my-1 h-px bg-rule" />
+          <button onClick={() => move(fresh)} className="rounded-lg px-[11px] py-[7px] text-left text-[12.5px] font-semibold text-ink hover:bg-chip">
+            New section
+            <span className="block text-[11px] font-normal text-soft">"{fresh}", at the end; rename it after</span>
+          </button>
+        </div>
+      </Popover>
+      <button
+        onClick={() => {
+          if (n >= doc.chapters.length) {
+            askConfirm({
+              message: "An anthology keeps at least one piece",
+              detail: "Leave one piece unselected, then delete the rest.",
+              confirmLabel: "Got it",
+              onConfirm: () => {},
+            });
+            return;
+          }
+          const titles = doc.chapters.filter((c) => ids.includes(c.id)).map((c) => c.title || "Untitled piece");
+          askConfirm({
+            message: `Delete ${n} ${n === 1 ? "piece" : "pieces"}?`,
+            detail: `${titles.slice(0, 4).join(", ")}${titles.length > 4 ? `, and ${titles.length - 4} more` : ""}. Their writing, maps and notes go with them. This can't be undone.`,
+            confirmLabel: "Delete",
+            danger: true,
+            onConfirm: () => {
+              deleteChapters(ids);
+              clear();
+            },
+          });
+        }}
+        className={`${btnCls} text-but hover:border-but`}
+      >
+        Delete
+      </button>
+      <button onClick={clear} className={`${btnCls} text-ink`}>
+        Clear
+      </button>
     </div>
   );
 }
 
 function PieceCard({
   c,
+  picked,
   dragging,
   mark,
   onOpen,
@@ -173,9 +280,10 @@ function PieceCard({
   onDrop,
 }: {
   c: Chapter;
+  picked: boolean;
   dragging: boolean;
   mark: "before" | "after" | null;
-  onOpen: () => void;
+  onOpen: (e: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }) => void;
   onDragStart: (e: DragEvent) => void;
   onDragEnd: () => void;
   onDragOver: (e: DragEvent) => void;
@@ -185,7 +293,9 @@ function PieceCard({
   const k = kindInfo(pieceKind(doc, c));
   const nouns = pieceNouns(doc, c);
   const n = c.scenes.length;
-  const edge = mark === "before" ? "-4px 0 0 0 var(--therefore), " : mark === "after" ? "4px 0 0 0 var(--therefore), " : "";
+  const edge =
+    (mark === "before" ? "-4px 0 0 0 var(--therefore), " : mark === "after" ? "4px 0 0 0 var(--therefore), " : "") +
+    (picked ? "0 0 0 3px color-mix(in srgb, var(--therefore) 30%, transparent), " : "");
   return (
     <div
       draggable
@@ -195,14 +305,17 @@ function PieceCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onOpen();
+          onOpen(e);
         }
       }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className="flex min-h-[142px] w-[244px] cursor-grab flex-col gap-[7px] rounded-xl border border-rule bg-card p-[12px_14px] text-left hover:border-faint focus-visible:outline-2 focus-visible:outline-therefore"
+      aria-pressed={picked}
+      className={`flex min-h-[142px] w-[244px] cursor-grab flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] text-left hover:border-faint focus-visible:outline-2 focus-visible:outline-therefore ${
+        picked ? "border-therefore" : "border-rule"
+      }`}
       style={{ boxShadow: `${edge}var(--shadow)`, opacity: dragging ? 0.4 : 1 }}
       title={`Open ${c.title || "this piece"}`}
     >
@@ -370,7 +483,7 @@ function SectionJump({ here }: { here: Chapter }) {
                   b.section ? "font-serif italic" : "text-[11px] font-semibold uppercase tracking-wider"
                 } ${b.section === mine ? "text-ink" : "text-soft"}`}
               >
-                {b.section || "Before the first section"}
+                {b.section || "No section"}
               </button>
               {b.pieces.map((c) => (
                 <button
