@@ -106,15 +106,24 @@ section?: string;               // "a section starts here, called this" (Part On
   numbered chapters again. Per-piece kinds stay in the file but are not read.
   Saved copy first.
 
-### 4.2 Home screen (mockup has two options)
+### 4.2 Home screen: the board (Option B, chosen by Ray 2026-11-21)
 
-- **Option A, contents list.** Title and byline, then the pieces in order,
-  grouped under section headings. Each row: title, kind tag, status, words /
-  target, part count. Drag to reorder, or drag onto a section. Click opens the
-  piece.
-- **Option B, board of cards.** Today's board with the chapter number replaced
-  by the kind tag, no act bands, no chapter links. Sections show as labelled
-  bands.
+- **Each card is one piece; each dashed band is a section.** A card carries
+  the kind tag where a chapter number would be, status, title, summary, part
+  count ("4 stanzas", "7 scenes") and words / target. No act bands, no chapter
+  links, no chapter numbers.
+- **Pieces move by dragging:** within a band to reorder, or into another band
+  to change section. Drop on a card lands before / after it (by which half);
+  drop on a band's empty space lands at its end. Order is still `num`; the
+  section is the `section` field on the first piece of each band (§3), so a
+  drag rewrites both.
+- **Every band ends with a "+ Add piece" card** that adds into that section,
+  and **"+ Add section"** sits under the last band. A new section starts empty.
+- **Cards flow in rows inside their band** rather than sitting at free x / y
+  positions as chapter cards do, so the order you see is the book's order.
+  Chapter `x` / `y` stay in the file, unused here.
+- Click (a press that doesn't move) opens the piece, as on the board today.
+- *Option A, a contents list, was the alternative; dropped.*
 - Both: the toolbar keeps Characters, World, Notes, versions, Export, Sync;
   drops New chapter, Auto-arrange, Timeline and templates; gains **+ Add piece**.
 
@@ -237,7 +246,7 @@ headings. Recorded for the Android SPECS §7 when the web lands.
 
 ## 8. Open questions
 
-1. **Home screen:** contents list (A) or board of cards (B)? *(mockup screen 2)*
+1. ~~**Home screen:** contents list (A) or board of cards (B)?~~ **Board (B)**, §4.2.
 2. **Taking a piece out:** does the dialog in the mockup match what you picture?
    Move by default, Copy as the second choice? *(mockup screen 6)*
 3. **Name:** call it "Anthology" in the UI, or keep "Collection" (already the
