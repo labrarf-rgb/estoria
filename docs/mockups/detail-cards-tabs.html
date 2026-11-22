@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cast and World Tiles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Colour values copied from src/index.css so the mock matches the app. */
+:root {
+  --bg: #e9e0cd; --panel: #f6f0e2; --card: #fffdf6; --ink: #2b2620; --soft: #7a6f5c;
+  --faint: #a99c84; --line: #cdbfa2; --rule: #e1d6bf; --dot: #e1d6bf; --chip: #ece3d0;
+  --shadow: 0 1px 2px rgba(70,52,20,.1), 0 6px 16px rgba(70,52,20,.08);
+  --therefore: oklch(0.54 0.1 152); --but: oklch(0.55 0.15 33);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+    --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+    --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #231f19; --panel: #2b2721; --card: #352f29; --ink: #e4ddd3; --soft: #aaa49b;
+  --faint: #79746d; --line: #4c4740; --rule: #605a52; --dot: #1a1712; --chip: #272320;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+  --therefore: oklch(0.62 0.09 152); --but: oklch(0.63 0.13 33);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 36px 16px 80px; }
+.eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--therefore); }
+h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 30px; margin: 6px 0 10px; }
+h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 24px; margin: 4px 0 8px; }
+h3 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 18px; margin: 30px 0 4px; }
+.lede { color: var(--soft); font-size: 15px; line-height: 1.6; max-width: 780px; margin: 0; }
+.note { font-size: 13.5px; color: var(--soft); line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
+.rules { margin: 16px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 28px; font-size: 14px; line-height: 1.5; }
+.rules b { font-weight: 600; }
+
+section { padding: 40px 0; border-top: 1px solid var(--line); }
+.frames { display: flex; flex-direction: column; gap: 24px; }
+.cap { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; }
+.cap span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.grow { flex: 1; }
+
+/* Drawer */
+.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.dhead { display: flex; align-items: center; gap: 8px; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
+.dhead .t { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
+.dhead .s { font-size: 11.5px; color: var(--soft); font-weight: 500; margin-top: 2px; }
+.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; flex: none; }
+.list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px 22px; }
+.add { border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
+.grid .add, .tgrid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; }
+.tgrid .add { min-height: 120px; font-size: 12px; }
+
+/* App frames. Layers share one grid cell, so a frame grows to its tallest layer. */
+.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+.app > * { grid-area: 1 / 1; }
+.boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start; }
+.appbar { align-self: start; height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
+.dim { background: rgba(20,14,6,.46); }
+.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
+.app .drawer.full { border: 0; border-radius: 0; }
+.winscrim { background: rgba(20,14,6,.38); display: flex; align-items: center; justify-content: center; padding: 28px 24px; }
+.modal { width: min(600px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 16px 20px 20px; }
+
+/* Chapter modal */
+.chmodal { margin: 28px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); align-self: start; }
+.chhead { padding: 18px 26px 12px; }
+.chhead .row { display: flex; align-items: center; gap: 10px; }
+.chhead .title { font-size: 22px; }
+.chmeta { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); margin-top: 6px; }
+.tabs { display: flex; gap: 6px; padding: 4px 26px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.tabs span { font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--rule); border-radius: 8px; padding: 5px 10px; }
+.tabs span.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; opacity: .7; margin-left: 4px; }
+.chbody { padding: 16px 26px 22px; }
+.flowph { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; font-size: 12px; color: var(--faint); }
+
+/* Chapter card */
+.chap { width: 244px; min-height: 142px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.cast { display: flex; padding-right: 6px; }
+.cast span { margin-right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--card); color: #fff; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.top { display: flex; align-items: center; gap: 8px; }
+.title { font-family: Spectral, serif; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.title.untitled { color: var(--faint); }
+.sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sum.empty { color: var(--faint); }
+.meta { display: flex; justify-content: flex-end; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: var(--soft); }
+.meta .sep { color: var(--faint); }
+
+/* Tile (the new card) */
+.tile { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.grid .tile { min-height: 142px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tgrid .tile { min-height: 120px; }
+.ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
+.tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.pic { border-radius: 8px; min-height: 54px; flex: 1; max-height: 70px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
+.pic.big { max-height: none; min-height: 200px; }
+
+/* Fields */
+.fields { display: flex; flex-direction: column; gap: 12px; }
+.lab { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+.inp { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
+.inp.ta { min-height: 48px; }
+.inp.ph { color: var(--faint); }
+.pair { display: flex; gap: 12px; } .pair > * { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips span { border: 1px solid var(--rule); border-radius: 6px; padding: 2px 8px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
+.more { font-size: 11.5px; color: var(--faint); font-style: italic; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ghost { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--soft); }
+.hint { font-size: 11.5px; color: var(--faint); }
+.todo { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.todo .done { text-decoration: line-through; color: var(--faint); }
+.addrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 7px; }
+.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+
+/* Notes drawer */
+.nbody { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
+.drawer.full .nbody { padding: 18px 22px 22px; }
+.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; min-height: 110px; }
+.liblist { display: flex; flex-direction: column; gap: 11px; }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.libgrid .tile { min-height: 142px; }
+
+/* Changes table */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.45; }
+th { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+</style>
+<style>
+.page { background: var(--panel); align-self: start; min-height: 100%; }
+.ptop { display: flex; align-items: center; gap: 10px; padding: 12px 26px; border-bottom: 1px solid var(--rule); font-size: 12px; color: var(--soft); }
+.ptitle { padding: 18px 26px 6px; font-family: Spectral, serif; font-size: 26px; font-weight: 600; }
+.pmeta { padding: 0 26px 12px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
+.pchip { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); border: 1px solid var(--rule); border-radius: 6px; padding: 2px 7px; margin-right: 8px; font-family: "Hanken Grotesk"; }
+.tabs2 { display: flex; gap: 6px; padding: 12px 26px; flex-wrap: wrap; }
+.tabs2 span { font-size: 12px; font-weight: 500; color: var(--soft); background: var(--chip); border-radius: 8px; padding: 6px 11px; }
+.tabs2 span.on { background: var(--ink); color: var(--bg); }
+.tabs2 i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; margin-left: 6px; opacity: .7; }
+.tabbody { padding: 0 26px 16px; border-bottom: 1px solid var(--rule); }
+.flow { padding: 14px 26px 26px; }
+.flow .lbl { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+.flow .row { display: flex; gap: 14px; flex-wrap: wrap; }
+.scene { width: 200px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.45; box-shadow: var(--shadow); }
+.scene b { display: block; font-size: 10px; letter-spacing: .1em; color: var(--faint); margin-bottom: 4px; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.cchip { display: flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 6px 5px 8px; font-size: 12px; font-weight: 500; color: #fff; }
+.cchip .ci { width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.25); font-size: 8.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.wchip { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 6px 5px 10px; font-size: 12px; font-weight: 500; background: var(--ink); color: var(--bg); }
+.wchip small { font-size: 9px; text-transform: uppercase; opacity: .7; }
+.dashchip { border: 1px dashed var(--line); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--soft); }
+.ttile { position: relative; }
+.picker { margin-top: 10px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
+.pick { display: flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--panel); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 500; }
+.pick .d { width: 16px; height: 16px; border-radius: 50%; color: #fff; font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.sbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 24px; align-items: start; }
+.sbs .scene { width: 150px; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Estoria · one more piece of option B</div>
+  <h1>Characters and World tabs as tiles</h1>
+  <p class="lede">An anthology piece's Characters and World tabs (a chapter uses the same tabs). Today on the left, tiles on the right, row by row. Scroll down.</p>
+  <ul class="rules">
+    <li><b>Same tiles.</b> The cast of this piece as character tiles, its world entries as world tiles. A grid, like the chapter's pinned references.</li>
+    <li><b>Click to open.</b> Opens the same character or world window as the drawers do, so you can edit them from here.</li>
+    <li><b>Take one off this piece</b> with "Remove from this piece" at the foot of the window. They stay in your cast. (Today that is the ✕ on the chip.)</li>
+    <li><b>Add</b> with the "+ Add character" tile, which opens the same picker as today.</li>
+  </ul>
+
+  <section>
+    <div class="eyebrow">1 · Characters tab</div>
+    <h2>The piece's cast</h2>
+    <div class="sbs">
+      <div><div class="cap">Today · chips</div><div id="c-today"></div></div>
+      <div><div class="cap">Proposed · tiles</div><div id="c-new"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">2 · World details tab</div>
+    <h2>The piece's world entries</h2>
+    <div class="sbs">
+      <div><div class="cap">Today · chips</div><div id="w-today"></div></div>
+      <div><div class="cap">Proposed · tiles</div><div id="w-new"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">3 · Clicking one</div>
+    <h2>Wren Calloway, clicked</h2>
+    <div class="sbs">
+      <div><div class="cap">Today <span>(clicking a chip does nothing; its ✕ takes her off this piece)</span></div><div id="click-today"></div></div>
+      <div><div class="cap">Proposed <span>(her window opens; "Remove from this piece" at its foot)</span></div><div id="click-new"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">4 · Adding one</div>
+    <h2>"+ Add character", clicked</h2>
+    <div class="sbs">
+      <div><div class="cap">Today</div><div id="add-today"></div></div>
+      <div><div class="cap">Proposed <span>(same picker)</span></div><div id="add-new"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">5 · Inside a chapter</div>
+    <h2>A chapter uses the same tabs</h2>
+    <p class="note">So it changes the same way, unless chapters keep chips. Keeping them the same means a chapter and an anthology piece never look different.</p>
+    <div class="sbs">
+      <div><div class="cap">Today · chips</div><div id="ch-today"></div></div>
+      <div><div class="cap">Proposed · tiles</div><div id="ch-new"></div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sep = '<span class="sep">·</span>';
+const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
+const put = (id, html) => (document.getElementById(id).innerHTML = html);
+const inp = (v, ph) => `<div class="inp ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+const area = (v, ph) => `<div class="inp ta ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+
+const CAST = [
+  { name: "Wren Calloway", ini: "WC", color: "oklch(0.55 0.1 220)", role: "Protagonist", type: "Hero", desc: "A cartographer who can chart any coast but her own way home.", n: 8, bio: "Grew up on the tide flats, apprenticed to the harbour's last chart-maker.", want: "To find her mother's map", need: "To stop running" },
+  { name: "Pip", ini: "P", color: "oklch(0.52 0.12 300)", role: "Catalyst", type: "Trickster", desc: "A dock-rat who trades in secrets and stolen tide-charts.", n: 4 },
+];
+const NOT_CAST = [
+  { name: "Sela Voss", ini: "SV", color: "oklch(0.55 0.13 30)" },
+  { name: "Bram Okonkwo", ini: "BO", color: "oklch(0.55 0.1 80)" },
+];
+const WORLD = [
+  { name: "The Lower City", cat: "Place", desc: "A tide-flooded port built on the drowned bones of an older one.", notes: "Streets renumber themselves at high water; locals navigate by smell and habit.", n: 6, refs: 2 },
+];
+
+const charTile = (c) => `<div class="tile"><div class="top"><span class="ini" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role)}</span></div>
+  <div class="title">${esc(c.name)}</div><div class="sum">${esc(c.desc)}</div><div class="grow"></div>
+  <div class="meta"><span>${esc(c.type)}</span>${sep}<span>in ${nch(c.n)}</span></div></div>`;
+const worldTile = (w) => `<div class="tile"><div class="top"><span class="badge">${esc(w.cat.toUpperCase())}</span></div>
+  <div class="title">${esc(w.name)}</div><div class="sum">${esc(w.desc)}</div><div class="grow"></div>
+  <div class="meta"><span>on ${nch(w.n)}</span>${sep}<span>${w.refs} refs</span></div></div>`;
+const addTile = (label) => `<div class="add" style="display:flex;align-items:center;justify-content:center;min-height:142px">+ ${label}</div>`;
+
+const tabsFor = (on, chapter) => `<div class="tabs2"><span class="${on === "c" ? "on" : ""}">Characters<i>2</i></span><span class="${on === "w" ? "on" : ""}">World details<i>1</i></span><span>${chapter ? "Chapter notes" : "Piece notes"}</span><span>Pinned references<i>2</i></span></div>`;
+const flow = `<div class="flow"><div class="lbl">Map · 3 scenes</div><div class="row"><div class="scene"><b>SCENE 1</b>Wren haggles for a water-ruined chart at the night market.</div><div class="scene"><b>SCENE 2</b>She recognizes her mother's hand inking the margins.</div><div class="scene"><b>SCENE 3</b>The coastline rearranges itself when the paper gets wet.</div></div></div>`;
+const pieceTop = `<div class="ptop">Piece 1 of 8<span class="grow"></span>‹ Previous · A Door in the Floor ›</div><div class="ptitle">The Drowned Map</div><div class="pmeta"><span class="pchip">Short story</span>3,200 words · 3 scenes · Done</div>`;
+const piecePage = (on, tab, win = "") => `<div class="app"><div class="page"><div class="appbar" style="position:static">Untitled Voyage · Anthology</div>${pieceTop}${tabsFor(on)}<div class="tabbody">${tab}</div>${flow}</div>${win}</div>`;
+const tgrid = (inner) => `<div class="tgrid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${inner}</div>`;
+
+const chipsC = `<div class="chiprow">${CAST.map((c) => `<span class="cchip" style="background:${c.color}"><span class="ci">${c.ini}</span>${esc(c.name)} ✕</span>`).join("")}<span class="dashchip">+ Add character</span></div>`;
+const chipsW = `<div class="chiprow">${WORLD.map((w) => `<span class="wchip">${esc(w.name)}<small>${w.cat}</small> ✕</span>`).join("")}<span class="dashchip">+ Add world detail</span></div>`;
+const cTab = tgrid(CAST.map(charTile).join("") + addTile("Add character"));
+const wTab = tgrid(WORLD.map(worldTile).join("") + addTile("Add world detail"));
+const picker = `<div class="picker">${NOT_CAST.map((c) => `<span class="pick"><span class="d" style="background:${c.color}">${c.ini}</span>${esc(c.name)}</span>`).join("")}<span class="dashchip">+ Create new character</span></div>`;
+const winFoot = (keep) => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding:12px 20px"><span class="ghost">Remove from this piece</span><span class="hint">${keep}</span></div>`;
+const w0 = CAST[0];
+const charWin = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="ini" style="background:${w0.color}">${w0.ini}</span><span class="tag">${w0.role}</span><div class="title">${w0.name}</div><span class="grow"></span><span class="iconbtn">✕</span></div>
+  <div class="mbody"><div class="fields">
+  <div class="pair"><div><div class="lab">Name</div>${inp(w0.name)}</div><div style="flex:0 0 70px"><div class="lab">Initials</div>${inp(w0.ini)}</div></div>
+  <div class="pair"><div><div class="lab">Role</div>${inp(w0.role)}</div><div><div class="lab">Archetype</div>${inp(w0.type)}</div></div>
+  <div><div class="lab">Description</div>${area(w0.desc)}</div>
+  <div class="more">Bio, Traits, Goals, Motivations, Wants, Needs, Notes, Appears in (same as the drawer's window)</div>
+  </div></div>${winFoot("They stay in your cast.")}</div></div>`;
+
+put("c-today", piecePage("c", chipsC));
+put("c-new", piecePage("c", cTab));
+put("w-today", piecePage("w", chipsW));
+put("w-new", piecePage("w", wTab));
+put("click-today", piecePage("c", chipsC));
+put("click-new", piecePage("c", cTab, charWin));
+put("add-today", piecePage("c", chipsC + picker));
+put("add-new", piecePage("c", cTab + picker));
+const chapter = (tab) => `<div class="app"><div class="dim"></div><div class="chmodal" style="margin:18px"><div class="chhead"><div class="row"><span class="badge">01</span><div class="title">The Drowned Map</div><span class="grow"></span><span class="iconbtn">‹</span><span class="iconbtn">›</span><span class="iconbtn">✕</span></div><div class="chmeta">3,200 words · 3 scenes · Done · Act 1</div></div>${tabsFor("c", true)}<div class="tabbody">${tab}</div>${flow}</div></div>`;
+put("ch-today", chapter(chipsC));
+put("ch-new", chapter(cTab));
+</script>
+</body>
+</html>
