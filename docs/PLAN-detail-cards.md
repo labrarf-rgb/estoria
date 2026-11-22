@@ -25,8 +25,16 @@ Rejected: option A (chapter look, but still expanding in place).
 | World drawer (`WorldPanel.tsx`) | one-line rows, expand in list | tiles, open in a window |
 | Notes library (`NotesPanel.tsx` via `RefList`) | list or cards (switch), expand in list | tiles, open in a window; no switch |
 | World entry references (`RefList` in the world window) | list or cards (switch) | tiles inside the entry's window |
-| Chapter pinned references (`RefList` in `ChapterDetail.tsx`) | list or cards (switch) | tiles, open in a window over the chapter |
-| Anthology piece's Pinned tab (same `ChapterDetail`) | list or cards (switch) | tiles, as a chapter |
+| Chapter pinned references (`RefList` in `ChapterDetail.tsx`) | list or cards (switch) | **chips** (see below), open in a window over the chapter |
+| Anthology piece's Pinned tab (same `ChapterDetail`) | list or cards (switch) | chips, as a chapter |
+| Chapter / piece Characters and World tabs | chips, no click | chips; a click opens the drawer's window |
+
+**Decided 2026-11-22 (Ray), after the build:** inside a chapter or anthology
+piece every tab list is chips, and clicking any chip opens its window
+(mockups `docs/mockups/detail-cards-tabs.html`, then
+`docs/mockups/detail-cards-chips.html`). The windows are the drawers' own
+(`CharacterWindow`, `WorldWindow`, RefList's), with a "Remove from this
+chapter / piece" foot; Archive and Delete stay in the drawers.
 | Story notes box, chapter cast and world chips | | unchanged |
 
 ## The card face (one shared component)

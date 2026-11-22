@@ -44,7 +44,8 @@ import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
  * `reorderChapterRef` / `reorderWorldRef`.
  *
  * Layout (since the detail-card restyle, 2026-11-22): every item is a
- * chapter-style `DetailCard` tile, one column where it's narrow or a grid of
+ * chapter-style `DetailCard` tile (or, with `layout="chips"`, a compact pill:
+ * a chapter's or piece's tabs are all chips), one column where it's narrow or a grid of
  * tiles at least `tileMin` px wide where there's room. A tile never edits:
  * clicking it opens the item in a `DetailWindow`, which holds the title, the
  * note / checklist / picture, the caller's `extra` (the library's "Pinned in")
@@ -52,6 +53,10 @@ import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
  */
 const ADD_BTN =
   "rounded-[10px] border-[1.5px] border-dashed border-line py-[8px] text-[11.5px] font-semibold text-faint hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-faint";
+
+/** The add buttons as dashed pills, beside chips. */
+const ADD_CHIP =
+  "rounded-full border border-dashed border-line px-[11px] py-[5px] text-[12px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft";
 
 const KIND_WORD: Record<RefKind, string> = { IMAGE: "Image", NOTE: "Note", TODO: "To-do" };
 
@@ -80,6 +85,7 @@ export function RefList({
   archivePrompt,
   caption,
   extra,
+  layout = "tiles",
   tileMin,
   idPrefix = "r",
   removeMode = "detach",
@@ -116,7 +122,13 @@ export function RefList({
   caption?: (r: ResolvedRef) => string | undefined;
   /** Optional extra content inside an item's window (e.g. the pin list). */
   extra?: (r: ResolvedRef) => React.ReactNode;
-  /** Lay tiles out in a grid of at least this many px each; omitted, one column. */
+  /**
+   * "tiles" (default): chapter-style tiles. "chips": a row of compact pills
+   * (order number, title, kind), for the tabs inside a chapter or piece, where
+   * every list is chips. Either way a click opens the item's window.
+   */
+  layout?: "tiles" | "chips";
+  /** Tiles only: a grid of tiles at least this many px wide; omitted, one column. */
   tileMin?: number;
   /** The detach button's words in the window (e.g. "Remove from this chapter"). */
   removeLabel?: string;
@@ -320,19 +332,19 @@ export function RefList({
   // Note · To-do · Image, in that order everywhere this list appears (chapter
   // modal, World panel, shared library) — the two text kinds together, the
   // upload last.
-  const addButtons = () => (
+  const addButtons = (cls = ADD_BTN) => (
     <>
-      <button onClick={() => startDraft("NOTE")} disabled={!!draft} className={ADD_BTN}>
+      <button onClick={() => startDraft("NOTE")} disabled={!!draft} className={cls}>
         + Note
       </button>
-      <button onClick={() => startDraft("TODO")} disabled={!!draft} className={ADD_BTN}>
+      <button onClick={() => startDraft("TODO")} disabled={!!draft} className={cls}>
         + To-do
       </button>
-      <button onClick={() => startDraft("IMAGE")} disabled={!!draft} className={ADD_BTN}>
+      <button onClick={() => startDraft("IMAGE")} disabled={!!draft} className={cls}>
         + Image
       </button>
       {onLink && (
-        <button onClick={onLink} className={ADD_BTN}>
+        <button onClick={onLink} className={cls}>
           {linkLabel}
         </button>
       )}
@@ -448,7 +460,76 @@ export function RefList({
   return (
     <div className="flex flex-col gap-[9px]">
       {items.length === 0 && <div className="px-[2px] text-[12px] text-faint">No references yet.</div>}
-      {items.length > 0 && (
+      {items.length > 0 && layout === "chips" && (
+        <div className="flex flex-wrap items-center gap-[7px]">
+          {items.map((r) => {
+            const isDraft = r.id === draft?.id;
+            const idx = refs.findIndex((x) => x.id === r.id);
+            const name = r.label || (isDraft ? newLabel(r.kind) : untitled(r.kind));
+            return (
+              <div
+                key={r.id}
+                ref={(el) => {
+                  if (el) rowEls.current.set(r.id, el);
+                  else rowEls.current.delete(r.id);
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${name}`}
+                title={r.archived ? `${name} (archived)` : `Open ${name}`}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("[data-no-open]")) return;
+                  setOpenId(r.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    setOpenId(r.id);
+                  }
+                }}
+                className={`flex max-w-full cursor-pointer items-center gap-[6px] rounded-full border bg-card py-[4px] pl-[5px] pr-[10px] text-[12px] font-medium shadow-[var(--shadow)] outline-none hover:border-faint focus-visible:border-faint ${
+                  overId === r.id ? "border-faint" : "border-rule"
+                } ${dragId === r.id || isDraft || r.archived ? "opacity-50" : ""}`}
+              >
+                {onReorder && !isDraft && (
+                  <span
+                    data-no-open
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      startGripDrag(r.id);
+                    }}
+                    className={`-my-[4px] flex h-[22px] w-[12px] shrink-0 select-none items-center justify-center text-[11px] leading-none text-faint hover:text-soft ${
+                      dragId === r.id ? "cursor-grabbing" : "cursor-grab"
+                    }`}
+                    title="Drag to reorder"
+                  >
+                    ⠿
+                  </span>
+                )}
+                {isDraft || idx === -1 ? (
+                  <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
+                    {isDraft ? "New" : "?"}
+                  </span>
+                ) : onReorder ? (
+                  <span data-no-open className="shrink-0">
+                    <PositionInput small index={idx} total={refs.length} onCommit={(to) => onReorder(r.id, to)} />
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-ink px-[6px] py-[1px] font-mono text-[9.5px] font-semibold text-bg">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                )}
+                <span className={`truncate ${r.label ? "text-ink" : "text-faint"}`}>{name}</span>
+                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-faint">
+                  {KIND_WORD[r.kind]}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {items.length > 0 && layout === "tiles" && (
         <TileGrid min={tileMin}>
           {items.map((r) => {
             const isDraft = r.id === draft?.id;
@@ -505,7 +586,11 @@ export function RefList({
           })}
         </TileGrid>
       )}
-      <div className="grid grid-cols-2 gap-[7px] sm:grid-cols-4">{addButtons()}</div>
+      {layout === "chips" ? (
+        <div className="flex flex-wrap items-center gap-[7px]">{addButtons(ADD_CHIP)}</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-[7px] sm:grid-cols-4">{addButtons()}</div>
+      )}
 
       {openItem && (
         <DetailWindow
@@ -620,10 +705,13 @@ export function RefList({
 function PositionInput({
   index,
   total,
+  small = false,
   onCommit,
 }: {
   index: number;
   total: number;
+  /** The pill-sized badge a chip carries. */
+  small?: boolean;
   onCommit: (toIdx: number) => void;
 }) {
   const [typed, setTyped] = useState<string | null>(null);
@@ -657,7 +745,9 @@ function PositionInput({
       onClick={(e) => e.stopPropagation()}
       title={`Position ${index + 1} of ${total}, type a number to move it`}
       aria-label={`Position ${index + 1} of ${total}`}
-      className="h-[20px] w-[32px] shrink-0 rounded-md border border-transparent bg-ink text-center font-mono text-[11px] font-semibold text-bg outline-none hover:border-faint focus:border-ink focus:bg-card focus:text-ink"
+      className={`shrink-0 border border-transparent bg-ink text-center font-mono font-semibold text-bg outline-none hover:border-faint focus:border-ink focus:bg-card focus:text-ink ${
+        small ? "h-[18px] w-[26px] rounded-full text-[10px]" : "h-[20px] w-[32px] rounded-md text-[11px]"
+      }`}
     />
   );
 }

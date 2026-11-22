@@ -6,7 +6,8 @@ import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { DetailCard, EmptyBody, InkBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
-import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
+import { DetailWindow } from "@/components/ui/DetailWindow";
+import { DrawerFooter } from "@/components/panels/CharactersPanel";
 import { resolveRefs } from "@/lib/refs";
 import { countWorldReferences } from "@/lib/entities";
 import type { WorldCategory, WorldEntry } from "@/types";
@@ -150,7 +151,12 @@ export function WorldPanel() {
           appearsIn={appearsIn(open.id)}
           onJump={jumpTo}
           onClose={closeWindow}
-          onArchive={() => {
+          footer={
+            <DrawerFooter
+              isDraft={openIsDraft}
+              deleteLabel="Delete entry"
+              draftHint="Nothing saved yet, type anything to add it"
+              onArchive={() => {
             const n = countWorldReferences(doc, open.id);
             askConfirm({
               message: `Archive "${open.name || "this entry"}"?`,
@@ -164,7 +170,7 @@ export function WorldPanel() {
               onConfirm: () => archiveWorldEntry(open.id),
             });
           }}
-          onDelete={() =>
+              onDelete={() =>
             // Nothing to confirm on a draft: there's nothing saved to lose.
             openIsDraft
               ? discardDraft()
@@ -173,6 +179,8 @@ export function WorldPanel() {
                   danger: true,
                   onConfirm: () => deleteWorldEntry(open.id),
                 })
+              }
+            />
           }
         />
       )}
@@ -180,25 +188,27 @@ export function WorldPanel() {
   );
 }
 
-/** One world entry, open: the expanded card's fields, in the same order. */
-function WorldWindow({
+/**
+ * One world entry, open: the expanded card's fields, in the same order.
+ * Opened from the World drawer and from a chapter's or piece's World chips,
+ * each passing its own footer.
+ */
+export function WorldWindow({
   w,
-  isDraft,
+  isDraft = false,
   set,
   appearsIn,
   onJump,
   onClose,
-  onArchive,
-  onDelete,
+  footer,
 }: {
   w: WorldEntry;
-  isDraft: boolean;
+  isDraft?: boolean;
   set: (patch: Partial<WorldEntry>) => void;
   appearsIn: { id: string; num: number; title: string }[];
   onJump: (chapterId: string) => void;
   onClose: () => void;
-  onArchive: () => void;
-  onDelete: () => void;
+  footer: React.ReactNode;
 }) {
   const assets = useStore((s) => s.doc.assets);
   const addWorldRef = useStore((s) => s.addWorldRef);
@@ -221,18 +231,7 @@ function WorldWindow({
       badge={<InkBadge>{w.cat}</InkBadge>}
       title={w.name || (isDraft ? "New entry" : "Untitled entry")}
       untitled={!w.name}
-      footer={
-        // Archive before Delete: the reversible action reads first.
-        <>
-          {!isDraft && <WindowButton onClick={onArchive}>Archive</WindowButton>}
-          <WindowButton onClick={onDelete} danger>
-            {isDraft ? "Discard" : "Delete entry"}
-          </WindowButton>
-          {isDraft && (
-            <span className="text-[11.5px] text-faint">Nothing saved yet, type anything to add it</span>
-          )}
-        </>
-      }
+      footer={footer}
     >
       <div className="flex flex-col gap-[12px]">
         <div className="flex gap-[12px]">

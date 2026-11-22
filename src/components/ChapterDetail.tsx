@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { Scrim, stop, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
+import { CharacterWindow, DetachFooter } from "@/components/panels/CharactersPanel";
+import { WorldWindow } from "@/components/panels/WorldPanel";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { resolveRefs } from "@/lib/refs";
@@ -52,6 +54,9 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const editChapterText = useStore((s) => s.editChapterText);
   const toggleChapterChar = useStore((s) => s.toggleChapterChar);
   const toggleChapterWorld = useStore((s) => s.toggleChapterWorld);
+  const updateCharacter = useStore((s) => s.updateCharacter);
+  const updateWorldEntry = useStore((s) => s.updateWorldEntry);
+  const jumpToChapter = useStore((s) => s.jumpToChapter);
   const deleteChapter = useStore((s) => s.deleteChapter);
   const addScene = useStore((s) => s.addScene);
   const insertScene = useStore((s) => s.insertScene);
@@ -90,6 +95,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [charAdd, setCharAdd] = useState(false);
   const [worldAdd, setWorldAdd] = useState(false);
+  // Which cast or world chip is open in its window (the drawers' windows,
+  // reused). Local: a chip's window belongs to this chapter's tab.
+  const [openCharId, setOpenCharId] = useState<string | null>(null);
+  const [openWorldId, setOpenWorldId] = useState<string | null>(null);
   // Scene select mode: pick scenes with checkboxes, then act on the block —
   // send it to a chapter (this one included, which is a reorder) or delete it.
   // One selection, two verbs: the picking is identical either way, so a second
@@ -797,8 +806,18 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 {members.map((c) => (
                   <span
                     key={c.id}
-                    title={c.archived ? archivedTitle(c.name || "Unnamed character") : undefined}
-                    className={`flex items-center gap-[7px] rounded-full border border-transparent py-[5px] pl-[8px] pr-[6px] text-[12px] font-medium text-white ${c.archived ? ARCHIVED_DIM : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenCharId(c.id)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        setOpenCharId(c.id);
+                      }
+                    }}
+                    aria-label={`Open ${c.name || "this character"}`}
+                    title={c.archived ? archivedTitle(c.name || "Unnamed character") : "Open to see their details"}
+                    className={`flex cursor-pointer items-center gap-[7px] rounded-full border border-transparent py-[5px] pl-[8px] pr-[6px] text-[12px] font-medium text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-faint ${c.archived ? ARCHIVED_DIM : ""}`}
                     style={{ background: c.color }}
                   >
                     <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/25 text-[8.5px] font-semibold">
@@ -806,7 +825,11 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                     </span>
                     {c.name || "Unnamed character"}
                     <button
-                      onClick={() => toggleChapterChar(ch.id, c.id)}
+                      // The ✕ takes them off this chapter without opening anything.
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleChapterChar(ch.id, c.id);
+                      }}
                       className="ml-[1px] flex h-[16px] w-[16px] items-center justify-center rounded-full text-[10px] hover:bg-black/25"
                       title={`Remove ${c.name}`}
                     >
@@ -852,6 +875,33 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   </button>
                 </div>
               )}
+              {(() => {
+                const c = members.find((x) => x.id === openCharId);
+                if (!c) return null;
+                const close = () => setOpenCharId(null);
+                return (
+                  <CharacterWindow
+                    p={c}
+                    set={(patch) => updateCharacter(c.id, patch)}
+                    appearsIn={doc.chapters.filter((x) => x.chars.includes(c.id))}
+                    onJump={(id) => {
+                      close();
+                      jumpToChapter(doc.activeBookId, doc.activeDraftId, id);
+                    }}
+                    onClose={close}
+                    footer={
+                      <DetachFooter
+                        label={`Remove from this ${unit}`}
+                        hint="They stay in your cast."
+                        onRemove={() => {
+                          close();
+                          toggleChapterChar(ch.id, c.id);
+                        }}
+                      />
+                    }
+                  />
+                );
+              })()}
             </div>
           );
         })()}
@@ -866,13 +916,27 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 {members.map((w) => (
                   <span
                     key={w.id}
-                    title={w.archived ? archivedTitle(w.name || "Untitled entry", "entry") : undefined}
-                    className={`flex items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg ${w.archived ? ARCHIVED_DIM : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenWorldId(w.id)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        setOpenWorldId(w.id);
+                      }
+                    }}
+                    aria-label={`Open ${w.name || "this entry"}`}
+                    title={w.archived ? archivedTitle(w.name || "Untitled entry", "entry") : "Open to see its details"}
+                    className={`flex cursor-pointer items-center gap-[6px] rounded-full border border-transparent bg-ink py-[5px] pl-[10px] pr-[6px] text-[12px] font-medium text-bg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-faint ${w.archived ? ARCHIVED_DIM : ""}`}
                   >
                     {w.name || "Untitled entry"}
                     <span className="text-[9px] uppercase opacity-70">{w.cat}</span>
                     <button
-                      onClick={() => toggleChapterWorld(ch.id, w.id)}
+                      // The ✕ takes it off this chapter without opening anything.
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleChapterWorld(ch.id, w.id);
+                      }}
                       className="flex h-[16px] w-[16px] items-center justify-center rounded-full text-[10px] hover:bg-white/20"
                       title={`Remove ${w.name}`}
                     >
@@ -914,6 +978,33 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   </button>
                 </div>
               )}
+              {(() => {
+                const w = members.find((x) => x.id === openWorldId);
+                if (!w) return null;
+                const close = () => setOpenWorldId(null);
+                return (
+                  <WorldWindow
+                    w={w}
+                    set={(patch) => updateWorldEntry(w.id, patch)}
+                    appearsIn={doc.chapters.filter((x) => (x.worldRefs ?? []).includes(w.id))}
+                    onJump={(id) => {
+                      close();
+                      jumpToChapter(doc.activeBookId, doc.activeDraftId, id);
+                    }}
+                    onClose={close}
+                    footer={
+                      <DetachFooter
+                        label={`Remove from this ${unit}`}
+                        hint="It stays in your world list."
+                        onRemove={() => {
+                          close();
+                          toggleChapterWorld(ch.id, w.id);
+                        }}
+                      />
+                    }
+                  />
+                );
+              })()}
             </div>
           );
         })()}
@@ -937,7 +1028,9 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
             <div className="px-[26px] pb-[16px]">
               <RefList
                 refs={resolveRefs(ch.refs, doc.assets)}
-                tileMin={200}
+                // Every list inside a chapter or piece is chips; a click opens
+                // the item's window, like the cast and world chips beside it.
+                layout="chips"
                 onAdd={(kind, id) => addChapterRef(ch.id, kind, id)}
                 // Content edits write through to the shared asset this ref links.
                 // The store resolves ref → asset, so a burst of typing right after

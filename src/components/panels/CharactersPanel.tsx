@@ -141,7 +141,12 @@ export function CharactersPanel() {
           appearsIn={appearsIn(open.id)}
           onJump={jumpTo}
           onClose={closeWindow}
-          onArchive={() => {
+          footer={
+            <DrawerFooter
+              isDraft={openIsDraft}
+              deleteLabel="Delete character"
+              draftHint="Nothing saved yet, type anything to add them"
+              onArchive={() => {
             const n = countCharacterCastings(doc, open.id);
             askConfirm({
               message: `Archive ${open.name || "this character"}?`,
@@ -158,7 +163,7 @@ export function CharactersPanel() {
               onConfirm: () => archiveCharacter(open.id),
             });
           }}
-          onDelete={() =>
+              onDelete={() =>
             // Nothing to confirm on a draft: there's nothing saved to lose.
             openIsDraft
               ? discardDraft()
@@ -168,6 +173,8 @@ export function CharactersPanel() {
                   danger: true,
                   onConfirm: () => deleteCharacter(open.id),
                 })
+              }
+            />
           }
         />
       )}
@@ -176,27 +183,69 @@ export function CharactersPanel() {
 }
 
 /**
- * One character, open. The fields are the ones the expanded card had, in the
- * same order; only where they live changed (a window, not the list).
+ * The drawer's window footer: Archive before Delete, matching the shared
+ * library's destroy row (the reversible action reads first). A draft has
+ * nothing to retire, so it offers Discard.
  */
-function CharacterWindow({
-  p,
+export function DrawerFooter({
   isDraft,
+  deleteLabel,
+  draftHint,
+  onArchive,
+  onDelete,
+}: {
+  isDraft: boolean;
+  deleteLabel: string;
+  draftHint: string;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <>
+      {!isDraft && <WindowButton onClick={onArchive}>Archive</WindowButton>}
+      <WindowButton onClick={onDelete} danger>
+        {isDraft ? "Discard" : deleteLabel}
+      </WindowButton>
+      {isDraft && <span className="text-[11.5px] text-faint">{draftHint}</span>}
+    </>
+  );
+}
+
+/**
+ * The footer when a character or world entry is opened from a chapter or
+ * piece: take it off this one only. Archive and Delete stay in the drawer.
+ */
+export function DetachFooter({ label, hint, onRemove }: { label: string; hint: string; onRemove: () => void }) {
+  return (
+    <>
+      <WindowButton onClick={onRemove}>{label}</WindowButton>
+      <span className="text-[11.5px] text-faint">{hint}</span>
+    </>
+  );
+}
+
+/**
+ * One character, open. The fields are the ones the expanded card had, in the
+ * same order; only where they live changed (a window, not the list). Opened
+ * from the Characters drawer and from a chapter's or piece's Characters chips,
+ * each passing its own footer.
+ */
+export function CharacterWindow({
+  p,
+  isDraft = false,
   set,
   appearsIn,
   onJump,
   onClose,
-  onArchive,
-  onDelete,
+  footer,
 }: {
   p: Character;
-  isDraft: boolean;
+  isDraft?: boolean;
   set: (patch: Partial<Character>) => void;
   appearsIn: { id: string; num: number; title: string }[];
   onJump: (chapterId: string) => void;
   onClose: () => void;
-  onArchive: () => void;
-  onDelete: () => void;
+  footer: React.ReactNode;
 }) {
   return (
     <DetailWindow
@@ -213,19 +262,7 @@ function CharacterWindow({
       }
       title={p.name || (isDraft ? "New character" : "Unnamed character")}
       untitled={!p.name}
-      footer={
-        // Archive before Delete, matching the shared library's destroy row:
-        // the reversible action reads first. A draft has nothing to retire.
-        <>
-          {!isDraft && <WindowButton onClick={onArchive}>Archive</WindowButton>}
-          <WindowButton onClick={onDelete} danger>
-            {isDraft ? "Discard" : "Delete character"}
-          </WindowButton>
-          {isDraft && (
-            <span className="text-[11.5px] text-faint">Nothing saved yet, type anything to add them</span>
-          )}
-        </>
-      }
+      footer={footer}
     >
       <div className="flex flex-col gap-[12px]">
         <Row>

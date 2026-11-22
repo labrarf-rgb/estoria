@@ -6390,4 +6390,16 @@ prompt), and try Draft done on a copy of a book first.
   pins with "Remove from this chapter", "+ Create new character" from inside a
   chapter, and an anthology piece's Pinned tab. Typecheck, 294 tests,
   production build. Not pushed or deployed; Ray tests locally first.
+- **Follow-up the same day: a chapter's tabs are all chips that open.** Ray
+  compared the tabs three ways (now, all tiles, all chips:
+  `docs/mockups/detail-cards-tabs.html`), chose chips, then approved
+  `docs/mockups/detail-cards-chips.html`. Cast and world chips in a chapter or
+  anthology piece now open the drawers' `CharacterWindow` / `WorldWindow`
+  (exported; each caller passes its footer: `DrawerFooter` with Archive /
+  Delete, or `DetachFooter` with "Remove from this chapter / piece"). The ✕ on
+  a chip still removes without opening. Pinned references use a new
+  `RefList layout="chips"`: pills with grip, typed order number, title and
+  kind, opening the same item window. Verified in the in-app browser on a
+  chapter and an anthology piece (open, ✕, Remove, + Note draft, grip drag,
+  drawers' footers unchanged); typecheck, 294 tests, production build.
 
