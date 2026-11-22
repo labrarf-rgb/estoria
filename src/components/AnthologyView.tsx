@@ -104,29 +104,19 @@ function AnthologyBoard() {
         {all.map((b, bi) => (
           <section
             key={`${b.section}:${bi}`}
-            id={bandId(bi)}
             onDragOver={(e) => onOver(e, b.section, null)}
             onDrop={onDrop}
-            className="relative scroll-mt-[16px] rounded-2xl border border-dashed px-[18px] pb-[18px] pt-[14px]"
+            className="relative rounded-2xl border border-dashed px-[18px] pb-[18px] pt-[14px]"
             style={{
               borderColor: over?.band === b.section && dragId ? "var(--therefore)" : "var(--line)",
               background: "color-mix(in srgb, var(--panel) 45%, transparent)",
             }}
           >
             {b.section ? (
-              <SectionHead
-                name={b.section}
-                count={b.pieces.length}
-                index={bi}
-                total={all.length}
-                pending={!b.pieces.length}
-                jumps={all.map((x) => x.section || "Before the first section")}
-              />
+              <SectionHead name={b.section} count={b.pieces.length} index={bi} total={all.length} pending={!b.pieces.length} />
             ) : hasSections ? (
-              <div className="mb-[12px] flex items-center gap-[10px]">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">Before the first section</span>
-                <div className="flex-1" />
-                <SectionJump jumps={all.map((x) => x.section || "Before the first section")} here={bi} />
+              <div className="mb-[12px] text-[11px] font-semibold uppercase tracking-wider text-faint">
+                Before the first section
               </div>
             ) : null}
             <div className="flex flex-wrap gap-[18px]">
@@ -245,14 +235,12 @@ function SectionHead({
   index,
   total,
   pending,
-  jumps,
 }: {
   name: string;
   count: number;
   index: number;
   total: number;
   pending: boolean;
-  jumps: string[];
 }) {
   const renameSection = useStore((s) => s.renameSection);
   const moveSection = useStore((s) => s.moveSection);
@@ -306,7 +294,6 @@ function SectionHead({
       >
         ⋯
       </button>
-      <SectionJump jumps={jumps} here={index} />
       <Popover anchorRef={btn} open={menu} onClose={() => setMenu(false)} align="right" width={250}>
         <div className="flex flex-col p-[6px]">
           <div className="px-[11px] pb-[4px] pt-[6px] text-[10.5px] font-semibold uppercase tracking-wider text-faint">{name}</div>
@@ -345,45 +332,59 @@ function SectionHead({
   );
 }
 
-const bandId = (i: number) => `anthology-section-${i}`;
-
 /**
- * Jump to another section: a dropdown beside each section's ⋯ that scrolls the
- * board to the band picked. Only drawn when there is somewhere else to go.
+ * Go to another section while reading a piece: a dropdown after the piece's ⋯
+ * listing each section with its pieces. A section opens its first piece; a
+ * piece opens itself. On the board every section is already in view, so this
+ * lives only here. Drawn only when the anthology has sections.
  */
-function SectionJump({ jumps, here }: { jumps: string[]; here: number }) {
+function SectionJump({ here }: { here: Chapter }) {
+  const doc = useStore((s) => s.doc);
+  const openChapter = useStore((s) => s.openChapter);
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
-  if (jumps.length < 2) return null;
+  const bs = bands(doc.chapters);
+  if (!bs.some((b) => b.section)) return null;
+  const mine = here.section?.trim() ?? "";
+  const go = (id: string) => {
+    setOpen(false);
+    if (id !== here.id) openChapter(id);
+  };
   return (
     <>
       <button
         ref={btn}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-[5px] rounded-md border border-rule bg-card px-[9px] py-[3px] text-[11.5px] font-medium text-soft hover:border-faint hover:text-ink"
-        aria-label="Go to a section"
-        title="Go to a section"
+        className="flex items-center gap-[5px] rounded-lg border border-rule bg-card px-[10px] py-[5px] text-[12px] font-medium text-ink hover:border-faint"
+        title="Go to another section"
       >
         Sections <span className="text-[9px] text-faint">▾</span>
       </button>
-      <Popover anchorRef={btn} open={open} onClose={() => setOpen(false)} align="right" width={240}>
+      <Popover anchorRef={btn} open={open} onClose={() => setOpen(false)} align="right" width={280}>
         <div className="flex flex-col p-[6px]">
-          <div className="px-[11px] pb-[4px] pt-[6px] text-[10.5px] font-semibold uppercase tracking-wider text-faint">Go to</div>
-          {jumps.map((name, i) => (
-            <button
-              key={`${name}:${i}`}
-              disabled={i === here}
-              onClick={() => {
-                setOpen(false);
-                document.getElementById(bandId(i))?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className={`truncate rounded-lg px-[11px] py-[7px] text-left text-[12.5px] ${
-                i === here ? "cursor-default font-semibold text-ink" : "font-medium text-soft hover:bg-chip hover:text-ink"
-              } ${name === "Before the first section" ? "italic" : "font-serif"}`}
-            >
-              {i === here ? "· " : ""}
-              {name}
-            </button>
+          {bs.map((b, i) => (
+            <div key={`${b.section}:${i}`} className={i ? "mt-[4px] border-t border-rule pt-[4px]" : ""}>
+              <button
+                onClick={() => go(b.pieces[0].id)}
+                className={`w-full truncate rounded-lg px-[11px] py-[6px] text-left text-[13px] hover:bg-chip ${
+                  b.section ? "font-serif italic" : "text-[11px] font-semibold uppercase tracking-wider"
+                } ${b.section === mine ? "text-ink" : "text-soft"}`}
+              >
+                {b.section || "Before the first section"}
+              </button>
+              {b.pieces.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => go(c.id)}
+                  className={`w-full truncate rounded-lg py-[4px] pl-[22px] pr-[11px] text-left text-[12px] hover:bg-chip ${
+                    c.id === here.id ? "font-semibold text-ink" : "text-soft"
+                  }`}
+                >
+                  {c.id === here.id ? "· " : ""}
+                  {c.title || "Untitled piece"}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </Popover>
@@ -432,6 +433,7 @@ function AnthologyPiece() {
           {next ? next.title || "Untitled piece" : "Next"} ›
         </button>
         <PieceMenu ch={ch} />
+        <SectionJump here={ch} />
       </div>
       <ErrorBoundary resetKey={`${ch.id}:${mode}`} fallback={(error, retry) => <ChapterCrash error={error} retry={retry} />}>
         <ChapterModal page />

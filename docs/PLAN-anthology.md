@@ -310,6 +310,8 @@ with these calls made during the build:
   touch screens (mouse drag only, like the board); the phone update.
 - **After Ray's first test (2026-11-21):** the way back from a piece is a
   **Board** button in the toolbar, where a book's Board / Timeline switch is
-  (the ‹ Board link under the toolbar is gone); and each section heading has a
-  **Sections ▾** dropdown after its ⋯ that scrolls the board to any section.
+  (the ‹ Board link under the toolbar is gone); and on a piece's page a
+  **Sections ▾** dropdown after the piece's ⋯ lists each section with its
+  pieces, to jump to another section (its first piece) or straight to a piece.
+  Not on the board, where every section is already in view.
 
