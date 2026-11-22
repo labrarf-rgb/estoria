@@ -14,18 +14,23 @@ Characters drawer.
 
 ## Data model
 
-One new optional top-level field on `StoryDoc`, beside `characters`:
+Two new optional top-level fields on `StoryDoc`, beside `characters`:
 
 ```ts
 relationships?: Relationship[];
+relationshipKinds?: RelationshipKind[];   // absent = the starter set
 
-export type RelationshipKind = "family" | "friend" | "romance" | "mentor" | "rival" | "other";
+export interface RelationshipKind {
+  id: string;          // starter kinds keep fixed ids; new ones get a fresh id
+  name: string;        // "Rival", or whatever the writer renames it to
+  color: number;       // 1-10: one of ten muted palette swatches
+}
 
 export interface Relationship {
   id: string;          // own id: merges as its own unit
   a: string;           // character id
   b: string;           // character id, a !== b
-  kind: RelationshipKind;  // fixed list, sets the color; unknown reads as "other"
+  kind?: string;       // a RelationshipKind id; missing or unknown = "No kind"
   label?: string;      // free text: "former mentor", "sisters"
   aView?: string;      // how a sees b
   bView?: string;      // how b sees a
@@ -42,9 +47,22 @@ Why this shape:
   keeps clear of the "new board field needs a phone update first" contract (§8).
 - **One record per pair, two optional points of view.** Covers one-sided
   feelings without a direction flag, and keeps the chart to one line per pair.
-- **Kind is a fixed list, label is free.** Color needs a small fixed set; the
-  specifics are the writer's words. Every line is labeled, so color is never the
-  only cue.
+- **Kinds are the project's own list, label is free.** Every project starts
+  with a starter set (Family, Friend, Romance, Mentor, Rival, Other, ids
+  `family`... `other`, colors 1-6). The writer can rename, recolor, add and
+  remove kinds. The label is still free text for the specifics. Every line is
+  labeled, so color is never the only cue.
+- **Colors come from a fixed palette of ten swatches,** not a free color
+  picker, so every kind stays muted and readable in light and dark. Kinds past
+  ten reuse colors; the labels still tell them apart.
+- **Absent means the starter set.** A file without `relationshipKinds` reads
+  as the six starters, and the first edit writes the whole list. Because the
+  starter ids are fixed, two devices that never edited kinds agree, and a
+  relationship made on either uses the same ids.
+- **Removing a kind keeps its relationships.** The confirm says how many use it;
+  they stay, shown as "No kind" (their `kind` is cleared). Nothing is deleted.
+- **Kinds are per project,** stored in the file, so they travel to Drive, other
+  browsers and the phone. They are series-wide like characters.
 - **No schema bump.** Optional field, same precedent as `manuscript`, `author`,
   `pace`.
 
@@ -69,8 +87,14 @@ character in a window.
 - **Tile footer:** the restyle's mono footer ("archetype · in N chapters") gains
   "· N ties" when there are any (archived partners not counted). Optional.
 - **Editor:** one small dialog: With (picker; self, archived and already-tied
-  characters excluded), Kind, Label, both views, Notes. Remove in the footer.
-  It opens over the character window, or over the drawer from the chart.
+  characters excluded), Kind (the project's kinds plus "No kind"), Label, both
+  views, Notes. Remove in the footer. It opens over the character window, or
+  over the drawer from the chart.
+- **Edit kinds:** a small dialog opened from "Edit kinds" in the chart's side
+  panel or beside Kind in the editor. One row per kind: color swatch (opens the
+  ten-swatch palette), name, how many relationships use it, remove. "+ Add kind"
+  at the end; Done closes. Removing a kind in use asks first, inline. It stacks
+  above the editor when opened from there, and the editor keeps what was typed.
 - **Empty state:** plain copy pointing at the character's card.
 
 ## Fitting with the detail-card plans
@@ -112,32 +136,45 @@ Ray chose option B, everywhere):
 
 ## Store, persistence, sync (web)
 
-1. `types.ts`: `Relationship`, `RelationshipKind`, `StoryDoc.relationships?`.
-2. `persistence.ts` `normalizeDoc`: **whitelist the field** (it rebuilds the
+1. `types.ts`: `Relationship`, `RelationshipKind`, `StoryDoc.relationships?`,
+   `StoryDoc.relationshipKinds?`; `lib/relationships.ts` with `STARTER_KINDS`
+   and `kindsOf(doc)` (the stored list, or the starters when absent).
+2. `persistence.ts` `normalizeDoc`: **whitelist both fields** (it rebuilds the
    top level from named keys; without this a file round trip drops it, the trap
    piece mode hit). Read defensively: drop entries with a missing endpoint, a
    self-tie, or a duplicate pair (the pair is unordered: (a,b) and (b,a) are
-   the same pair; keep the first); unknown kind becomes "other";
-   blank strings dropped; omit the field when empty.
-3. `useStore.ts`: `addRelationship`, `updateRelationship`, `removeRelationship`.
+   the same pair; keep the first); a `kind` that names no kind is cleared (the
+   tie is kept, as "No kind"); blank strings dropped; omit `relationships` when
+   empty. Kinds: drop entries without an id, dedupe ids, clamp `color` to 1-10,
+   keep a blank name (shown as "Unnamed kind"). An empty list `[]` is kept and
+   means "no kinds", which is different from absent (the starters).
+3. `useStore.ts`: `addRelationship`, `updateRelationship`, `removeRelationship`;
+   `addKind`, `updateKind`, `removeKind` (the first kind edit writes the
+   starters out as the stored list; `removeKind` clears `kind` on the
+   relationships that used it).
    `deleteCharacter` removes that character's relationships (no dangling ids,
    §9 item 5's bug class) and its confirm text counts them. Archive keeps them.
    Project merge (`dedupeById` for characters) unions relationships too.
 4. `sync.ts` diff: a `relationship` unit, labeled by the two names, so a
-   relationship-only difference shows in the conflict dialog.
+   relationship-only difference shows in the conflict dialog; and one
+   story-wide `doc:relationshipKinds` unit ("Relationship kinds") for the list,
+   taken whole like chapter connections (per-kind merging could pair one copy's
+   name with the other's color). Absent and the starter list compare equal.
 5. `merge.ts`: take/keep per relationship, plus **reference closure** (a kept
-   relationship brings in both characters it points at, reported first).
+   relationship brings in both characters it points at, reported first, and
+   its kind if the kept kind list lacks it).
 6. Markdown/structure export: a Relationships section under Characters, if
    export covers characters today (check `lib/` export code first).
-7. Tests: normalize round trip and pruning, delete cascade, diff unit, merge
-   closure (`sync.test.ts` style).
+7. Tests: normalize round trip and pruning, delete cascade, kind removal,
+   absent-vs-starters equality, diff units, merge closure (`sync.test.ts`
+   style).
 
 ## Android
 
 - **The phone keeps it without an update.** Checked in `Estoria-aa`:
   `Normalize.kt` builds the doc from `d.toMutableMap()` and overwrites only
   known keys, and `StoryDoc` has the `ExtrasSerializer` passthrough. So
-  `relationships` round-trips untouched.
+  `relationships` and `relationshipKinds` round-trip untouched.
 - **Known gaps until the phone learns it (not blockers):**
   - Deleting a character on the phone leaves its relationships behind; the web
     drops them on read (step 2).
@@ -152,7 +189,10 @@ See the report in the session; repeated here so they stay with the plan.
 1. Static map, or track change over the story ("rival from Ch 3")? Changes would
    tie relationships to chapters, which fork per version: a much bigger change.
    Proposal: static first.
-2. Is the kind list right (Family, Friend, Romance, Mentor, Rival, Other)?
+2. Kinds are now editable per project, starting from Family, Friend, Romance,
+   Mentor, Rival, Other. Is that the right starter set? And should there also
+   be a personal default for new projects (like Author details' saved
+   default), or is per project enough?
 3. Chart in the drawer (proposed), or a third main view beside Board / Timeline?
 4. Ring in roster order with no saved layout (proposed; rearranging cards then
    arranges the ring), or drag characters on the chart and remember where?

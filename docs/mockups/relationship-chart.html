@@ -15,12 +15,16 @@
     --frame-shadow: 0 20px 60px rgba(40,28,10,.22);
     --but: oklch(0.55 0.15 33);
     --new: oklch(0.54 0.10 152);
-    --k-family: oklch(0.55 0.09 70);
-    --k-friend: oklch(0.54 0.10 152);
-    --k-romance: oklch(0.55 0.12 355);
-    --k-mentor: oklch(0.52 0.08 250);
-    --k-rival: oklch(0.55 0.15 33);
-    --k-other: oklch(0.56 0.02 70);
+    --sw-1: oklch(0.55 0.09 70);
+    --sw-2: oklch(0.54 0.10 152);
+    --sw-3: oklch(0.55 0.12 355);
+    --sw-4: oklch(0.52 0.08 250);
+    --sw-5: oklch(0.55 0.15 33);
+    --sw-6: oklch(0.56 0.02 70);
+    --sw-7: oklch(0.55 0.10 305);
+    --sw-8: oklch(0.56 0.08 200);
+    --sw-9: oklch(0.57 0.09 115);
+    --sw-10: oklch(0.52 0.06 45);
     --serif: "Spectral", Georgia, serif;
     --sans: "Hanken Grotesk", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -35,12 +39,16 @@
       --frame-shadow: 0 20px 60px rgba(0,0,0,.45);
       --but: oklch(0.63 0.13 33);
       --new: oklch(0.62 0.09 152);
-      --k-family: oklch(0.64 0.08 70);
-      --k-friend: oklch(0.62 0.09 152);
-      --k-romance: oklch(0.64 0.11 355);
-      --k-mentor: oklch(0.62 0.08 250);
-      --k-rival: oklch(0.63 0.13 33);
-      --k-other: oklch(0.64 0.02 70);
+      --sw-1: oklch(0.64 0.08 70);
+      --sw-2: oklch(0.62 0.09 152);
+      --sw-3: oklch(0.64 0.11 355);
+      --sw-4: oklch(0.62 0.08 250);
+      --sw-5: oklch(0.63 0.13 33);
+      --sw-6: oklch(0.64 0.02 70);
+      --sw-7: oklch(0.64 0.09 305);
+      --sw-8: oklch(0.64 0.07 200);
+      --sw-9: oklch(0.65 0.08 115);
+      --sw-10: oklch(0.61 0.05 45);
       color-scheme: dark;
     }
   }
@@ -53,12 +61,16 @@
     --frame-shadow: 0 20px 60px rgba(0,0,0,.45);
     --but: oklch(0.63 0.13 33);
     --new: oklch(0.62 0.09 152);
-    --k-family: oklch(0.64 0.08 70);
-    --k-friend: oklch(0.62 0.09 152);
-    --k-romance: oklch(0.64 0.11 355);
-    --k-mentor: oklch(0.62 0.08 250);
-    --k-rival: oklch(0.63 0.13 33);
-    --k-other: oklch(0.64 0.02 70);
+    --sw-1: oklch(0.64 0.08 70);
+    --sw-2: oklch(0.62 0.09 152);
+    --sw-3: oklch(0.64 0.11 355);
+    --sw-4: oklch(0.62 0.08 250);
+    --sw-5: oklch(0.63 0.13 33);
+    --sw-6: oklch(0.64 0.02 70);
+    --sw-7: oklch(0.64 0.09 305);
+    --sw-8: oklch(0.64 0.07 200);
+    --sw-9: oklch(0.65 0.08 115);
+    --sw-10: oklch(0.61 0.05 45);
     color-scheme: dark;
   }
 
@@ -102,7 +114,7 @@
     display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
     color: var(--new); border: 1px solid var(--new); border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px;
   }
-  .flag.q { color: var(--k-family); border-color: var(--k-family); }
+  .flag.q { color: var(--sw-1); border-color: var(--sw-1); }
 
   /* ---------- App frame ---------- */
   .frame { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); box-shadow: var(--frame-shadow); position: relative; }
@@ -269,6 +281,7 @@
   .dlg .bd { padding: 12px 24px 4px; display: flex; flex-direction: column; gap: 14px; }
   .dlg .ft { display: flex; align-items: center; gap: 10px; padding: 18px 24px; flex-wrap: wrap; }
   .dlg .ft .first { margin-right: auto; }
+  .dlg .ft .first.help { flex: 1 1 220px; }
   .inp, .area, .sel {
     width: 100%; border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 7px 9px;
     font: inherit; font-size: 12.5px; color: var(--ink); outline: none; transition: border-color .2s;
@@ -284,6 +297,14 @@
   @media (max-width: 520px) { .two { grid-template-columns: minmax(0,1fr); } }
   .help { font-size: 11.5px; color: var(--faint); line-height: 1.45; margin-top: 4px; }
   .arcbox { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .krow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+  .krow:has(.kconfirm) { grid-template-columns: auto minmax(0, 1fr); }
+  .krow .kconfirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--but); line-height: 1.4; }
+  .krow .kconfirm span { flex: 1 1 180px; }
+  .kused { font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--card); box-shadow: 0 0 0 1px var(--rule); padding: 0; flex: none; }
+  .swatch[aria-pressed="true"], .swatch[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--ink); }
+  .palette { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 6px 30px; }
   .picker { display: flex; flex-wrap: wrap; gap: 6px; }
   .picker button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 999px; padding: 3px 10px 3px 3px; font-size: 12px; font-weight: 500; }
   .picker button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
@@ -353,6 +374,7 @@
       <ul>
         <li><b>No saved layout.</b> Everyone sits on a ring in roster order, clockwise from the top (Wren, Bram, Ione, Sela, Pip, the same order as the tiles). Clicking a character moves them to the middle with their ties around them. There are no positions to store or sync. If cards become rearrangeable, moving a card moves its place on the ring.</li>
         <li><b>Kind filters</b> in the side panel hide whole kinds of tie. Archived characters are off by default (screen 4).</li>
+        <li><b>Kinds are yours.</b> "Edit kinds" (side panel, or in the editor) opens the project's list: rename, recolor, add or remove. The six here are only the starter set. Try renaming Rival, or adding "Debt".</li>
         <li><b>The side panel</b> shows the selected pair or character. Each pair has a line for how each one sees the other, because feelings are rarely mutual.</li>
       </ul>
     </div>
@@ -417,7 +439,7 @@
     <div class="caption">
       <b>One small dialog for adding and editing,</b> in the style of Estoria's confirm dialog. It opens on top of the character window, so it stacks one level higher than the restyle's window. Shown here: adding a tie from Bram's window, with Sela picked. The picker greys out anyone Bram already has a tie with, since a pair has one record. Click the dialog to try it live; it also opens from "+ Add relationship" on any card or in the chart, and from any tie row (as Edit, with Remove).
       <ul>
-        <li><b>Kind</b> is a short fixed list that sets the color: Family, Friend, Romance, Mentor, Rival, Other. <b>Label</b> is free text for the specifics ("former mentor", "sisters").</li>
+        <li><b>Kind</b> comes from the project's own list and sets the color. Every project starts with Family, Friend, Romance, Mentor, Rival and Other; "Edit kinds" changes the list without leaving the editor. "No kind" is allowed. <b>Label</b> is free text for the specifics ("former mentor", "sisters").</li>
         <li><b>Both points of view are optional.</b> Leave one blank for a tie only one of them feels, or write "doesn't know she exists".</li>
         <li><b>Changes over the story</b> is shown greyed as a question, not a decision. It would let a tie turn at a chapter ("rival from Ch 3"). See the open questions.</li>
       </ul>
@@ -467,16 +489,22 @@
     <div class="pairgrid">
       <div class="paper">
         <div class="eyebrow">In the project file</div>
-        <h2>One new list, next to characters</h2>
-<pre><span class="c">// StoryDoc gains one optional top-level field</span>
+        <h2>Two new lists, next to characters</h2>
+<pre><span class="c">// StoryDoc gains two optional top-level fields</span>
 relationships?: Relationship[]
+relationshipKinds?: RelationshipKind[]  <span class="c">// absent = the starter six</span>
+
+interface RelationshipKind {
+  id: string;        <span class="c">// starter kinds keep fixed ids: "family", "rival", ...</span>
+  name: string;      <span class="c">// "Rival", or whatever you rename it to</span>
+  color: number;     <span class="c">// one of 10 palette swatches, 1-10</span>
+}
 
 interface Relationship {
   id: string;        <span class="c">// its own id, so merge treats it as a unit</span>
   a: string;         <span class="c">// character id</span>
   b: string;         <span class="c">// character id (a != b, one record per pair)</span>
-  kind: "family" | "friend" | "romance"
-      | "mentor" | "rival" | "other";
+  kind?: string;     <span class="c">// a RelationshipKind id; missing = No kind</span>
   label?: string;    <span class="c">// "former mentor"</span>
   aView?: string;    <span class="c">// how a sees b</span>
   bView?: string;    <span class="c">// how b sees a</span>
@@ -496,8 +524,9 @@ interface Relationship {
           <li><b>No schema bump.</b> The field is optional, like manuscript, author and pace before it. A file without it is a project with no relationships.</li>
           <li><b>Series-wide.</b> It sits beside characters, not on a book or version board, so every book in a series shares it and the phone needs no update first.</li>
           <li><b>The phone keeps it.</b> Android's normalize starts from the raw file and only overwrites keys it knows, so the list round-trips untouched. It just isn't shown there.</li>
-          <li><b>Read defensively.</b> A tie whose character is gone (deleted on the phone, say) is dropped on read, as is a tie to itself or a second record for the same pair. An unknown kind reads as Other.</li>
-          <li><b>Conflicts and merge.</b> Each relationship becomes its own row in the compare and merge dialog. Taking one from the file brings in both characters it points at.</li>
+          <li><b>Kinds live in the project.</b> Absent means the starter six. The first edit writes the whole list. Starter kinds keep fixed ids, so two devices that never edited agree.</li>
+          <li><b>Read defensively.</b> A tie whose character is gone (deleted on the phone, say) is dropped on read, as is a tie to itself or a second record for the same pair. A tie whose kind was removed is kept and shows as No kind.</li>
+          <li><b>Conflicts and merge.</b> Each relationship becomes its own row in the compare and merge dialog, and the kind list is one more row, taken whole. Taking a relationship from the file brings in both characters it points at, and its kind if this copy lacks it.</li>
           <li><b>Delete cleans up.</b> Deleting a character removes its relationships; archiving keeps them.</li>
         </ul>
       </div>
@@ -507,6 +536,7 @@ interface Relationship {
 
 <div class="scrim live" id="winScrim" style="z-index:35; align-items:flex-start" hidden></div>
 <div class="scrim" id="scrim" hidden></div>
+<div class="scrim" id="kindsScrim" style="z-index:50" hidden></div>
 
 <script>
 (function () {
@@ -524,11 +554,15 @@ interface Relationship {
     { id: "dace", name: "Captain Dace", first: "Dace", role: "Mentor", type: "Mentor", ini: "CD", color: "oklch(0.60 0.11 100)", ch: 1, archived: true,
       desc: "Bram's first captain. Cut in the second draft.", notes: "" },
   ];
+  // The project's own kinds. These six are only the starter set: rename, recolor, add or remove them.
+  // `sw` picks one of ten muted swatches, so every kind stays in the Estoria palette.
   const KINDS = [
-    ["family", "Family"], ["friend", "Friend"], ["romance", "Romance"],
-    ["mentor", "Mentor"], ["rival", "Rival"], ["other", "Other"],
+    { id: "family", name: "Family", sw: 1 }, { id: "friend", name: "Friend", sw: 2 }, { id: "romance", name: "Romance", sw: 3 },
+    { id: "mentor", name: "Mentor", sw: 4 }, { id: "rival", name: "Rival", sw: 5 }, { id: "other", name: "Other", sw: 6 },
   ];
-  const KIND_NAME = Object.fromEntries(KINDS);
+  const SWATCHES = 10;
+  const kindOf = (id) => KINDS.find((k) => k.id === id);
+  const kname = (id) => (kindOf(id) ? kindOf(id).name || "Unnamed kind" : "No kind");
   let uid = 20;
   const RELS = [
     { id: "r1", a: "sela", b: "wren", kind: "mentor", label: "former mentor",
@@ -557,16 +591,17 @@ interface Relationship {
   const other = (r, id) => (r.a === id ? r.b : r.a);
   const viewOf = (r, id) => (r.a === id ? r.aView : r.bView);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
-  const kc = (k) => `var(--k-${k})`;
+  const kc = (id) => (kindOf(id) ? `var(--sw-${kindOf(id).sw})` : "var(--faint)");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const NS = "http://www.w3.org/2000/svg";
   const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
 
   /* ---------------- Chart ---------------- */
   function makeChart(svg, opts) {
-    const st = { focus: null, sel: null, kinds: new Set(KINDS.map((k) => k[0])), showArch: !!opts.showArch, pos: {} };
+    const st = { focus: null, sel: null, hidden: new Set(), showArch: !!opts.showArch, pos: {} };
     const CX = 320, CY = 222, R = 165;
     const nodes = {}, edges = {};
+    const shownKind = (k) => !st.hidden.has(kindOf(k) ? k : "_none");
     const gEdges = el("g", {}), gNodes = el("g", {});
     svg.append(gEdges, gNodes);
 
@@ -603,10 +638,10 @@ interface Relationship {
         const hit = el("line", { class: "hit" });
         const pill = el("rect", { class: "pill", rx: "7", ry: "7", height: "20" });
         const tx = el("text", { class: "tx", fill: kc(r.kind) });
-        tx.textContent = r.label || KIND_NAME[r.kind];
+        tx.textContent = r.label || kname(r.kind);
         g.append(ln, hit, pill, tx);
         const A = byId(r.a), B = byId(r.b);
-        g.setAttribute("aria-label", `${A.first} and ${B.first}: ${KIND_NAME[r.kind]}, ${r.label || ""}`);
+        g.setAttribute("aria-label", `${A.first} and ${B.first}: ${kname(r.kind)}, ${r.label || ""}`);
         g.addEventListener("click", (e) => { e.stopPropagation(); selectEdge(r.id); });
         g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEdge(r.id); } });
         gEdges.append(g);
@@ -655,7 +690,7 @@ interface Relationship {
         const shown = vis.has(id);
         n.g.style.display = shown ? "" : "none";
         let dim = false;
-        if (st.focus && id !== st.focus) dim = !RELS.some((r) => st.kinds.has(r.kind) && ((r.a === st.focus && r.b === id) || (r.b === st.focus && r.a === id)));
+        if (st.focus && id !== st.focus) dim = !RELS.some((r) => shownKind(r.kind) && ((r.a === st.focus && r.b === id) || (r.b === st.focus && r.a === id)));
         if (st.sel) { const r = RELS.find((x) => x.id === st.sel); dim = r && id !== r.a && id !== r.b; }
         n.g.style.opacity = dim ? ".3" : "1";
         n.g.classList.toggle("sel", id === st.focus);
@@ -664,7 +699,7 @@ interface Relationship {
         const e = edges[id], r = e.r;
         const archived = byId(r.a).archived || byId(r.b).archived;
         e.g.classList.toggle("arch", archived);
-        const shown = st.kinds.has(r.kind) && vis.has(r.a) && vis.has(r.b);
+        const shown = shownKind(r.kind) && vis.has(r.a) && vis.has(r.b);
         e.g.style.display = shown ? "" : "none";
         let o = 1, lab = 1;
         if (st.focus) { const on = r.a === st.focus || r.b === st.focus; o = on ? 1 : 0.12; lab = on ? 1 : 0; }
@@ -705,7 +740,7 @@ interface Relationship {
     return {
       st, update, selectNode, selectEdge,
       rebuild() { build(); st.pos = targetPos(); update(false); },
-      setKinds(k) { st.kinds = k; update(false); },
+      toggleKind(key) { st.hidden.has(key) ? st.hidden.delete(key) : st.hidden.add(key); update(false); },
       setArch(v) { st.showArch = v; update(false); },
     };
   }
@@ -713,7 +748,7 @@ interface Relationship {
   /* ---------------- Side panel ---------------- */
   const side = document.getElementById("sideMain");
   function avatar(c, sm) { return `<span class="av${sm ? " sm" : ""}${c.archived ? " arch" : ""}" style="background:${c.color}">${esc(c.ini)}</span>`; }
-  function kindPill(k) { return `<span class="kindpill" style="--kc:${kc(k)}">${KIND_NAME[k]}</span>`; }
+  function kindPill(k) { return `<span class="kindpill" style="--kc:${kc(k)}">${esc(kname(k))}</span>`; }
   function tiesOf(id, chart) {
     return RELS.filter((r) => (r.a === id || r.b === id) && (!chart || chart.st.showArch || !byId(other(r, id)).archived));
   }
@@ -755,12 +790,14 @@ interface Relationship {
     }
     side.innerHTML = `${top}
       <div class="hr"></div>
-      <div><div class="label">Kinds</div><div class="legend" id="legend">${KINDS.map(([k, n]) => `<button style="--kc:${kc(k)}" data-kind="${k}" aria-pressed="${st.kinds.has(k)}">${n}</button>`).join("")}</div></div>
+      <div><div class="label" style="display:flex;justify-content:space-between;align-items:center">Kinds <button class="link" data-edit-kinds style="font-size:11px;text-transform:none;letter-spacing:0">Edit kinds</button></div>
+        <div class="legend" id="legend">${KINDS.map((k) => `<button style="--kc:${kc(k.id)}" data-kind="${k.id}" aria-pressed="${!st.hidden.has(k.id)}">${esc(k.name || "Unnamed kind")}</button>`).join("")}${RELS.some((r) => !kindOf(r.kind)) ? `<button style="--kc:var(--faint)" data-kind="_none" aria-pressed="${!st.hidden.has("_none")}">No kind</button>` : ""}</div></div>
       <label class="check"><input type="checkbox" id="archToggle" ${st.showArch ? "checked" : ""}> Show archived characters (1)</label>`;
   }
   side.addEventListener("click", (e) => {
     const t = e.target.closest("button, input"); if (!t) return;
-    if (t.dataset.kind) { const k = new Set(chart.st.kinds); k.has(t.dataset.kind) ? k.delete(t.dataset.kind) : k.add(t.dataset.kind); chart.setKinds(k); }
+    if (t.dataset.kind) chart.toggleKind(t.dataset.kind);
+    else if ("editKinds" in t.dataset) openKinds();
     else if (t.dataset.edit) openDialog({ id: t.dataset.edit });
     else if (t.dataset.new) openDialog({ from: t.dataset.new });
     else if (t.dataset.open) openWindow(t.dataset.open);
@@ -836,7 +873,7 @@ interface Relationship {
     const meC = byId(me);
     const withId = r ? r.b : d.with || null;
     const W = withId ? byId(withId) : null;
-    const kind = d.kind || (r ? r.kind : "friend");
+    const kind = "kind" in d ? d.kind : r ? r.kind : KINDS[0] ? KINDS[0].id : "";
     const taken = new Set(RELS.filter((x) => x.a === me || x.b === me).map((x) => other(x, me)));
     const title = r ? `${meC.first} and ${W.first}` : `New relationship for ${meC.first}`;
     const pick = r ? "" : `
@@ -848,7 +885,8 @@ interface Relationship {
       <div class="hd"><div class="eyebrow">${r ? "Relationship" : "Add relationship"}</div><div class="t">${esc(title)}</div></div>
       <div class="bd">
         ${pick}
-        <div><div class="label">Kind</div><div class="kinds">${KINDS.map(([k, n]) => `<button type="button" style="--kc:${kc(k)}" data-k="${k}" aria-pressed="${k === kind}">${n}</button>`).join("")}</div></div>
+        <div><div class="label" style="display:flex;justify-content:space-between;align-items:center">Kind <button type="button" class="link" data-act="kinds" style="font-size:11px;text-transform:none;letter-spacing:0">Edit kinds</button></div>
+          <div class="kinds">${KINDS.map((k) => `<button type="button" style="--kc:${kc(k.id)}" data-k="${k.id}" aria-pressed="${k.id === kind}">${esc(k.name || "Unnamed kind")}</button>`).join("")}<button type="button" style="--kc:var(--faint)" data-k="" aria-pressed="${!kindOf(kind)}">No kind</button></div></div>
         <div><label class="label" for="f-label">Label</label><input class="inp" id="f-label" value="${esc(r ? r.label : "")}" placeholder="e.g. sisters, former partners, uneasy truce"></div>
         <div class="two">
           <div><label class="label" for="f-a">How ${esc(meC.first)} sees ${esc(wn)}</label><textarea class="area" id="f-a" rows="3" placeholder="Optional">${esc(r ? r.aView : "")}</textarea></div>
@@ -878,6 +916,12 @@ interface Relationship {
     const f = scrim.querySelector("#f-label"); if (f) f.focus();
   }
   function closeDialog() { scrim.hidden = true; scrim.innerHTML = ""; dlgState = null; if (lastFocus) lastFocus.focus(); }
+  // Re-draw the open editor (after a kind or picker change) without losing what was typed.
+  function keepDialog() {
+    if (!dlgState) return;
+    const v = readForm(scrim); scrim.innerHTML = dialogHTML(dlgState, true);
+    scrim.querySelector("#f-label").value = v.label; scrim.querySelector("#f-a").value = v.aView; scrim.querySelector("#f-b").value = v.bView; scrim.querySelector("#f-n").value = v.notes;
+  }
   function readForm(root) {
     return {
       label: root.querySelector("#f-label").value.trim(),
@@ -889,21 +933,72 @@ interface Relationship {
   scrim.addEventListener("click", (e) => {
     if (e.target === scrim) return closeDialog();
     const t = e.target.closest("button"); if (!t) return;
-    const keep = () => { const v = readForm(scrim); scrim.innerHTML = dialogHTML(dlgState, true); scrim.querySelector("#f-label").value = v.label; scrim.querySelector("#f-a").value = v.aView; scrim.querySelector("#f-b").value = v.bView; scrim.querySelector("#f-n").value = v.notes; };
-    if (t.dataset.k) {
+    const keep = keepDialog;
+    if ("k" in t.dataset) {
       dlgState.kind = t.dataset.k;
       keep();
     } else if (t.dataset.pick) { dlgState.with = t.dataset.pick; keep(); }
+    else if (t.dataset.act === "kinds") openKinds();
     else if (t.dataset.act === "cancel") closeDialog();
     else if (t.dataset.act === "remove") { const i = RELS.findIndex((x) => x.id === dlgState.id); RELS.splice(i, 1); closeDialog(); refresh(); }
     else if (t.dataset.act === "save") {
       const v = readForm(scrim);
-      if (dlgState.id) { const rel = RELS.find((x) => x.id === dlgState.id); Object.assign(rel, v, { kind: dlgState.kind || rel.kind }); }
-      else if (dlgState.with) RELS.push({ id: "r" + uid++, a: dlgState.from, b: dlgState.with, kind: dlgState.kind || "friend", ...v });
+      if (dlgState.id) { const rel = RELS.find((x) => x.id === dlgState.id); Object.assign(rel, v, { kind: "kind" in dlgState ? dlgState.kind : rel.kind }); }
+      else if (dlgState.with) RELS.push({ id: "r" + uid++, a: dlgState.from, b: dlgState.with, kind: "kind" in dlgState ? dlgState.kind : KINDS[0] ? KINDS[0].id : "", ...v });
       closeDialog(); refresh();
     }
   });
-  document.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; if (!scrim.hidden) closeDialog(); else if (!winScrim.hidden) closeWindow(); });
+  document.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; if (!kindsScrim.hidden) closeKinds(); else if (!scrim.hidden) closeDialog(); else if (!winScrim.hidden) closeWindow(); });
+
+  /* ---------------- Edit kinds ---------------- */
+  const kindsScrim = document.getElementById("kindsScrim");
+  const ks = { palette: null, confirm: null };
+  const usedBy = (id) => RELS.filter((r) => r.kind === id).length;
+  function kindsHTML() {
+    return `<div class="dlg" role="dialog" aria-modal="true" aria-label="Relationship kinds">
+      <div class="hd"><div class="eyebrow">Relationship kinds</div><div class="t">Kinds in Untitled Voyage</div>
+        <div class="help" style="margin:0">Every project starts with these six. Rename them, change their color, add your own or remove any you don't use.</div></div>
+      <div class="bd" style="gap:8px">
+        ${KINDS.map((k) => {
+          const n = usedBy(k.id);
+          const tail = ks.confirm === k.id
+            ? `<div class="kconfirm"><span>${n} ${n === 1 ? "relationship uses" : "relationships use"} it. They'll stay, shown as No kind.</span>
+               <button type="button" class="btn big danger" data-kdel-yes="${k.id}">Remove</button><button type="button" class="btn big" data-kdel-no>Keep</button></div>`
+            : `<span class="kused">${n ? `${n} ${n === 1 ? "use" : "uses"}` : "unused"}</span><button type="button" class="btn x" data-kdel="${k.id}" aria-label="Remove ${esc(k.name)}">✕</button>`;
+          return `<div class="krow">
+            <button type="button" class="swatch" style="background:var(--sw-${k.sw})" data-kpal="${k.id}" aria-label="Change color of ${esc(k.name)}" aria-expanded="${ks.palette === k.id}"></button>
+            <input class="inp" data-kname="${k.id}" value="${esc(k.name)}" placeholder="Kind name" aria-label="Kind name">
+            ${tail}
+          </div>
+          ${ks.palette === k.id ? `<div class="palette" role="group" aria-label="Colors">${Array.from({ length: SWATCHES }, (_, i) => `<button type="button" class="swatch" style="background:var(--sw-${i + 1})" data-ksw="${k.id}:${i + 1}" aria-pressed="${k.sw === i + 1}" aria-label="Color ${i + 1}"></button>`).join("")}</div>` : ""}`;
+        }).join("") || '<div class="help">No kinds. Relationships will all show as No kind.</div>'}
+        <button type="button" class="dashed" data-kadd style="margin-top:4px">+ Add kind</button>
+      </div>
+      <div class="ft"><span class="first help" style="margin:0">Saved in this project, so the phone and your other devices get the same list.</span><button type="button" class="btn primary" data-kdone>Done</button></div>
+    </div>`;
+  }
+  function drawKinds(focusId) {
+    kindsScrim.innerHTML = kindsHTML();
+    if (focusId) { const f = kindsScrim.querySelector(`[data-kname="${focusId}"]`); if (f) { f.focus(); f.select(); } }
+  }
+  function openKinds() { ks.palette = null; ks.confirm = null; drawKinds(); kindsScrim.hidden = false; }
+  function closeKinds() { kindsScrim.hidden = true; kindsScrim.innerHTML = ""; refresh(); keepDialog(); }
+  kindsScrim.addEventListener("input", (e) => { const id = e.target.dataset.kname; if (id) kindOf(id).name = e.target.value; });
+  kindsScrim.addEventListener("click", (e) => {
+    if (e.target === kindsScrim) return closeKinds();
+    const t = e.target.closest("button"); if (!t) return;
+    if ("kdone" in t.dataset) closeKinds();
+    else if (t.dataset.kpal) { ks.palette = ks.palette === t.dataset.kpal ? null : t.dataset.kpal; ks.confirm = null; drawKinds(); }
+    else if (t.dataset.ksw) { const [id, n] = t.dataset.ksw.split(":"); kindOf(id).sw = Number(n); ks.palette = null; drawKinds(); }
+    else if (t.dataset.kdel) { const id = t.dataset.kdel; if (usedBy(id)) { ks.confirm = id; ks.palette = null; drawKinds(); } else { KINDS.splice(KINDS.findIndex((k) => k.id === id), 1); drawKinds(); } }
+    else if (t.dataset.kdelYes) { const id = t.dataset.kdelYes; RELS.forEach((r) => { if (r.kind === id) r.kind = ""; }); KINDS.splice(KINDS.findIndex((k) => k.id === id), 1); ks.confirm = null; drawKinds(); }
+    else if ("kdelNo" in t.dataset) { ks.confirm = null; drawKinds(); }
+    else if ("kadd" in t.dataset) {
+      const used = new Set(KINDS.map((k) => k.sw));
+      let sw = 1; while (used.has(sw) && sw < SWATCHES) sw++;
+      const id = "k" + uid++; KINDS.push({ id, name: "New kind", sw }); ks.confirm = null; ks.palette = null; drawKinds(id);
+    }
+  });
   // Screen 3 shows a static copy of the editor: adding Sela to Bram, a pair with no record yet.
   // Clicking it opens the live dialog with the same choices.
   const STAGE = { from: "bram", with: "sela", kind: "romance" };
