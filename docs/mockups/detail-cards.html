@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Detail Cards Options</title>
+<title>Detail Cards, Option B</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -34,390 +34,332 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Hanken
 .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--therefore); }
 h1 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 30px; margin: 6px 0 10px; }
 h2 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 24px; margin: 4px 0 8px; }
-.lede { color: var(--soft); font-size: 15px; line-height: 1.6; max-width: 760px; margin: 0; }
+h3 { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 18px; margin: 30px 0 4px; }
+.lede { color: var(--soft); font-size: 15px; line-height: 1.6; max-width: 780px; margin: 0; }
+.note { font-size: 13.5px; color: var(--soft); line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
+.rules { margin: 16px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 28px; font-size: 14px; line-height: 1.5; }
+.rules b { font-weight: 600; }
 
 section { padding: 40px 0; border-top: 1px solid var(--line); }
-section:first-of-type { border-top: 0; }
-.sechead { display: flex; flex-wrap: wrap; gap: 8px 40px; align-items: flex-start; margin-bottom: 22px; }
-.sechead > div:first-child { flex: 0 1 380px; }
-.points { flex: 1 1 360px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5; }
-.points b { font-weight: 600; }
-.verdict { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; }
-.verdict.rec { color: var(--therefore); border-color: var(--therefore); }
-
-.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
-.frame { flex: 0 1 460px; min-width: 0; }
-.frame.wide { flex: 1 1 100%; }
+.frames { display: flex; flex-direction: column; gap: 24px; }
 .cap { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); margin-bottom: 8px; }
 .cap span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.grow { flex: 1; }
 
-/* Drawer frame, as in the app (side panel 460px) */
-.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 14px 40px rgba(40,28,10,.16); }
+/* Drawer */
+.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .dhead { display: flex; align-items: center; gap: 8px; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
 .dhead .t { font-family: Spectral, serif; font-size: 18px; font-weight: 600; }
 .dhead .s { font-size: 11.5px; color: var(--soft); font-weight: 500; margin-top: 2px; }
-.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; background: none; }
+.iconbtn { width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 12px; flex: none; }
 .list { display: flex; flex-direction: column; gap: 11px; padding: 14px 18px 18px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; padding: 18px 22px 22px; }
-.add { border: 1.5px dashed var(--line); border-radius: 13px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
-.grid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; border-radius: 12px; }
+.add { border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px; text-align: center; font-size: 13px; font-weight: 600; color: var(--soft); }
+.grid .add, .tgrid .add { display: flex; align-items: center; justify-content: center; min-height: 142px; }
+.tgrid .add { min-height: 120px; font-size: 12px; }
 
-/* Board chapter card */
-.board { display: flex; flex-wrap: wrap; gap: 28px; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; }
+/* App frames. Layers share one grid cell, so a frame grows to its tallest layer. */
+.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+.app > * { grid-area: 1 / 1; }
+.boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start; }
+.appbar { align-self: start; height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
+.dim { background: rgba(20,14,6,.46); }
+.app .drawer.side { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
+.app .drawer.full { border: 0; border-radius: 0; }
+.winscrim { background: rgba(20,14,6,.38); display: flex; align-items: center; justify-content: center; padding: 28px 24px; }
+.modal { width: min(600px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.mhead .title { font-size: 20px; }
+.mbody { padding: 16px 20px 20px; }
+
+/* Chapter modal */
+.chmodal { margin: 28px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); align-self: start; }
+.chhead { padding: 18px 26px 12px; }
+.chhead .row { display: flex; align-items: center; gap: 10px; }
+.chhead .title { font-size: 22px; }
+.chmeta { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); margin-top: 6px; }
+.tabs { display: flex; gap: 6px; padding: 4px 26px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.tabs span { font-size: 12px; font-weight: 600; color: var(--soft); border: 1px solid var(--rule); border-radius: 8px; padding: 5px 10px; }
+.tabs span.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs i { font-style: normal; font-family: "JetBrains Mono", monospace; font-size: 10.5px; opacity: .7; margin-left: 4px; }
+.chbody { padding: 16px 26px 22px; }
+.flowph { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; font-size: 12px; color: var(--faint); }
+
+/* Chapter card */
 .chap { width: 244px; min-height: 142px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
-.badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; }
+.badge { border-radius: 6px; background: var(--ink); color: var(--bg); padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
 .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .cast { display: flex; padding-right: 6px; }
 .cast span { margin-right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--card); color: #fff; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
 .top { display: flex; align-items: center; gap: 8px; }
-.grow { flex: 1; }
 .title { font-family: Spectral, serif; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.title.untitled { color: var(--faint); }
 .sum { font-size: 12.5px; line-height: 1.45; color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sum.empty { color: var(--faint); }
 .meta { display: flex; justify-content: flex-end; gap: 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: var(--soft); }
 .meta .sep { color: var(--faint); }
-.callout { position: relative; }
-.callout .lbl { font-size: 11px; color: var(--soft); margin-top: 6px; }
 
-/* Today card */
-.old { border: 1px solid var(--rule); background: var(--card); border-radius: 13px; padding: 14px; }
-.old .row { display: flex; align-items: center; gap: 11px; }
-.old .av { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
-.old .wdot { width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
-.old .name { font-family: Spectral, serif; font-size: 15px; font-weight: 600; }
-.old .sub { font-size: 11.5px; font-weight: 500; color: var(--soft); }
-.old .cat { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
-.chev { color: var(--faint); font-size: 13px; margin-left: auto; }
-
-/* New card face */
-.new { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
-.new.open { border-color: var(--faint); }
-.grid .new { min-height: 142px; }
-.ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; }
+/* Tile (the new card) */
+.tile { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.grid .tile { min-height: 142px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tgrid .tile { min-height: 120px; }
+.ini { border-radius: 6px; color: #fff; padding: 2px 7px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; flex: none; }
 .tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.pic { border-radius: 8px; min-height: 54px; flex: 1; max-height: 70px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
+.pic.big { max-height: none; min-height: 200px; }
 
 /* Fields */
 .fields { display: flex; flex-direction: column; gap: 12px; }
-.old .fields, .new .fields { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--rule); }
 .lab { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
-.inp { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
+.inp { border: 1px solid var(--rule); background: var(--card); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; color: var(--ink); line-height: 1.5; min-height: 29px; }
 .inp.ta { min-height: 48px; }
 .inp.ph { color: var(--faint); }
 .pair { display: flex; gap: 12px; } .pair > * { flex: 1; min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chips span { border: 1px solid var(--rule); border-radius: 6px; padding: 2px 8px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); }
 .more { font-size: 11.5px; color: var(--faint); font-style: italic; }
-.btnrow { display: flex; gap: 8px; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ghost { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--soft); }
-
-/* Option B window */
-/* Drawer and window share one grid cell, so the stage grows to the taller one. */
-.winstage { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
-.winstage > * { grid-area: 1 / 1; }
-.winstage .drawer { border: 0; border-radius: 0; box-shadow: none; }
-.winscrim { background: rgba(20,14,6,.46); display: flex; align-items: center; justify-content: center; padding: 24px; }
-.modal { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
-.mhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
-.mhead .title { font-size: 20px; }
-.mbody { padding: 16px 20px 20px; }
-
-h3.sub { font-family: Spectral, Georgia, serif; font-weight: 500; font-size: 19px; margin: 34px 0 4px; }
-.subnote { font-size: 13.5px; color: var(--soft); margin: 0 0 14px; }
-/* Collapsed app frame: board, scrim and drawer share one grid cell. */
-.app { display: grid; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
-.app > * { grid-area: 1 / 1; }
-.app .boardbg { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 24px 24px; padding: 70px 40px; display: flex; gap: 40px; flex-wrap: wrap; align-content: flex-start; }
-.app .appbar { align-self: start; height: 44px; border-bottom: 1px solid var(--rule); background: var(--panel); display: flex; align-items: center; padding: 0 16px; font-family: Spectral, serif; font-weight: 600; font-size: 15px; }
-.app .dim { background: rgba(20,14,6,.46); }
-.app .drawer { justify-self: end; width: min(460px, 100%); border: 0; border-left: 1px solid var(--rule); border-radius: 0; box-shadow: -20px 0 60px rgba(0,0,0,.3); }
-.app .winscrim { background: rgba(20,14,6,.3); }
+.hint { font-size: 11.5px; color: var(--faint); }
+.todo { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.todo .done { text-decoration: line-through; color: var(--faint); }
+.addrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 7px; }
+.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
 
 /* Notes drawer */
 .nbody { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
-.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; min-height: 120px; }
-.libhead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.libhead .lab { margin: 0; }
-.vt { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; font-size: 11px; font-weight: 600; color: var(--soft); }
-.vt span { padding: 3px 8px; } .vt span.on { background: var(--chip); color: var(--ink); }
-.lrow { display: flex; align-items: center; gap: 10px; border: 1px solid var(--rule); background: var(--card); border-radius: 10px; padding: 9px 12px; }
-.lrow .grip { color: var(--faint); font-size: 12px; }
-.lrow .pos { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--faint); }
-.lrow .ic { font-size: 13px; }
-.lrow .lt { font-size: 12.5px; font-weight: 600; }
-.lrow .ls { font-size: 11.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lrows { display: flex; flex-direction: column; gap: 7px; }
-.ocards { display: flex; flex-wrap: wrap; gap: 12px; }
-.ocard { width: 164px; height: 150px; border: 1px solid var(--rule); background: var(--card); border-radius: 11px; padding: 11px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
-.ocard .lt { font-size: 12.5px; font-weight: 600; }
-.ocard .ls { font-size: 12px; color: var(--soft); line-height: 1.45; flex: 1; overflow: hidden; }
-.ocard .cp { font-size: 10.5px; color: var(--faint); }
-.ocard.img { padding: 0; box-shadow: none; border: 0; background: none; }
-.pic { border-radius: 10px; flex: 1; min-height: 60px; background: linear-gradient(160deg, oklch(0.78 0.04 220), oklch(0.62 0.05 210) 55%, oklch(0.5 0.04 70)); }
-.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.drawer.full .nbody { padding: 18px 22px 22px; }
+.storybox { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; padding: 16px; font-family: Spectral, serif; font-size: 13.5px; line-height: 1.65; min-height: 110px; }
 .liblist { display: flex; flex-direction: column; gap: 11px; }
-.new .pic { min-height: 54px; max-height: 64px; }
-.todo { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--soft); }
-.todo .done { text-decoration: line-through; color: var(--faint); }
-.addrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-.addrow span { border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.libgrid .tile { min-height: 142px; }
 
-/* Comparison table */
+/* Changes table */
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.45; }
 th { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
-td:first-child { color: var(--soft); font-weight: 500; white-space: nowrap; }
+td:first-child { font-weight: 600; white-space: nowrap; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">Estoria · cards mockup</div>
-  <h1>Character and world cards: three options</h1>
-  <p class="lede">Scroll down. First, what a chapter card looks like. Then the drawers three ways: as they are today, option A, and option B. Option B is shown at both drawer sizes (collapsed side panel and expanded full screen) and for all three drawers: Characters, World and Notes. A comparison is at the bottom.</p>
+  <div class="eyebrow">Estoria · option B, to confirm</div>
+  <h1>Every card looks and opens like a chapter card</h1>
+  <p class="lede">This is option B applied everywhere: characters, world entries, the Notes library, a world entry's references and a chapter's pinned references. Each one is shown with the drawer collapsed (side panel) and expanded (full screen), and with a card clicked open. Scroll down.</p>
+  <ul class="rules">
+    <li><b>One card design.</b> Badge, name in serif type, two lines of text, a small count line at the bottom. The same as a chapter on the board.</li>
+    <li><b>Click to open.</b> Clicking a card opens it in a window on top, like clicking a chapter. You edit there, not in the list.</li>
+    <li><b>Collapsed:</b> cards stack in one column. <b>Expanded:</b> they sit in a grid.</li>
+    <li><b>Nothing in your file changes.</b> This is only how things look and open, so the Android app and Drive are not affected.</li>
+  </ul>
 
   <section>
-    <div class="sechead"><div>
-      <div class="eyebrow">For reference</div>
-      <h2>A chapter card on the board</h2>
-    </div>
-    <ul class="points">
-      <li>A dark number badge, the title in large serif type, two lines of summary, and a small count line at the bottom right.</li>
-      <li>Click anywhere on it and the chapter opens in a window.</li>
-    </ul></div>
-    <div class="board">
-      <div class="chap">
-        <div class="top"><span class="badge">03</span><span class="sdot" style="background:var(--therefore)"></span><span class="grow"></span>
-          <div class="cast"><span style="background:oklch(0.55 0.12 250)">MV</span><span style="background:oklch(0.55 0.12 30)">OT</span></div></div>
-        <div class="title">The Lantern Market</div>
-        <div class="sum">Mara trades her compass for a map that should not exist, and Oren sees it in her hands.</div>
-        <div class="grow"></div>
-        <div class="meta"><span>4 scenes</span><span class="sep">·</span><span>2,410 words</span></div>
-      </div>
-      <div class="chap">
-        <div class="top"><span class="badge">04</span><span class="sdot" style="background:var(--but)"></span><span class="grow"></span>
-          <div class="cast"><span style="background:oklch(0.55 0.12 300)">IL</span></div></div>
-        <div class="title">Low Water</div>
-        <div class="sum">The guild closes the channels. Ines makes Mara an offer she cannot read.</div>
-        <div class="grow"></div>
-        <div class="meta"><span>3 scenes</span><span class="sep">·</span><span>1,880 words</span></div>
-      </div>
+    <div class="eyebrow">For reference</div>
+    <h2>A chapter card on the board</h2>
+    <p class="note">The design every other card now follows.</p>
+    <div class="boardbg" style="padding:28px;border:1px solid var(--line);border-radius:12px" id="board"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">1 · Characters drawer</div>
+    <h2>Characters</h2>
+    <p class="note">Badge: initials in the character's colour, with their role beside it. Bottom line: archetype and how many chapters they're in.</p>
+    <div class="frames">
+      <div><div class="cap">Collapsed</div><div id="c-side"></div></div>
+      <div><div class="cap">Collapsed, after clicking Oren Tal</div><div id="c-side-win"></div></div>
+      <div><div class="cap">Expanded</div><div id="c-full"></div></div>
+      <div><div class="cap">Expanded, after clicking Oren Tal</div><div id="c-full-win"></div></div>
     </div>
   </section>
 
   <section>
-    <div class="sechead"><div>
-      <div class="eyebrow">Today</div>
-      <h2>How the cards look now</h2>
-    </div>
-    <ul class="points">
-      <li>One line per card: a round avatar or a grey dot, the name, one small line under it.</li>
-      <li>Click the name or ▾ to open a card. You edit it right there in the list.</li>
-      <li>You can't see who someone is until you open the card.</li>
-    </ul></div>
+    <div class="eyebrow">2 · World drawer</div>
+    <h2>World</h2>
+    <p class="note">Badge: the category. Bottom line: how many chapters use it and how many references it has. Inside the window, the entry's references are tiles too.</p>
     <div class="frames">
-      <div class="frame"><div class="cap">Characters drawer <span>(side panel)</span></div><div id="today-chars"></div></div>
-      <div class="frame"><div class="cap">World drawer <span>(side panel)</span></div><div id="today-world"></div></div>
-      <div class="frame"><div class="cap">Notes drawer <span>(side panel, library as a list)</span></div><div id="today-notes"></div></div>
-      <div class="frame"><div class="cap">Notes drawer <span>(side panel, library as cards)</span></div><div id="today-notes-cards"></div></div>
+      <div><div class="cap">Collapsed</div><div id="w-side"></div></div>
+      <div><div class="cap">Expanded</div><div id="w-full"></div></div>
+      <div><div class="cap">Expanded, after clicking The Drowned City <span>(its references are tiles)</span></div><div id="w-full-win"></div></div>
     </div>
   </section>
 
   <section>
-    <div class="sechead"><div>
-      <div class="eyebrow">Option A</div>
-      <h2>Same look as a chapter card, opens in place</h2>
-      <span class="verdict rec">My recommendation</span>
-    </div>
-    <ul class="points">
-      <li><b>Looks like a chapter card.</b> Badge, name in large serif type, two lines of description, count line at the bottom.</li>
-      <li><b>Opens in place.</b> Click anywhere on a card and it opens right there in the list. Editing works exactly as it does today.</li>
-      <li><b>Readable at a glance.</b> You can see who someone is without opening their card. The cards are taller, so fewer fit on screen.</li>
-      <li><b>Small change.</b> Only the look of the cards changes.</li>
-    </ul></div>
+    <div class="eyebrow">3 · Notes drawer</div>
+    <h2>Story notes and the shared library</h2>
+    <p class="note">The story notes box stays on top. Library items become tiles. Badge: the item's position number, the way a chapter shows its number, with the kind beside it. The List / Cards switch goes away.</p>
     <div class="frames">
-      <div class="frame"><div class="cap">Characters drawer <span>(side panel)</span></div><div id="a-chars"></div></div>
-      <div class="frame"><div class="cap">World drawer <span>(side panel)</span></div><div id="a-world"></div></div>
+      <div><div class="cap">Collapsed</div><div id="n-side"></div></div>
+      <div><div class="cap">Expanded</div><div id="n-full"></div></div>
+      <div><div class="cap">Expanded, after clicking "Revision pass 2"</div><div id="n-full-win"></div></div>
     </div>
   </section>
 
   <section>
-    <div class="sechead"><div>
-      <div class="eyebrow">Option B</div>
-      <h2>Tiles like chapter cards, open in a window</h2>
-    </div>
-    <ul class="points">
-      <li><b>Looks and acts like the board.</b> Each card is a same-size tile. Click one and its details open in a window on top, the way a chapter opens.</li>
-      <li><b>A grid at full screen.</b> The side panel is too narrow for two tiles, so there they stack in one column, like option A closed.</li>
-      <li><b>Editing moves.</b> You edit in the window, not in the list.</li>
-      <li><b>Bigger change,</b> and it overlaps with the later "rearrange the cards" work.</li>
-    </ul></div>
-    <h3 class="sub">Collapsed: the side panel</h3>
-    <p class="subnote">The drawer's normal size, over the dimmed board. Tiles stack in one column.</p>
+    <div class="eyebrow">4 · Inside a chapter</div>
+    <h2>Pinned references</h2>
+    <p class="note">The chapter window's Pinned references tab uses the same tiles. Clicking one opens it in a window on top of the chapter. Here the button removes it from this chapter only; it stays in the shared library.</p>
     <div class="frames">
-      <div class="frame wide"><div class="cap">Characters drawer <span>(collapsed)</span></div><div id="b-side"></div></div>
-      <div class="frame wide"><div class="cap">After clicking Mara Vell <span>(collapsed)</span></div><div id="b-side-window"></div></div>
-    </div>
-    <h3 class="sub">Expanded: full screen</h3>
-    <p class="subnote">After clicking ⤢. The drawer fills the window and the tiles sit in a grid.</p>
-    <div class="frames">
-      <div class="frame wide"><div class="cap">Characters drawer <span>(expanded)</span></div><div id="b-grid"></div></div>
-      <div class="frame wide"><div class="cap">After clicking Mara Vell <span>(expanded)</span></div><div id="b-window"></div></div>
-      <div class="frame wide"><div class="cap">World drawer <span>(expanded)</span></div><div id="b-world"></div></div>
-    </div>
-    <h3 class="sub">Notes, the same way</h3>
-    <p class="subnote">The story notes box stays at the top. The shared library below it (notes, to-do lists, images) turns into the same tiles. The library already has an order, so its position number takes the chapter number's place in the badge. The list/cards switch goes away, because the tiles replace both.</p>
-    <div class="frames">
-      <div class="frame wide"><div class="cap">Notes drawer <span>(collapsed)</span></div><div id="b-notes-side"></div></div>
-      <div class="frame wide"><div class="cap">Notes drawer <span>(expanded)</span></div><div id="b-notes"></div></div>
-      <div class="frame wide"><div class="cap">After clicking "Revision pass 2" <span>(expanded)</span></div><div id="b-notes-window"></div></div>
+      <div><div class="cap">Chapter window, Pinned references tab</div><div id="ch"></div></div>
+      <div><div class="cap">After clicking "Harbour at low tide"</div><div id="ch-win"></div></div>
     </div>
   </section>
 
   <section>
-    <div class="sechead"><div>
-      <div class="eyebrow">Side by side</div>
-      <h2>The three options compared</h2>
-    </div></div>
+    <div class="eyebrow">Summary</div>
+    <h2>What changes, place by place</h2>
     <div class="tablewrap">
     <table>
-      <tr><th></th><th>Today</th><th>Option A</th><th>Option B</th></tr>
-      <tr><td>Closed card</td><td>One line: avatar, name, role</td><td>Chapter look: badge, name, description, counts</td><td>Chapter look, fixed-size tile</td></tr>
-      <tr><td>How it opens</td><td>Click the name or ▾</td><td>Click anywhere on the card</td><td>Click anywhere on the tile</td></tr>
-      <tr><td>Where you edit</td><td>In the list</td><td>In the list</td><td>In a window on top</td></tr>
-      <tr><td>Full screen drawer</td><td>One column</td><td>One column</td><td>Grid of tiles</td></tr>
-      <tr><td>Size of change</td><td></td><td>Small</td><td>Larger</td></tr>
+      <tr><th>Place</th><th>Today</th><th>With option B</th></tr>
+      <tr><td>Characters drawer</td><td>One-line rows, open in the list</td><td>Tiles, open in a window</td></tr>
+      <tr><td>World drawer</td><td>One-line rows, open in the list</td><td>Tiles, open in a window</td></tr>
+      <tr><td>Notes library</td><td>List or cards (switch), open in the list</td><td>Tiles, open in a window; no switch</td></tr>
+      <tr><td>World entry references</td><td>List or cards (switch)</td><td>Tiles inside the entry's window</td></tr>
+      <tr><td>Chapter pinned references</td><td>List or cards (switch)</td><td>Tiles, open in a window over the chapter</td></tr>
+      <tr><td>Story notes box, chapter cast and world chips</td><td colspan="2">Unchanged</td></tr>
     </table>
     </div>
   </section>
 </div>
 
 <script>
-// Renders the static frames above. Nothing on this page is interactive.
+// Draws the static frames above. Nothing on this page is interactive.
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sep = '<span class="sep">·</span>';
+const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
+const put = (id, html) => (document.getElementById(id).innerHTML = html);
+const inp = (v, ph) => `<div class="inp ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+const area = (v, ph) => `<div class="inp ta ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
+const chipRow = (label, ch) => `<div><div class="lab">${label}</div><div class="chips">${ch.map((n) => `<span>${typeof n === "number" ? `Ch ${n}` : esc(n)} ↗</span>`).join("")}</div></div>`;
+
+// ---- Data ----
 const CHARS = [
-  { id: "mv", name: "Mara Vell", ini: "MV", color: "oklch(0.55 0.12 250)", role: "Protagonist", type: "Seeker", desc: "A cartographer's apprentice who can read water the way others read faces.", bio: "Raised on the tide flats below Aster.", traits: "stubborn, observant, guarded", want: "To find the true chart", need: "To trust someone with it", ch: [1, 2, 3, 5, 7, 8, 9, 11, 12] },
-  { id: "ot", name: "Oren Tal", ini: "OT", color: "oklch(0.55 0.12 30)", role: "Mentor", type: "Mentor", desc: "The harbourmaster who taught Mara to sound the channels, and lied about why.", bio: "Former guild surveyor.", traits: "patient, secretive", want: "To keep Mara out of it", need: "To tell the truth", ch: [1, 3, 7, 12] },
+  { id: "mv", name: "Mara Vell", ini: "MV", color: "oklch(0.55 0.12 250)", role: "Protagonist", type: "Seeker", desc: "A cartographer's apprentice who can read water the way others read faces.", ch: [1, 2, 3, 5, 7, 8, 9, 11, 12] },
+  { id: "ot", name: "Oren Tal", ini: "OT", color: "oklch(0.55 0.12 30)", role: "Mentor", type: "Mentor", desc: "The harbourmaster who taught Mara to sound the channels, and lied about why.", bio: "Former guild surveyor. Left the guild the year the city drowned.", want: "To keep Mara out of it", need: "To tell the truth", ch: [1, 3, 7, 12] },
   { id: "il", name: "Ines Lorre", ini: "IL", color: "oklch(0.55 0.12 300)", role: "Antagonist", type: "Shadow", desc: "Guild factor. Wants the map burned, and Mara with it if need be.", ch: [4, 6, 8, 10, 11, 12] },
   { id: "sk", name: "Sefa Kaur", ini: "SK", color: "oklch(0.55 0.1 150)", role: "", type: "", desc: "", ch: [] },
 ];
 const WORLD = [
   { id: "dc", name: "The Drowned City", cat: "Place", desc: "What is left of Aster after the sea came in. The bell towers still stand at low tide.", notes: "Who rang the bells the night it flooded?", ch: [1, 3, 5, 7, 9, 12], refs: 3 },
   { id: "sg", name: "The Soundings Guild", cat: "Faction", desc: "Keeps the only true charts of the channels and sells the false ones.", ch: [4, 6], refs: 0 },
+  { id: "bc", name: "Bell Code", cat: "Lore", desc: "Harbour signals rung on the drowned towers. Few still know the full set.", ch: [9, 12], refs: 1 },
   { id: "lt", name: "The Long Tide", cat: "Event", desc: "", ch: [], refs: 0 },
 ];
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const nch = (n) => `${n} chapter${n === 1 ? "" : "s"}`;
-const sep = '<span class="sep">·</span>';
-const inp = (v, ph) => `<div class="inp ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
-const area = (v, ph) => `<div class="inp ta ${v ? "" : "ph"}">${esc(v || ph)}</div>`;
-const chips = (ch) => (ch.length ? `<div><div class="lab">Appears in</div><div class="chips">${ch.map((n) => `<span>Ch ${n} ↗</span>`).join("")}</div></div>` : "");
+const ASSETS = {
+  theme: { kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
+  todo: { kind: "TODO", label: "Revision pass 2", items: [["Cut the second market scene", true], ["Give Oren a reason to lie", false], ["Seed the bell code in Ch 2", false]], pins: 2, where: [3, 7] },
+  harbour: { kind: "IMAGE", label: "Harbour at low tide", pins: 2, where: [3, "The Drowned City"] },
+  towers: { kind: "NOTE", label: "Bell towers", body: "Seven towers. Only four still ring. The fifth is where Oren hid the chart.", pins: 2 },
+  blank: { kind: "NOTE", label: "", body: "", pins: 0 },
+};
+const LIBRARY = [ASSETS.theme, ASSETS.todo, ASSETS.harbour, ASSETS.towers, ASSETS.blank];
 
-const charFields = (c) => `<div class="fields">
-  <div class="pair"><div><div class="lab">Name</div>${inp(c.name)}</div><div style="flex:0 0 70px"><div class="lab">Initials</div>${inp(c.ini)}</div></div>
-  <div class="pair"><div><div class="lab">Role</div>${inp(c.role, "e.g. Protagonist")}</div><div><div class="lab">Archetype</div>${inp(c.type, "e.g. Mentor")}</div></div>
-  <div><div class="lab">Description</div>${area(c.desc, "A one-line description")}</div>
-  <div><div class="lab">Bio</div>${area(c.bio, "Backstory and background")}</div>
-  <div class="pair"><div><div class="lab">Wants</div>${area(c.want, "What they want")}</div><div><div class="lab">Needs</div>${area(c.need, "What they need")}</div></div>
-  <div class="more">Traits, Goals, Motivations, Notes (same as today)</div>
-  ${chips(c.ch)}
-  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete character</span></div>
-</div>`;
-const worldFields = (w) => `<div class="fields">
-  <div class="pair"><div><div class="lab">Name</div>${inp(w.name)}</div><div style="flex:0 0 110px"><div class="lab">Category</div>${inp(w.cat + "  ▾")}</div></div>
-  <div><div class="lab">Description</div>${area(w.desc, "Describe this piece of the world")}</div>
-  <div><div class="lab">Notes</div>${area(w.notes, "Extra notes, connections, open questions")}</div>
-  ${chips(w.ch)}
-  <div class="more">References: pinned notes, images and to-dos (same as today)</div>
-  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete entry</span></div>
-</div>`;
-
-function drawer(isChar, body, grid) {
-  return `<div class="drawer"><div class="dhead"><div><div class="t">${isChar ? "Characters" : "World"}</div>${isChar ? "" : '<div class="s">Places, factions, lore &amp; references</div>'}</div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
-    <div class="${grid ? "grid" : "list"}">${body}<div class="add">+ Add ${isChar ? "character" : "world entry"}</div></div></div>`;
-}
-function todayCard(x, isChar, open) {
-  const head = isChar
-    ? `<span class="av" style="background:${x.color}">${esc(x.ini)}</span><div><div class="name">${esc(x.name)}</div><div class="sub">${esc(x.role || "No role")} · in ${nch(x.ch.length)}</div></div>`
-    : `<span class="wdot"></span><div><div class="name">${esc(x.name)}</div><div class="cat">${esc(x.cat)}</div></div>`;
-  return `<div class="old"><div class="row">${head}<span class="chev">${open ? "▴" : "▾"}</span></div>${open ? (isChar ? charFields(x) : worldFields(x)) : ""}</div>`;
-}
-function face(x, isChar, chev, tile) {
-  const badge = isChar ? `<span class="ini" style="background:${x.color}">${esc(x.ini)}</span><span class="tag">${esc(x.role || "No role")}</span>` : `<span class="badge">${esc(x.cat.toUpperCase())}</span>`;
-  const meta = isChar
-    ? [x.type && `<span>${esc(x.type)}</span>`, `<span>in ${nch(x.ch.length)}</span>`].filter(Boolean).join(sep)
-    : [`<span>on ${nch(x.ch.length)}</span>`, x.refs ? `<span>${x.refs} ref${x.refs === 1 ? "" : "s"}</span>` : ""].filter(Boolean).join(sep);
-  return `<div class="top">${badge}<span class="grow"></span>${chev ? `<span class="chev">${chev}</span>` : ""}</div>
-    <div class="title">${esc(x.name)}</div>
-    <div class="sum ${x.desc ? "" : "empty"}">${esc(x.desc || "No description yet")}</div>
-    ${tile ? '<div class="grow"></div>' : ""}<div class="meta">${meta}</div>`;
-}
-const aCard = (x, isChar, open) => `<div class="new ${open ? "open" : ""}">${face(x, isChar, open ? "▴" : "▾")}${open ? (isChar ? charFields(x) : worldFields(x)) : ""}</div>`;
-const tile = (x) => `<div class="new">${face(x, true, "", true)}</div>`;
-
-const put = (id, html) => (document.getElementById(id).innerHTML = html);
-put("today-chars", drawer(true, CHARS.map((c) => todayCard(c, true, c.id === "ot")).join("")));
-put("today-world", drawer(false, WORLD.map((w) => todayCard(w, false, w.id === "dc")).join("")));
-put("a-chars", drawer(true, CHARS.map((c) => aCard(c, true, c.id === "ot")).join("")));
-put("a-world", drawer(false, WORLD.map((w) => aCard(w, false, w.id === "dc")).join("")));
-const worldTile = (w) => `<div class="new">${face(w, false, "", true)}</div>`;
-const mv = CHARS[0];
-const win = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="ini" style="background:${mv.color}">${mv.ini}</span><div class="title">${mv.name}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody">${charFields(mv)}</div></div></div>`;
-// The board's two chapter cards, reused as the backdrop behind the collapsed drawer.
-const boardCards = [...document.querySelectorAll(".board .chap")].map((e) => e.outerHTML).join("");
-const app = (extra) => `<div class="app"><div class="boardbg">${boardCards}</div><div class="appbar">The Drowned Map</div><div class="dim"></div>${drawer(true, CHARS.map(tile).join(""))}${extra}</div>`;
-put("b-side", app(""));
-put("b-side-window", app(win));
-put("b-grid", drawer(true, CHARS.map(tile).join(""), true));
-put("b-window", `<div class="winstage">${drawer(true, CHARS.map(tile).join(""), true)}${win}</div>`);
-put("b-world", drawer(false, WORLD.map(worldTile).join(""), true));
-
-// ---- Notes ----
-const ASSETS = [
-  { kind: "NOTE", label: "Theme: what maps owe the dead", body: "Every chart in the book is a kind of grave marker. Mara learns to read them as promises, not records.", pins: 4 },
-  { kind: "TODO", label: "Revision pass 2", items: [["Cut the second market scene", true], ["Give Oren a reason to lie", false], ["Seed the bell code in Ch 2", false]], pins: 1, where: [3, 7] },
-  { kind: "IMAGE", label: "Harbour at low tide", pins: 2 },
-  { kind: "NOTE", label: "", body: "", pins: 0 },
-];
+// ---- Tiles ----
+const charTile = (c) => `<div class="tile"><div class="top"><span class="ini" style="background:${c.color}">${esc(c.ini)}</span><span class="tag">${esc(c.role || "No role")}</span></div>
+  <div class="title">${esc(c.name)}</div><div class="sum ${c.desc ? "" : "empty"}">${esc(c.desc || "No description yet")}</div><div class="grow"></div>
+  <div class="meta">${[c.type && `<span>${esc(c.type)}</span>`, `<span>in ${nch(c.ch.length)}</span>`].filter(Boolean).join(sep)}</div></div>`;
+const worldTile = (w) => `<div class="tile"><div class="top"><span class="badge">${esc(w.cat.toUpperCase())}</span></div>
+  <div class="title">${esc(w.name)}</div><div class="sum ${w.desc ? "" : "empty"}">${esc(w.desc || "No description yet")}</div><div class="grow"></div>
+  <div class="meta">${[`<span>on ${nch(w.ch.length)}</span>`, w.refs ? `<span>${w.refs} ref${w.refs === 1 ? "" : "s"}</span>` : ""].filter(Boolean).join(sep)}</div></div>`;
 const kindWord = { NOTE: "Note", TODO: "To-do", IMAGE: "Image" };
-const icon = { NOTE: "📝", TODO: "☑", IMAGE: "🖼" };
-const pad = (i) => String(i + 1).padStart(2, "0");
 const untitled = (a) => a.label || (a.kind === "IMAGE" ? "Untitled image" : a.kind === "TODO" ? "Untitled list" : "Untitled note");
 const progress = (a) => `${a.items.filter((x) => x[1]).length} of ${a.items.length} done`;
-const snippet = (a) => (a.kind === "IMAGE" ? "Image" : a.kind === "TODO" ? progress(a) : a.body || "Empty note");
-const pinCap = (a) => (a.pins ? `${a.pins} pin${a.pins === 1 ? "" : "s"} across versions & books` : "Not pinned yet");
-const notesHead = `<div class="dhead"><div><div class="t">Story notes</div><div class="s">The Drowned Map · themes, questions &amp; reminders</div></div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>`;
-const storyBox = `<div class="storybox">The map is the antagonist's argument: that the past can be owned. Mara's arc ends when she gives the true chart away.</div>`;
-const addRow = `<div class="addrow" style="grid-template-columns:repeat(3,1fr)"><span>+ Note</span><span>+ To-do</span><span>+ Image</span></div>`;
-const notesDrawer = (lib, toggle = true) => `<div class="drawer">${notesHead}<div class="nbody">${storyBox}<div>
-  <div class="libhead"><div class="lab">Shared library · link these into any chapter</div><span class="grow"></span>${toggle ? `<span class="vt"><span class="${toggle === "list" ? "on" : ""}">List</span><span class="${toggle === "cards" ? "on" : ""}">Cards</span></span>` : ""}</div>
-  ${lib}</div></div></div>`;
-
-const listRow = (a, i) => `<div class="lrow"><span class="grip">⠿</span><span class="pos">${pad(i)}</span><span class="ic">${icon[a.kind]}</span><div style="min-width:0;flex:1"><div class="lt" style="${a.label ? "" : "color:var(--faint)"}">${esc(untitled(a))}</div><div class="ls">${esc(snippet(a))}</div><div class="ls" style="color:var(--faint)">${pinCap(a)}</div></div><span class="chev">▾</span></div>`;
-const oldCard = (a, i) => a.kind === "IMAGE"
-  ? `<div class="ocard img"><div class="pic"></div><div class="lt" style="margin-top:5px"><span class="pos mono" style="color:var(--faint);font-size:10.5px">${pad(i)}</span> ${esc(untitled(a))}</div><div class="cp">${pinCap(a)}</div></div>`
-  : `<div class="ocard"><div class="lt" style="${a.label ? "" : "color:var(--faint)"}"><span class="mono" style="color:var(--faint);font-size:10.5px">${pad(i)}</span> ${esc(untitled(a))}</div><div class="ls">${a.kind === "TODO" ? `<div class="todo">${a.items.map((x) => `<span class="${x[1] ? "done" : ""}">${x[1] ? "☑" : "☐"} ${esc(x[0])}</span>`).join("")}</div>` : esc(a.body || "Note...")}</div><div class="cp">${pinCap(a)}</div></div>`;
-put("today-notes", notesDrawer(`<div class="lrows">${ASSETS.map(listRow).join("")}</div><div style="margin-top:9px">${addRow}</div>`, "list"));
-put("today-notes-cards", notesDrawer(`<div class="ocards">${ASSETS.map(oldCard).join("")}</div><div style="margin-top:9px">${addRow}</div>`, "cards"));
-
+const pad = (i) => String(i + 1).padStart(2, "0");
 const assetTile = (a, i) => {
   const body = a.kind === "IMAGE" ? `<div class="pic"></div>`
     : a.kind === "TODO" ? `<div class="sum">${esc(a.items.filter((x) => !x[1]).map((x) => x[0]).join(" · "))}</div>`
     : `<div class="sum ${a.body ? "" : "empty"}">${esc(a.body || "Empty note")}</div>`;
   const meta = [a.kind === "TODO" ? `<span>${progress(a)}</span>` : "", `<span>${a.pins ? `${a.pins} pin${a.pins === 1 ? "" : "s"}` : "not pinned"}</span>`].filter(Boolean).join(sep);
-  return `<div class="new"><div class="top"><span class="badge">${pad(i)}</span><span class="tag">${kindWord[a.kind]}</span><span class="grow"></span></div>
-    <div class="title" style="${a.label ? "" : "color:var(--faint)"}">${esc(untitled(a))}</div>${body}<div class="grow"></div><div class="meta">${meta}</div></div>`;
+  return `<div class="tile"><div class="top"><span class="badge">${pad(i)}</span><span class="tag">${kindWord[a.kind]}</span></div>
+    <div class="title ${a.label ? "" : "untitled"}">${esc(untitled(a))}</div>${body}<div class="grow"></div><div class="meta">${meta}</div></div>`;
 };
-const libTiles = (grid) => `<div class="${grid ? "libgrid" : "liblist"}">${ASSETS.map(assetTile).join("")}${grid ? `<div class="add" style="display:flex;align-items:center;justify-content:center;min-height:142px;border-radius:12px">+ Add note, to-do or image</div>` : ""}</div>${grid ? "" : `<div style="margin-top:11px">${addRow}</div>`}`;
-const notesFull = (grid) => notesDrawer(libTiles(grid), false);
-put("b-notes-side", `<div class="app"><div class="boardbg">${boardCards}</div><div class="appbar">The Drowned Map</div><div class="dim"></div>${notesFull(false)}</div>`);
-put("b-notes", notesFull(true));
-const td = ASSETS[1];
-const todoWin = `<div class="winscrim"><div class="modal"><div class="mhead"><span class="badge">02</span><span class="tag">To-do</span><div class="title">${td.label}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody"><div class="fields">
+
+// ---- Frames ----
+const boardCards = `
+  <div class="chap"><div class="top"><span class="badge">03</span><span class="sdot" style="background:var(--therefore)"></span><span class="grow"></span><div class="cast"><span style="background:oklch(0.55 0.12 250)">MV</span><span style="background:oklch(0.55 0.12 30)">OT</span></div></div>
+    <div class="title">The Lantern Market</div><div class="sum">Mara trades her compass for a map that should not exist, and Oren sees it in her hands.</div><div class="grow"></div>
+    <div class="meta"><span>4 scenes</span>${sep}<span>2,410 words</span></div></div>
+  <div class="chap"><div class="top"><span class="badge">04</span><span class="sdot" style="background:var(--but)"></span><span class="grow"></span><div class="cast"><span style="background:oklch(0.55 0.12 300)">IL</span></div></div>
+    <div class="title">Low Water</div><div class="sum">The guild closes the channels. Ines makes Mara an offer she cannot read.</div><div class="grow"></div>
+    <div class="meta"><span>3 scenes</span>${sep}<span>1,880 words</span></div></div>`;
+put("board", boardCards);
+
+const head = (t, s) => `<div class="dhead"><div><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div><span class="grow"></span><span class="iconbtn" title="Expand or collapse">⤢</span><span class="iconbtn">✕</span></div>`;
+const drawer = (size, t, s, tiles, addLabel) => `<div class="drawer ${size}">${head(t, s)}<div class="${size === "full" ? "grid" : "list"}">${tiles}<div class="add">+ ${addLabel}</div></div></div>`;
+const window_ = (badge, title, body) => `<div class="winscrim"><div class="modal"><div class="mhead">${badge}<div class="title">${esc(title)}</div><span class="grow"></span><span class="iconbtn">✕</span></div><div class="mbody">${body}</div></div></div>`;
+// Collapsed: board behind, dimmed, drawer on the right. Expanded: drawer fills the frame.
+const side = (drawerHtml, win = "") => `<div class="app"><div class="boardbg">${boardCards}</div><div class="appbar">The Drowned Map</div><div class="dim"></div>${drawerHtml}${win}</div>`;
+const full = (drawerHtml, win = "") => `<div class="app">${drawerHtml}${win}</div>`;
+
+// Characters
+const cTiles = CHARS.map(charTile).join("");
+const ot = CHARS[1];
+const otWin = window_(`<span class="ini" style="background:${ot.color}">${ot.ini}</span><span class="tag">${ot.role}</span>`, ot.name, `<div class="fields">
+  <div class="pair"><div><div class="lab">Name</div>${inp(ot.name)}</div><div style="flex:0 0 70px"><div class="lab">Initials</div>${inp(ot.ini)}</div></div>
+  <div class="pair"><div><div class="lab">Role</div>${inp(ot.role)}</div><div><div class="lab">Archetype</div>${inp(ot.type)}</div></div>
+  <div><div class="lab">Description</div>${area(ot.desc)}</div>
+  <div><div class="lab">Bio</div>${area(ot.bio)}</div>
+  <div class="pair"><div><div class="lab">Wants</div>${area(ot.want)}</div><div><div class="lab">Needs</div>${area(ot.need)}</div></div>
+  <div class="more">Traits, Goals, Motivations, Notes (same fields as today)</div>
+  ${chipRow("Appears in", ot.ch)}
+  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete character</span></div></div>`);
+put("c-side", side(drawer("side", "Characters", "", cTiles, "Add character")));
+put("c-side-win", side(drawer("side", "Characters", "", cTiles, "Add character"), otWin));
+put("c-full", full(drawer("full", "Characters", "", cTiles, "Add character")));
+put("c-full-win", full(drawer("full", "Characters", "", cTiles, "Add character"), otWin));
+
+// World
+const wSub = "Places, factions, lore &amp; references";
+const wTiles = WORLD.map(worldTile).join("");
+const dc = WORLD[0];
+const dcRefs = [ASSETS.harbour, ASSETS.towers, ASSETS.todo];
+const dcWin = window_(`<span class="badge">PLACE</span>`, dc.name, `<div class="fields">
+  <div class="pair"><div><div class="lab">Name</div>${inp(dc.name)}</div><div style="flex:0 0 120px"><div class="lab">Category</div>${inp("Place  ▾")}</div></div>
+  <div><div class="lab">Description</div>${area(dc.desc)}</div>
+  <div><div class="lab">Notes</div>${area(dc.notes)}</div>
+  ${chipRow("Appears in", dc.ch)}
+  <div><div class="lab">References</div><div class="tgrid">${dcRefs.map(assetTile).join("")}</div>
+    <div class="addrow" style="margin-top:9px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span><span>+ Link book asset</span></div></div>
+  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete entry</span></div></div>`);
+put("w-side", side(drawer("side", "World", wSub, wTiles, "Add world entry")));
+put("w-full", full(drawer("full", "World", wSub, wTiles, "Add world entry")));
+put("w-full-win", full(drawer("full", "World", wSub, wTiles, "Add world entry"), dcWin));
+
+// Notes
+const nSub = "The Drowned Map · themes, questions &amp; reminders";
+const story = `<div class="storybox">The map is the antagonist's argument: that the past can be owned. Mara's arc ends when she gives the true chart away.</div>`;
+const libLabel = `<div class="lab">Shared library · link these into any chapter</div>`;
+const notes = (size) => `<div class="drawer ${size}">${head("Story notes", nSub)}<div class="nbody">${story}<div>${libLabel}
+  <div class="${size === "full" ? "libgrid" : "liblist"}">${LIBRARY.map(assetTile).join("")}${size === "full" ? '<div class="add" style="display:flex;align-items:center;justify-content:center;min-height:142px">+ Add note, to-do or image</div>' : ""}</div>
+  ${size === "full" ? "" : '<div class="addrow" style="margin-top:11px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span></div>'}</div></div></div>`;
+const td = ASSETS.todo;
+const tdWin = window_(`<span class="badge">02</span><span class="tag">To-do</span>`, td.label, `<div class="fields">
   <div><div class="lab">Title</div>${inp(td.label)}</div>
-  <div><div class="lab">Items</div><div class="todo" style="gap:7px;font-size:13px">${td.items.map((x) => `<span class="${x[1] ? "done" : ""}">${x[1] ? "☑" : "☐"} ${esc(x[0])}</span>`).join("")}<span style="color:var(--faint)">+ Add item</span></div></div>
-  <div><div class="lab">Pinned in</div><div class="chips">${td.where.map((n) => `<span>Ch ${n} ↗</span>`).join("")}</div></div>
-  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete</span></div>
-</div></div></div></div>`;
-put("b-notes-window", `<div class="winstage">${notesFull(true)}${todoWin}</div>`);
+  <div><div class="lab">Items</div><div class="todo">${td.items.map((x) => `<span class="${x[1] ? "done" : ""}">${x[1] ? "☑" : "☐"} ${esc(x[0])}</span>`).join("")}<span style="color:var(--faint)">+ Add item</span></div></div>
+  ${chipRow("Pinned in", td.where)}
+  <div class="btnrow"><span class="ghost">Archive</span><span class="ghost">Delete</span></div></div>`);
+put("n-side", side(notes("side")));
+put("n-full", full(notes("full")));
+put("n-full-win", full(notes("full"), tdWin));
+
+// Inside a chapter
+const chRefs = [ASSETS.todo, ASSETS.harbour, ASSETS.theme];
+const chapter = `<div class="chmodal"><div class="chhead"><div class="row"><span class="badge">03</span><div class="title">The Lantern Market</div><span class="grow"></span><span class="iconbtn">⤢</span><span class="iconbtn">✕</span></div>
+  <div class="chmeta">2,410 words · 4 scenes · Drafting</div></div>
+  <div class="tabs"><span>Characters<i>2</i></span><span>World details<i>1</i></span><span>Chapter notes</span><span class="on">Pinned references<i>3</i></span></div>
+  <div class="chbody"><div class="tgrid">${chRefs.map(assetTile).join("")}</div>
+    <div class="addrow" style="margin-top:10px"><span>+ Note</span><span>+ To-do</span><span>+ Image</span><span>+ Link book asset</span></div>
+    <div class="flowph">Scene flow continues below (unchanged)</div></div></div>`;
+const hb = ASSETS.harbour;
+const hbWin = window_(`<span class="badge">02</span><span class="tag">Image</span>`, hb.label, `<div class="fields">
+  <div class="pic big"></div>
+  <div><div class="lab">Title</div>${inp(hb.label)}</div>
+  ${chipRow("Pinned in", hb.where)}
+  <div class="btnrow"><span class="ghost">Remove from this chapter</span><span class="hint">It stays in the shared library.</span></div></div>`);
+put("ch", side(chapter));
+put("ch-win", side(chapter, hbWin));
 </script>
 </body>
 </html>

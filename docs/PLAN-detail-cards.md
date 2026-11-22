@@ -1,126 +1,105 @@
-# Plan: character and world detail cards styled like chapter cards
+# Plan: every detail card looks and opens like a chapter card
 
-Status: **PLAN ONLY**, waiting for Ray's go-ahead. No feature code.
+Status: **PLAN ONLY.** Ray chose option B and "everywhere" on 2026-11-21 and is
+confirming against the mockup. No feature code yet.
 Branch: `claude/detail-cards-style-5424f7` (worktree), not pushed.
-Mockup: [`docs/mockups/detail-cards.html`](mockups/detail-cards.html)
+Mockup: [`docs/mockups/detail-cards.html`](mockups/detail-cards.html) (option B
+everywhere, both drawer sizes, each with a card opened).
 
-## What differs today
+## The decision
 
-| | Chapter card (`Board.tsx`, copied in `Timeline.tsx` rail) | Detail card (`CharactersPanel.tsx`, `WorldPanel.tsx`) |
+**Option B, everywhere.** Each card takes the board chapter card's face, and
+clicking it opens a window on top (as clicking a chapter opens the chapter),
+instead of expanding in the list. Collapsed drawer (460px side panel): one
+column. Expanded drawer (full screen, ≤1180px): a grid of tiles.
+
+Rejected: option A (chapter look, but still expanding in place).
+
+## Where it applies
+
+| Place | Today | Option B |
 |---|---|---|
-| Shell | `rounded-xl`, `p-[12px_14px]`, `gap-[7px]`, `var(--shadow)`, `hover:border-faint` | `rounded-[13px]`, `p-[14px]`, no shadow, no hover |
-| Top row | ink number badge (mono), status dot, cast avatars right | 34px round avatar (char) / 10px grey dot (world), name + one sub line beside it |
-| Title | serif 16, its own line, faint "Untitled chapter" when empty | serif 15, inline beside the avatar |
-| Body | 2-line clamped summary | none while collapsed |
-| Footer | mono 11, right-aligned: parts · words | none (counts sit in the sub line) |
-| Click | whole card opens the chapter modal | name or ▾ toggles inline expand; edit fields in place |
+| Characters drawer (`CharactersPanel.tsx`) | one-line rows, expand in list | tiles, open in a window |
+| World drawer (`WorldPanel.tsx`) | one-line rows, expand in list | tiles, open in a window |
+| Notes library (`NotesPanel.tsx` via `RefList`) | list or cards (switch), expand in list | tiles, open in a window; no switch |
+| World entry references (`RefList` in the world window) | list or cards (switch) | tiles inside the entry's window |
+| Chapter pinned references (`RefList` in `ChapterDetail.tsx`) | list or cards (switch) | tiles, open in a window over the chapter |
+| Story notes box, chapter cast and world chips | | unchanged |
 
-## Recommendation: option A, restyle only
+## The card face (one shared component)
 
-The side panel is 460px (about 424px inside its padding); a chapter card is a
-fixed 244px tile. Two tiles cannot sit side by side there, so a tile grid only
-works at the expanded (1180px) size. The plain reading of "like chapter cards"
-that works at both sizes is:
+| Slot (chapter card) | Character | World | Library / reference item |
+|---|---|---|---|
+| Ink number badge | initials, in the character's colour | category | position number (`01`) |
+| Status dot | role, small uppercase tag | | kind: Note / To-do / Image |
+| Title (serif 16) | name | name | label |
+| 2-line body | description | description | note text · open to-do items · the picture |
+| Mono footer | archetype · in N chapters | on N chapters · N refs | to-do progress · N pins |
 
-- **Same face.** Each collapsed card takes the chapter card's shell and four
-  rows: badge row, serif title, 2-line summary, mono meta footer. Slot mapping:
+Empty values read faint, like "Untitled chapter" (existing copy:
+"Unnamed character", "Untitled entry", "Untitled note"; "No description yet").
 
-  | Chapter slot | Character | World |
-  |---|---|---|
-  | Number badge | initials, `rounded-md` mono badge in the character's colour | category, ink badge |
-  | Status dot | role, small uppercase tag | nothing |
-  | Cast avatars | ▾ / ▴ | ▾ / ▴ |
-  | Title | name | name |
-  | Summary | `desc` | `desc` |
-  | Footer | `archetype · in N chapters` | `on N chapters · N refs` |
+## The window
 
-- **Whole card clickable** to expand/collapse (today only the name and ▾ are),
-  matching "click a card to open it". Clicks inside the expanded fields do not
-  collapse it.
-- **Same list, same editing.** Expanded, the card grows below a hairline rule
-  and shows today's fields in today's order. Nothing about editing changes.
-- Empty values read faint, like "Untitled chapter": "Unnamed character" /
-  "Untitled entry" (existing copy), "No description yet" for the summary.
-- The draft card ("New character", faint "Nothing saved yet…") and the
-  selected-card `scrollIntoView` keep working.
-- The archive shelf rows stay as they are (they are a compact list, not cards).
-- Both sizes of the drawer stay a single column.
+One shared window shell (badge + title + ✕ header, scrolling body) holding the
+**same fields as today's expanded card, in the same order**, plus Archive /
+Delete at the foot. For a reference pinned on a chapter or world entry, the foot
+is "Remove from this chapter / entry" with "It stays in the shared library",
+matching today's detach rule. The window stacks over the chapter modal for
+chapter references (z-order between the chapter modal and ConfirmDialog).
 
-Option B (tiles in a grid at the expanded size, click opens a modal editor like
-the chapter modal) is shown at the bottom of the mockup for comparison only. It
-is a much larger change and overlaps with the rearrange feature; see questions.
-
-## Update 2026-11-21: Ray is leaning to option B, and wants Notes included
-
-The mockup now shows option B at both drawer sizes (collapsed side panel,
-expanded full screen) for Characters, World and Notes.
-
-**Notes drawer under B.** The story notes box stays on top. The shared library
-below it (notes, to-dos, images) becomes the same tiles: the position number
-goes in the badge (the library already has an order), the kind sits beside it,
-then title, a two-line body (to-do: open items; image: the picture), and a
-footer with progress and pin count. Clicking opens the item in a window with
-its editor and "Pinned in" chips. The List/Cards switch goes away.
-
-**Catch: `RefList` is shared.** It draws the Notes library, a world entry's
-References and a chapter's Pinned references, and it already has a card view,
-drag-to-reorder (grip) and position numbers. If the library becomes tiles,
-the other two surfaces either follow (consistent everywhere, larger change,
-and the chapter modal's refs tab changes too) or keep today's list/cards
-(the library alone changes). That is a question for Ray. RefList's reorder
-also overlaps directly with the "rearrangeable cards" session.
+Things that must survive the move from expand-in-list to a window:
+- **Draft cards.** "+ Add character / world entry / note" opens the window on
+  the blank draft; nothing is saved until something is typed (today's rule).
+  Closing an untouched draft discards it.
+- **"+ Create new character" from a chapter** opens the window over the chapter
+  (today it opens the drawer and scrolls to the new card).
+- **`jumpToWorldEntry` and "Appears in" / "Pinned in" chips**: jumping to an
+  entry opens its window; a chip inside a window closes it and navigates.
+- **Lightbox** for images still opens from the image inside the window.
+- `selChar` / `selWorld` become "which window is open". UI state only.
 
 ## Files
 
-- `src/components/ui/DetailCard.tsx` (new): the shared shell and face
-  (`badge`, `tag`, `title`, `summary`, `meta`, `open`, `onToggle`, `children`
-  for the expanded body). One component for both panels, so they cannot
-  drift, and the natural place for a drag handle later.
-- `src/components/panels/CharactersPanel.tsx`: render each roster card through
-  `DetailCard`; expanded field list untouched.
-- `src/components/panels/WorldPanel.tsx`: same.
-- `docs/SPECS.md` §4 row + `docs/SESSIONS.md` entry.
+- `src/components/ui/DetailCard.tsx` (new): the tile face, used by all five places.
+- `src/components/ui/DetailWindow.tsx` (new): the window shell.
+- `CharactersPanel.tsx`, `WorldPanel.tsx`: tiles in list / grid by drawer size;
+  the field block moves into the window unchanged.
+- `RefList.tsx`: the tile view replaces both list and card views; editing moves
+  into the window. Keep its `onReorder` and position numbers (see below).
+- `NotesPanel.tsx`, `ChapterDetail.tsx`: drop the `ViewToggle`.
+- `ViewToggle.tsx` and the `refView` preference: removed if nothing else uses
+  them (`refView` is a UI preference, not in `doc`).
+- Store: the open-window id(s), and draft handling that opens a window.
+- `docs/SPECS.md` §4 rows (Panels, Pinned refs, Library) and `docs/SESSIONS.md`.
 
-Not touched: `Board.tsx` and `Timeline.tsx`. They already duplicate the
-chapter face between them; folding them onto the same component is a separate
-cleanup, not this feature. The detail card matches their classes by value.
+Not touched: `Board.tsx`, `Timeline.tsx` (the chapter face stays theirs; the
+new component matches it by value).
 
 ## Data model, Drive, Android
 
 None. No `types.ts` change, no `normalizeDoc` change, no schema bump, nothing
-new in the Drive file, so the Android app is unaffected. Which card is open is
-already UI state (`selChar` / `selWorld`). If any new preference appears (say
-a list/grid toggle under option B) it stays out of `doc`, like `beatRailHidden`.
+new in the Drive file, so the Android app is unaffected. Removing `refView`
+only drops a local preference.
 
 ## Coexisting with the other two features
 
-- **Relationship chart** (`claude/relationship-chart-4c8990`): it adds a
-  Relationships field under "Appears in" in the expanded character card. This
-  plan only replaces the card shell and the collapsed face, and leaves the
-  expanded field list's structure alone, so the field drops in as a child of
-  `DetailCard`. Its open question "tie count in the card subtitle" would land
-  in this card's mono footer (`… · in 9 chapters · 3 ties`). Whichever lands
-  first, the other rebases; the conflict should be small and mechanical.
-- **Rearrangeable cards** (later): the list stays a plain flex column in
-  `doc.characters` / `doc.world` order (row-major if a grid ever comes), never
-  CSS columns or masonry, so drag order maps straight onto array order.
-  `DetailCard` gets the drag handle then. Whole-card click to expand will need
-  the same "a press that moves is a drag, one that doesn't is a click" rule
-  the board uses; noted for that session.
+- **Relationship chart** (`claude/relationship-chart-4c8990`) puts its
+  Relationships field under "Appears in" on the character card. Under option B
+  that field lives in the character **window**; its "+ Add relationship" dialog
+  would stack over that window. A tie count, if wanted, goes in the tile's mono
+  footer. Whichever lands first, the other rebases.
+- **Rearrangeable cards** (`detail-cards-reorder` session): option B makes
+  this simpler, since a tile no longer expands, so dragging a tile is the same
+  move as dragging a chapter card on the board (a press that moves is a drag,
+  one that doesn't is a click). `RefList` already has grip-drag reorder and
+  position numbers; the tile view should keep them working so that session
+  extends one mechanism to characters and world rather than inventing a second.
+  This restyle should land first so reorder is built on tiles.
 
-## Questions for Ray
+## Open questions for Ray
 
-1. **Look, or look and behave?** Option A (restyle the list, keep editing in
-   place) or option B (tiles, click opens an editor like the chapter modal)?
-2. **Character badge:** initials in the character's colour (as mocked), or
-   keep the round avatar and put the role in the badge?
-3. **World badge:** category in an ink badge (as mocked), or give each
-   category its own muted colour (new tokens, presentation only)?
-4. **Footer:** `archetype · in N chapters` for characters and
-   `on N chapters · N refs` for world. Right fields?
-5. **Summary source:** `desc` for both. For a character with no description,
-   fall back to the start of the bio, or just show "No description yet"?
-6. **Expanded size:** stay a single column (as planned), or a two-column list
-   of cards when the drawer is full screen?
-7. **Order with the relationship chart:** fine for whichever is approved first
-   to land first?
+1. Does the mockup match what you want, for all five places?
+2. Opening a card from the **collapsed** drawer: the window opens in the
+   middle of the screen over everything (as mocked). OK?
+3. Library tiles drop the List / Cards switch entirely. OK to remove it?
