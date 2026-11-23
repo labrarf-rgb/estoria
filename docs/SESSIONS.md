@@ -6507,3 +6507,39 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   labrarf.com/estoria). Not yet tried: the chart on a real touchscreen, and
   the conflict rows in the dialog itself (covered by unit tests).
 
+
+### 2026-11-22 — Review of the day's ships, and its fixes (web + phone)
+
+- **Review** (`docs/REVIEW-2026-11-22.md`): anthology, detail-card restyle,
+  rearranging and the phone's anthology support, for Android gaps, security,
+  performance, save-file stability and size limits. No critical findings;
+  eight should-fix (S1-S8), ten nice-to-have.
+- **Web fixes** (after the relationship chart shipped, on `89fa7fb`):
+  - S1: `lib/join.ts` `reconcileIncoming`: on bring-in and Merge into a
+    series, an incoming character, world entry, asset, relationship or stored
+    kind that differs from the target's record with the same id comes in as a
+    second record with a fresh id; chapters, ties and chart positions follow.
+  - S2: bring-in puts the piece project's Story notes into the piece's notes.
+  - S6: bring-in and Move it out reach every version; moving out drops the
+    piece's chapter links.
+  - S3: an anthology's map export is one Act I in piece order.
+  - S5: "Piece order and sections" story-wide unit between two anthologies;
+    merges renumber.
+  - S7: 5 newest saved copies per project kept in the browser (Ray's choice),
+    trimmed automatically with a notice, only when the copy's file is in the
+    Estoria folder; nothing in Drive deleted. Storage use tracked; Footer and
+    copy notes warn from 80%.
+- **Phone fixes** (Android `fix/review-2026-11-22`, `94c335d`): S4 order units
+  in compare and merge; S5 piece order unit; S3 export order; S8 stream decode,
+  unreadable saved project kept aside with a message, too-large sync reported,
+  `largeHeap`. Emulator (Pixel 3, API 31): a 41.6 MB anthology went from
+  OutOfMemoryError on load (silent fall back to Welcome) to a ~61 MB heap peak.
+- **Verified:** web 336 tests (18 new in `src/lib/review-fixes.test.ts`), tsc,
+  build; phone 246 tests (13 new in `ReviewFixesTest.kt`), debug APK and
+  release bundle. In the in-app browser: copy out, revise Wren and add a tie,
+  bring back (two Wrens, tie on the revised one), piece notes, bring in and
+  move out across Main draft and Alt ending, map export order, the 85%-full
+  warning (simulated) and the trim notice. The bring-in dialog's "joins the
+  version you're viewing" was stale and is fixed.
+- **Still open:** picture URLs not restricted to `data:` (N6), and N1-N5,
+  N8-N10 from the review.
