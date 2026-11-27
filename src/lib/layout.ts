@@ -236,8 +236,9 @@ export const SCENE_MARGIN = 18;
 
 /**
  * Columns that fit across the *visible* scene-canvas width (the canvas isn't
- * zoomed, it scrolls), so auto-arrange uses the room it actually has — more
- * columns when the chapter modal is expanded, fewer when collapsed.
+ * zoomed, it scrolls), so auto-arrange uses the room it actually has. The
+ * chapter modal always fills the window since 2026-11-26; the narrower width
+ * is still estimated for `scenePosCompact` (see `scenePosBoth` in the store).
  */
 export function sceneColumnsForWidth(n: number, visW: number): number {
   if (n <= 1) return 1;

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Expand-only Before/After</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* Tokens copied from src/index.css */
+:root, [data-theme="light"] {
+  --bg:#e9e0cd; --panel:#f6f0e2; --card:#fffdf6; --ink:#2b2620; --soft:#7a6f5c; --faint:#a99c84;
+  --line:#cdbfa2; --rule:#e1d6bf; --dot:#e1d6bf; --chip:#ece3d0;
+  --shadow:0 1px 2px rgba(70,52,20,.1),0 6px 16px rgba(70,52,20,.08);
+  --but:oklch(.55 .15 33); --sw-2:oklch(.54 .10 152); --sw-3:oklch(.55 .12 355); --sw-4:oklch(.52 .08 250); --sw-7:oklch(.55 .10 305);
+  --pin:oklch(.55 .15 33); --gone:oklch(.55 .15 33); --kept:oklch(.54 .10 152);
+  --serif:"Spectral",Georgia,serif; --sans:"Hanken Grotesk",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#231f19; --panel:#2b2721; --card:#352f29; --ink:#e4ddd3; --soft:#aaa49b; --faint:#79746d;
+    --line:#4c4740; --rule:#605a52; --dot:#1a1712; --chip:#272320;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 26px rgba(0,0,0,.4);
+    --but:oklch(.63 .13 33); --sw-2:oklch(.62 .09 152); --sw-3:oklch(.64 .11 355); --sw-4:oklch(.62 .08 250); --sw-7:oklch(.64 .09 305);
+    --pin:oklch(.63 .13 33); --gone:oklch(.63 .13 33); --kept:oklch(.62 .09 152);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#231f19; --panel:#2b2721; --card:#352f29; --ink:#e4ddd3; --soft:#aaa49b; --faint:#79746d;
+  --line:#4c4740; --rule:#605a52; --dot:#1a1712; --chip:#272320;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 26px rgba(0,0,0,.4);
+  --but:oklch(.63 .13 33); --sw-2:oklch(.62 .09 152); --sw-3:oklch(.64 .11 355); --sw-4:oklch(.62 .08 250); --sw-7:oklch(.64 .09 305);
+  --pin:oklch(.63 .13 33); --gone:oklch(.63 .13 33); --kept:oklch(.62 .09 152);
+}
+* { box-sizing:border-box; }
+html, body { margin:0; }
+body { background:var(--bg); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+button { font:inherit; color:inherit; cursor:pointer; }
+
+/* ---- mockup chrome ---- */
+.bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:14px 20px; border-bottom:1px solid var(--rule); background:var(--panel); }
+.bar h1 { font-family:var(--serif); font-weight:600; font-size:19px; margin:0 8px 0 0; }
+.eyebrow { font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
+.seg { display:inline-flex; background:var(--chip); border-radius:8px; padding:3px; gap:2px; }
+.seg button { border:0; background:transparent; border-radius:6px; padding:4px 10px; font-size:12px; font-weight:500; color:var(--soft); }
+.seg button[aria-pressed="true"] { background:var(--card); color:var(--ink); box-shadow:var(--shadow); }
+.grp { display:flex; align-items:center; gap:8px; }
+
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:20px; padding:20px; align-items:start; }
+@media (max-width: 900px) { .layout { grid-template-columns:1fr; padding:16px; } }
+
+/* ---- the fake app ---- */
+.stage { position:relative; height:640px; border:1px solid var(--rule); border-radius:12px; overflow:hidden; background:var(--bg); display:flex; flex-direction:column; }
+.tb { display:flex; align-items:center; gap:8px; padding:9px 14px; border-bottom:1px solid var(--rule); background:var(--panel); font-size:12px; flex-wrap:wrap; }
+.tb .logo { font-family:var(--serif); font-style:italic; font-weight:600; font-size:15px; margin-right:6px; }
+.tbtn { border:1px solid var(--rule); background:var(--card); border-radius:8px; padding:4px 10px; font-size:11.5px; font-weight:500; }
+.tbtn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.board { flex:1; position:relative; background-image:radial-gradient(var(--dot) 1px, transparent 1px); background-size:22px 22px; overflow:hidden; }
+.card { position:absolute; width:180px; background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:10px 12px; box-shadow:var(--shadow); cursor:pointer; }
+.card .n { display:inline-block; background:var(--ink); color:var(--bg); font-family:var(--mono); font-size:10px; font-weight:600; border-radius:5px; padding:1px 5px; }
+.card .t { font-family:var(--serif); font-weight:600; font-size:14px; margin:6px 0 3px; }
+.card .s { font-size:11px; color:var(--soft); line-height:1.35; }
+.ft { padding:6px 14px; border-top:1px solid var(--rule); background:var(--panel); font-size:10.5px; color:var(--faint); }
+
+.scrim { position:absolute; inset:0; background:rgba(20,14,6,.46); backdrop-filter:blur(2px); z-index:50; }
+.scrim.fill { display:flex; padding:16px; }
+.scrim.center { display:flex; align-items:center; justify-content:center; padding:30px; }
+
+.drawer { position:absolute; display:flex; flex-direction:column; background:var(--panel); }
+.drawer.side { top:0; right:0; bottom:0; width:460px; max-width:100%; border-left:1px solid var(--rule); box-shadow:-20px 0 60px rgba(0,0,0,.3); }
+.drawer.full { inset:0; }
+.dhead { flex-shrink:0; border-bottom:1px solid var(--rule); }
+.inner { width:100%; }
+.drawer.full .inner { max-width:1180px; margin:0 auto; }
+.dhead .row { display:flex; align-items:center; padding:20px 22px; gap:10px; }
+.dtitle { font-family:var(--serif); font-size:18px; font-weight:600; }
+.dbody { flex:1; min-height:0; overflow:auto; }
+.btn { border:1px solid var(--rule); background:var(--card); border-radius:8px; padding:6px 10px; font-size:11.5px; font-weight:500; }
+.x { width:30px; height:30px; border:1px solid var(--rule); background:var(--card); border-radius:8px; font-size:14px; font-weight:500; }
+.grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); }
+.col { display:flex; flex-direction:column; gap:11px; }
+.tile { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:12px 14px; box-shadow:var(--shadow); min-height:118px; }
+.tile .top { display:flex; align-items:center; gap:7px; }
+.badge { width:22px; height:18px; border-radius:5px; color:#fff; font-size:9.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+.tag { font-size:9.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); }
+.tile .nm { font-family:var(--serif); font-weight:600; font-size:15px; margin:7px 0 4px; }
+.tile .bd { font-size:11.5px; color:var(--soft); line-height:1.4; }
+.tile .mt { font-family:var(--mono); font-size:10px; color:var(--faint); margin-top:8px; }
+.add { border:1.5px dashed var(--line); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:var(--soft); background:transparent; }
+.shelf { font-size:11.5px; color:var(--soft); margin-top:14px; }
+textarea.notes { width:100%; border:1px solid var(--rule); background:var(--card); border-radius:10px; padding:10px 12px; font-family:var(--serif); font-size:13.5px; color:var(--ink); resize:none; }
+.pill { border:1px solid var(--rule); background:var(--card); border-radius:999px; padding:2px 9px; font-size:10.5px; font-weight:500; color:var(--soft); }
+
+.modal { background:var(--panel); border:1px solid var(--rule); border-radius:16px; box-shadow:0 30px 90px rgba(0,0,0,.5); overflow:auto; display:flex; flex-direction:column; }
+.modal.compact { width:min(980px,100%); max-height:92%; overflow-x:hidden; }
+.modal > .pinn, .drawer > .pinn { top:6px; right:6px; }
+.modal.fill { flex:1; min-width:0; }
+.mhead { display:flex; align-items:flex-start; gap:14px; padding:20px 24px; border-bottom:1px solid var(--rule); }
+.mnum { background:var(--ink); color:var(--bg); font-family:var(--mono); font-weight:600; font-size:12px; border-radius:7px; padding:4px 7px; }
+.mtitle { font-family:var(--serif); font-size:22px; font-weight:600; }
+.msub { font-size:12.5px; color:var(--faint); margin-top:2px; }
+.tabs { display:flex; gap:6px; padding:12px 24px 0; flex-wrap:wrap; }
+.tabchip { background:var(--chip); border-radius:8px; padding:4px 10px; font-size:11px; color:var(--soft); }
+.flowrow { display:flex; align-items:center; gap:8px; padding:12px 24px; flex-wrap:wrap; }
+.mode { display:inline-flex; background:var(--chip); border-radius:8px; padding:3px; }
+.mode span { padding:3px 9px; border-radius:6px; font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+.mode span.on { background:var(--card); color:var(--ink); }
+.canvas { margin:0 22px 18px; border:1px solid var(--rule); border-radius:12px; background:var(--bg); background-image:radial-gradient(var(--dot) 1px, transparent 1px); background-size:22px 22px; padding:16px; display:flex; flex-wrap:wrap; gap:14px; align-content:flex-start; overflow:auto; }
+.modal.compact .canvas { max-height:180px; }
+.modal.fill .canvas { flex:1; min-height:200px; }
+.scene { width:190px; background:var(--card); border:1px solid var(--rule); border-radius:10px; padding:9px 11px; box-shadow:var(--shadow); font-size:11.5px; }
+.scene .tag { display:block; margin-bottom:4px; }
+.prose { flex:1; display:flex; gap:0; min-height:0; border-top:1px solid var(--rule); }
+.rail { width:190px; border-right:1px solid var(--rule); padding:12px; display:flex; flex-direction:column; gap:8px; }
+.page { flex:1; padding:22px 30px; font-family:var(--serif); font-size:14.5px; line-height:1.65; color:var(--ink); overflow:auto; }
+.modal.compact.ms { height:92%; }
+
+/* ---- annotations ---- */
+.mark { position:relative; }
+.mark.gone { outline:2px dashed var(--gone); outline-offset:2px; border-radius:8px; }
+.mark.kept { outline:2px dashed var(--kept); outline-offset:2px; border-radius:8px; }
+.pinn { position:absolute; top:-9px; right:-9px; z-index:5; width:18px; height:18px; border-radius:50%; background:var(--pin); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:var(--sans); box-shadow:0 1px 3px rgba(0,0,0,.3); }
+.pinn.q { background:var(--kept); }
+
+.rail-notes { position:sticky; top:20px; background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:18px 18px 8px; }
+.rail-notes h2 { font-family:var(--serif); font-size:17px; font-weight:600; margin:4px 0 10px; }
+.rail-notes p, .rail-notes li { font-size:12.5px; line-height:1.5; color:var(--soft); }
+.rail-notes ul { padding:0; margin:0 0 14px; list-style:none; }
+.rail-notes li { display:flex; gap:9px; margin-bottom:9px; }
+.rail-notes li .pinn { position:static; flex-shrink:0; margin-top:1px; }
+.rail-notes strong { color:var(--ink); font-weight:600; }
+.legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--soft); margin-bottom:14px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.sw { width:14px; height:10px; border-radius:3px; border:2px dashed; }
+.toast { position:absolute; left:50%; bottom:46px; transform:translateX(-50%); background:var(--ink); color:var(--bg); font-size:12px; padding:7px 12px; border-radius:8px; z-index:90; opacity:0; transition:opacity .2s; pointer-events:none; white-space:nowrap; }
+.toast.on { opacity:1; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Expand-only, before and after</h1>
+  <div class="grp"><span class="eyebrow">Version</span>
+    <div class="seg" id="ver"><button data-v="before">Before (today)</button><button data-v="after">After (my branch)</button></div></div>
+  <div class="grp"><span class="eyebrow">Open</span>
+    <div class="seg" id="surf"><button data-s="chars">Characters</button><button data-s="world">World</button><button data-s="notes">Notes</button><button data-s="chapter">Chapter</button><button data-s="ms">Manuscript</button><button data-s="none">Nothing</button></div></div>
+  <div class="grp"><span class="eyebrow">Theme</span>
+    <div class="seg" id="theme"><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+</div>
+
+<div class="layout">
+  <div class="stage" id="stage"></div>
+  <aside class="rail-notes" id="notes"></aside>
+</div>
+
+<script>
+const S = { v: "after", s: "chars", panelExpanded: false, sceneFlowExpanded: false, msExpanded: false, charsView: "roster", theme: null };
+
+const CHARS = [
+  ["MV","Protagonist","Mara Vell","The lighthouse keeper's daughter, who can hear the drowned bell.","in 8 chapters","--sw-3"],
+  ["TC","Mentor","Tobias Crane","Retired tide-caller who taught Mara to read the charts.","in 4 chapters","--sw-4"],
+  ["RA","Ally","Captain Ruth Ambrose","Commands the last Tidewarden cutter.","in 5 chapters","--sw-2"],
+  ["EH","Love interest","Ezra Hale","Cartographer from inland, mapping the coast for the Guild.","in 3 chapters","--sw-7"],
+];
+const WORLD = [
+  ["SM","Place","Saltmarrow","The harbour town under the lighthouse.","on 9 chapters","--sw-2"],
+  ["GL","Place","Gull Light","The lighthouse, and the bell beneath it.","on 6 chapters","--sw-4"],
+  ["TW","Group","The Tidewardens","Coast guard sworn to the old charts.","on 4 chapters","--sw-3"],
+];
+const NOTES = [
+  ["1","Note","Bell legend","Three versions of the drowned bell story.","2 pins","--sw-7"],
+  ["2","To-do","Fix the timeline","Ruth can't be in two harbours in ch. 5.","1 of 3 done","--sw-2"],
+  ["3","Image","Chart of the reef","Reference sketch for chapter 7.","3 pins","--sw-4"],
+];
+
+const $ = (h) => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
+const pin = (n, kind = "gone") => `<span class="pinn ${kind === "q" ? "q" : ""}">${n}</span>`;
+const before = () => S.v === "before";
+
+function tiles(list, gridMode) {
+  const t = list.map(([b, tag, nm, bd, mt, c]) => `
+    <div class="tile"><div class="top"><span class="badge" style="background:var(${c})">${b}</span><span class="tag">${tag}</span></div>
+    <div class="nm">${nm}</div><div class="bd">${bd}</div><div class="mt">${mt}</div></div>`).join("");
+  return gridMode
+    ? `<div class="grid">${t}<button class="add" style="min-height:118px">+ Add</button></div>`
+    : `<div class="col mark ${before() ? "gone" : ""}">${before() ? pin("C") : ""}${t}<button class="add" style="padding:13px">+ Add</button></div>`;
+}
+
+function board() {
+  const cards = [
+    [40,40,"01","The Drowned Bell","Mara hears the bell for the first time."],
+    [250,40,"02","A Door in the Floor","The cellar under the light."],
+    [460,40,"03","Low Tide","Tobias tells her about the charts."],
+    [40,210,"04","The Cutter","Ruth's ship comes into harbour."],
+    [250,210,"05","Two Harbours","Ezra arrives with the Guild maps."],
+    [460,210,"06","The Reef","Where the bell went down."],
+  ];
+  return `<div class="tb"><span class="logo">Estoria</span><span class="tbtn">Main draft</span><span class="tbtn">+ New chapter</span>
+    <span class="tbtn on">Board</span><span class="tbtn">Timeline</span><span style="flex:1"></span>
+    <button class="tbtn" data-open="chars">Characters</button><button class="tbtn" data-open="world">World</button><button class="tbtn" data-open="notes">Notes</button></div>
+    <div class="board">${cards.map(([x,y,n,t,s]) => `<div class="card" data-open="chapter" style="left:${x}px;top:${y}px"><span class="n">${n}</span><div class="t">${t}</div><div class="s">${s}</div></div>`).join("")}</div>
+    <div class="ft">Saved · 6 chapters</div>`;
+}
+
+function panel(kind) {
+  const full = before() ? S.panelExpanded : true;
+  const name = { chars: "Characters", world: "World", notes: "Notes" }[kind];
+  const showChart = kind === "chars" && S.charsView === "chart" && full;
+  const sizeBtn = before()
+    ? `<span class="mark gone">${pin("A")}<button class="btn" data-act="size">${full ? "Collapse" : "Expand"}</button></span>`
+    : "";
+  const sw = kind === "chars" ? `<div class="seg" style="margin-left:14px"><button data-act="roster" aria-pressed="${!showChart}">Roster</button><button data-act="chart" aria-pressed="${showChart}">Chart</button></div>` : "";
+  const xBtn = `<span class="mark ${before() ? "" : "kept"}">${before() ? "" : pin("3", "q")}<button class="x" data-act="close">✕</button></span>`;
+  let body;
+  if (showChart) {
+    body = `<div style="height:380px;display:flex;align-items:center;justify-content:center;position:relative">
+      <svg width="420" height="320" viewBox="0 0 420 320" style="max-width:100%">
+        <g stroke="var(--line)" stroke-width="2"><line x1="210" y1="60" x2="90" y2="230"/><line x1="210" y1="60" x2="330" y2="230"/><line x1="90" y1="230" x2="330" y2="230"/><line x1="210" y1="60" x2="210" y2="270"/></g>
+        ${[[210,60,"MV","--sw-3"],[90,230,"TC","--sw-4"],[330,230,"RA","--sw-2"],[210,270,"EH","--sw-7"]].map(([x,y,t,c])=>`<circle cx="${x}" cy="${y}" r="22" fill="var(${c})"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="Hanken Grotesk, sans-serif">${t}</text>`).join("")}
+      </svg></div>`;
+  } else if (kind === "notes") {
+    const exp = `<span class="mark kept">${pin("2", "q")}<button class="pill">Expand</button></span>`;
+    body = `<div style="padding:${full ? "18px 22px" : "14px 18px"}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span class="eyebrow">Story notes</span>${exp}</div>
+      <textarea class="notes" rows="4">The bell is the spine. Every act ends with someone hearing it, and only Mara hears it on the page.</textarea>
+      <div class="eyebrow" style="margin:16px 0 8px">Library</div>
+      ${tiles(NOTES, full)}
+      <div class="shelf">▸ Archived · 1</div></div>`;
+  } else {
+    body = `<div style="padding:${full ? "18px 22px" : "14px 18px"}">${tiles(kind === "chars" ? CHARS : WORLD, full)}<div class="shelf">▸ Archived · 1</div></div>`;
+  }
+  const cls = full ? "full" : "side";
+  const wrap = !full && before() ? "mark gone" : "";
+  return `<div class="scrim" data-act="scrim">
+    <div class="drawer ${cls} ${wrap}" data-stop>${!full && before() ? pin("B") : ""}
+      <div class="dhead"><div class="inner"><div class="row"><span class="dtitle">${name}</span>${sw}<span style="flex:1"></span>${sizeBtn}${xBtn}</div></div></div>
+      <div class="dbody"><div class="inner">${body}</div></div>
+    </div></div>`;
+}
+
+function chapter() {
+  const fill = before() ? S.sceneFlowExpanded : true;
+  const sizeBtn = before()
+    ? `<span class="mark gone">${pin("D")}<button class="btn" data-act="sfsize">${fill ? "Collapse" : "Expand"}</button></span>` : "";
+  const scenes = ["Wren follows the chart down to a flooded cellar.","A trapdoor opens onto water that flows uphill.","Bram drags her out before the tide takes the shop.","She finds the bell's clapper in the silt."];
+  return `<div class="scrim ${fill ? "fill" : "center"}" data-act="scrim">
+    <div class="modal ${fill ? "fill" : "compact mark gone"}" data-stop>${!fill ? pin("E") : ""}
+      <div class="mhead"><span class="mnum">02</span><div style="flex:1"><div class="mtitle">A Door in the Floor</div><div class="msub">The cellar under the light.</div></div>
+        <button class="x">‹</button><button class="x">›</button><button class="x" data-act="close">✕</button></div>
+      <div class="tabs"><span class="tabchip">Characters 3</span><span class="tabchip">World details</span><span class="tabchip">Chapter notes</span><span class="tabchip">Pinned references 1</span></div>
+      <div class="flowrow"><span class="mark kept" style="color:var(--faint)">${pin("1", "q")}▾</span>
+        <span class="mode"><span class="on">Scene flow</span><span>Manuscript</span></span><span class="tag">4 scenes</span>
+        <span style="flex:1"></span><button class="btn">Select scenes</button><button class="btn" style="background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600">+ Add scene</button>${sizeBtn}</div>
+      <div class="canvas">${scenes.map((s, i) => `<div class="scene"><span class="tag">Scene ${i + 1}</span>${s}</div>`).join("")}</div>
+    </div></div>`;
+}
+
+function manuscript() {
+  const fill = before() ? S.msExpanded : true;
+  return `<div class="scrim ${fill ? "fill" : "center"}" data-act="scrim">
+    <div class="modal ${fill ? "fill" : "compact ms mark gone"}" data-stop>${!fill ? pin("G") : ""}
+      <div class="mhead"><span class="mnum">02</span><div style="flex:1"><div class="mtitle">A Door in the Floor</div>
+        <div class="flowrow" style="padding:8px 0 0"><span class="tag">2,800 words</span><span class="mode"><span>Scene flow</span><span class="on">Manuscript</span></span><span style="flex:1"></span>
+        <button class="btn">Edit</button>${before() ? `<span class="mark gone">${pin("F")}<button class="btn" data-act="mssize">${fill ? "Collapse" : "Expand"}</button></span>` : ""}</div></div>
+        <button class="x">‹</button><button class="x">›</button><button class="x" data-act="close">✕</button></div>
+      <div class="prose"><div class="rail"><span class="tag">‹ Hide · 4 scenes</span>${["Flooded cellar","Uphill water","Bram","The clapper"].map(b => `<div class="scene" style="width:auto">${b}</div>`).join("")}</div>
+        <div class="page">The chart was wrong about the cellar, which was the first thing Wren noticed, and the water was the second. It stood knee-deep and perfectly still, and when she lifted the lamp it did not reflect the flame.</div></div>
+    </div></div>`;
+}
+
+function notesRail() {
+  const b = before();
+  return `<span class="eyebrow">${b ? "Today" : "After the change"}</span>
+  <h2>${b ? "What goes away" : "What you get"}</h2>
+  <div class="legend"><span><i class="sw" style="border-color:var(--gone)"></i>Removed</span><span><i class="sw" style="border-color:var(--kept)"></i>Kept as is (your call)</span></div>
+  ${b ? `<ul>
+    <li>${pin("A")}<span><strong>Expand / Collapse on the panels.</strong> Gone. One size only.</span></li>
+    <li>${pin("B")}<span><strong>The 460px side panel</strong>, with the dimmed board showing beside it and a click on the board to close. Gone.</span></li>
+    <li>${pin("C")}<span><strong>The one-column card list</strong> in the side panel. Gone; always the grid.</span></li>
+    <li>${pin("D")}<span><strong>Expand / Collapse on Scene flow.</strong> Gone.</span></li>
+    <li>${pin("E")}<span><strong>The 980px chapter window</strong> with a short scene canvas. Gone; the chapter always fills the window.</span></li>
+    <li>${pin("F")}<span><strong>Expand / Collapse on the manuscript.</strong> Gone (you added it: it began as the same control as D).</span></li>
+    <li>${pin("G")}<span><strong>The 980px manuscript window.</strong> Gone; open Manuscript in Before to see it. Both faces now fill the window, so switching tabs never changes the size.</span></li>
+  </ul>
+  <p>Try it: in Before, Chart forces the panel full screen, and Collapse sends you back to Roster.</p>` : `<ul>
+    <li>${pin("1", "q")}<span><strong>Scene canvas ▾.</strong> Stays.</span></li>
+    <li>${pin("2", "q")}<span><strong>Story notes Expand.</strong> Stays.</span></li>
+    <li>${pin("3", "q")}<span><strong>Closing a panel.</strong> Unchanged: ✕ closes it, no Escape added. The redesign revisits it.</span></li>
+  </ul>
+  <p><strong>Done since your note:</strong> the manuscript's Expand / Collapse is gone too.</p>
+  <p><strong>Not changing:</strong> the look of the expanded panels (another session is redesigning it), the Archived shelf, the beat rail's Hide.</p>
+  <p><strong>Behind the scenes:</strong> a saved "collapsed" setting is ignored and cleared. Nothing in your project file changes, so the phone is unaffected.</p>`}`;
+}
+
+function render() {
+  document.documentElement.toggleAttribute("data-theme", !!S.theme);
+  if (S.theme) document.documentElement.dataset.theme = S.theme;
+  for (const b of document.querySelectorAll("#ver button")) b.setAttribute("aria-pressed", b.dataset.v === S.v);
+  for (const b of document.querySelectorAll("#surf button")) b.setAttribute("aria-pressed", b.dataset.s === S.s);
+  const dark = S.theme ? S.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  for (const b of document.querySelectorAll("#theme button")) b.setAttribute("aria-pressed", (b.dataset.t === "dark") === dark);
+  const stage = document.getElementById("stage");
+  let overlay = "";
+  if (["chars", "world", "notes"].includes(S.s)) overlay = panel(S.s);
+  if (S.s === "chapter") overlay = chapter();
+  if (S.s === "ms") overlay = manuscript();
+  stage.innerHTML = board() + overlay + `<div class="toast" id="toast"></div>`;
+  document.getElementById("notes").innerHTML = notesRail();
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 2200);
+}
+
+document.addEventListener("click", (e) => {
+  const v = e.target.closest("#ver button"); if (v) { S.v = v.dataset.v; return render(); }
+  const s = e.target.closest("#surf button"); if (s) { S.s = s.dataset.s; return render(); }
+  const t = e.target.closest("#theme button"); if (t) { S.theme = t.dataset.t; return render(); }
+  const o = e.target.closest("[data-open]"); if (o && S.s === "none") { S.s = o.dataset.open; return render(); }
+  const a = e.target.closest("[data-act]");
+  if (!a) return;
+  const act = a.dataset.act;
+  if (act === "scrim") {
+    if (e.target.closest("[data-stop]")) return;
+    S.s = "none"; render(); return;
+  }
+  if (act === "close") { S.s = "none"; return render(); }
+  if (act === "size") { S.panelExpanded = !S.panelExpanded; if (!S.panelExpanded && S.charsView === "chart") toast("Collapsed: back to Roster"); return render(); }
+  if (act === "sfsize") { S.sceneFlowExpanded = !S.sceneFlowExpanded; return render(); }
+  if (act === "mssize") { S.msExpanded = !S.msExpanded; return render(); }
+  if (act === "roster") { S.charsView = "roster"; return render(); }
+  if (act === "chart") {
+    S.charsView = "chart";
+    if (before() && !S.panelExpanded) { S.panelExpanded = true; render(); return toast("Chart forced the panel full screen"); }
+    return render();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && ["chars", "world", "notes"].includes(S.s)) toast("Escape does nothing on a panel today (unchanged, item 3)");
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+render();
+</script>
+</body>
+</html>

@@ -47,8 +47,8 @@ import { Grip, ReorderItem, ReorderLive, useTileReorder } from "@/components/ui/
  *
  * Layout (since the detail-card restyle, 2026-11-22): every item is a
  * chapter-style `DetailCard` tile (or, with `layout="chips"`, a compact pill:
- * a chapter's or piece's tabs are all chips), one column where it's narrow or a grid of
- * tiles at least `tileMin` px wide where there's room. A tile never edits:
+ * a chapter's or piece's tabs are all chips), in a grid of tiles at least
+ * `tileMin` px wide. A tile never edits:
  * clicking it opens the item in a `DetailWindow`, which holds the title, the
  * note / checklist / picture, the caller's `extra` (the library's "Pinned in")
  * and the remove controls. The old list / card switch is gone.
@@ -88,7 +88,7 @@ export function RefList({
   caption,
   extra,
   layout = "tiles",
-  tileMin,
+  tileMin = 230,
   idPrefix = "r",
   removeMode = "detach",
   removeLabel = "Remove from here",
@@ -130,7 +130,7 @@ export function RefList({
    * every list is chips. Either way a click opens the item's window.
    */
   layout?: "tiles" | "chips";
-  /** Tiles only: a grid of tiles at least this many px wide; omitted, one column. */
+  /** Tiles only: the grid's minimum tile width (default 230, the drawers'). */
   tileMin?: number;
   /** The detach button's words in the window (e.g. "Remove from this chapter"). */
   removeLabel?: string;
@@ -154,7 +154,6 @@ export function RefList({
   const reorder = useTileReorder({
     ids: refs.map((r) => r.id),
     onMove: onReorder,
-    mode: layout === "chips" || tileMin ? "grid" : "column",
     nameOf: (id) => {
       const r = refs.find((x) => x.id === id);
       return r ? r.label || untitled(r.kind) : "Item";
@@ -469,7 +468,7 @@ export function RefList({
       <div className="min-w-0 flex-1">
         <DetailCard
           onOpen={() => setOpenId(r.id)}
-          minHeight={tileMin ? (tileMin < 200 ? 120 : 142) : 0}
+          minHeight={tileMin < 200 ? 120 : 142}
           grip={isDraft ? undefined : <Grip r={reorder} id={r.id} name={name} />}
           badge={badgeOf(r)}
           tag={KIND_WORD[r.kind]}

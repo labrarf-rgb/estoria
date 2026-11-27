@@ -226,29 +226,8 @@ interface UiState {
   /** Tall/short state per expandable-textarea surface (persisted, global). */
   textareaExpanded: Record<TextareaKey, boolean>;
   /**
-   * How much room the scene canvas gets, and with it how wide the story map
-   * modal is.
-   *
-   * It drove the manuscript sheet too while that was a section of the same
-   * modal, which is why it was once one flag for two areas. The manuscript has
-   * its own modal and its own `manuscriptExpanded` now, so this is back to
-   * meaning exactly what it is named for.
-   *
-   * **Not renamed, deliberately.** It is not only a width: `scenePosKey` uses it
-   * to choose between `scenePos` and `scenePosCompact`, which are persisted
-   * *document* data. Renaming the flag would either drag a doc migration behind
-   * it or leave the flag and the layout key disagreeing.
-   */
-  sceneFlowExpanded: boolean;
-  /**
-   * The manuscript modal's own width toggle. Separate from `sceneFlowExpanded`
-   * because each modal keeps its own size control, and a writer who wants the
-   * page wide has no opinion about the scene canvas at that moment.
-   */
-  manuscriptExpanded: boolean;
-  /**
    * The manuscript's beat rail folded to a slim strip, for more room to write.
-   * A view preference like the two above: global, remembered, never in the
+   * A view preference: global, remembered, never in the
    * document, so the phone never sees it.
    */
   beatRailHidden: boolean;
@@ -272,13 +251,6 @@ interface UiState {
     previousTarget: number | undefined;
     label: string;
   } | null;
-  /**
-   * Right-hand panel size (Characters / World / Notes), persisted and shared by
-   * all three. `false` = the 460px drawer, which leaves the board beside it live
-   * (no scrim, so you can pan, drag and open chapters while it's open); `true` =
-   * full screen, covering the canvas.
-   */
-  panelExpanded: boolean;
   /**
    * The notice after a change of form: "Saved a copy of … before …". Transient
    * and not persisted; it names where the copy went and goes away.
@@ -608,10 +580,7 @@ interface StoreState extends UiState {
   /** Swap the open chapter between its story map and its manuscript. */
   setChapterMode: (mode: ChapterMode) => void;
   toggleTextarea: (key: TextareaKey) => void;
-  setSceneFlowExpanded: (expanded: boolean) => void;
-  setManuscriptExpanded: (expanded: boolean) => void;
   setBeatRailHidden: (hidden: boolean) => void;
-  setPanelExpanded: (expanded: boolean) => void;
   selectChar: (id: string | null) => void;
   selectWorld: (id: string | null) => void;
   selectBook: (id: string | null) => void;
@@ -779,50 +748,56 @@ const emptyBookData = (): BookData => ({
   draftData: {},
 });
 
+/**
+ * Prefs this app no longer has, stripped from a stored shell on hydrate.
+ *
+ * All three were size toggles, retired on 2026-11-26 when Characters / World /
+ * Notes and both faces of the chapter modal became expand-only:
+ * `panelExpanded` (the 460px side panel when `false`), `sceneFlowExpanded` (the
+ * 980px story map) and `manuscriptExpanded` (the 980px manuscript). A shell
+ * written before then may still hold a `false`. Nothing reads
+ * them any more and `partialize` no longer writes them, so they would drop out
+ * on the next save anyway; stripping them here keeps them out of state in the
+ * meantime. UI prefs only: no document field is involved, so no schema bump.
+ */
+export const RETIRED_PREFS = ["panelExpanded", "sceneFlowExpanded", "manuscriptExpanded"] as const;
+
 /** Renumber chapters sequentially (1..n) after add/delete. */
-/** Estimated visible scene-canvas width for the chapter modal in the given
- *  mode — used to lay out chapters whose modal isn't (or isn't yet) open,
- *  e.g. on open and for a scene-move destination. */
+/** Estimated visible scene-canvas width for the chapter modal — used to lay
+ *  out chapters whose modal isn't (or isn't yet) open, e.g. on open and for a
+ *  scene-move destination. `expanded: false` is the retired 980px modal, still
+ *  estimated so `scenePosCompact` keeps being written (see `scenePosBoth`). */
 const sceneBoxWidthEstimate = (expanded: boolean) => {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1500;
-  // Expanded fills the window less the scrim's 16px margin each side (`Scrim`'s
-  // `fill`, which both chapter modals use when expanded).
+  // The modal fills the window less the scrim's 16px margin each side (`Scrim`'s
+  // `fill`).
   const modalW = expanded ? vw - 32 : Math.min(980, vw);
   return modalW - 44;
 };
 
 /**
- * Scene positions for BOTH canvas sizes at once.
+ * Scene positions for BOTH layouts the file carries.
  *
- * The scene flow has an expanded and a collapsed size that fit different column
- * counts, and each remembers its own layout (`scenePos` / `scenePosCompact`) so
- * toggling between them no longer has to re-arrange — which is what used to
- * throw the arrangement away. Every structural change (add/insert/delete/
- * reorder/move) therefore lays out both: the mode on screen with the column
- * count the caller measured, the other one with an estimate for its width.
+ * The scene flow used to have an expanded and a collapsed size, each with its
+ * own layout (`scenePos` / `scenePosCompact`, schema v6). Since 2026-11-26 the
+ * story map modal is always expanded, so `scenePos` is the one on screen (laid
+ * out with the column count the caller measured). `scenePosCompact` is still
+ * written, from an estimate of the old 980px canvas, because it is document
+ * data: the phone carries it (and its round-trip test checks it), and an older
+ * web build that still has the collapsed view reads it. Files written now look
+ * exactly like files written before with the modal expanded.
  */
 const scenePosBoth = (
   scenes: string[],
-  expanded: boolean,
   cols?: number
-): Pick<Chapter, "scenePos" | "scenePosCompact"> => {
-  const otherCols = sceneColumnsForWidth(scenes.length, sceneBoxWidthEstimate(!expanded));
-  const active = sceneAutoArrange(scenes, 0, cols);
-  const other = sceneAutoArrange(scenes, 0, otherCols);
-  return expanded
-    ? { scenePos: active, scenePosCompact: other }
-    : { scenePos: other, scenePosCompact: active };
-};
-
-/**
- * Whether the scene canvas on screen is the wide one. A piece's canvas fills
- * the page and has no size control, so it is always wide; otherwise the flag
- * says. Every layout read and write goes through this, so a piece never
- * switches to its compact layout because a book's chapter was collapsed.
- */
-const wideScenes = (s: { sceneFlowExpanded: boolean; doc: StoryDoc }): boolean =>
-  // An anthology piece is a page too (`AnthologyView`), so it is always wide.
-  s.sceneFlowExpanded || isPiece(s.doc) || isAnthology(s.doc);
+): Pick<Chapter, "scenePos" | "scenePosCompact"> => ({
+  scenePos: sceneAutoArrange(scenes, 0, cols),
+  scenePosCompact: sceneAutoArrange(
+    scenes,
+    0,
+    sceneColumnsForWidth(scenes.length, sceneBoxWidthEstimate(false))
+  ),
+});
 
 /**
  * Take an ordered subset of a chapter's scenes, keeping each link that joined
@@ -930,11 +905,8 @@ const initialUi: UiState = {
   chapterTab: null,
   chapterMode: "map",
   textareaExpanded: { storyNotes: false, chapterNotes: false, worldDesc: false, worldNotes: false },
-  sceneFlowExpanded: true,
-  manuscriptExpanded: true,
   beatRailHidden: false,
   manuscriptUndo: null,
-  panelExpanded: false,
   savedNotice: null,
   pendingSections: [],
   addPieceDialog: null,
@@ -1725,7 +1697,7 @@ export const useStore = create<StoreState>()(
                 ...c,
                 scenes,
                 sceneLinks,
-                ...scenePosBoth(scenes, wideScenes(s), cols),
+                ...scenePosBoth(scenes, cols),
               };
             }),
           },
@@ -1752,7 +1724,7 @@ export const useStore = create<StoreState>()(
                 ...c,
                 scenes,
                 sceneLinks,
-                ...scenePosBoth(scenes, wideScenes(s), cols),
+                ...scenePosBoth(scenes, cols),
               };
             }),
           },
@@ -1836,7 +1808,7 @@ export const useStore = create<StoreState>()(
                       ...c,
                       scenes: [""],
                       sceneLinks: [],
-                      ...scenePosBoth([""], wideScenes(s), cols),
+                      ...scenePosBoth([""], cols),
                     }
                   : {
                       ...c,
@@ -1871,7 +1843,7 @@ export const useStore = create<StoreState>()(
               if (sceneLinks.length) sceneLinks.splice(Math.min(fromIdx, sceneLinks.length - 1), 1);
               if (scenes.length > 1) sceneLinks.splice(Math.min(to, sceneLinks.length), 0, "none");
 
-              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, wideScenes(s), cols) };
+              return { ...c, scenes, sceneLinks, ...scenePosBoth(scenes, cols) };
             }),
           },
         })),
@@ -1916,7 +1888,7 @@ export const useStore = create<StoreState>()(
                     ...c,
                     scenes: srcScenes,
                     sceneLinks: srcLinks,
-                    ...scenePosBoth(srcScenes, wideScenes(s), cols),
+                    ...scenePosBoth(srcScenes, cols),
                   };
                 if (c.id === toChId)
                   return {
@@ -1927,8 +1899,7 @@ export const useStore = create<StoreState>()(
                     // keep a cramped count-heuristic grid when later opened.
                     ...scenePosBoth(
                       toScenes,
-                      wideScenes(s),
-                      sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(wideScenes(s)))
+                      sceneColumnsForWidth(toScenes.length, sceneBoxWidthEstimate(true))
                     ),
                   };
                 return c;
@@ -1989,7 +1960,7 @@ export const useStore = create<StoreState>()(
                       ...c,
                       scenes: next.scenes,
                       sceneLinks: next.sceneLinks,
-                      ...scenePosBoth(next.scenes, wideScenes(s), cols),
+                      ...scenePosBoth(next.scenes, cols),
                     }
                   : c
               ),
@@ -2987,10 +2958,7 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           textareaExpanded: { ...s.textareaExpanded, [key]: !s.textareaExpanded[key] },
         })),
-      setSceneFlowExpanded: (expanded) => set({ sceneFlowExpanded: expanded }),
-      setManuscriptExpanded: (expanded) => set({ manuscriptExpanded: expanded }),
       setBeatRailHidden: (hidden) => set({ beatRailHidden: hidden }),
-      setPanelExpanded: (expanded) => set({ panelExpanded: expanded }),
       selectChar: (id) => set((s) => ({ selChar: s.selChar === id ? null : id })),
       selectWorld: (id) => set((s) => ({ selWorld: s.selWorld === id ? null : id })),
       selectBook: (id) => set((s) => ({ selBook: s.selBook === id ? null : id })),
@@ -3081,11 +3049,15 @@ export const useStore = create<StoreState>()(
         chapterTab: s.chapterTab,
         chapterMode: s.chapterMode,
         textareaExpanded: s.textareaExpanded,
-        sceneFlowExpanded: s.sceneFlowExpanded,
-        manuscriptExpanded: s.manuscriptExpanded,
         beatRailHidden: s.beatRailHidden,
-        panelExpanded: s.panelExpanded,
       }),
+      // zustand's default merge (stored state over the defaults), less the
+      // retired prefs.
+      merge: (persisted, current) => {
+        const p = { ...((persisted as Record<string, unknown> | undefined) ?? {}) };
+        for (const k of RETIRED_PREFS) delete p[k];
+        return { ...current, ...p };
+      },
       // On a schema bump, convert the persisted document (and every stashed
       // project) through `normalizeDoc`, which understands all older shapes.
       // Discarding is the last resort, only for docs that fail to convert.

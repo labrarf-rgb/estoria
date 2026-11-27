@@ -145,39 +145,33 @@ export function InitialsBadge({ initials, color }: { initials: string; color: st
 }
 
 /**
- * The tile list: one column in a narrow place (the side panel), a grid of
- * tiles of at least `min` px where there is room. Reading order is row-major
- * either way, so array order maps straight onto what you see.
+ * The tile list: a grid of tiles of at least `min` px. Reading order is
+ * row-major, so array order maps straight onto what you see. (Its one-column
+ * form went with the side panel, 2026-11-26.)
  */
-export function TileGrid({ min, children }: { min?: number; children: ReactNode }) {
-  return min ? (
+export function TileGrid({ min, children }: { min: number; children: ReactNode }) {
+  return (
     <div className="grid gap-[14px]" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${min}px, 1fr))` }}>
       {children}
     </div>
-  ) : (
-    <div className="flex flex-col gap-[11px]">{children}</div>
   );
 }
 
-/** The dashed "+ Add …" tile at the end of a list or grid. */
+/** The dashed "+ Add …" tile at the end of a grid. */
 export function AddTile({
   onClick,
   disabled,
-  grid,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
-  grid?: boolean;
   children: ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center justify-center gap-[7px] rounded-xl border-[1.5px] border-dashed border-line text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft ${
-        grid ? "min-h-[142px]" : "py-[13px]"
-      }`}
+      className="flex w-full items-center justify-center gap-[7px] rounded-xl border-[1.5px] border-dashed border-line text-[13px] font-semibold text-soft hover:border-faint hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-soft min-h-[142px]"
     >
       {children}
     </button>

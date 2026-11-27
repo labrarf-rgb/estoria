@@ -15,8 +15,9 @@ import { createPortal } from "react-dom";
  *   own element stays mounted as the dashed space (same key, contents hidden),
  *   so its size is exact and a finger's pointer target never leaves the page.
  * - **Reading order decides the space**: before the first tile the pointer is
- *   ahead of. In a grid that is above its row, or in its row and left of its
- *   middle; in a column, above its middle.
+ *   ahead of: above its row, or in its row and left of its middle. Chips and
+ *   tiles are always laid out in rows (a one-column mode went with the side
+ *   panel, 2026-11-26).
  * - **Pointer events**, with `touch-action: none` on the grip only, so a finger
  *   drags by the grip and the rest of the list still scrolls.
  * - **Keyboard**: arrow keys on a focused grip move it one place.
@@ -27,8 +28,6 @@ import { createPortal } from "react-dom";
  * This replaces RefList's earlier mouse-only grip drag ("drop on a row to take
  * its place"); the store actions behind each list are unchanged.
  */
-
-export type ReorderMode = "column" | "grid";
 
 const SLOP = 4;
 const EDGE = 48;
@@ -61,14 +60,12 @@ function scrollParent(el: HTMLElement | null): HTMLElement | null {
 export function useTileReorder({
   ids,
   onMove,
-  mode,
   nameOf,
 }: {
   /** The orderable items, in their current order (no draft). */
   ids: string[];
   /** Commit a move; `toIdx` indexes `ids`. Omit to turn ordering off. */
   onMove?: (id: string, toIdx: number) => void;
-  mode: ReorderMode;
   /** For the screen-reader announcement after a move. */
   nameOf: (id: string) => string;
 }) {
@@ -87,8 +84,8 @@ export function useTileReorder({
   const pendingFocus = useRef<string | null>(null);
   const cleanup = useRef<(() => void) | null>(null);
   // Latest values for the window-level handlers, which outlive a render.
-  const latest = useRef({ ids, onMove, mode, drag });
-  latest.current = { ids, onMove, mode, drag };
+  const latest = useRef({ ids, onMove, drag });
+  latest.current = { ids, onMove, drag };
 
   useEffect(() => () => cleanup.current?.(), []);
 
@@ -193,10 +190,7 @@ export function useTileReorder({
       for (let i = 0; i < others.length; i++) {
         const b = boxes.current.get(others[i]);
         if (!b) continue;
-        const ahead =
-          latest.current.mode === "column"
-            ? y < (b.top + b.bottom) / 2
-            : y < b.top || (y <= b.bottom && x < (b.left + b.right) / 2);
+        const ahead = y < b.top || (y <= b.bottom && x < (b.left + b.right) / 2);
         if (ahead) return i;
       }
       return others.length;

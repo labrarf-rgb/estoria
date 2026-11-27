@@ -78,11 +78,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
   const toggleScenesCollapsed = useStore((s) => s.toggleScenesCollapsed);
   const tab = useStore((s) => s.chapterTab);
   const setTab = useStore((s) => s.setChapterTab);
-  // A piece's canvas fills the page, so it is always the wide one and has no
-  // size control. Keeps the layout read here in step with `wideScenes` in the
-  // store, which every write uses.
-  const expanded = useStore((s) => s.sceneFlowExpanded) || page;
-  const setSceneFlowExpanded = useStore((s) => s.setSceneFlowExpanded);
   const notesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
   const focusScene = useStore((s) => s.focusScene);
@@ -640,19 +635,17 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 
   return (
     <>
-    <Shell page={page} fill={expanded} onClose={closeFromScrim}>
+    <Shell page={page} onClose={closeFromScrim}>
       <div
         ref={modalRef}
         onMouseDown={stop}
-        // Expanded fills the window, as a piece fills the page: a column whose
-        // scene canvas takes the height left over (see the canvas below).
-        // Collapsed sizes to its content, as it always has.
+        // Fills the window, as a piece fills the page: a column whose scene
+        // canvas takes the height left over (see the canvas below). Always,
+        // since 2026-11-26: the 980px collapsed size and its toggle are gone.
         className={
           page
             ? "min-h-full bg-panel"
-            : `overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-                expanded ? "flex min-w-0 flex-1 flex-col" : "max-h-[92vh] w-[min(980px,100%)]"
-              }`
+            : "overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] flex min-w-0 flex-1 flex-col"
         }
       >
         {/* Header */}
@@ -1152,18 +1145,6 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
               >
                 + Add {nouns.one}
               </button>
-              {/* Last, in both modals: the size control is always the right-most
-                  button on its row, so it is found in the same place. A piece
-                  already fills the page, so it has none. */}
-              {!page && (
-                <button
-                  onClick={() => setSceneFlowExpanded(!expanded)}
-                  className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                  title={expanded ? `Shrink the ${nouns.one} area` : `Expand the ${nouns.one} area`}
-                >
-                  {expanded ? "Collapse" : "Expand"}
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -1220,10 +1201,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
         <div
           ref={sceneBoxRef}
           className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg [scrollbar-gutter:stable] ${
-            // Expanded: whatever height the modal has left, never under 320px;
-            // an open reference tab pushes it down, and past the floor the
-            // modal scrolls instead.
-            page ? "max-h-[70vh] min-h-[320px]" : expanded ? "min-h-[320px] flex-1" : "max-h-[40vh]"
+            // Whatever height the modal has left, never under 320px; an open
+            // reference tab pushes it down, and past the floor the modal
+            // scrolls instead.
+            page ? "max-h-[70vh] min-h-[320px]" : "min-h-[320px] flex-1"
           }`}
           style={{
             backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
@@ -1521,18 +1502,16 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 /** A modal over the board, or, for a single piece, the page itself. */
 function Shell({
   page,
-  fill,
   onClose,
   children,
 }: {
   page: boolean;
-  fill: boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
   if (page) return <div className="min-h-0 flex-1 overflow-auto bg-panel">{children}</div>;
   return (
-    <Scrim onClose={onClose} z={50} center fill={fill}>
+    <Scrim onClose={onClose} z={50} center fill>
       {children}
     </Scrim>
   );

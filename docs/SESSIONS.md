@@ -6543,3 +6543,42 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   version you're viewing" was stale and is fixed.
 - **Still open:** picture URLs not restricted to `data:` (N6), and N1-N5,
   N8-N10 from the review.
+
+### 2026-11-26 — Expand-only Characters, World, Notes and chapter modals (branch `claude/expand-only`)
+
+- **Ray's call:** drop the partial (collapsed) view of the three panels and
+  of the chapter modal. First pass covered the story map face
+  (`ChapterDetail`); after reviewing a before/after mockup
+  (`docs/expand-only/mockup/index.html`) Ray added the manuscript face, whose
+  Expand / Collapse began as the same control. Investigation and knock-ons in
+  `docs/expand-only/IMPACT.md`.
+- **Removed:** the panels' 460px side panel, their Expand / Collapse button
+  (`SizeButton`) and the `panelExpanded` pref; the story map's Expand /
+  Collapse and `sceneFlowExpanded` (the 980px modal with a 40% canvas); the
+  manuscript's Expand / Collapse and `manuscriptExpanded` (980px at 92vh);
+  `wideScenes`; the Characters chart's "needs full screen" gate (the Roster /
+  Chart switch now just switches). `Drawer` lost its `expanded` prop. The
+  one-column branches only the side panel used went too: `TileGrid` without
+  `min`, `AddTile`'s `grid`, `useTileReorder`'s `"column"` mode, `RefList`
+  without `tileMin` (defaults to 230).
+- **Prefs migration:** all three keys are listed in `RETIRED_PREFS` and stripped by
+  a persist `merge` on hydrate, and `partialize` no longer writes them, so a
+  stored `false` from `estoria:shell:v2` can't bring a partial view back. No
+  `SCHEMA_VERSION` bump.
+- **Project file unchanged.** `scenePosCompact` (the collapsed canvas's
+  layout, schema v6) is still written on every scene edit, estimated for the
+  old 980px canvas, so files read the same on the phone (its round-trip test
+  checks the field) and in older web builds.
+- **Kept unchanged (Ray's call after the mockup):** the scene canvas chevron
+  (`scenesCollapsed`), the Story notes Expand and the other tall / short
+  textareas, the beat rail's Hide, the archive shelves, and panel closing (✕
+  only, no Escape added; the redesign revisits it).
+- **Verified:** `npm run typecheck`, `npm test` (342, 6 new in
+  `src/lib/expand-only.test.ts`), `npm run build`; no lint script exists. In
+  the in-app browser with a shell seeded with `panelExpanded:false,
+  sceneFlowExpanded:false`: Characters opened full screen with no size button,
+  Chart switched directly, the next saved shell had neither key, the story map
+  filled the window with no size button, and adding a scene still wrote both
+  `scenePos` and `scenePosCompact`. Then, seeded with `manuscriptExpanded:false`,
+  the manuscript filled the window with no size button and the key was gone
+  from the next saved shell. Not committed.

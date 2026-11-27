@@ -351,6 +351,10 @@ export interface Chapter {
    * fit different column counts, so one shared layout meant toggling had to
    * re-arrange, which threw away how the scenes had been laid out. Keeping a
    * layout per mode is what makes the arrangement survive a toggle.
+   *
+   * The web dropped the collapsed size on 2026-11-26 but still writes this
+   * (estimated for the old 980px canvas) so the file format is unchanged: the
+   * phone carries it and older web builds read it. See `scenePosBoth`.
    */
   scenePosCompact?: Vec2[];
   refs: PinnedRef[];

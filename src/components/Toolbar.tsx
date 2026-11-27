@@ -416,7 +416,7 @@ export function Toolbar() {
       </div>
       )}
 
-      {/* Side panels */}
+      {/* Characters / World / Notes (full-screen panels, see `Drawer`) */}
       <div className="flex shrink-0 gap-[2px] rounded-[9px] bg-chip p-[3px]">
         <button className={segOff} onClick={() => setPanel("showChars", true)}>
           Characters

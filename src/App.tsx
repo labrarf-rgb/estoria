@@ -80,7 +80,7 @@ export function App() {
           <ChapterModal />
         </ErrorBoundary>
       )}
-      {/* Side panels are modal overlays: the app behind them is dimmed and
+      {/* The panels are full-screen modal overlays: the app behind them is
           inert, one panel at a time (see `Drawer`). */}
       <CharactersPanel />
       <WorldPanel />

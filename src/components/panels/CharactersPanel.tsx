@@ -1,5 +1,5 @@
 import { useStore } from "@/store/useStore";
-import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, CloseButton } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { DetailCard, EmptyBody, InitialsBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
 import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
@@ -27,8 +27,6 @@ export function CharactersPanel() {
   const startDraft = useStore((s) => s.startCharDraft);
   const updateDraft = useStore((s) => s.updateCharDraft);
   const discardDraft = useStore((s) => s.discardCharDraft);
-  const panelExpanded = useStore((s) => s.panelExpanded);
-  const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
   const reorderCharacter = useStore((s) => s.reorderCharacter);
   const charsView = useStore((s) => s.charsView);
@@ -38,18 +36,11 @@ export function CharactersPanel() {
   const reorder = useTileReorder({
     ids: doc.characters.filter((c) => !c.archived).map((c) => c.id),
     onMove: reorderCharacter,
-    mode: panelExpanded ? "grid" : "column",
     nameOf: (id) => doc.characters.find((c) => c.id === id)?.name || "Unnamed character",
   });
 
   if (!show) return null;
   const close = () => setPanel("showChars", false);
-  // The chart needs the full-screen drawer; collapsing it shows the roster.
-  const view = panelExpanded ? charsView : "roster";
-  const showView = (v: "roster" | "chart") => {
-    setCharsView(v);
-    if (v === "chart") setPanelExpanded(true);
-  };
 
   // Archived characters keep every casting, so they stay on the board (dimmed)
   // but leave the roster and the chapter picker. The shelf below is the only
@@ -135,7 +126,6 @@ export function CharactersPanel() {
 
   return (
     <Drawer
-      expanded={panelExpanded}
       onClose={close}
       header={
         <div className="flex items-center px-[22px] py-5">
@@ -144,11 +134,11 @@ export function CharactersPanel() {
             {(["roster", "chart"] as const).map((v) => (
               <button
                 key={v}
-                aria-pressed={view === v}
-                onClick={() => showView(v)}
+                aria-pressed={charsView === v}
+                onClick={() => setCharsView(v)}
                 title={v === "chart" ? "Relationship chart" : "Character cards"}
                 className={`rounded-md px-[10px] py-[3px] text-[11.5px] font-medium capitalize ${
-                  view === v ? "bg-card text-ink" : "text-soft hover:bg-card"
+                  charsView === v ? "bg-card text-ink" : "text-soft hover:bg-card"
                 }`}
               >
                 {v}
@@ -157,18 +147,17 @@ export function CharactersPanel() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-[8px]">
-            <SizeButton expanded={panelExpanded} onClick={() => setPanelExpanded(!panelExpanded)} />
             <CloseButton onClick={close} />
           </div>
         </div>
       }
     >
-      {view === "chart" ? (
+      {charsView === "chart" ? (
         <RelationshipChart onOpenCard={(id) => selectChar(id)} />
       ) : (
-      <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
+      <div className="flex flex-col gap-[11px] px-[22px] py-[18px]">
         <div {...reorder.containerProps}>
-          <TileGrid min={panelExpanded ? 230 : undefined}>
+          <TileGrid min={230}>
             {reorder.order.map((id) => {
               const p = roster.find((c) => c.id === id);
               return p ? (
@@ -182,7 +171,7 @@ export function CharactersPanel() {
                 {tileFor(draft)}
               </div>
             )}
-            <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
+            <AddTile onClick={startDraft} disabled={!!draft}>
               + Add character
             </AddTile>
           </TileGrid>
@@ -237,7 +226,7 @@ export function CharactersPanel() {
             const id = open.id;
             closeWindow();
             setChartFocus(id);
-            showView("chart");
+            setCharsView("chart");
           }}
           footer={
             <DrawerFooter

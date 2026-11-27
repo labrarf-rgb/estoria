@@ -28,8 +28,8 @@ import type { ReactNode } from "react";
  * canvas and the prose feeling messy. Each was patched; the cause was not. The
  * shapes that fix it are here and are worth not undoing:
  *
- *  - **The modal is a fixed height** (`h-[92vh]`, or the whole window less a
- *    margin when expanded), not a maximum. An empty chapter and a finished one
+ *  - **The modal is a fixed height** (the whole window less a 16px margin; it
+ *    was `h-[92vh]` collapsed until 2026-11-26), not a maximum. An empty chapter and a finished one
  *    are the same size, so nothing reflows under you and there is no page
  *    scroll for a scrollbar to go missing from.
  *  - **The rail and the prose scroll side by side**, not nested. Neither needs
@@ -70,8 +70,6 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
   const openChapter = useStore((s) => s.openChapter);
   const editChapterText = useStore((s) => s.editChapterText);
   const setManuscript = useStore((s) => s.setManuscript);
-  const expanded = useStore((s) => s.manuscriptExpanded);
-  const setExpanded = useStore((s) => s.setManuscriptExpanded);
   const railHidden = useStore((s) => s.beatRailHidden);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -198,19 +196,18 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
   const draftName = doc.drafts.find((d) => d.id === draftId)?.name ?? "Main draft";
 
   return (
-    <Shell page={page} fill={expanded} onClose={closeFromScrim}>
+    <Shell page={page} onClose={closeFromScrim}>
       <div
         onMouseDown={stop}
         // A fixed height, not a maximum. See the note at the top of the file:
         // sizing to the content is what made an empty chapter scroll. A piece
         // takes the height the page gives it, for the same reason, and so does
-        // an expanded chapter, which fills the window as a piece fills the page.
+        // a chapter, which fills the window as a piece fills the page (always,
+        // since 2026-11-26: the 980px collapsed size and its toggle are gone).
         className={
           page
             ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-panel"
-            : `flex flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] ${
-                expanded ? "min-w-0 flex-1" : "h-[92vh] w-[min(980px,100%)]"
-              }`
+            : "flex flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] min-w-0 flex-1"
         }
       >
         {/* Header. Not sticky, because nothing scrolls past it: the modal itself
@@ -298,17 +295,6 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
                   <ChapterModeTabs />
                   <div className="ml-auto flex items-center gap-[6px]">
                     <SheetViewToggle view={view} onChange={setView} />
-                    {/* Last, in both modals: the size control is always the
-                        right-most button on its row. */}
-                    {!page && (
-                      <button
-                        onClick={() => setExpanded(!expanded)}
-                        className="rounded-lg border border-rule bg-card px-3 py-[6px] text-[12px] font-medium text-ink hover:border-faint"
-                        title={expanded ? "Narrow the page" : "Widen the page"}
-                      >
-                        {expanded ? "Collapse" : "Expand"}
-                      </button>
-                    )}
                   </div>
                 </>
               }
@@ -398,18 +384,16 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
 /** A modal over the board, or, for a single piece, the page itself. */
 function Shell({
   page,
-  fill,
   onClose,
   children,
 }: {
   page: boolean;
-  fill: boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
   if (page) return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
   return (
-    <Scrim onClose={onClose} z={50} center fill={fill}>
+    <Scrim onClose={onClose} z={50} center fill>
       {children}
     </Scrim>
   );

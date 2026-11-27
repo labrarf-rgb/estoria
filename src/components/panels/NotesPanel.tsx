@@ -1,5 +1,5 @@
 import { useStore } from "@/store/useStore";
-import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, CloseButton } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { RefList, todoProgress } from "@/components/ui/RefList";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -27,8 +27,6 @@ export function NotesPanel() {
   const notesExpanded = useStore((s) => s.textareaExpanded.storyNotes);
   const pieceNotesExpanded = useStore((s) => s.textareaExpanded.chapterNotes);
   const toggleTextarea = useStore((s) => s.toggleTextarea);
-  const panelExpanded = useStore((s) => s.panelExpanded);
-  const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   if (!show) return null;
   const close = () => setPanel("showNotes", false);
   // One walk of the doc for every asset's link count (used by the caption and
@@ -88,7 +86,6 @@ export function NotesPanel() {
 
   return (
     <Drawer
-      expanded={panelExpanded}
       onClose={close}
       header={
         <div className="flex items-center px-[22px] py-5">
@@ -100,7 +97,6 @@ export function NotesPanel() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-[8px]">
-            <SizeButton expanded={panelExpanded} onClick={() => setPanelExpanded(!panelExpanded)} />
             <CloseButton onClick={close} />
           </div>
         </div>
@@ -143,8 +139,8 @@ export function NotesPanel() {
           </div>
           <RefList
             refs={assets}
-            // One column in the side panel, a grid of tiles at full screen.
-            tileMin={panelExpanded ? 230 : undefined}
+            // A grid of tiles (the panel is always full screen).
+            tileMin={230}
             onAdd={(kind, id) => addAsset(kind, id)}
             idPrefix="a"
             onUpdate={(id, patch) => updateAsset(id, patch)}

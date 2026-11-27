@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { Drawer, SizeButton, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, CloseButton } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -38,8 +38,6 @@ export function WorldPanel() {
   const archiveWorldEntry = useStore((s) => s.archiveWorldEntry);
   const unarchiveWorldEntry = useStore((s) => s.unarchiveWorldEntry);
   const askConfirm = useStore((s) => s.askConfirm);
-  const panelExpanded = useStore((s) => s.panelExpanded);
-  const setPanelExpanded = useStore((s) => s.setPanelExpanded);
   const jumpToChapter = useStore((s) => s.jumpToChapter);
   const chapters = useStore((s) => s.doc.chapters);
   const activeBookId = useStore((s) => s.doc.activeBookId);
@@ -49,7 +47,6 @@ export function WorldPanel() {
   const reorder = useTileReorder({
     ids: world.filter((w) => !w.archived).map((w) => w.id),
     onMove: reorderWorldEntry,
-    mode: panelExpanded ? "grid" : "column",
     nameOf: (id) => world.find((w) => w.id === id)?.name || "Untitled entry",
   });
   if (!show) return null;
@@ -115,7 +112,6 @@ export function WorldPanel() {
 
   return (
     <Drawer
-      expanded={panelExpanded}
       onClose={close}
       header={
         <div className="flex items-center px-[22px] py-5">
@@ -127,15 +123,14 @@ export function WorldPanel() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-[8px]">
-            <SizeButton expanded={panelExpanded} onClick={() => setPanelExpanded(!panelExpanded)} />
             <CloseButton onClick={close} />
           </div>
         </div>
       }
     >
-      <div className={`flex flex-col gap-[11px] ${panelExpanded ? "px-[22px] py-[18px]" : "px-[18px] py-[14px]"}`}>
+      <div className="flex flex-col gap-[11px] px-[22px] py-[18px]">
         <div {...reorder.containerProps}>
-          <TileGrid min={panelExpanded ? 230 : undefined}>
+          <TileGrid min={230}>
             {reorder.order.map((id) => {
               const w = entries.find((x) => x.id === id);
               return w ? (
@@ -149,7 +144,7 @@ export function WorldPanel() {
                 {tileFor(draft)}
               </div>
             )}
-            <AddTile onClick={startDraft} disabled={!!draft} grid={panelExpanded}>
+            <AddTile onClick={startDraft} disabled={!!draft}>
               + Add world entry
             </AddTile>
           </TileGrid>

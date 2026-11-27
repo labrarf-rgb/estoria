@@ -35,45 +35,31 @@ export function stop(e: React.MouseEvent) {
 }
 
 /**
- * The frame shared by the three right-hand panels (Characters / World / Notes),
- * in two sizes the user toggles with `SizeButton`:
+ * The frame shared by the three right-hand panels (Characters / World / Notes):
+ * the panel filling the viewport, content capped and centred so lines don't
+ * stretch the width of a wide monitor. It sits in a `Scrim` like every modal,
+ * which keeps the app behind it inert and a second panel from opening over it.
  *
- *  - **side panel** (default) — a 460px column over the right edge, behind the
- *    usual dimmed `Scrim`: the rest of the app is greyed out and inert while a
- *    panel is open, and clicking the backdrop closes it. Because the scrim
- *    covers the toolbar too, this is also what keeps a second panel from being
- *    opened on top of the first — that click closes this one instead.
- *  - **full screen** — the same panel filling the viewport, for when it's the
- *    thing you're working in. It covers everything, so it needs no backdrop of
- *    its own; content is capped and centred so lines don't stretch the width of
- *    a wide monitor.
+ * Expand-only since 2026-11-26: the 460px side panel and its Expand / Collapse
+ * toggle (`SizeButton`, the `panelExpanded` pref) are gone.
  *
  * Header and body are separate slots so the header stays put while the body
- * scrolls, in both sizes.
+ * scrolls.
  */
 export function Drawer({
-  expanded,
   onClose,
   z = 55,
   header,
   children,
 }: {
-  expanded: boolean;
   onClose: () => void;
   z?: number;
   header: ReactNode;
   children: ReactNode;
 }) {
-  const inner = expanded ? "mx-auto w-full max-w-[1180px]" : "w-full";
+  const inner = "mx-auto w-full max-w-[1180px]";
   const panel = (
-    <div
-      onMouseDown={stop}
-      className={
-        expanded
-          ? "absolute inset-0 flex flex-col bg-panel"
-          : "absolute bottom-0 right-0 top-0 flex w-[460px] flex-col border-l border-rule bg-panel shadow-[-20px_0_60px_rgba(0,0,0,0.3)]"
-      }
-    >
+    <div onMouseDown={stop} className="absolute inset-0 flex flex-col bg-panel">
       <div className="shrink-0 border-b border-rule bg-panel">
         <div className={inner}>{header}</div>
       </div>
@@ -86,19 +72,6 @@ export function Drawer({
     <Scrim onClose={onClose} z={z}>
       {panel}
     </Scrim>
-  );
-}
-
-/** Panel size toggle — same wording as the chapter modal's scene-flow control. */
-export function SizeButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title={expanded ? "Shrink back to the side panel" : "Expand to fill the screen"}
-      className="rounded-lg border border-rule bg-card px-[10px] py-[6px] text-[11.5px] font-medium text-ink hover:border-faint"
-    >
-      {expanded ? "Collapse" : "Expand"}
-    </button>
   );
 }
 
