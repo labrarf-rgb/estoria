@@ -102,7 +102,9 @@ function AnthologyBoard() {
 
   return (
     <div
-      className="min-h-0 flex-1 overflow-auto bg-bg"
+      // No bg-bg of its own: the app root under it paints --bg (and Plain's
+      // paper texture), or lets a background scene through.
+      className="scene-dots min-h-0 flex-1 overflow-auto"
       style={{ backgroundImage: "radial-gradient(var(--dot) 1.2px, transparent 1.2px)", backgroundSize: "22px 22px" }}
     >
       <div className="mx-auto flex max-w-[1240px] flex-col gap-[18px] px-[26px] pb-[40px] pt-[22px]">
@@ -207,7 +209,7 @@ function SelectionBar({ ids, sections, clear }: { ids: string[]; sections: strin
     clear();
   };
   return (
-    <div className="fixed bottom-[46px] left-1/2 z-[40] flex w-max max-w-[94vw] -translate-x-1/2 flex-wrap items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]">
+    <div className="scene-bar fixed bottom-[46px] left-1/2 z-[40] flex w-max max-w-[94vw] -translate-x-1/2 flex-wrap items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]">
       <span className="text-[12.5px] font-medium text-ink">
         {n} {n === 1 ? "piece" : "pieces"} selected
       </span>
@@ -528,7 +530,7 @@ function AnthologyPiece() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-rule bg-panel px-[26px] py-[8px] text-[12px] text-soft">
+      <div className="scene-bar flex shrink-0 flex-wrap items-center gap-[8px] border-b border-rule bg-panel px-[26px] py-[8px] text-[12px] text-soft">
         {ch.section && (
           <>
             <span className="italic">{ch.section}</span>

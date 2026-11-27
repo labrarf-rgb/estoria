@@ -426,7 +426,7 @@ export function Timeline() {
               key={`act-${i}`}
               // Card gaps are generous because the link curves are drawn in
               // them — tighten these and the connectors have nowhere to run.
-              className={`relative rounded-2xl bg-panel ${
+              className={`scene-sheet relative rounded-2xl bg-panel ${
                 vertical ? "flex flex-col gap-[52px] p-[28px_13px_16px]" : "flex flex-none gap-[52px] p-[26px_13px_13px]"
               }`}
               style={{ border: "1.5px dashed var(--line)" }}
@@ -545,7 +545,7 @@ export function Timeline() {
                 className={vertical ? "" : "flex h-full flex-none flex-col pl-[22px]"}
               >
                 <div
-                  className={`sticky z-[6] flex items-center gap-[9px] bg-bg ${
+                  className={`scene-bar-bg sticky z-[6] flex items-center gap-[9px] bg-bg ${
                     vertical ? "top-0 p-[15px_2px_9px]" : "left-0 w-max self-start p-[13px_12px_9px_0]"
                   }`}
                 >
@@ -622,7 +622,7 @@ export function Timeline() {
                   )
                 ) : (
                 <div
-                  className={`relative overflow-hidden rounded-xl border border-rule ${
+                  className={`scene-dots relative overflow-hidden rounded-xl border border-rule ${
                     vertical ? "" : "mb-[18px] min-h-0 flex-1"
                   }`}
                   style={{

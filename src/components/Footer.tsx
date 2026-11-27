@@ -520,7 +520,7 @@ export function Footer() {
       : "Click a chapter to map its scenes · drag to rearrange · scroll to zoom";
 
   return (
-    <div className="flex items-center gap-3 border-t border-rule bg-panel px-4 py-[6px] text-[11px] font-medium text-faint">
+    <div className="scene-bar scene-hide-under-modal flex items-center gap-3 border-t border-rule bg-panel px-4 py-[6px] text-[11px] font-medium text-faint">
       <span
         className="flex shrink-0 items-center gap-[6px]"
         style={

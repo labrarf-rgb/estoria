@@ -9,6 +9,7 @@ import { openDriveChooser } from "@/lib/driveSession";
 import { isStandalone } from "@/lib/install";
 import { canCollapse, countParts, formLabel, isPiece } from "@/lib/piece";
 import { canMakeAnthology, isAnthology } from "@/lib/anthology";
+import { LookSettings } from "@/components/LookSettings";
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -20,12 +21,10 @@ export function Toolbar() {
   const pane = useStore((s) => s.timelinePane);
   const setTimelinePane = useStore((s) => s.setTimelinePane);
   const zoom = useStore((s) => s.zoom);
-  const theme = useStore((s) => s.theme);
   const newMenu = useStore((s) => s.newMenu);
 
   const setView = useStore((s) => s.setView);
   const setOrient = useStore((s) => s.setOrient);
-  const toggleTheme = useStore((s) => s.toggleTheme);
   const zoomIn = useStore((s) => s.zoomIn);
   const zoomOut = useStore((s) => s.zoomOut);
   const setPanel = useStore((s) => s.setPanel);
@@ -121,7 +120,7 @@ export function Toolbar() {
 
   return (
     <div
-      className="relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="scene-bar scene-hide-under-modal relative z-30 flex items-center gap-[10px] overflow-x-auto border-b border-rule bg-panel px-4 py-[8px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Brand wordmark */}
       <span className="shrink-0 select-none font-serif text-[21px] font-semibold italic tracking-tight text-ink">
@@ -569,16 +568,8 @@ export function Toolbar() {
               </div>
             </div>
           )}
-          <button
-            onClick={toggleTheme}
-            className="flex items-center justify-between rounded-lg px-[11px] py-[9px] text-left hover:bg-chip"
-          >
-            <span className="text-[12.5px] font-semibold text-ink">Theme</span>
-            <span className="flex items-center gap-[6px] text-[11px] font-medium text-soft">
-              <ThemeIcon theme={theme} />
-              {theme === "dark" ? "Dark" : "Light"}
-            </span>
-          </button>
+          {/* Theme (Light / Dark / Auto) and Background (the scene). */}
+          <LookSettings />
           {/* Where this device backs up: connect Google Drive, or change or disconnect it. */}
           {driveAvailableHere() && (
             <MenuItem
@@ -626,43 +617,6 @@ export function Toolbar() {
         </Popover>
       </div>
     </div>
-  );
-}
-
-/**
- * The theme button's glyph, matching the portfolio site: a moon while the light
- * theme is on (click for dark), a sun while the dark theme is on.
- */
-function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
-  const props = {
-    width: 15,
-    height: 15,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  if (theme === "dark") {
-    return (
-      <svg {...props}>
-        <circle cx="12" cy="12" r="5" />
-        <line x1="12" y1="1" x2="12" y2="3" />
-        <line x1="12" y1="21" x2="12" y2="23" />
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-        <line x1="1" y1="12" x2="3" y2="12" />
-        <line x1="21" y1="12" x2="23" y2="12" />
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...props}>
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
   );
 }
 

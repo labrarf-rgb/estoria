@@ -32,9 +32,18 @@ import { PaceModal } from "@/components/modals/PaceModal";
 import { InstallModal } from "@/components/modals/InstallModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { UpdateToast } from "@/components/UpdateToast";
+import { SceneBackground } from "@/components/backgrounds";
+import { paperTile } from "@/components/backgrounds/paper";
+import { sceneToShow } from "@/lib/look";
 
 export function App() {
   const theme = useStore((s) => s.theme);
+  const themeMode = useStore((s) => s.themeMode);
+  const tickAutoTheme = useStore((s) => s.tickAutoTheme);
+  const sceneLight = useStore((s) => s.sceneLight);
+  const sceneDark = useStore((s) => s.sceneDark);
+  const shufflePicks = useStore((s) => s.shufflePicks);
+  const scene = sceneToShow({ sceneLight, sceneDark }, shufflePicks, theme);
   const openCh = useStore((s) => s.openCh);
   const seriesMode = useStore((s) => s.doc.seriesMode);
   const level = useStore((s) => s.level);
@@ -59,13 +68,42 @@ export function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Plain's paper texture, painted once per theme (index.css `.scene-paper`).
+  useEffect(() => {
+    const url = paperTile(theme);
+    document.documentElement.style.setProperty("--paper", url ? `url(${url})` : "none");
+  }, [theme]);
+
+  // Auto theme follows the clock: checked now, about once a minute, and when
+  // the tab comes back (a laptop opened at night after a day asleep).
+  useEffect(() => {
+    if (themeMode !== "auto") return;
+    tickAutoTheme();
+    const iv = window.setInterval(tickAutoTheme, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tickAutoTheme();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [themeMode, tickAutoTheme]);
+
   return (
     <div
       data-theme={theme}
-      className="fixed inset-0 flex flex-col overflow-hidden bg-bg text-ink"
+      // With a scene on, the root lets it through (the scene layer sits behind
+      // the app, fixed to the viewport). On Plain it paints --bg as always.
+      className={`scene-paper fixed inset-0 flex flex-col overflow-hidden text-ink ${scene === "plain" ? "bg-bg" : ""}`}
     >
+      <SceneBackground scene={scene} theme={theme} />
       <Toolbar />
-      {piece ? <PieceView /> : anthology ? <AnthologyView /> : onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
+      {/* `contents`: no box of its own, it only hides the view behind a
+          full-window modal while a scene is on (index.css). */}
+      <div className="scene-hide-under-modal contents">
+        {piece ? <PieceView /> : anthology ? <AnthologyView /> : onSeriesMap ? <SeriesMap /> : onTimeline ? <Timeline /> : <Board />}
+      </div>
       <Footer />
 
       {/* The chapter modal catches its own errors, because the board behind it

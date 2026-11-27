@@ -1,4 +1,34 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
+
+/*
+ * Full-window backdrops (`fill`) open now, oldest first. Under a background
+ * scene a fill backdrop is clear (index.css), which is right for the first
+ * one; one that opens over another (a panel over the chapter: + New character
+ * inside a chapter) must still dim what is under it, or two see-through
+ * sheets read as one. So each fill backdrop knows whether it is stacked.
+ */
+const fillStack: symbol[] = [];
+const fillListeners = new Set<() => void>();
+
+function useStackedFill(active: boolean): boolean {
+  const [id] = useState(() => Symbol("scrim"));
+  const [stacked, setStacked] = useState(false);
+  // Layout effect, so the attribute is right before the first paint.
+  useLayoutEffect(() => {
+    if (!active) return;
+    fillStack.push(id);
+    const update = () => setStacked(fillStack.indexOf(id) > 0);
+    fillListeners.add(update);
+    fillListeners.forEach((fn) => fn());
+    return () => {
+      const i = fillStack.indexOf(id);
+      if (i >= 0) fillStack.splice(i, 1);
+      fillListeners.delete(update);
+      fillListeners.forEach((fn) => fn());
+    };
+  }, [active, id]);
+  return active && stacked;
+}
 
 /** Dimmed full-screen backdrop. Clicking it calls onClose. */
 export function Scrim({
@@ -16,9 +46,15 @@ export function Scrim({
    *  still shows round the edge (an expanded chapter). Wins over `center`. */
   fill?: boolean;
 }) {
+  const stacked = useStackedFill(fill);
   return (
     <div
       onMouseDown={onClose}
+      // Background scenes key on these (index.css): no blur under a scene, and
+      // a "fill" backdrop goes clear with the app hidden behind it, unless it
+      // is stacked on another, when it keeps its dim over the one below.
+      data-scrim={fill ? "fill" : center ? "center" : "plain"}
+      data-stacked={stacked ? "" : undefined}
       className={`fixed inset-0 backdrop-blur-[2px] ${
         fill ? "flex p-[16px]" : center ? "flex items-center justify-center p-[30px]" : ""
       }`}

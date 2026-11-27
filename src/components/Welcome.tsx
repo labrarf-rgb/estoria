@@ -41,6 +41,8 @@ export function Welcome() {
 
   return (
     <div
+      // A backdrop: background scenes drop its blur (index.css).
+      data-scrim="center"
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.6)", backdropFilter: "blur(3px)" }}
     >
@@ -144,6 +146,8 @@ function summarize(chapters: number, characters: number, world: number): string 
 function Restoring() {
   return (
     <div
+      // A backdrop: background scenes drop its blur (index.css).
+      data-scrim="center"
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.6)", backdropFilter: "blur(3px)" }}
     >

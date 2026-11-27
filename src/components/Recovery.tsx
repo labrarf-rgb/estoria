@@ -83,6 +83,8 @@ export function Recovery() {
 
   return (
     <div
+      // A backdrop: background scenes drop its blur (index.css).
+      data-scrim="center"
       className="fixed inset-0 z-[95] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.72)", backdropFilter: "blur(3px)" }}
     >

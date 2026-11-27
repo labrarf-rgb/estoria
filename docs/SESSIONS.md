@@ -6606,3 +6606,132 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   full-screen header (`100vh-150px`) and gave a ~25px scrollbar at 1920x1080;
   now `100vh-176px` (the frame's 16px margins, border and ~141px header). Body
   scroll height equals its height at 1920x1080 and 1280x720.
+
+### 2026-11-27 — Background scenes, phase 3a: engine, picker, prefs, Auto by clock (branch `claude/backgrounds`)
+
+- **From the approved mockup** (`docs/backgrounds/mockup/`, six rounds with Ray;
+  plan in `PROJECT.md`). Phase 3a is the engine, the scenes, the prefs and the
+  Settings controls; the surface work (translucent panels, the board hidden
+  behind modals, the chapter modal at 40%, the dot grid, Plain's paper
+  texture) is phase 3b, after the panels-as-modal build merges.
+- **Ported from TTePub** into `src/components/backgrounds/`: `engine.ts`,
+  `sun.ts`, `scenes.ts` (plus Starry night and Sunny day as a pair),
+  `SceneBackground.tsx`, `starry.ts` and `snow.ts` (warm colors only),
+  `rain.ts` (half speed, short varied streaks, slanting down and to the right
+  as in the mockup), `underwater.ts` (no caustics),
+  `sunny.ts` (the mockup's round 2 look on TTePub's clock and easing),
+  `sky.ts` (the mockup's warm stops). The engine gained one thing: it refits
+  when devicePixelRatio changes (another monitor, browser zoom).
+- **Prefs:** `themeMode`, `sceneLight`, `sceneDark` in the shell beside
+  `theme`; Shuffle picks made fresh per app open, never stored. Rules in
+  `src/lib/look.ts`: Auto by clock (6:00 to 17:59 light), pairing, Shuffle.
+  A shell from before keeps its theme as the mode (`readLookPrefs`, called
+  from the persist `merge`); each stored scene is checked against its own
+  theme (a scene from the other theme becomes its counterpart); under Auto
+  the clock sets the theme on load, so a reload across 6:00 or 18:00 is
+  right at once. No project-file change. `toggleTheme` removed (nothing
+  called it once Theme became a segment).
+- **UI:** `LookSettings.tsx` in the Settings popover: Theme as Light / Dark /
+  Auto, then the Background dropdown (Plain, the theme's scenes, Shuffle).
+  `App.tsx` mounts the layer, runs the Auto tick (on open, every minute, on
+  tab return) and drops the root's `bg-bg` while a scene is on. `index.css`:
+  `--bg-deep` in both themes, and `body` paints `--bg` under the layer.
+- **Verified:** `npm run typecheck`; `npm test` 409 (67 new in
+  `look.test.ts`, `scenes.test.ts`, `sun.test.ts`, `engine.test.ts`);
+  `npm run build`. `engine.test.ts` ports TTePub's `runScene` test to Node
+  fakes (30 fps ticks, pause when hidden, cleanup, reduced-motion still
+  frame and its refresh, live motion change, devicePixelRatio refit).
+  TTePub's component tests (layer on body, swap, StrictMode, unmount) need
+  jsdom and @testing-library/react, which Estoria does not have; not ported. In the
+  in-app browser on the sample: Sunny day draws behind the board with the
+  root transparent and the layer at z-index -1; Dark switched it to Starry
+  night (the pair) with the dark scenes in the dropdown; Auto at 0:20 went
+  dark; Shuffle set both themes and showed a dark scene; the shell stored
+  the three prefs and no picks; Plain restored the opaque root. No console
+  errors from the app (only the Drive auth dev server on :3000 being down).
+  Not committed. A dev-server entry `estoria-backgrounds` (port 5184) was
+  added to `~/WebAppProjects/.claude/launch.json`, outside the repo.
+
+### 2026-11-27 — Background scenes, phase 3b: the surfaces under a scene (branch `claude/backgrounds`)
+
+- **Ray asked for 3b now**, before the panels-as-modal branch merges, after
+  noticing the mockup's transparency was missing from 3a. Done without
+  touching the files that branch changes, apart from `Scrim` (a
+  `data-scrim` attribute only; that branch edits `Drawer` and `CloseButton`
+  in the same file, in other hunks).
+- **CSS hooks in `index.css`**, all under `:root[data-scene]`: `.scene-bar`
+  (88% `--panel`), `.scene-bar-bg` (88% `--bg`), `.scene-sheet` (40%),
+  `.scene-rail` (45% `--bg`), `.scene-sheet-head` (no fill), `.scene-dots`
+  (grid off), `.scene-hide-under-modal`; `[data-scrim]` loses its blur, and a
+  `fill` backdrop goes clear with its child at 40%. Plain's paper texture
+  (`paper.ts`, round 4 values) on the app root via `--paper`.
+- **Hooks placed on:** Toolbar, Footer, Board (grid, selection bar),
+  ChapterDetail (sticky header as a bar, canvas as a rail, page as a sheet),
+  ManuscriptModal (header, both rails, page), Timeline (act bands, sticky
+  headers, scene panes), SeriesMap (grid), AnthologyView (grid, bars; its
+  `bg-bg` removed), PieceView (placeholder), App (paper, the view wrapped in
+  a `contents` div to hide it under a full-window modal).
+- **After the panels merge:** their `Drawer` already uses `Scrim fill` and
+  `role="dialog"`, so the frame, the clear backdrop and the header pick the
+  treatment up with no change; the relationship chart's `--bg` and grid need
+  hooks then.
+- **Verified:** `npm run typecheck`, `npm test` 409, `npm run build`. In the
+  in-app browser: on Snowy day the toolbar is 88%, the board grid is off and
+  the root has no paper; opening a chapter makes the backdrop clear with no
+  blur, hides the toolbar and board, and the frame is 40% with snow showing
+  through and round it; the manuscript face matches the mockup (tinted rail,
+  solid beat cards); the timeline's bands are 40%, headers 88%, panes
+  gridless. On Plain: the paper is on the root, the grid is back, and an open
+  chapter is opaque over the dimmed, blurred board as before. No app console
+  errors. Not committed.
+
+### 2026-11-27 — Background scenes, 3b finished on top of panels-as-modal (branch `claude/backgrounds`)
+
+- **Merged main in** (3ddd8d6, panels-as-modal) with the work uncommitted:
+  backup of the diff and untracked files in the session scratchpad, a
+  tagged stash, a fast-forward, then the stash re-applied. `Overlay.tsx`
+  merged cleanly (the panels changed `Drawer` and `CloseButton`, this branch
+  only `Scrim`'s `data-scrim`), so the panels' frame, header, Close label and
+  backdrop click stand beside the scene hooks. `SESSIONS.md` conflicted:
+  both entries kept. `SPECS.md` merged on its own.
+- **Panels under a scene:** 40%, the chapter modal's level (the mockup's
+  rule: panels follow the chapter modal). Nothing new was needed for the
+  frame, the clear backdrop, the hidden board or the header: `Drawer` uses
+  `Scrim fill` and `role="dialog"`, which the 3b CSS already covers.
+- **Relationship chart:** canvas `--bg` moved from inline to `bg-bg` and
+  given `.scene-rail .scene-dots`; its side column `.scene-sheet-head`.
+- **Verified:** typecheck, `npm test` 409, build. In the in-app browser on
+  Rainy day (light), Starry night (dark) and Plain: Characters, World and
+  Notes have a clear, unblurred backdrop, a hidden toolbar and board, a 40%
+  frame and an unfilled header under a scene, and are exactly as on main on
+  Plain; the chart's canvas is tinted with no dots under Starry night and
+  `--bg` with dots on Plain; the chapter modal and the Timeline (40% bands,
+  88% headers) as before. No app console errors. Not committed.
+
+### 2026-11-27 — Background scenes, review fixes (branch `claude/backgrounds`)
+
+- **Hidden dialogs (high):** the Footer renders `SyncConflictModal` and
+  `DriveLinkModal`, and `Scrim` is not portaled, so with a scene on and a
+  chapter or panel open `.scene-hide-under-modal` hid them. Now
+  `[data-scrim]` sets `visibility: visible` under a scene, which a
+  descendant may do inside a hidden ancestor. Audit: every other modal is
+  rendered at App level or portaled (Popover, DetailWindow, the tile drag
+  ghost); only the Footer's two sit in a hidden region.
+- **Stacked modals (medium):** `Scrim` keeps a small stack of open fill
+  backdrops (`useStackedFill`, a layout effect so it is right before the
+  first paint); one over another gets `data-stacked`, keeps its dim with no
+  blur, and its frame is 88%, so the chapter under a panel opened from it
+  does not read through.
+- **Piece page (low):** one 40% sheet on the story map face, as on the
+  manuscript face (the inner frame and header have no fill).
+- **Welcome and Recovery (low):** `data-scrim="center"`; the no-blur rule is
+  `!important` to beat their inline blur.
+- **Verified:** typecheck, `npm test` 409, build. In the in-app browser on
+  Snowy night: with a chapter open the Footer is hidden but a backdrop
+  placed inside it is visible, unblurred and takes the click (the real sync
+  conflict and Drive link dialogs need a Drive account, so this was a probe
+  in their place); + Create new character from the chapter's Characters tab
+  opens the panel stacked (dim 0.46, no blur, frame 88%) over the clear
+  chapter, and closing it returns the chapter to unstacked; a new short
+  story's page is a single 40% sheet on Map and Write. No app console
+  errors. Not committed.

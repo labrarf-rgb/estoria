@@ -96,6 +96,16 @@ import {
 import { TEMPLATES } from "@/lib/templates";
 import { downloadProjectFile, normalizeDoc, reconcileWords, zustandStorage } from "@/store/persistence";
 import { markHydrated } from "@/store/hydration";
+import {
+  autoTheme,
+  chooseScene as chooseScenePrefs,
+  freshShufflePicks,
+  lookPrefsToStore,
+  readLookPrefs,
+  type SceneChoice,
+  type ShufflePicks,
+  type ThemeMode,
+} from "@/lib/look";
 
 export type View = "board" | "timeline";
 export type Theme = "light" | "dark";
@@ -138,7 +148,21 @@ export type ChapterMode = "map" | "manuscript";
 export type TextareaKey = "storyNotes" | "chapterNotes" | "worldDesc" | "worldNotes";
 
 interface UiState {
+  /** The theme on screen. Under Auto it follows the clock (see `themeMode`). */
   theme: Theme;
+  /**
+   * Light, Dark, or Auto (light from 6:00 to 17:59, dark otherwise, as in
+   * TTePub). A local pref in the shell, never in the project file.
+   */
+  themeMode: ThemeMode;
+  /**
+   * The background scene chosen for each theme, or Shuffle. Local prefs in the
+   * shell, never in the project file. See `lib/look.ts` for the rules.
+   */
+  sceneLight: SceneChoice;
+  sceneDark: SceneChoice;
+  /** Shuffle's pick for each theme: made fresh each time the app opens, never stored. */
+  shufflePicks: ShufflePicks;
   view: View;
   level: Level;
   timelineOrient: TimelineOrient;
@@ -554,7 +578,12 @@ interface StoreState extends UiState {
   setMainDraft: (id: string) => void;
 
   // ---- ui ----
-  toggleTheme: () => void;
+  /** Light, Dark or Auto. Auto applies the clock's theme at once. */
+  setThemeMode: (mode: ThemeMode) => void;
+  /** Auto: re-check the clock. App calls this about once a minute and when the tab comes back. */
+  tickAutoTheme: () => void;
+  /** The Background dropdown in Settings, for the theme on screen. Pairs and shuffles as `lib/look.ts` says. */
+  chooseScene: (choice: SceneChoice) => void;
   setView: (v: View) => void;
   setOrient: (o: TimelineOrient) => void;
   setTimelinePane: (p: TimelinePane) => void;
@@ -860,6 +889,10 @@ const renumber = (chapters: Chapter[]): Chapter[] =>
 
 const initialUi: UiState = {
   theme: "light",
+  themeMode: "light",
+  sceneLight: "plain",
+  sceneDark: "plain",
+  shufflePicks: freshShufflePicks(),
   view: "board",
   level: "book",
   timelineOrient: "vertical",
@@ -2838,7 +2871,24 @@ export const useStore = create<StoreState>()(
         ),
 
       // ---- ui ----
-      toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
+      setThemeMode: (mode) =>
+        set(() => ({ themeMode: mode, theme: mode === "auto" ? autoTheme(new Date()) : mode })),
+      tickAutoTheme: () =>
+        set((s) => {
+          if (s.themeMode !== "auto") return s;
+          const theme = autoTheme(new Date());
+          return theme === s.theme ? s : { theme };
+        }),
+      chooseScene: (choice) =>
+        set((s) => {
+          const out = chooseScenePrefs(
+            { sceneLight: s.sceneLight, sceneDark: s.sceneDark },
+            s.shufflePicks,
+            s.theme,
+            choice,
+          );
+          return { ...out.prefs, shufflePicks: out.picks };
+        }),
       setView: (v) => set({ view: v }),
       setOrient: (o) => set({ timelineOrient: o }),
       setTimelinePane: (p) => set({ timelinePane: p }),
@@ -3038,6 +3088,8 @@ export const useStore = create<StoreState>()(
         doc: s.doc,
         projectStash: s.projectStash,
         theme: s.theme,
+        // themeMode, sceneLight, sceneDark; never the Shuffle picks (lib/look.ts).
+        ...lookPrefsToStore(s),
         authorDefault: s.authorDefault,
         relationshipKindsDefault: s.relationshipKindsDefault,
         charsView: s.charsView,
@@ -3056,7 +3108,12 @@ export const useStore = create<StoreState>()(
       merge: (persisted, current) => {
         const p = { ...((persisted as Record<string, unknown> | undefined) ?? {}) };
         for (const k of RETIRED_PREFS) delete p[k];
-        return { ...current, ...p };
+        // The look prefs are read back defensively (see readLookPrefs). Under
+        // Auto the stored theme may be stale (a reload across 6:00 or 18:00),
+        // so the clock decides it before the first paint.
+        const look = readLookPrefs(p);
+        const merged = { ...current, ...p, ...look } as StoreState;
+        return look.themeMode === "auto" ? { ...merged, theme: autoTheme(new Date()) } : merged;
       },
       // On a schema bump, convert the persisted document (and every stashed
       // project) through `normalizeDoc`, which understands all older shapes.

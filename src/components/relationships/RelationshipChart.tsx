@@ -260,9 +260,10 @@ export function RelationshipChart({ onOpenCard }: { onOpenCard: (id: string) => 
   return (
     <div className="grid min-h-[520px] grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
       <div
-        className="relative min-w-0 border-b border-rule md:border-b-0 md:border-r"
+        // bg-bg as a class, not inline, so a background scene can tint it like
+        // the other canvases (index.css `.scene-rail`, `.scene-dots`).
+        className="scene-rail scene-dots relative min-w-0 border-b border-rule bg-bg md:border-b-0 md:border-r"
         style={{
-          backgroundColor: "var(--bg)",
           backgroundImage: "radial-gradient(var(--dot) 1.2px, transparent 1.2px)",
           backgroundSize: "22px 22px",
         }}
@@ -454,7 +455,7 @@ export function RelationshipChart({ onOpenCard }: { onOpenCard: (id: string) => 
         </div>
       </div>
 
-      <aside className="flex min-w-0 flex-col gap-[16px] bg-panel p-[18px]" aria-live="polite">
+      <aside className="scene-sheet-head flex min-w-0 flex-col gap-[16px] bg-panel p-[18px]" aria-live="polite">
         <SidePanel
           sel={sel ? rels.find((r) => r.id === sel) ?? null : null}
           focus={focus ? byId(focus) ?? null : null}

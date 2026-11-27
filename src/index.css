@@ -36,6 +36,10 @@
   --sw-8: oklch(0.56 0.08 200);
   --sw-9: oklch(0.57 0.09 115);
   --sw-10: oklch(0.52 0.06 45);
+  /* The deepest page tone, used only by the background scenes' dark skies
+     (components/backgrounds/sky.ts). Light skies never go below --bg; this
+     matches --rule for completeness. */
+  --bg-deep: #e1d6bf;
 }
 
 /*
@@ -84,6 +88,8 @@
   --sw-8: oklch(0.64 0.07 200);
   --sw-9: oklch(0.65 0.08 115);
   --sw-10: oklch(0.61 0.05 45);
+  /* Between --dot and --bg (about L 0.225): the top of the dark scene skies. */
+  --bg-deep: #1e1a15;
 }
 
 @theme inline {
@@ -122,6 +128,88 @@ body,
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Painted on the root canvas, under the background scene layer (z-index -1).
+     Keep <html> itself without a background, or this stops propagating and
+     covers the scene. */
+  background: var(--bg);
+}
+
+/*
+ * Background scenes: how each surface behaves while a scene is on. <html>
+ * carries `data-scene` while a scene layer is mounted (SceneBackground.tsx);
+ * on Plain none of this applies and every surface is as it always was. The
+ * classes are hooks on the surfaces; the values are Ray's from the approved
+ * mockup (docs/backgrounds/mockup/NOTES.md). No backdrop-filter anywhere: a
+ * blur over a moving layer repaints every frame.
+ */
+:root {
+  /* Bars: toolbar, footer, floating action bars, sticky headers. */
+  --scene-bar-a: 88%;
+  /* Sheets: modal frames, a piece's page, the timeline's act bands. */
+  --scene-sheet-a: 40%;
+  /* Inner columns on a sheet (the beat rail, the scene canvas): a light --bg tint. */
+  --scene-rail-a: 45%;
+}
+:root[data-scene] .scene-bar {
+  background-color: color-mix(in oklab, var(--panel) var(--scene-bar-a), transparent);
+}
+:root[data-scene] .scene-bar-bg {
+  background-color: color-mix(in oklab, var(--bg) var(--scene-bar-a), transparent);
+}
+:root[data-scene] .scene-sheet {
+  background-color: color-mix(in oklab, var(--panel) var(--scene-sheet-a), transparent);
+}
+:root[data-scene] .scene-rail {
+  background-color: color-mix(in oklab, var(--bg) var(--scene-rail-a), transparent);
+}
+/* A header or column on a sheet that nothing scrolls under: no fill of its own (two layers would add up). */
+:root[data-scene] .scene-sheet-head {
+  background-color: transparent;
+}
+/* The dot grid is for Plain only. The grids are inline styles, hence !important. */
+:root[data-scene] .scene-dots {
+  background-image: none !important;
+}
+/*
+ * Every backdrop drops its blur under a scene (Welcome and Recovery set theirs
+ * inline, hence !important); centred dialogs keep the dim. A backdrop is never
+ * hidden by `.scene-hide-under-modal` below: a dialog rendered inside a hidden
+ * region (the Footer's sync conflict and Drive link dialogs) must still show
+ * and take clicks, and `visibility` lets a descendant opt back in.
+ */
+:root[data-scene] [data-scrim] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  visibility: visible;
+}
+/*
+ * A full-window modal (the chapter, and the panels in their chapter frame):
+ * the backdrop is clear and the app behind it is hidden, so the scene shows
+ * round the modal instead of a dimmed board. One stacked on another (a panel
+ * opened from inside the chapter) keeps its dim, unblurred, over the one
+ * below, as on Plain. The frame, the backdrop's child, is a sheet, and a
+ * dialog's first child (the panels' header) has no fill.
+ */
+:root[data-scene] [data-scrim="fill"]:not([data-stacked]) {
+  background: transparent !important;
+}
+:root[data-scene] [data-scrim="fill"] > * {
+  background-color: color-mix(in oklab, var(--panel) var(--scene-sheet-a), transparent);
+}
+:root[data-scene] [data-scrim="fill"][data-stacked] > * {
+  /* Stacked: a bar's opacity, so the modal below (dimmed) doesn't read through. */
+  background-color: color-mix(in oklab, var(--panel) var(--scene-bar-a), transparent);
+}
+:root[data-scene] [data-scrim="fill"] > [role="dialog"] > :first-child {
+  background-color: transparent;
+}
+:root[data-scene]:has([data-scrim="fill"]) .scene-hide-under-modal {
+  visibility: hidden;
+}
+/* Plain's paper texture (components/backgrounds/paper.ts), under the dot grid. */
+:root:not([data-scene]) .scene-paper {
+  background-image: var(--paper, none);
+  background-size: 360px 360px;
 }
 
 ::-webkit-scrollbar {

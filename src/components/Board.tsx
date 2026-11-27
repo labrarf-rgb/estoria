@@ -411,7 +411,7 @@ export function Board() {
     <div
       ref={viewportRef}
       onMouseDown={onCanvasDown}
-      className="relative flex-1 overflow-hidden"
+      className="scene-dots relative flex-1 overflow-hidden"
       style={{
         backgroundImage: "radial-gradient(var(--dot) 1px, transparent 1px)",
         backgroundSize: "24px 24px",
@@ -588,7 +588,7 @@ export function Board() {
       {selected.size > 0 && (
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute bottom-[22px] left-1/2 flex -translate-x-1/2 items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
+          className="scene-bar absolute bottom-[22px] left-1/2 flex -translate-x-1/2 items-center gap-[10px] rounded-2xl border border-rule bg-panel px-[16px] py-[11px] shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
         >
           <span className="text-[12.5px] font-medium text-ink">
             {selected.size} {selected.size === 1 ? "chapter" : "chapters"} selected

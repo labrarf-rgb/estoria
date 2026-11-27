@@ -644,14 +644,17 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
         // since 2026-11-26: the 980px collapsed size and its toggle are gone.
         className={
           page
-            ? "min-h-full bg-panel"
+            ? // A piece's page: the Shell around it is the one 40% sheet, as the manuscript's page is.
+              "scene-sheet-head min-h-full bg-panel"
             : "overflow-auto rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] flex min-w-0 flex-1 flex-col"
         }
       >
         {/* Header */}
         <div
+          // Under a scene: a bar (88%) in the modal, which scrolls under this
+          // sticky header; no fill on a piece's page, where nothing does.
           className={`flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px] ${
-            page ? "" : "sticky top-0 z-[2]"
+            page ? "scene-sheet-head" : "scene-bar sticky top-0 z-[2]"
           }`}
         >
           {!page && (
@@ -1200,7 +1203,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
         <>
         <div
           ref={sceneBoxRef}
-          className={`mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg [scrollbar-gutter:stable] ${
+          className={`scene-rail scene-dots mx-[22px] isolate overflow-auto rounded-xl border border-rule bg-bg [scrollbar-gutter:stable] ${
             // Whatever height the modal has left, never under 320px; an open
             // reference tab pushes it down, and past the floor the modal
             // scrolls instead.
@@ -1509,7 +1512,7 @@ function Shell({
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (page) return <div className="min-h-0 flex-1 overflow-auto bg-panel">{children}</div>;
+  if (page) return <div className="scene-sheet min-h-0 flex-1 overflow-auto bg-panel">{children}</div>;
   return (
     <Scrim onClose={onClose} z={50} center fill>
       {children}

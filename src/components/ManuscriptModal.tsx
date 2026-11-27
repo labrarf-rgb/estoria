@@ -206,7 +206,7 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
         // since 2026-11-26: the 980px collapsed size and its toggle are gone).
         className={
           page
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-panel"
+            ? "scene-sheet flex min-h-0 flex-1 flex-col overflow-hidden bg-panel"
             : "flex flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)] min-w-0 flex-1"
         }
       >
@@ -217,7 +217,7 @@ export function ManuscriptModal({ ch, page = false }: { ch: Chapter; page?: bool
             and the folded rail's tabs wrapped to a line of their own beside
             plenty of empty header. */}
         <div
-          className={`grid shrink-0 items-start gap-x-[14px] border-b border-rule bg-panel px-[26px] py-[22px] ${
+          className={`scene-sheet-head grid shrink-0 items-start gap-x-[14px] border-b border-rule bg-panel px-[26px] py-[22px] ${
             page ? "grid-cols-[minmax(240px,1fr)_auto]" : "grid-cols-[auto_minmax(240px,1fr)_auto]"
           }`}
         >
@@ -420,7 +420,7 @@ function BeatRail({ ch }: { ch: Chapter }) {
   const nouns = pieceNouns(doc, ch);
 
   return (
-    <aside className="flex shrink-0 flex-col border-r border-rule bg-bg" style={{ width: RAIL_W }}>
+    <aside className="scene-rail flex shrink-0 flex-col border-r border-rule bg-bg" style={{ width: RAIL_W }}>
       {/* The count and the fold. The mode tabs that used to head the rail are
           on the meta line, where folding the rail cannot move them. */}
       <div className="shrink-0 px-[16px] pb-[8px] pt-[14px]">
@@ -474,7 +474,7 @@ function FoldedRail({ count, ch }: { count: number; ch: Chapter }) {
   const doc = useStore((s) => s.doc);
   const nouns = pieceNouns(doc, ch);
   return (
-    <aside className="flex w-[38px] shrink-0 flex-col items-center gap-[12px] border-r border-rule bg-bg pt-[14px]">
+    <aside className="scene-rail flex w-[38px] shrink-0 flex-col items-center gap-[12px] border-r border-rule bg-bg pt-[14px]">
       <button
         onClick={() => setRailHidden(false)}
         title={`Show the ${nouns.many}`}

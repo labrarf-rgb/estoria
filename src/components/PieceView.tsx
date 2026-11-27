@@ -26,7 +26,7 @@ export function PieceView() {
     if (chId && openCh !== chId) openChapter(chId);
   }, [chId, openCh, openChapter]);
 
-  if (!chId || openCh !== chId) return <div className="flex-1 bg-panel" />;
+  if (!chId || openCh !== chId) return <div className="scene-sheet flex-1 bg-panel" />;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* The phone shows a piece as a one-chapter book, so a chapter can be
