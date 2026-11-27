@@ -315,7 +315,7 @@ function PieceCard({
       onDragOver={onDragOver}
       onDrop={onDrop}
       aria-pressed={picked}
-      className={`flex min-h-[142px] w-[244px] cursor-grab flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] text-left hover:border-faint focus-visible:outline-2 focus-visible:outline-therefore ${
+      className={`scene-solid flex min-h-[142px] w-[244px] cursor-grab flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] text-left hover:border-faint focus-visible:outline-2 focus-visible:outline-therefore ${
         picked ? "border-therefore" : "border-rule"
       }`}
       style={{ boxShadow: `${edge}var(--shadow)`, opacity: dragging ? 0.4 : 1 }}

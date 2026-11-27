@@ -6735,3 +6735,65 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   chapter, and closing it returns the chapter to unstacked; a new short
   story's page is a single 40% sheet on Map and Write. No app console
   errors. Not committed.
+
+### 2026-11-27 — See-through cards under a scene (branch `claude/see-through-solids`)
+
+- **An experiment Ray kept.** Under a scene, the surfaces that were still
+  solid went see-through at their own level, tried live on a temporary
+  Settings slider from 30% to 100%. Ray chose 40% for all of them; the
+  slider and its pref (`sceneSolidA`) are gone, and the pref is in
+  `RETIRED_PREFS`, so a stored value is dropped on load and never written.
+- **At 40% (`--scene-solid-a`):** cards (`.scene-solid`, `--card`) on the
+  board, series map, timeline (chapters and scenes), story map scene canvas,
+  beat rail, panel tiles (`DetailCard`), anthology board, and the story
+  map's pickers; every `Popover` (Settings included); the tile
+  `DetailWindow` and every centred dialog frame (`--panel`). Form fields,
+  chips, toasts and drag ghosts stay solid. Plain unchanged.
+- **Connector lines stop at card edges** (Ray: lines showing through the
+  cards). `ui/CardCutout.tsx` masks each connector layer with every card's
+  rounded box cut out (board cards' tilt included): board, story map scene
+  canvas, timeline rail and scene panes, series map.
+- **Readability noted during the experiment:** a popover or dialog over a
+  card lets the card's text read through; under Starry night a bright star
+  behind a card drops dark ink to about 3.3:1 at that spot, and summary text
+  further. Not changed; Ray judged 40% by eye.
+- **Verified:** typecheck, `npm test` 410 (1 new: the retired pref is
+  dropped whatever was stored), build. In the in-app browser on a light
+  scene, a dark scene and Plain (see the reply for this session). Not
+  committed.
+
+- **Review fixes (same day):**
+  - *Light dialogs (medium):* a 40% frame over a dimmed board put `--soft` near
+    2.3:1. Now every backdrop (`Scrim`, `DetailWindow`, Welcome, Recovery) is
+    in one layer stack (`OverlayLayer`, `useOverlayLayer`); under a scene all
+    are clear and unblurred, the app hides behind any of them, and covered
+    layers hide too, so only the top frame shows, over the scene. Replaces the
+    stacked dim plus 88% frame. Worst sky stop: light `--soft` 3.99, `--faint`
+    2.18; dark 6.14 / 3.28.
+  - *Mask on Plain (low):* `CardCutout` renders the lines unmasked unless a
+    scene is on.
+  - *Card heights (low):* board and series map cut-outs use measured heights
+    (`useCardHeights`); rect lists memoized (board, series map, timeline rail).
+  - *Verified:* typecheck, tests 410, build; in the in-app browser on Rainy
+    day, Snowy night and Plain: About over the board, a detail window over the
+    Characters panel (panel hidden while it is open, back after), board
+    cut-outs at the measured 149px; Plain dims as before with no mask.
+- **Popovers at 88% (Ray, same day):** under a scene every `Popover` (version
+  menu, File, Settings, sync history, the anthology's four menus) and the
+  story map's inline cast, world and move-to pickers are 88% `--card`
+  (`.scene-pop`), the toolbar's level; cards, windows and dialogs stay 40%.
+- **Final review fixes (same day):**
+  - *Hidden draft window (high):* + Create new character / entry inside a
+    chapter opens the panel and its draft window in one update; the window,
+    a React child, registered in the layer stack first and was taken as
+    covered. The top layer is now decided by z-index, then document order
+    (`lib/layers.ts` `topLayer`, 4 tests incl. the child-first case), from
+    each backdrop's element.
+  - *Cut-outs (low):* story map scene cards' heights measured
+    (`useCardHeights`); `CardCutout` memoizes its mask on the boxes' content.
+    Timeline scene cards already have an exact height.
+  - *Verified:* typecheck, tests 414, build; on Snowy day both create
+    buttons show their draft on top with the chapter and panel hidden, a
+    detail window over a panel and the Delete chapter confirm over the
+    chapter sit alone over the scene, and closing each returns to the layer
+    below. No app console errors. Not committed.

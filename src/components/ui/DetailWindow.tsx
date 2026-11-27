@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@/store/useStore";
-import { stop } from "@/components/ui/Overlay";
+import { OverlayLayer, stop } from "@/components/ui/Overlay";
 
 /**
  * The window a tile opens: a character, a world entry, a library item or a
@@ -63,7 +63,8 @@ export function DetailWindow({
   }, []);
 
   return createPortal(
-    <div
+    <OverlayLayer
+      kind="center"
       onMouseDown={(e) => {
         stop(e);
         onClose();
@@ -78,7 +79,7 @@ export function DetailWindow({
         aria-modal="true"
         aria-label={title}
         onMouseDown={stop}
-        className="flex max-h-full w-full max-w-[620px] flex-col rounded-[14px] border border-rule bg-panel shadow-[0_30px_80px_rgba(0,0,0,0.35)] outline-none"
+        className="scene-solid-panel flex max-h-full w-full max-w-[620px] flex-col rounded-[14px] border border-rule bg-panel shadow-[0_30px_80px_rgba(0,0,0,0.35)] outline-none"
       >
         <div className="flex shrink-0 items-center gap-[10px] border-b border-rule px-[20px] py-[15px]">
           {badge}
@@ -104,7 +105,7 @@ export function DetailWindow({
           </div>
         )}
       </div>
-    </div>,
+    </OverlayLayer>,
     document.body
   );
 }

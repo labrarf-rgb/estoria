@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { readImageForStorage } from "@/lib/files";
 import { BOOK_W, BOOK_H, BOOK_GAP_X, timelineBookPositions, fitBooksToContent } from "@/lib/layout";
+import { CardCutout, useCardHeights } from "@/components/ui/CardCutout";
+
 import type { BookMeta, BookStatus } from "@/types";
 
 const STATUSES: BookStatus[] = ["drafting", "planned", "idea"];
@@ -114,6 +116,16 @@ export function SeriesMap() {
   }
   const posById: Record<string, { x: number; y: number }> = {};
   bookPos.forEach((p) => (posById[p.id] = { x: p.x, y: p.y }));
+
+  // Each book card's real box for the connector cut-outs: cards have only a minHeight.
+  const { heights: bookHeights, refFor: bookRef } = useCardHeights();
+  const posKey = bookPos.map((p) => `${p.id}:${p.x}:${p.y}`).join("|");
+  const cutRects = useMemo(
+    () => bookPos.map((p) => ({ x: p.x, y: p.y, w: BOOK_W, h: bookHeights[p.id] ?? BOOK_H, r: 16 })),
+    // bookPos is rebuilt every render; posKey says when it really changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [posKey, bookHeights],
+  );
 
   const uploadCover = async (id: string, file: File | undefined) => {
     if (!file) return;
@@ -381,13 +393,16 @@ export function SeriesMap() {
       >
         {/* Connectors */}
         <svg width={6000} height={4000} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}>
-          {bookLinks.map((l) => {
-            const a = center(l.fromId);
-            const b = center(l.toId);
-            return (
-              <line key={l.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--soft)" strokeWidth={2} strokeLinecap="round" />
-            );
-          })}
+          {/* Links run center to center: cut them out under every book card. */}
+          <CardCutout rects={cutRects}>
+            {bookLinks.map((l) => {
+              const a = center(l.fromId);
+              const b = center(l.toId);
+              return (
+                <line key={l.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--soft)" strokeWidth={2} strokeLinecap="round" />
+              );
+            })}
+          </CardCutout>
         </svg>
 
         {/* Connector labels (editable, deletable) */}
@@ -458,6 +473,7 @@ export function SeriesMap() {
           return (
             <div
               key={b.id}
+              ref={bookRef(b.id)}
               data-book-card
               onMouseDown={(e) => onCardDown(e, b.id, p.x, p.y, i)}
               onClick={() => onCardClick(b.id)}
@@ -473,7 +489,7 @@ export function SeriesMap() {
               }}
             >
               <div
-                className="flex h-full flex-col gap-[8px] rounded-2xl border bg-card p-[15px]"
+                className="scene-solid flex h-full flex-col gap-[8px] rounded-2xl border bg-card p-[15px]"
                 style={{
                   borderColor:
                     isConnectSource

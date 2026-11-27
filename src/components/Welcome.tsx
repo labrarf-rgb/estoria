@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { docHasContent, useStore } from "@/store/useStore";
 import { useHydrated, useLoadState } from "@/store/hydration";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { OverlayLayer } from "@/components/ui/Overlay";
 
 /** How long a load may take before we say something rather than show nothing. */
 const PATIENCE_MS = 600;
@@ -40,9 +41,10 @@ export function Welcome() {
   const existing = docHasContent(doc);
 
   return (
-    <div
-      // A backdrop: background scenes drop its blur (index.css).
-      data-scrim="center"
+    <OverlayLayer
+      // A backdrop in the overlay stack: under a background scene it is clear,
+      // unblurred, and whatever is behind it is hidden (index.css).
+      kind="center"
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.6)", backdropFilter: "blur(3px)" }}
     >
@@ -123,7 +125,7 @@ export function Welcome() {
           </button>
         </div>
       </div>
-    </div>
+    </OverlayLayer>
   );
 }
 
@@ -145,9 +147,10 @@ function summarize(chapters: number, characters: number, world: number): string 
  */
 function Restoring() {
   return (
-    <div
-      // A backdrop: background scenes drop its blur (index.css).
-      data-scrim="center"
+    <OverlayLayer
+      // A backdrop in the overlay stack: under a background scene it is clear,
+      // unblurred, and whatever is behind it is hidden (index.css).
+      kind="center"
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.6)", backdropFilter: "blur(3px)" }}
     >
@@ -162,6 +165,6 @@ function Restoring() {
           </div>
         </div>
       </div>
-    </div>
+    </OverlayLayer>
   );
 }

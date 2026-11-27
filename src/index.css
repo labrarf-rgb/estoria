@@ -171,41 +171,65 @@ body {
   background-image: none !important;
 }
 /*
- * Every backdrop drops its blur under a scene (Welcome and Recovery set theirs
- * inline, hence !important); centred dialogs keep the dim. A backdrop is never
- * hidden by `.scene-hide-under-modal` below: a dialog rendered inside a hidden
- * region (the Footer's sync conflict and Drive link dialogs) must still show
- * and take clicks, and `visibility` lets a descendant opt back in.
+ * Backdrops under a scene. Every overlay layer (`Scrim`, the tile's
+ * DetailWindow, Welcome, Recovery: ui/Overlay.tsx `OverlayLayer`) is clear,
+ * with no blur (a blur over a moving layer repaints every frame; Welcome and
+ * Recovery set theirs inline, hence !important). Only the top layer shows:
+ * the app (toolbar, view, footer: `.scene-hide-under-modal`) and every layer
+ * below the top (`data-covered`) are hidden rather than dimmed, so each frame
+ * sits over the scene alone, never over other text (Ray's rule for modals).
+ * The top backdrop is never hidden by the rule on the app: a dialog rendered
+ * inside a hidden region (the Footer's sync conflict and Drive link dialogs)
+ * must still show and take clicks, and `visibility` lets a descendant opt
+ * back in.
  */
 :root[data-scene] [data-scrim] {
+  background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   visibility: visible;
 }
-/*
- * A full-window modal (the chapter, and the panels in their chapter frame):
- * the backdrop is clear and the app behind it is hidden, so the scene shows
- * round the modal instead of a dimmed board. One stacked on another (a panel
- * opened from inside the chapter) keeps its dim, unblurred, over the one
- * below, as on Plain. The frame, the backdrop's child, is a sheet, and a
- * dialog's first child (the panels' header) has no fill.
- */
-:root[data-scene] [data-scrim="fill"]:not([data-stacked]) {
-  background: transparent !important;
+:root[data-scene] [data-scrim][data-covered] {
+  visibility: hidden;
 }
+:root[data-scene]:has([data-scrim]) .scene-hide-under-modal {
+  visibility: hidden;
+}
+/*
+ * A full-window modal's frame (the chapter's two faces, the panels in their
+ * chapter frame) is a 40% sheet; a dialog's first child (the panels' header,
+ * which nothing scrolls under) has no fill.
+ */
 :root[data-scene] [data-scrim="fill"] > * {
   background-color: color-mix(in oklab, var(--panel) var(--scene-sheet-a), transparent);
-}
-:root[data-scene] [data-scrim="fill"][data-stacked] > * {
-  /* Stacked: a bar's opacity, so the modal below (dimmed) doesn't read through. */
-  background-color: color-mix(in oklab, var(--panel) var(--scene-bar-a), transparent);
 }
 :root[data-scene] [data-scrim="fill"] > [role="dialog"] > :first-child {
   background-color: transparent;
 }
-:root[data-scene]:has([data-scrim="fill"]) .scene-hide-under-modal {
-  visibility: hidden;
+/*
+ * Cards and the surfaces that float over the app are see-through under a
+ * scene too. Cards, a tile's detail window and centred dialogs at a fixed 40%
+ * (Ray, after trying 30 to 100% on a slider): cards in --card, dialog frames
+ * and the detail window in --panel. Popovers and dropdown menus at 88%, the
+ * toolbar's level (`.scene-pop`, --card): every `Popover`, and the chapter's
+ * inline cast, world and move-to pickers. Connector lines are cut out under
+ * cards (ui/CardCutout.tsx), so a line never shows through one. Plain is
+ * untouched.
+ */
+:root {
+  --scene-solid-a: 40%;
 }
+:root[data-scene] .scene-solid {
+  background-color: color-mix(in oklab, var(--card) var(--scene-solid-a), transparent);
+}
+:root[data-scene] .scene-pop {
+  background-color: color-mix(in oklab, var(--card) var(--scene-bar-a), transparent);
+}
+:root[data-scene] .scene-solid-panel,
+:root[data-scene] [data-scrim="center"] > * {
+  background-color: color-mix(in oklab, var(--panel) var(--scene-solid-a), transparent);
+}
+
 /* Plain's paper texture (components/backgrounds/paper.ts), under the dot grid. */
 :root:not([data-scene]) .scene-paper {
   background-image: var(--paper, none);

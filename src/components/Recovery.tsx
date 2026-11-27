@@ -9,6 +9,7 @@ import {
   type LoadFailure,
 } from "@/store/persistence";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { OverlayLayer } from "@/components/ui/Overlay";
 
 /**
  * What shows when the stored document could not be read.
@@ -82,9 +83,10 @@ export function Recovery() {
     });
 
   return (
-    <div
-      // A backdrop: background scenes drop its blur (index.css).
-      data-scrim="center"
+    <OverlayLayer
+      // A backdrop in the overlay stack: under a background scene it is clear,
+      // unblurred, and whatever is behind it is hidden (index.css).
+      kind="center"
       className="fixed inset-0 z-[95] flex items-center justify-center p-6"
       style={{ background: "rgba(20,14,6,.72)", backdropFilter: "blur(3px)" }}
     >
@@ -159,7 +161,7 @@ export function Recovery() {
           </button>
         </div>
       </div>
-    </div>
+    </OverlayLayer>
   );
 }
 

@@ -789,7 +789,13 @@ const emptyBookData = (): BookData => ({
  * on the next save anyway; stripping them here keeps them out of state in the
  * meantime. UI prefs only: no document field is involved, so no schema bump.
  */
-export const RETIRED_PREFS = ["panelExpanded", "sceneFlowExpanded", "manuscriptExpanded"] as const;
+export const RETIRED_PREFS = [
+  "panelExpanded",
+  "sceneFlowExpanded",
+  "manuscriptExpanded",
+  // The see-through cards experiment's slider (2026-11-27); cards settled at a fixed 40%.
+  "sceneSolidA",
+] as const;
 
 /** Renumber chapters sequentially (1..n) after add/delete. */
 /** Estimated visible scene-canvas width for the chapter modal — used to lay

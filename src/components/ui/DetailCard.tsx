@@ -74,7 +74,7 @@ export function DetailCard({
         }
       }}
       style={{ minHeight }}
-      className={`flex cursor-pointer flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] text-left shadow-[var(--shadow)] outline-none transition-colors hover:border-faint focus-visible:border-faint focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--therefore)_35%,transparent)] ${
+      className={`scene-solid flex cursor-pointer flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] text-left shadow-[var(--shadow)] outline-none transition-colors hover:border-faint focus-visible:border-faint focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--therefore)_35%,transparent)] ${
         highlight ? "border-faint" : "border-rule"
       } ${faded ? "opacity-50" : ""}`}
     >

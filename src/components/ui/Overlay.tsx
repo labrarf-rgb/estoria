@@ -1,33 +1,70 @@
-import { useLayoutEffect, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from "react";
+import { topLayer } from "@/lib/layers";
 
 /*
- * Full-window backdrops (`fill`) open now, oldest first. Under a background
- * scene a fill backdrop is clear (index.css), which is right for the first
- * one; one that opens over another (a panel over the chapter: + New character
- * inside a chapter) must still dim what is under it, or two see-through
- * sheets read as one. So each fill backdrop knows whether it is stacked.
+ * The overlay layers open now: every backdrop (`Scrim`, the tile's
+ * DetailWindow, Welcome, Recovery). Under a background scene only the top one
+ * shows, over the clear scene (index.css): each layer below it, the board
+ * included, is hidden rather than dimmed, so every frame stays a 40% sheet
+ * over the scene and never sits over other text (Ray's rule for modals: hide
+ * what is behind, don't dim it). On Plain this changes nothing.
+ *
+ * "Top" is what is painted on top (z-index, then document order; see
+ * lib/layers.ts), never the order the layers mounted in: React runs a child's
+ * layout effects before its parent's, so a draft window opening in the same
+ * update as its panel registers first.
  */
-const fillStack: symbol[] = [];
-const fillListeners = new Set<() => void>();
+const layers = new Map<symbol, RefObject<HTMLElement | null>>();
+const layerListeners = new Set<() => void>();
 
-function useStackedFill(active: boolean): boolean {
-  const [id] = useState(() => Symbol("scrim"));
-  const [stacked, setStacked] = useState(false);
-  // Layout effect, so the attribute is right before the first paint.
+function zOf(el: HTMLElement): number {
+  const v = parseInt(getComputedStyle(el).zIndex, 10);
+  return Number.isFinite(v) ? v : 0;
+}
+
+function currentTop(): symbol | undefined {
+  const items: { id: symbol; el: HTMLElement }[] = [];
+  layers.forEach((ref, id) => {
+    if (ref.current) items.push({ id, el: ref.current });
+  });
+  return topLayer(
+    items,
+    (x) => zOf(x.el),
+    // a follows b in the document, or sits inside it.
+    (a, b) => (b.el.compareDocumentPosition(a.el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+  )?.id;
+}
+
+/** Registers an open overlay layer by its element; true while another layer is painted above it. */
+export function useOverlayLayer(ref: RefObject<HTMLElement | null>): boolean {
+  const [id] = useState(() => Symbol("layer"));
+  const [covered, setCovered] = useState(false);
+  // Layout effect, so the attribute is right before the first paint. Every
+  // layer re-checks whenever one opens or closes, so the answer is right once
+  // a whole update has committed, whichever effect ran first.
   useLayoutEffect(() => {
-    if (!active) return;
-    fillStack.push(id);
-    const update = () => setStacked(fillStack.indexOf(id) > 0);
-    fillListeners.add(update);
-    fillListeners.forEach((fn) => fn());
+    layers.set(id, ref);
+    const update = () => setCovered(currentTop() !== id);
+    layerListeners.add(update);
+    layerListeners.forEach((fn) => fn());
     return () => {
-      const i = fillStack.indexOf(id);
-      if (i >= 0) fillStack.splice(i, 1);
-      fillListeners.delete(update);
-      fillListeners.forEach((fn) => fn());
+      layers.delete(id);
+      layerListeners.delete(update);
+      layerListeners.forEach((fn) => fn());
     };
-  }, [active, id]);
-  return active && stacked;
+  }, [id, ref]);
+  return covered;
+}
+
+/**
+ * A backdrop element that takes part in the layer stack. `kind` is what the
+ * background-scene CSS keys on: `fill` (a full-window modal), `center` (a
+ * centred dialog) or `plain`.
+ */
+export function OverlayLayer({ kind, ...rest }: { kind: "fill" | "center" | "plain" } & HTMLAttributes<HTMLDivElement>) {
+  const ref = useRef<HTMLDivElement>(null);
+  const covered = useOverlayLayer(ref);
+  return <div {...rest} ref={ref} data-scrim={kind} data-covered={covered ? "" : undefined} />;
 }
 
 /** Dimmed full-screen backdrop. Clicking it calls onClose. */
@@ -46,22 +83,19 @@ export function Scrim({
    *  still shows round the edge (an expanded chapter). Wins over `center`. */
   fill?: boolean;
 }) {
-  const stacked = useStackedFill(fill);
   return (
-    <div
+    <OverlayLayer
       onMouseDown={onClose}
-      // Background scenes key on these (index.css): no blur under a scene, and
-      // a "fill" backdrop goes clear with the app hidden behind it, unless it
-      // is stacked on another, when it keeps its dim over the one below.
-      data-scrim={fill ? "fill" : center ? "center" : "plain"}
-      data-stacked={stacked ? "" : undefined}
+      // Background scenes key on this (index.css): under a scene the backdrop
+      // is clear with no blur, and whatever is behind it is hidden.
+      kind={fill ? "fill" : center ? "center" : "plain"}
       className={`fixed inset-0 backdrop-blur-[2px] ${
         fill ? "flex p-[16px]" : center ? "flex items-center justify-center p-[30px]" : ""
       }`}
       style={{ background: "rgba(20,14,6,.46)", zIndex: z }}
     >
       {children}
-    </div>
+    </OverlayLayer>
   );
 }
 

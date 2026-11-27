@@ -9,6 +9,8 @@ import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
 import { resolveRefs } from "@/lib/refs";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
 import { SCENE_H, SCENE_MARGIN, sceneColumnsForWidth, sceneFit, sceneSlotAt, sceneSlotPos } from "@/lib/layout";
+import { CardCutout, useCardHeights } from "@/components/ui/CardCutout";
+
 import { SCENE_TEXT_MAX } from "@/lib/sceneFit";
 import { ChapterMetaRow, ChapterModeTabs } from "@/components/ChapterMeta";
 import { type ChapterTab } from "@/store/useStore";
@@ -403,6 +405,10 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
     if (Date.now() - openedAt.current < 400) return;
     closeChapter();
   };
+
+  // Each scene card's real height for the connector cut-outs (cards have only
+  // a minHeight). Before the early return: it is a hook.
+  const { heights: sceneHeights, refFor: sceneRef } = useCardHeights();
 
   if (!ch) return null;
 
@@ -844,7 +850,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 </button>
               </div>
               {charAdd && (
-                <div className="mt-[10px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+                <div className="mt-[10px] scene-pop flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
                   {available.map((c) => (
                     <button
                       key={c.id}
@@ -951,7 +957,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 </button>
               </div>
               {worldAdd && (
-                <div className="mt-[10px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+                <div className="mt-[10px] scene-pop flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
                   {available.map((w) => (
                     <button
                       key={w.id}
@@ -1154,7 +1160,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
 
         {/* Destination dropdown — the "Select chapter" menu. */}
         {selectMode && destPickerOpen && selected.size > 0 && (
-          <div className="mx-[26px] mb-[4px] flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
+          <div className="mx-[26px] mb-[4px] scene-pop flex flex-wrap gap-[7px] rounded-xl border border-rule bg-card p-[10px]">
             <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-faint">
               {page ? "Move them where?" : "Move to which chapter?"}
             </span>
@@ -1221,13 +1227,21 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                 height={canvasH}
                 className="pointer-events-none absolute left-0 top-0 overflow-visible"
               >
-                {ch.scenes.slice(0, -1).map((_, i) => {
-                  const a = sceneCenter(i);
-                  const b = sceneCenter(i + 1);
-                  return (
-                    <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--line)" strokeWidth={1.75} />
-                  );
-                })}
+                {/* Links run center to center: cut them out under every card. */}
+                <CardCutout
+                  rects={ch.scenes.map((_, i) => {
+                    const p = positions[i] ?? { x: 0, y: 0 };
+                    return { x: p.x, y: p.y, w: fit.w, h: sceneHeights[`s${i}`] ?? SCENE_H, r: 11 };
+                  })}
+                >
+                  {ch.scenes.slice(0, -1).map((_, i) => {
+                    const a = sceneCenter(i);
+                    const b = sceneCenter(i + 1);
+                    return (
+                      <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--line)" strokeWidth={1.75} />
+                    );
+                  })}
+                </CardCutout>
               </svg>
             )}
 
@@ -1264,6 +1278,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   className={`group absolute z-[5] transition-[left,top] duration-150 ease-out ${
                     selectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
                   }`}
+                  ref={sceneRef(`s${i}`)}
                   style={{ left: slot.pos.x, top: slot.pos.y, width: fit.w, minHeight: SCENE_H }}
                 >
                   {/* Hover the left/right edge of a card to drop a new scene in
@@ -1290,7 +1305,7 @@ export function ChapterDetail({ page = false }: { page?: boolean }) {
                   )}
                   <div
                     data-scene-card
-                    className="flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
+                    className="scene-solid flex h-full flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-faint"
                     style={
                       // Inline only when refused, selected or freshly jumped to
                       // — a permanent inline borderColor would override the

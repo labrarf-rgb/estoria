@@ -59,7 +59,7 @@ export function Popover({
     <>
       <div className="fixed inset-0 z-[59]" onMouseDown={onClose} />
       <div
-        className="fixed z-[60] flex flex-col gap-[2px] overflow-y-auto overscroll-contain rounded-[11px] border border-rule bg-card p-[7px] shadow-[0_16px_44px_rgba(0,0,0,0.32)] [&>*]:shrink-0"
+        className="scene-pop fixed z-[60] flex flex-col gap-[2px] overflow-y-auto overscroll-contain rounded-[11px] border border-rule bg-card p-[7px] shadow-[0_16px_44px_rgba(0,0,0,0.32)] [&>*]:shrink-0"
         style={{ left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, width }}
       >
         {children}

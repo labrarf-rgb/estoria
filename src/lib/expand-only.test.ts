@@ -37,6 +37,14 @@ describe("retired size prefs", () => {
     expect("beatRailHidden" in saved).toBe(true);
   });
 
+  it("drops the see-through cards experiment's level, whatever was stored", () => {
+    for (const v of [30, 100, "60", null, { x: 1 }]) {
+      const merged = opts.merge!({ theme: "light", sceneSolidA: v }, useStore.getState()) as unknown as Record<string, unknown>;
+      expect("sceneSolidA" in merged).toBe(false);
+      expect(merged.theme).toBe("light");
+    }
+  });
+
   it("is not in the store's state at all", () => {
     const state = useStore.getState() as unknown as Record<string, unknown>;
     for (const k of RETIRED_PREFS) expect(k in state).toBe(false);

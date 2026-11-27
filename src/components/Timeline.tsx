@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CardCutout } from "@/components/ui/CardCutout";
 import { flushSync } from "react-dom";
 import { useStore } from "@/store/useStore";
 import { sceneGrid, sceneMetrics, type SceneBox, type SceneFill } from "@/lib/layout";
@@ -175,6 +176,8 @@ export function Timeline() {
   // wrapping cards), so the only way to know where a card landed is to measure
   // it after render, relative to the rail's own content box.
   const [cardBoxes, setCardBoxes] = useState<Record<string, Box>>({});
+  // The measured boxes, as connector cut-outs (ui/CardCutout.tsx).
+  const railCuts = useMemo(() => Object.values(cardBoxes).map((b) => ({ ...b, r: 12 })), [cardBoxes]);
   const [railInner, setRailInner] = useState({ w: 0, h: 0 });
 
   // Grids are fitted to the pane, so the pane has to be measured before they
@@ -405,21 +408,23 @@ export function Timeline() {
             height={railInner.h}
             className="pointer-events-none absolute left-0 top-0 z-[10] overflow-visible"
           >
-            {doc.links.map((l, i) => {
-              const a = cardBoxes[l.fromId];
-              const b = cardBoxes[l.toId];
-              if (!a || !b) return null;
-              return (
-                <path
-                  key={i}
-                  d={railConnector(a, b, vertical)}
-                  fill="none"
-                  stroke="var(--line)"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                />
-              );
-            })}
+            <CardCutout rects={railCuts}>
+              {doc.links.map((l, i) => {
+                const a = cardBoxes[l.fromId];
+                const b = cardBoxes[l.toId];
+                if (!a || !b) return null;
+                return (
+                  <path
+                    key={i}
+                    d={railConnector(a, b, vertical)}
+                    fill="none"
+                    stroke="var(--line)"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+            </CardCutout>
           </svg>
           {bands.map((b, i) => (
             <div
@@ -443,7 +448,7 @@ export function Timeline() {
                   }}
                   onClick={() => jumpTo(c.id)}
                   title={`Jump to chapter ${c.num}`}
-                  className={`relative z-[20] flex cursor-pointer flex-col gap-[5px] rounded-xl border bg-card p-[10px_12px] hover:border-faint ${
+                  className={`scene-solid relative z-[20] flex cursor-pointer flex-col gap-[5px] rounded-xl border bg-card p-[10px_12px] hover:border-faint ${
                     vertical ? "" : "w-[234px] flex-none"
                   }`}
                   style={
@@ -648,16 +653,18 @@ export function Timeline() {
                         height={vertical ? g.height : "100%"}
                         className="pointer-events-none absolute left-0 top-0 z-[1] overflow-visible"
                       >
-                        {c.scenes.slice(0, -1).map((_, i) => (
-                          <path
-                            key={i}
-                            d={sceneConnector(g.nodes[i], g.nodes[i + 1], fill).d}
-                            fill="none"
-                            stroke="var(--line)"
-                            strokeWidth={1.75}
-                            strokeLinecap="round"
-                          />
-                        ))}
+                        <CardCutout rects={g.nodes.map((n) => ({ ...n, r: 11 }))}>
+                          {c.scenes.slice(0, -1).map((_, i) => (
+                            <path
+                              key={i}
+                              d={sceneConnector(g.nodes[i], g.nodes[i + 1], fill).d}
+                              fill="none"
+                              stroke="var(--line)"
+                              strokeWidth={1.75}
+                              strokeLinecap="round"
+                            />
+                          ))}
+                        </CardCutout>
                       </svg>
 
                       {c.scenes.map((text, i) => (
@@ -665,7 +672,7 @@ export function Timeline() {
                           key={i}
                           onClick={() => openChapterAtScene(c.id, i)}
                           title={`Open chapter ${c.num} at scene ${i + 1}`}
-                          className="group absolute z-[5] flex cursor-pointer flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-[var(--therefore)]"
+                          className="scene-solid group absolute z-[5] flex cursor-pointer flex-col gap-[7px] rounded-[11px] border border-rule bg-card p-[12px_13px] shadow-[var(--shadow)] hover:border-[var(--therefore)]"
                           style={{
                             left: g.nodes[i].x,
                             top: g.nodes[i].y,

@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { wordsMeta } from "@/lib/manuscript";
 import { countParts } from "@/lib/piece";
 import { CARD_W, CARD_H, GRID_GAP_X, fitToContent, type Camera } from "@/lib/layout";
+import { CardCutout, useCardHeights } from "@/components/ui/CardCutout";
+
 import { displaySummary } from "@/lib/drafts";
 import { chipRestLabel, chipSplit } from "@/lib/chips";
 import { ARCHIVED_DIM, archivedTitle } from "@/components/ui/ArchiveShelf";
@@ -371,6 +373,13 @@ export function Board() {
   const posById: Record<string, { x: number; y: number }> = {};
   doc.chapters.forEach((c) => (posById[c.id] = { x: c.x, y: c.y }));
 
+  // Each card's real box for the connector cut-outs: cards have only a minHeight.
+  const { heights: cardHeights, refFor: cardRef } = useCardHeights();
+  const cutRects = useMemo(
+    () => doc.chapters.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: cardHeights[c.id] ?? CARD_H, r: 12, rot: c.rot })),
+    [doc.chapters, cardHeights],
+  );
+
   const onCardDown = (e: React.MouseEvent, ch: Chapter) => {
     e.stopPropagation();
     e.preventDefault();
@@ -432,21 +441,24 @@ export function Board() {
           height={4000}
           style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}
         >
-          {doc.links.map((l, i) => {
-            const a = posById[l.fromId];
-            const b = posById[l.toId];
-            if (!a || !b) return null;
-            return (
-              <path
-                key={i}
-                d={connectorPath(a, b)}
-                fill="none"
-                stroke="var(--line)"
-                strokeWidth={2}
-                strokeLinecap="round"
-              />
-            );
-          })}
+          {/* Cut out under every card, so a line never shows beneath a see-through one. */}
+          <CardCutout rects={cutRects}>
+            {doc.links.map((l, i) => {
+              const a = posById[l.fromId];
+              const b = posById[l.toId];
+              if (!a || !b) return null;
+              return (
+                <path
+                  key={i}
+                  d={connectorPath(a, b)}
+                  fill="none"
+                  stroke="var(--line)"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+          </CardCutout>
         </svg>
 
         {/* The end-of-book drop slot. Sits below the cards and takes no pointer
@@ -482,6 +494,7 @@ export function Board() {
           return (
             <div
               key={c.id}
+              ref={cardRef(c.id)}
               // A click opens the chapter (see `onUp`); no double-click handler,
               // because by the time a second click lands the modal is already
               // over the card.
@@ -499,7 +512,7 @@ export function Board() {
               }}
             >
               <div
-                className="flex h-full flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] hover:border-faint"
+                className="scene-solid flex h-full flex-col gap-[7px] rounded-xl border bg-card p-[12px_14px] hover:border-faint"
                 style={{
                   borderColor:
                     dropTargetId === c.id

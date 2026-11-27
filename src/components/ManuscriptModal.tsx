@@ -502,7 +502,7 @@ function BeatCard({ num, text, noun, onOpen }: { num: number; text: string; noun
     <button
       onClick={onOpen}
       title={`Open this ${noun} on the map`}
-      className="block w-full rounded-[11px] border border-rule bg-card p-[8px_12px] text-left shadow-[var(--shadow)] hover:border-faint"
+      className="scene-solid block w-full rounded-[11px] border border-rule bg-card p-[8px_12px] text-left shadow-[var(--shadow)] hover:border-faint"
     >
       <span className="font-mono text-[9.5px] font-semibold tracking-wide text-faint">
         {noun.toUpperCase()} {num}
