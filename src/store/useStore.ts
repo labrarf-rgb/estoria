@@ -3028,11 +3028,10 @@ export const useStore = create<StoreState>()(
       useSample: () =>
         guardReplace(get, "Replace the open project with the sample story?", () =>
           set((s) => {
-            // The sample's authored coordinates run left to right across 2100px
-            // — legible as data, a long thin line as a board, and the first
-            // thing anyone ever sees of Estoria. Lay it out on load with the
-            // same auto-arrange the toolbar button uses, sized to *this* window
-            // rather than a fixed grid, so it opens as a map.
+            // The sample ships on a fixed 4-column arrange (data/sampleStory.ts).
+            // Lay it out again on load with the same auto-arrange the toolbar
+            // button uses, sized to *this* window, so it opens as a map that
+            // fills the screen.
             //
             // Bumping `arrangeN` is also what makes the Board fit the result to
             // the screen (see its arrange effect), so this needs no camera work.

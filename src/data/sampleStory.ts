@@ -1,4 +1,5 @@
 import { MAIN_DRAFT_ID, SCHEMA_VERSION, type StoryDoc } from "@/types";
+import { autoArrange } from "@/lib/layout";
 
 /**
  * "The Drowned Map" - the sample story from the design prototype. Used as the
@@ -316,8 +317,20 @@ export const sampleStory: StoryDoc = {
   },
 };
 
+// The authored x/y above run left to right in a two-row zigzag, a long thin
+// line as a board. This object is also the store's default document, which is
+// what shows behind the Welcome screen, during a slow load, and after a failed
+// load ("Continue without saving"), none of which runs "Explore the sample"'s
+// own arrange. So it ships pre-arranged, on the toolbar Auto-arrange's first
+// pass at a fixed 4 columns (the board fits the camera to it on mount).
+// Arranged in place: the store tells the untouched default apart by identity
+// (`docHasContent`). Positions only, so the project file is unaffected, and a
+// saved layout is never touched: it loads as its own object.
+sampleStory.chapters = autoArrange(sampleStory.chapters, 0, 4).chapters;
+
 // The "Alt ending" version is a standalone fork of the main board, differing
-// only in the last chapter's title and summary.
+// only in the last chapter's title and summary. Derived after the arrange, so
+// switching versions doesn't move the map.
 sampleStory.draftData = {
   alt: {
     chapters: sampleStory.chapters.map((c) =>
