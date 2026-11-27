@@ -35,43 +35,77 @@ export function stop(e: React.MouseEvent) {
 }
 
 /**
- * The frame shared by the three right-hand panels (Characters / World / Notes):
- * the panel filling the viewport, content capped and centred so lines don't
- * stretch the width of a wide monitor. It sits in a `Scrim` like every modal,
- * which keeps the app behind it inert and a second panel from opening over it.
+ * The frame shared by Characters, World and Notes: the expanded chapter modal's
+ * frame, so opening a panel and opening a chapter look the same apart from what
+ * is inside. Same `Scrim fill` (16px of dimmed board showing all round, and a
+ * click there closes), same rounded panel and shadow, same header: 24px serif
+ * title, a 14px subtitle, a row of meta chips, and the close button top right.
  *
- * Expand-only since 2026-11-26: the 460px side panel and its Expand / Collapse
- * toggle (`SizeButton`, the `panelExpanded` pref) are gone.
+ * Panels as modals since 2026-11-27 (docs/panels/mockup/NOTES.md). Before that
+ * the panel covered the whole window with no frame and no backdrop to click;
+ * before expand-only (2026-11-26) it also had a 460px side-panel size.
  *
- * Header and body are separate slots so the header stays put while the body
- * scrolls.
+ * Content fills the window's width, as the chapter's scene canvas does: tile
+ * grids just gain columns on a wide screen. The header stays put while the
+ * body scrolls. The relationship chart sizes itself to this frame (its SVG cap
+ * in RelationshipChart.tsx assumes this header), with a 520px minimum, so a
+ * short window scrolls the body.
  */
 export function Drawer({
   onClose,
   z = 55,
-  header,
+  title,
+  subtitle,
+  meta,
+  label,
   children,
 }: {
   onClose: () => void;
   z?: number;
-  header: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  /** The chips under the subtitle, as the chapter's meta line sits under its summary. */
+  meta?: ReactNode;
+  /** Accessible name for the dialog. */
+  label: string;
   children: ReactNode;
 }) {
-  const inner = "mx-auto w-full max-w-[1180px]";
-  const panel = (
-    <div onMouseDown={stop} className="absolute inset-0 flex flex-col bg-panel">
-      <div className="shrink-0 border-b border-rule bg-panel">
-        <div className={inner}>{header}</div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className={inner}>{children}</div>
-      </div>
-    </div>
-  );
   return (
-    <Scrim onClose={onClose} z={z}>
-      {panel}
+    <Scrim onClose={onClose} z={z} fill>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onMouseDown={stop}
+        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-rule bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+      >
+        <div className="flex shrink-0 items-start gap-[14px] border-b border-rule bg-panel px-[26px] py-[22px]">
+          <div className="min-w-0 flex-1">
+            <div className="font-serif text-[24px] font-semibold leading-tight text-ink">{title}</div>
+            {subtitle && <div className="mt-[5px] text-[14px] leading-[1.5] text-soft">{subtitle}</div>}
+            {meta && <div className="mt-[11px] flex flex-wrap items-center gap-[10px]">{meta}</div>}
+          </div>
+          <CloseButton onClick={onClose} />
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      </div>
     </Scrim>
+  );
+}
+
+/**
+ * One chip in a panel header's meta row, styled like the chapter's word count:
+ * a mono number and a softer unit, or a faint uppercase key before the number.
+ */
+export function MetaChip({ n, unit, k }: { n: number; unit?: string; k?: string }) {
+  return (
+    <span className="flex items-center gap-[5px] rounded-lg bg-chip px-[8px] py-[3px]">
+      {k && (
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-faint">{k}</span>
+      )}
+      <span className="font-mono text-[12px] font-medium text-ink">{n.toLocaleString()}</span>
+      {unit && <span className="font-mono text-[11px] font-medium text-soft">{unit}</span>}
+    </span>
   );
 }
 
@@ -79,7 +113,9 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[30px] w-[30px] rounded-lg border border-rule bg-card text-[14px] font-medium text-ink hover:border-faint"
+      title="Close"
+      aria-label="Close"
+      className="h-[30px] w-[30px] shrink-0 rounded-lg border border-rule bg-card text-[14px] font-medium text-ink hover:border-faint"
     >
       ✕
     </button>

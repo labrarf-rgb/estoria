@@ -272,7 +272,10 @@ export function RelationshipChart({ onOpenCard }: { onOpenCard: (id: string) => 
           viewBox={`0 0 ${VW} ${VH}`}
           role="img"
           aria-label="Relationship chart"
-          className="block h-auto max-h-[calc(100vh-150px)] w-full select-none"
+          // Capped so the chart fits the panel body with no scrollbar: 176px is
+          // the panel frame's chrome (16px margin top and bottom, the border and
+          // the ~141px header in `Drawer`, ui/Overlay.tsx). Retune both together.
+          className="block h-auto max-h-[calc(100vh-176px)] w-full select-none"
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}

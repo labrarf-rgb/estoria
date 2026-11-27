@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { Drawer, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, MetaChip } from "@/components/ui/Overlay";
 import { RefList } from "@/components/ui/RefList";
 import { AssetLinkPicker } from "@/components/ui/AssetLinkPicker";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -113,22 +113,14 @@ export function WorldPanel() {
   return (
     <Drawer
       onClose={close}
-      header={
-        <div className="flex items-center px-[22px] py-5">
-          <div>
-            <div className="font-serif text-[18px] font-semibold text-ink">World</div>
-            <div className="mt-[2px] text-[11.5px] font-medium text-soft">
-              Places, factions, lore &amp; references
-            </div>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-[8px]">
-            <CloseButton onClick={close} />
-          </div>
-        </div>
-      }
+      label="World"
+      title="World"
+      subtitle="Places, factions, lore & references"
+      meta={CATEGORIES.map((k) => (
+        <MetaChip key={k} k={k} n={entries.filter((w) => w.cat === k).length} />
+      ))}
     >
-      <div className="flex flex-col gap-[11px] px-[22px] py-[18px]">
+      <div className="flex flex-col gap-[14px] px-[26px] py-[22px]">
         <div {...reorder.containerProps}>
           <TileGrid min={230}>
             {reorder.order.map((id) => {

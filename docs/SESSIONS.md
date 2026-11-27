@@ -6582,3 +6582,27 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   `scenePos` and `scenePosCompact`. Then, seeded with `manuscriptExpanded:false`,
   the manuscript filled the window with no size button and the key was gone
   from the next saved shell. Not committed.
+
+### 2026-11-27 — Characters, World and Notes as modals (branch `claude/panels-modal`)
+
+- **Ray's call:** the expanded panels should look like the expanded chapter
+  modal, not cover the window. Mockup and decisions:
+  `docs/panels/mockup/index.html` and `NOTES.md` (approved 2026-11-27): full
+  window frame only, details window on top (no split view), count chips in
+  the header, Archived shelves kept, Story notes box as today, Timeline as is.
+- **Built:** `Drawer` (`src/components/ui/Overlay.tsx`) renders the chapter
+  modal's frame (`Scrim fill`, rounded panel, chapter header) from
+  `title` / `subtitle` / `meta` / `label`; new `MetaChip`. The three panels
+  pass their header pieces and chips; body padding is 26px / 22px to line up
+  with the header; the 1180px content cap is gone. Clicking the dimmed band
+  closes a panel again. `CloseButton` gained `title` / `aria-label` "Close"
+  and `shrink-0` (every modal that uses it).
+- **Not changed:** the backdrop blur (the backgrounds work changes modal
+  backdrops later, when a scene is on), panel Escape (still none, as for the
+  chapter modal), the project file.
+- **Verified:** `npm run typecheck`, `npm test` (342), `npm run build`; then
+  in the in-app browser on the dev server. Not committed.
+- **Review fix:** the relationship chart's SVG cap was sized for the old
+  full-screen header (`100vh-150px`) and gave a ~25px scrollbar at 1920x1080;
+  now `100vh-176px` (the frame's 16px margins, border and ~141px header). Body
+  scroll height equals its height at 1920x1080 and 1280x720.

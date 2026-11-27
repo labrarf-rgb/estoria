@@ -1,5 +1,6 @@
 import { useStore } from "@/store/useStore";
-import { Drawer, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, MetaChip } from "@/components/ui/Overlay";
+import { countWords } from "@/lib/manuscript";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { RefList, todoProgress } from "@/components/ui/RefList";
 import { ExpandableTextarea } from "@/components/ui/ExpandableTextarea";
@@ -36,6 +37,7 @@ export function NotesPanel() {
   // library list and the link picker, so nothing new can be pinned to them.
   const assets = doc.assets.filter((a) => !a.archived);
   const archived = doc.assets.filter((a) => a.archived);
+  const notesWords = countWords(notes ?? "");
   // A piece has no notes tab of its own any more (it repeated this panel), but
   // its one chapter still carries notes: typed there before, or joined from the
   // chapters when a book became a piece. They show here while there are any.
@@ -87,22 +89,17 @@ export function NotesPanel() {
   return (
     <Drawer
       onClose={close}
-      header={
-        <div className="flex items-center px-[22px] py-5">
-          <div>
-            <div className="font-serif text-[18px] font-semibold text-ink">Story notes</div>
-            <div className="mt-[2px] text-[11.5px] font-medium text-soft">
-              {activeBook ? activeBook.title : "This book"} · themes, questions &amp; reminders
-            </div>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-[8px]">
-            <CloseButton onClick={close} />
-          </div>
-        </div>
+      label="Story notes"
+      title="Story notes"
+      subtitle={<>{activeBook ? activeBook.title : "This book"} · themes, questions &amp; reminders</>}
+      meta={
+        <>
+          <MetaChip n={notesWords} unit={notesWords === 1 ? "word of notes" : "words of notes"} />
+          <MetaChip n={assets.length} unit="in the library" />
+        </>
       }
     >
-      <div className="flex flex-col gap-4 p-[18px]">
+      <div className="flex flex-col gap-4 px-[26px] py-[22px]">
         <ExpandableTextarea
           value={notes}
           onChange={setNotes}

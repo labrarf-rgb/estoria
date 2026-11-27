@@ -1,5 +1,5 @@
 import { useStore } from "@/store/useStore";
-import { Drawer, CloseButton } from "@/components/ui/Overlay";
+import { Drawer, MetaChip } from "@/components/ui/Overlay";
 import { ArchiveShelf } from "@/components/ui/ArchiveShelf";
 import { DetailCard, EmptyBody, InitialsBadge, TileGrid, AddTile } from "@/components/ui/DetailCard";
 import { DetailWindow, WindowButton } from "@/components/ui/DetailWindow";
@@ -47,6 +47,10 @@ export function CharactersPanel() {
   // place they're listed until restored.
   const roster = doc.characters.filter((c) => !c.archived);
   const archived = doc.characters.filter((c) => c.archived);
+  /** Relationships between two characters still on the roster: the header's
+   *  tie count, on the same rule as the tiles' (archived partners don't count). */
+  const onRoster = new Set(roster.map((c) => c.id));
+  const liveTies = (doc.relationships ?? []).filter((r) => onRoster.has(r.a) && onRoster.has(r.b)).length;
   // The draft tile sits last, exactly where it lands once committed, so the
   // window open on it keeps the same id and never remounts mid-typing.
   const tiles = draft ? roster.concat(draft) : roster;
@@ -127,10 +131,12 @@ export function CharactersPanel() {
   return (
     <Drawer
       onClose={close}
-      header={
-        <div className="flex items-center px-[22px] py-5">
-          <div className="font-serif text-[18px] font-semibold text-ink">Characters</div>
-          <div className="ml-[14px] flex rounded-lg bg-chip p-[3px]" role="group" aria-label="Characters view">
+      label="Characters"
+      title="Characters"
+      subtitle={`Who's in ${doc.projectTitle || "this story"}, and how they're tied together`}
+      meta={
+        <>
+          <div className="flex rounded-lg bg-chip p-[3px]" role="group" aria-label="Characters view">
             {(["roster", "chart"] as const).map((v) => (
               <button
                 key={v}
@@ -145,17 +151,15 @@ export function CharactersPanel() {
               </button>
             ))}
           </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-[8px]">
-            <CloseButton onClick={close} />
-          </div>
-        </div>
+          <MetaChip n={roster.length} unit="on the roster" />
+          <MetaChip n={liveTies} unit={liveTies === 1 ? "tie" : "ties"} />
+        </>
       }
     >
       {charsView === "chart" ? (
         <RelationshipChart onOpenCard={(id) => selectChar(id)} />
       ) : (
-      <div className="flex flex-col gap-[11px] px-[22px] py-[18px]">
+      <div className="flex flex-col gap-[14px] px-[26px] py-[22px]">
         <div {...reorder.containerProps}>
           <TileGrid min={230}>
             {reorder.order.map((id) => {
