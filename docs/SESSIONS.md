@@ -6736,6 +6736,25 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   story's page is a single 40% sheet on Map and Write. No app console
   errors. Not committed.
 
+### 2026-11-27 — Fresh starts open on an arranged board (commit 5a5f381)
+
+- **The gap:** the sample story is also the store's default document, which
+  is what shows behind the Welcome screen, during a slow load, and after a
+  failed load's "Continue without saving". None of those run Explore the
+  sample's own arrange, so they showed the sample's authored two-row zigzag
+  and needed a press of Auto-arrange.
+- **The change:** `data/sampleStory.ts` ships the sample already laid out on
+  Auto-arrange's first pass at a fixed 4 columns. It is arranged in place, so
+  the store still recognises the untouched default by identity
+  (`docHasContent`), and before the Alt ending is forked from it, so both
+  versions share positions. Explore the sample still re-arranges to fit the
+  window (`useSample`, comment updated).
+- **Unchanged:** saved layouts are never rearranged (a stored project loads
+  as its own object), and the `.estoria.json` format is untouched: only the
+  sample's positions moved.
+- **Verified:** `lib/sampleArrange.test.ts` (6 tests); full suite 420 on main
+  after the merge.
+
 ### 2026-11-27 — See-through cards under a scene (branch `claude/see-through-solids`)
 
 - **An experiment Ray kept.** Under a scene, the surfaces that were still
@@ -6798,6 +6817,35 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
     chapter sit alone over the scene, and closing each returns to the layer
     below. No app console errors. Not committed.
 
+### 2026-11-27 — Background scenes, round 7 (branch `claude/scene-updates`)
+
+- Built what Ray approved in the round 7 mockup (local design notes,
+  `docs/backgrounds/mockup/NOTES.md`, "Ray's picks"; SPECS row "Background
+  scenes, round 7"). Ray confirmed the turquoise water before the build.
+- **Sunny day** is a deep blue sky. **Underwater** is the turquoise lagoon of
+  Ray's photos by day and a matching teal by night. **Sea bed** (new pair)
+  is the same water over a sand floor with ripples. **Above water** (new pair)
+  is shallow water seen from above, with a soft, patchy caustic net and a few
+  glints. **Rain** is about twice as strong. Shuffle now draws from six scenes
+  per theme; the dropdown keeps the water scenes together.
+- The caustic net's frames are computed in a Web Worker
+  (`causticNet.worker.ts`), with an idle-slice fallback and a 15 s timeout;
+  measured 0.44 s in the worker and no main-thread long task. The engine got
+  an optional `attach` / `detach` hook (a reduced-motion still frame repaints
+  when the net lands) and passes `paintFrame` a `still` flag.
+- A test of the net's loop found a patch term that turned at half speed, so
+  the patches would have jumped every 14 s; fixed here (the mockup still has
+  it). An independent review found a fade-in that broke when the scene clock
+  went back (a still frame, then motion), tiles not freed on stop, a net
+  promise that could hang, and stale comments; all fixed and covered by tests.
+  A second review showed three of the new tests stayed green with the code
+  broken; they were rewritten, `loadNet` got its own tests, and each of the
+  reviewer's six mutations now fails a test.
+- *Verified:* typecheck, tests 449, every scene mounting with its sky in
+  both themes on the dev server, the new dropdown order, a choice surviving
+  a reload. No app console errors (only the local auth server on :3000,
+  which wasn't running). Not committed.
+
 ### 2026-11-28 — Toolbar on narrow windows (branch `claude/toolbar-narrow`)
 
 - **Problem (Ray):** on his portrait monitor (about 1080px) the toolbar ran
@@ -6825,6 +6873,7 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   both views, series book board and timeline with long names, anthology,
   single piece; nothing clips, no sideways scroll. More by keyboard, File /
   Settings / version menus on screen with Escape and focus return, light and
-  dark, Starry night at 88%, footer at 768 with long Drive lines. Not
-  committed.
+  dark, Starry night at 88%, footer at 768 with long Drive lines.
+- **Committed** c954427 after Ray's local test, with main (round 7 scenes)
+  merged in. Not deployed.
 

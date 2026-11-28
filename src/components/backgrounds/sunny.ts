@@ -30,7 +30,7 @@ const FAN_PERIOD = 22;
 /** How often the clock is read, and how quickly the sun eases to a new spot. */
 const CLOCK_EVERY = 60; // seconds
 const EASE_TAU = 6; // seconds to cover about 63% of the way
-/* Motes: a soft gold that reads on cream. */
+/* Motes: a soft gold that reads on the blue and on the pale haze below it. */
 const MOTE = "201,160,88";
 
 interface Beam {

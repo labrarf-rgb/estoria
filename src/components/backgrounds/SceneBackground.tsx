@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { ABOVE_WATER_DAY, ABOVE_WATER_NIGHT, createAboveWater } from "./abovewater";
 import { runScene, type SceneRenderer } from "./engine";
 import { createRain, RAIN_DAY, RAIN_NIGHT } from "./rain";
 import { sceneForTheme, type SceneId, type SceneTheme } from "./scenes";
@@ -17,7 +18,7 @@ import { SCENE_SKY as SKY, type DrawnScene } from "./sky";
 import { createSnow, SNOW_DAY, SNOW_NIGHT } from "./snow";
 import { createStarry } from "./starry";
 import { createSunny } from "./sunny";
-import { createUnderwater, UNDERWATER_DAY, UNDERWATER_NIGHT } from "./underwater";
+import { createUnderwater, SEA_BED_DAY, SEA_BED_NIGHT, UNDERWATER_DAY, UNDERWATER_NIGHT } from "./underwater";
 
 function makeRenderer(scene: DrawnScene, clock?: () => Date): SceneRenderer {
   switch (scene) {
@@ -27,6 +28,14 @@ function makeRenderer(scene: DrawnScene, clock?: () => Date): SceneRenderer {
       return createUnderwater(UNDERWATER_NIGHT);
     case "underwater-day":
       return createUnderwater(UNDERWATER_DAY);
+    case "sea-bed":
+      return createUnderwater(SEA_BED_NIGHT);
+    case "sea-bed-day":
+      return createUnderwater(SEA_BED_DAY);
+    case "above-water":
+      return createAboveWater(ABOVE_WATER_NIGHT);
+    case "above-water-day":
+      return createAboveWater(ABOVE_WATER_DAY, clock ? { now: clock } : {});
     case "snowy-night":
       return createSnow(SNOW_NIGHT);
     case "sunny-day":
@@ -46,7 +55,7 @@ export interface SceneBackgroundProps {
   theme: SceneTheme;
   /** Draw one still frame and stop. Reduced motion does this on its own. */
   still?: boolean;
-  /** Test and preview only: a fixed "now" for Sunny day's sun position. Defaults to the real clock. */
+  /** Test and preview only: a fixed "now" for the sun's position (Sunny day, and Above water's glints by day). Defaults to the real clock. */
   clock?: () => Date;
 }
 

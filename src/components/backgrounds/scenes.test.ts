@@ -1,4 +1,5 @@
-// Ported from TTePub (src/ui/backgrounds/scenes.test.ts); Estoria pairs Starry night with Sunny day.
+// Ported from TTePub (src/ui/backgrounds/scenes.test.ts); Estoria pairs Starry night with Sunny day,
+// and round 7 added Sea bed and Above water, each by night and by day.
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SCENE,
@@ -14,15 +15,19 @@ import {
 import { SCENE_SKY } from "./sky";
 
 describe("scene metadata", () => {
-  it("lists the nine scenes once each, Plain first", () => {
+  it("lists the thirteen scenes once each, Plain first, the water scenes together", () => {
     expect(SCENES.map((s) => s.id)).toEqual([
       "plain",
       "starry-night",
       "underwater",
+      "sea-bed",
+      "above-water",
       "snowy-night",
       "rainy-night",
       "sunny-day",
       "underwater-day",
+      "sea-bed-day",
+      "above-water-day",
       "snowy-day",
       "rainy-day",
     ]);
@@ -39,10 +44,14 @@ describe("scene metadata", () => {
       "Plain",
       "Starry night",
       "Underwater",
+      "Sea bed",
+      "Above water",
       "Snowy night",
       "Rainy night",
       "Sunny day",
       "Underwater",
+      "Sea bed",
+      "Above water",
       "Snowy day",
       "Rainy day",
     ]);
@@ -51,11 +60,11 @@ describe("scene metadata", () => {
   it("marks which themes each scene supports", () => {
     expect(sceneSupports("plain", "light")).toBe(true);
     expect(sceneSupports("plain", "dark")).toBe(true);
-    for (const id of ["starry-night", "underwater", "snowy-night", "rainy-night"] as const) {
+    for (const id of ["starry-night", "underwater", "sea-bed", "above-water", "snowy-night", "rainy-night"] as const) {
       expect(sceneSupports(id, "dark")).toBe(true);
       expect(sceneSupports(id, "light")).toBe(false);
     }
-    for (const id of ["sunny-day", "underwater-day", "snowy-day", "rainy-day"] as const) {
+    for (const id of ["sunny-day", "underwater-day", "sea-bed-day", "above-water-day", "snowy-day", "rainy-day"] as const) {
       expect(sceneSupports(id, "light")).toBe(true);
       expect(sceneSupports(id, "dark")).toBe(false);
     }
@@ -73,10 +82,20 @@ describe("scene metadata", () => {
       "plain",
       "starry-night",
       "underwater",
+      "sea-bed",
+      "above-water",
       "snowy-night",
       "rainy-night",
     ]);
-    expect(scenesForTheme("light").map((s) => s.id)).toEqual(["plain", "sunny-day", "underwater-day", "snowy-day", "rainy-day"]);
+    expect(scenesForTheme("light").map((s) => s.id)).toEqual([
+      "plain",
+      "sunny-day",
+      "underwater-day",
+      "sea-bed-day",
+      "above-water-day",
+      "snowy-day",
+      "rainy-day",
+    ]);
   });
 
   it("defaults to Plain in both themes", () => {
@@ -96,7 +115,10 @@ describe("parseSceneId", () => {
   it("keeps known ids and turns anything else into plain", () => {
     expect(parseSceneId("underwater")).toBe("underwater");
     expect(parseSceneId("rainy-day")).toBe("rainy-day");
-    for (const junk of [undefined, null, "", "Starry night", "cloudy-day", 3, {}]) {
+    expect(parseSceneId("sea-bed")).toBe("sea-bed");
+    expect(parseSceneId("above-water-day")).toBe("above-water-day");
+    // The mockup's working ids were never stored by the app; if one turned up, it would read as Plain.
+    for (const junk of [undefined, null, "", "Starry night", "cloudy-day", "above", "above-day", "sea-bed-night", 3, {}]) {
       expect(parseSceneId(junk)).toBe("plain");
       expect(isSceneId(junk)).toBe(false);
     }
@@ -109,10 +131,14 @@ describe("sceneForTheme", () => {
     ["plain", "plain", "plain"],
     ["starry-night", "sunny-day", "starry-night"],
     ["underwater", "underwater-day", "underwater"],
+    ["sea-bed", "sea-bed-day", "sea-bed"],
+    ["above-water", "above-water-day", "above-water"],
     ["snowy-night", "snowy-day", "snowy-night"],
     ["rainy-night", "rainy-day", "rainy-night"],
     ["sunny-day", "sunny-day", "starry-night"],
     ["underwater-day", "underwater-day", "underwater"],
+    ["sea-bed-day", "sea-bed-day", "sea-bed"],
+    ["above-water-day", "above-water-day", "above-water"],
     ["snowy-day", "snowy-day", "snowy-night"],
     ["rainy-day", "rainy-day", "rainy-night"],
   ];
@@ -131,7 +157,7 @@ describe("sceneForTheme", () => {
   });
 
   it("round-trips every pair across two switches, Starry night and Sunny day included", () => {
-    for (const id of ["starry-night", "underwater", "snowy-night", "rainy-night"] as const) {
+    for (const id of ["starry-night", "underwater", "sea-bed", "above-water", "snowy-night", "rainy-night"] as const) {
       expect(sceneForTheme(sceneForTheme(id, "light"), "dark")).toBe(id);
     }
   });
