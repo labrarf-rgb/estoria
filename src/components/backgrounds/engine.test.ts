@@ -198,6 +198,58 @@ describe("runScene", () => {
     expect(listeners("resolution")).toBe(0);
   });
 
+  it("tells a still frame from the repaint after a resize", () => {
+    const flags: [number, boolean][] = [];
+    const r = renderer({ paintFrame: (_c, _s, _t, dt, still) => void flags.push([dt, still]) });
+    const runner = runScene(fakeCanvas(), fakeCanvas(), r);
+    fire(40);
+    win.dispatchEvent(new Event("resize"));
+    expect(flags).toEqual([
+      [0, false], // first frame, running
+      [0.04, false], // a tick
+      [0, false], // the repaint after the resize: dt 0, but not a still frame
+    ]);
+    runner.stop();
+
+    reduced = true;
+    flags.length = 0;
+    runScene(fakeCanvas(), fakeCanvas(), r).stop();
+    expect(flags.length).toBeGreaterThan(0);
+    expect(flags.every(([dt, still]) => dt === 0 && still)).toBe(true);
+  });
+
+  it("lets a renderer repaint a still frame when late content arrives, and not after stop", () => {
+    reduced = true;
+    let invalidate = () => {};
+    const detach = vi.fn();
+    const r = renderer({ attach: (fn) => void (invalidate = fn), detach });
+    const runner = runScene(fakeCanvas(), fakeCanvas(), r);
+    const n = r.frames.length;
+    invalidate();
+    expect(r.frames).toHaveLength(n + 1);
+
+    doc.hidden = true;
+    invalidate(); // hidden: waits for the tab to come back
+    expect(r.frames).toHaveLength(n + 1);
+    doc.hidden = false;
+
+    runner.stop();
+    runner.stop();
+    expect(detach).toHaveBeenCalledTimes(1);
+    invalidate();
+    expect(r.frames).toHaveLength(n + 1);
+  });
+
+  it("leaves a running loop to repaint on its own next tick", () => {
+    let invalidate = () => {};
+    const r = renderer({ attach: (fn) => void (invalidate = fn) });
+    const runner = runScene(fakeCanvas(), fakeCanvas(), r);
+    expect(r.frames).toHaveLength(1);
+    invalidate();
+    expect(r.frames).toHaveLength(1);
+    runner.stop();
+  });
+
   it("does nothing without a canvas context", () => {
     const r = renderer();
     const runner = runScene(fakeCanvas(false), fakeCanvas(false), r);

@@ -6816,3 +6816,32 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
     detail window over a panel and the Delete chapter confirm over the
     chapter sit alone over the scene, and closing each returns to the layer
     below. No app console errors. Not committed.
+
+### 2026-11-27 — Background scenes, round 7 (branch `claude/scene-updates`)
+
+- Built what Ray approved in the round 7 mockup (local design notes,
+  `docs/backgrounds/mockup/NOTES.md`, "Ray's picks"; SPECS row "Background
+  scenes, round 7"). Ray confirmed the turquoise water before the build.
+- **Sunny day** is a deep blue sky. **Underwater** is the turquoise lagoon of
+  Ray's photos by day and a matching teal by night. **Sea bed** (new pair)
+  is the same water over a sand floor with ripples. **Above water** (new pair)
+  is shallow water seen from above, with a soft, patchy caustic net and a few
+  glints. **Rain** is about twice as strong. Shuffle now draws from six scenes
+  per theme; the dropdown keeps the water scenes together.
+- The caustic net's frames are computed in a Web Worker
+  (`causticNet.worker.ts`), with an idle-slice fallback and a 15 s timeout;
+  measured 0.44 s in the worker and no main-thread long task. The engine got
+  an optional `attach` / `detach` hook (a reduced-motion still frame repaints
+  when the net lands) and passes `paintFrame` a `still` flag.
+- A test of the net's loop found a patch term that turned at half speed, so
+  the patches would have jumped every 14 s; fixed here (the mockup still has
+  it). An independent review found a fade-in that broke when the scene clock
+  went back (a still frame, then motion), tiles not freed on stop, a net
+  promise that could hang, and stale comments; all fixed and covered by tests.
+  A second review showed three of the new tests stayed green with the code
+  broken; they were rewritten, `loadNet` got its own tests, and each of the
+  reviewer's six mutations now fails a test.
+- *Verified:* typecheck, tests 449, every scene mounting with its sky in
+  both themes on the dev server, the new dropdown order, a choice surviving
+  a reload. No app console errors (only the local auth server on :3000,
+  which wasn't running). Not committed.

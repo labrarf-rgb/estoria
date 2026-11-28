@@ -1,7 +1,9 @@
 /*
- * Ported from TTePub (src/ui/backgrounds/engine.ts). One addition: the canvases
- * also refit when devicePixelRatio changes (the window moved to a monitor with
- * a different scale, or browser zoom), not only on resize.
+ * Ported from TTePub (src/ui/backgrounds/engine.ts). Two additions: the
+ * canvases also refit when devicePixelRatio changes (the window moved to a
+ * monitor with a different scale, or browser zoom), not only on resize; and a
+ * renderer whose content arrives later (Above water's net, from a worker) can
+ * ask for a repaint, so a still frame doesn't miss it.
  *
  * The scene loop: two stacked canvases (a static layer painted on resize, a
  * live layer cleared and painted each tick), about 30 fps, scaled by
@@ -26,13 +28,23 @@ export interface SceneRenderer {
    * clock): repaint it this often while the tab is visible. Optional.
    */
   stillRefreshMs?: number;
+  /**
+   * Given a function that repaints a still frame (a running loop repaints on
+   * its next tick anyway), for content that arrives after the first frame.
+   * Optional.
+   */
+  attach?(invalidate: () => void): void;
+  /** Called once when the runner stops, so pending work can drop its callback. Optional. */
+  detach?(): void;
   /** Painted once after each layout. Optional. */
   paintStatic?(ctx: CanvasRenderingContext2D, size: Size): void;
   /**
    * Painted every tick on a cleared live layer. `t` is seconds since start,
-   * `dt` seconds since the last tick (0 for a still frame).
+   * `dt` seconds since the last tick (0 for a still frame, and for the repaint
+   * right after a resize). `still` tells those two apart: true only for a
+   * still frame (reduced motion, or the `still` option).
    */
-  paintFrame(ctx: CanvasRenderingContext2D, size: Size, t: number, dt: number): void;
+  paintFrame(ctx: CanvasRenderingContext2D, size: Size, t: number, dt: number, still: boolean): void;
 }
 
 export interface SceneStats {
@@ -127,7 +139,8 @@ export function runScene(
   function paint(dt: number): void {
     const t0 = performance.now();
     lctx!.clearRect(0, 0, size.w, size.h);
-    renderer.paintFrame(lctx!, size, still() ? STILL_T : t, dt);
+    const isStill = still();
+    renderer.paintFrame(lctx!, size, isStill ? STILL_T : t, dt, isStill);
     stats.paintMs += performance.now() - t0;
     stats.frames++;
   }
@@ -197,6 +210,9 @@ export function runScene(
   fit();
   paint(0);
   start();
+  renderer.attach?.(() => {
+    if (!stopped && !document.hidden && still()) paint(0);
+  });
   window.addEventListener("resize", onResize);
   document.addEventListener("visibilitychange", onVisibility);
   motionQuery?.addEventListener("change", onMotionChange);
@@ -207,6 +223,7 @@ export function runScene(
       if (stopped) return;
       stopped = true;
       halt();
+      renderer.detach?.();
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
       motionQuery?.removeEventListener("change", onMotionChange);

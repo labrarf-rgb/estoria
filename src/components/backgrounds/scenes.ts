@@ -2,9 +2,10 @@
  * Background scenes: ids, labels and theme rules. Pure data, no DOM, so the
  * Settings popover and prefs can import it without pulling in any canvas code.
  *
- * Ported from TTePub (src/ui/backgrounds/scenes.ts). One change: in Estoria
+ * Ported from TTePub (src/ui/backgrounds/scenes.ts). Changes: in Estoria
  * Starry night and Sunny day are each other's counterpart (Ray, mockup
- * round 2), so every scene has one.
+ * round 2), so every scene has one; and round 7 added two pairs of its own,
+ * Sea bed and Above water (docs/backgrounds/mockup/NOTES.md).
  */
 
 export type SceneTheme = "light" | "dark";
@@ -13,10 +14,14 @@ export type SceneId =
   | "plain"
   | "starry-night"
   | "underwater"
+  | "sea-bed"
+  | "above-water"
   | "snowy-night"
   | "rainy-night"
   | "sunny-day"
   | "underwater-day"
+  | "sea-bed-day"
+  | "above-water-day"
   | "snowy-day"
   | "rainy-day";
 
@@ -28,15 +33,22 @@ export interface SceneMeta {
   themes: readonly SceneTheme[];
 }
 
-/** In display order: Plain first, then the dark scenes, then the light ones. */
+/**
+ * In display order: Plain first, then the dark scenes, then the light ones.
+ * The water scenes sit together, surface last: Underwater, Sea bed, Above water.
+ */
 export const SCENES: readonly SceneMeta[] = [
   { id: "plain", label: "Plain", themes: ["light", "dark"] },
   { id: "starry-night", label: "Starry night", themes: ["dark"] },
   { id: "underwater", label: "Underwater", themes: ["dark"] },
+  { id: "sea-bed", label: "Sea bed", themes: ["dark"] },
+  { id: "above-water", label: "Above water", themes: ["dark"] },
   { id: "snowy-night", label: "Snowy night", themes: ["dark"] },
   { id: "rainy-night", label: "Rainy night", themes: ["dark"] },
   { id: "sunny-day", label: "Sunny day", themes: ["light"] },
   { id: "underwater-day", label: "Underwater", themes: ["light"] },
+  { id: "sea-bed-day", label: "Sea bed", themes: ["light"] },
+  { id: "above-water-day", label: "Above water", themes: ["light"] },
   { id: "snowy-day", label: "Snowy day", themes: ["light"] },
   { id: "rainy-day", label: "Rainy day", themes: ["light"] },
 ];
@@ -79,6 +91,10 @@ const COUNTERPART: Partial<Record<SceneId, SceneId>> = {
   "sunny-day": "starry-night",
   underwater: "underwater-day",
   "underwater-day": "underwater",
+  "sea-bed": "sea-bed-day",
+  "sea-bed-day": "sea-bed",
+  "above-water": "above-water-day",
+  "above-water-day": "above-water",
   "snowy-night": "snowy-day",
   "snowy-day": "snowy-night",
   "rainy-night": "rainy-day",
@@ -92,8 +108,8 @@ export function counterpartOf(id: SceneId): SceneId | undefined {
 
 /**
  * Maps a choice onto a theme: unchanged if the scene works there, else its
- * counterpart (starry night and sunny day, underwater by night and by day,
- * snowy night and snowy day, rainy night and rainy day), else `plain`.
+ * counterpart (starry night and sunny day, and each other scene by night and
+ * by day), else `plain`.
  */
 export function sceneForTheme(id: SceneId, theme: SceneTheme): SceneId {
   if (sceneSupports(id, theme)) return id;
