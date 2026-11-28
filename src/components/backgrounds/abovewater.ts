@@ -16,7 +16,7 @@
  * crossfading between two frames.
  */
 import { countFor, currentScale, makeRng, type SceneRenderer, type Size } from "./engine";
-import { NET, netFrame, netSide, type NetParams } from "./causticNet";
+import { NET, netBorder, netRows, netSide, points, type NetParams } from "./causticNet";
 import { sunProgressAt } from "./sun";
 
 export interface AboveWaterPalette {
@@ -58,7 +58,8 @@ const CLOCK_EVERY = 60; // seconds; the sun's patch moves slowly
 
 /* ---------- The net's frames: computed once, shared ---------- */
 
-let netPromise: Promise<Uint8Array[]> | null = null;
+/** The frames for each set of params asked for (in the app, only NET): computed once, shared. */
+const netCache = new Map<string, Promise<Uint8Array[]>>();
 /** If the worker hasn't answered by then, compute in idle slices instead. */
 const WORKER_TIMEOUT_MS = 15000;
 
@@ -69,7 +70,9 @@ const WORKER_TIMEOUT_MS = 15000;
  * forgotten, so the next Above water layer tries again.
  */
 export function loadNet(p: NetParams = NET): Promise<Uint8Array[]> {
-  if (netPromise) return netPromise;
+  const key = JSON.stringify(p);
+  const cached = netCache.get(key);
+  if (cached) return cached;
   const t0 = performance.now();
   const done = (frames: Uint8Array[], via: string) => {
     try {
@@ -106,29 +109,53 @@ export function loadNet(p: NetParams = NET): Promise<Uint8Array[]> {
     worker.onmessageerror = () => finish(null);
     worker.postMessage(p);
   });
-  netPromise = promise;
+  netCache.set(key, promise);
   promise.catch(() => {
-    if (netPromise === promise) netPromise = null;
+    if (netCache.get(key) === promise) netCache.delete(key);
   });
   return promise;
 }
 
+/** Rows computed per piece in the idle fallback: about 0.7 ms each at the default size. */
+const ROW_BAND = 8;
+
+/**
+ * The fallback: frames built a band of rows at a time, for as long as each
+ * idle period lasts (or one band per timer tick where there's no
+ * requestIdleCallback), so no task runs long.
+ */
 function computeInSlices(p: NetParams): Promise<Uint8Array[]> {
   return new Promise((resolve, reject) => {
+    const M = netSide(p);
+    const pts = points(p);
     const frames: Uint8Array[] = [];
-    const idle: (cb: () => void) => void =
-      typeof window.requestIdleCallback === "function" ? (cb) => window.requestIdleCallback(cb) : (cb) => window.setTimeout(cb, 16);
-    const step = () => {
+    let cur = new Uint8Array(M * M);
+    let row = 0;
+    const hasIdle = typeof window.requestIdleCallback === "function";
+    const next = () => (hasIdle ? window.requestIdleCallback(step) : window.setTimeout(() => step(null), 16));
+    function step(deadline: IdleDeadline | null): void {
       try {
-        frames.push(netFrame(p, frames.length));
+        do {
+          netRows(p, frames.length, cur, row, row + ROW_BAND, pts);
+          row += ROW_BAND;
+          if (row >= p.n) {
+            netBorder(p, cur);
+            frames.push(cur);
+            if (frames.length === p.frames) {
+              resolve(frames);
+              return;
+            }
+            cur = new Uint8Array(M * M);
+            row = 0;
+          }
+        } while (deadline && deadline.timeRemaining() > 2);
       } catch (err) {
         reject(err);
         return;
       }
-      if (frames.length < p.frames) idle(step);
-      else resolve(frames);
-    };
-    idle(step);
+      next();
+    }
+    next();
   });
 }
 

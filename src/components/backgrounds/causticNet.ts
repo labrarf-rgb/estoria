@@ -128,23 +128,35 @@ export function netValue(p: NetParams, P: (readonly [number, number])[], u0: num
   return Math.min(1, (Math.pow(line, p.pow) * p.core + glow * glow * p.glow) * patch);
 }
 
-/** Frame `k` (0 to frames - 1) of the loop, as `netSide(p)` squared intensities, row by row. */
-export function netFrame(p: NetParams, k: number, pts: Point[] = points(p)): Uint8Array {
+/** Fills tile rows y0 to y1 - 1 of frame `k` into `out` (a `netSide(p)` square), so a frame can be built in pieces. */
+export function netRows(p: NetParams, k: number, out: Uint8Array, y0: number, y1: number, pts: Point[] = points(p)): void {
   const N = p.n;
   const M = N + 2;
-  const out = new Uint8Array(M * M);
   const a = loopAngle(p, k);
   const P = pointsAt(pts, a);
-  for (let y = 0; y < N; y++) {
+  for (let y = y0; y < Math.min(y1, N); y++) {
     for (let x = 0; x < N; x++) out[(y + 1) * M + x + 1] = Math.round(255 * netValue(p, P, x / N, y / N, a));
   }
-  // The border: each edge copies the opposite one, corners included.
+}
+
+/** Fills the one-cell border of a finished frame from the opposite edges, corners included. */
+export function netBorder(p: NetParams, out: Uint8Array): void {
+  const N = p.n;
+  const M = N + 2;
   for (let y = 1; y <= N; y++) {
     out[y * M] = out[y * M + N]!;
     out[y * M + N + 1] = out[y * M + 1]!;
   }
   out.copyWithin(0, N * M, N * M + M);
   out.copyWithin((N + 1) * M, M, 2 * M);
+}
+
+/** Frame `k` (0 to frames - 1) of the loop, as `netSide(p)` squared intensities, row by row. */
+export function netFrame(p: NetParams, k: number, pts: Point[] = points(p)): Uint8Array {
+  const M = p.n + 2;
+  const out = new Uint8Array(M * M);
+  netRows(p, k, out, 0, p.n, pts);
+  netBorder(p, out);
   return out;
 }
 

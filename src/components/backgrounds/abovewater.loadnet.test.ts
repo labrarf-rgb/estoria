@@ -39,8 +39,11 @@ beforeEach(() => {
   vi.stubGlobal("window", {
     setTimeout: (fn: () => void) => timers.push(fn),
     clearTimeout: () => {},
-    // Idle slices run right away here.
-    requestIdleCallback: (fn: () => void) => fn(),
+    // Idle slices run right away here, each with room for two bands of rows.
+    requestIdleCallback: (fn: (d: { timeRemaining: () => number }) => void) => {
+      let left = 2;
+      fn({ timeRemaining: () => (left-- > 0 ? 10 : 0) });
+    },
   });
 });
 
@@ -53,6 +56,15 @@ const load = async () => (await import("./abovewater")).loadNet;
 const frames = (n = P.frames) => Array.from({ length: n }, () => new Uint8Array(4));
 
 describe("loadNet", () => {
+  it("keeps frames for different params apart", async () => {
+    const loadNet = await load();
+    const a = loadNet(P);
+    const b = loadNet({ ...P, n: 16 });
+    expect(FakeWorker.made).toHaveLength(2);
+    expect(loadNet(P)).toBe(a);
+    void b;
+  });
+
   it("takes the worker's frames, terminates it, and shares them with later layers", async () => {
     const loadNet = await load();
     const first = loadNet(P);
@@ -80,6 +92,9 @@ describe("loadNet", () => {
     const got = await p;
     expect(got).toHaveLength(P.frames);
     expect(got[0]).toHaveLength((P.n + 2) ** 2);
+    // Built in bands, they match frames computed in one go.
+    const { netFrame } = await import("./causticNet");
+    got.forEach((f, k) => expect(f).toEqual(netFrame(P, k)));
     if (FakeWorker.made[0]) expect(FakeWorker.made[0].terminated).toBe(true);
   });
 
@@ -87,7 +102,7 @@ describe("loadNet", () => {
     FakeWorker.throwOnCreate = true;
     vi.doMock("./causticNet", async (orig) => ({
       ...(await orig<typeof import("./causticNet")>()),
-      netFrame: () => {
+      netRows: () => {
         throw new Error("boom");
       },
     }));
