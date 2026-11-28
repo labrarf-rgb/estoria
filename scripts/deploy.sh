@@ -34,6 +34,25 @@ SETTLE_MIN=10
 # How many previous deploys' assets stay on the site beside the new one's.
 KEEP_DEPLOYS=3
 
+# The asset file names a page or script names: "assets/<name>". index.html names
+# the app's script and stylesheet; a script can name more that it loads itself
+# (since 2026-11-28, the caustic net's Web Worker), which index.html never does.
+asset_names() { grep -ohE 'assets/[A-Za-z0-9._-]+\.(js|mjs|css|wasm)' "$@" 2>/dev/null | sed 's#^assets/##' | sort -u || true; }
+# Those names, plus every asset the named scripts in directory $1 name in turn.
+# (No `case` inside a command substitution: macOS's bash 3.2 can't parse it.)
+with_script_assets() {
+  local dir="$1" names n
+  names="$(cat)"
+  {
+    printf '%s\n' "$names"
+    for n in $names; do
+      case "$n" in
+        *.js | *.mjs) if [ -f "$dir/$n" ]; then asset_names "$dir/$n"; fi ;;
+      esac
+    done
+  } | grep -v '^$' | sort -u || true
+}
+
 cd "$WEBAPP_DIR"
 
 # 1. Only ever deploy committed code, so the deployed SHA is meaningful.
@@ -95,7 +114,7 @@ KEEP="$(
     for rev in $(git log -n "$KEEP_DEPLOYS" --format=%h -- estoria/index.html); do
       git show "$rev:estoria/index.html" 2>/dev/null || true
     done
-  } | grep -oE 'assets/[^"]+' | sed 's#^assets/##' | sort -u || true
+  } | asset_names /dev/stdin | with_script_assets "$DEST/assets"
 )"
 for f in "$DEST"/assets/*; do
   [ -e "$f" ] || continue
@@ -111,10 +130,10 @@ else
 fi
 
 # 5. Verify prod is actually serving this commit (GitHub Pages needs a moment),
-#    and that the assets its index.html names load: a version.json that matches
+#    and that the assets its index.html and its scripts name load: a version.json that matches
 #    beside a script that 404s is exactly the blank page this script exists to
 #    rule out.
-ASSETS="$(grep -oE 'assets/[^"]+' "$WEBAPP_DIR/dist/index.html" | sort -u || true)"
+ASSETS="$(asset_names "$WEBAPP_DIR/dist/index.html" | with_script_assets "$WEBAPP_DIR/dist/assets" | sed 's#^#assets/#')"
 echo "→ Waiting for $SITE_URL to report $EXPECTED ..."
 for i in $(seq 1 30); do
   LIVE="$(curl -fsS "$SITE_URL/version.json?cb=$(date +%s)" 2>/dev/null \
