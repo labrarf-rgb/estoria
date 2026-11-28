@@ -84,6 +84,8 @@ describe("pairing", () => {
     expect(chooseScene(PLAIN, PICKS, "dark", "snowy-night").prefs).toEqual({ sceneDark: "snowy-night", sceneLight: "snowy-day" });
     expect(chooseScene(PLAIN, PICKS, "light", "sunny-day").prefs).toEqual({ sceneLight: "sunny-day", sceneDark: "starry-night" });
     expect(chooseScene(PLAIN, PICKS, "light", "underwater-day").prefs).toEqual({ sceneLight: "underwater-day", sceneDark: "underwater" });
+    expect(chooseScene(PLAIN, PICKS, "dark", "sea-bed").prefs).toEqual({ sceneDark: "sea-bed", sceneLight: "sea-bed-day" });
+    expect(chooseScene(PLAIN, PICKS, "light", "above-water-day").prefs).toEqual({ sceneLight: "above-water-day", sceneDark: "above-water" });
   });
 
   it("picking Plain leaves the other theme alone", () => {
@@ -101,8 +103,28 @@ describe("Shuffle", () => {
     for (const theme of ["light", "dark"] as const) {
       const pool = shufflePool(theme);
       expect(pool).not.toContain("plain");
-      expect(pool).toHaveLength(4);
+      expect(pool).toHaveLength(6);
       for (const id of pool) expect(sceneForTheme(id, theme)).toBe(id);
+    }
+  });
+
+  it("draws from all six scenes of each theme, Sea bed and Above water included", () => {
+    expect(shufflePool("dark")).toEqual(["starry-night", "underwater", "sea-bed", "above-water", "snowy-night", "rainy-night"]);
+    expect(shufflePool("light")).toEqual(["sunny-day", "underwater-day", "sea-bed-day", "above-water-day", "snowy-day", "rainy-day"]);
+    // Walking the random number across its range reaches every scene in the pool.
+    for (const theme of ["light", "dark"] as const) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 60; i++) seen.add(pickShuffle(theme, undefined, () => i / 60));
+      expect([...seen].sort()).toEqual([...shufflePool(theme)].sort());
+    }
+  });
+
+  it("never repeats the scene showing, the new ones included", () => {
+    for (const showing of ["sea-bed", "above-water"] as const) {
+      for (let i = 0; i < 40; i++) expect(pickShuffle("dark", showing, () => i / 40)).not.toBe(showing);
+    }
+    for (const showing of ["sea-bed-day", "above-water-day"] as const) {
+      for (let i = 0; i < 40; i++) expect(pickShuffle("light", showing, () => i / 40)).not.toBe(showing);
     }
   });
 
@@ -178,6 +200,28 @@ describe("stored values", () => {
       sceneDark: "underwater",
     });
     expect(readLookPrefs({ sceneLight: "shuffle", sceneDark: "plain" })).toMatchObject({ sceneLight: "shuffle", sceneDark: "plain" });
+  });
+
+  it("keeps a shell saved before round 7 as it was, and reads the new scenes back", () => {
+    // Saved with the scenes shipped on 2026-11-27: every id is still valid.
+    expect(readLookPrefs({ theme: "dark", themeMode: "dark", sceneLight: "underwater-day", sceneDark: "underwater" })).toEqual({
+      themeMode: "dark",
+      sceneLight: "underwater-day",
+      sceneDark: "underwater",
+    });
+    expect(readLookPrefs({ themeMode: "auto", sceneLight: "sea-bed-day", sceneDark: "above-water" })).toMatchObject({
+      sceneLight: "sea-bed-day",
+      sceneDark: "above-water",
+    });
+  });
+
+  it("maps a new scene stored under the wrong theme to its counterpart, and unknown ids to Plain", () => {
+    expect(readLookPrefs({ sceneLight: "sea-bed", sceneDark: "above-water-day" })).toMatchObject({
+      sceneLight: "sea-bed-day",
+      sceneDark: "above-water",
+    });
+    // An id from a later version, or the mockup's working names, loads as Plain rather than failing.
+    expect(readLookPrefs({ sceneLight: "coral-reef", sceneDark: "above" })).toMatchObject({ sceneLight: "plain", sceneDark: "plain" });
   });
 
   it("stores the three look prefs and never the Shuffle picks", () => {

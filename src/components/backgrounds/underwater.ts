@@ -5,8 +5,13 @@
  * Adapted from TTePub (src/ui/backgrounds/underwater.ts) as Ray tuned it in
  * the Estoria mockup (docs/backgrounds/mockup/NOTES.md, round 3): **no
  * caustic shimmer**, by night or by day. The water is the sky gradient
- * (sky.ts); this file draws only the shafts and the motes. Colors are warmed:
- * TTePub's aqua is pulled toward a muted sea green.
+ * (sky.ts); this file draws only the shafts and the motes (and Sea bed's
+ * sand ripples). Until round 7 the colors were a muted sea green.
+ *
+ * Round 7 (NOTES.md, "Ray's picks"): by day a tropical turquoise lagoon
+ * (turquoise bubble rims, brighter shafts), by night a matching teal. Sea bed
+ * is the same water with sunlit (or moonlit) ripples on a sand floor in the
+ * bottom fifth of the window, painted once on the static layer.
  */
 import { countFor, currentScale, haloDot, makeRng, softDot, type SceneRenderer, type Size } from "./engine";
 
@@ -21,26 +26,32 @@ export interface UnderwaterPalette {
   moteAlpha: [number, number];
   /** Multiplies mote size. */
   moteSize: number;
+  /** Sea bed: ripple lines on a sand floor, "r,g,b", lighter than the water, at `alpha` times their base strength. */
+  sand?: { rgb: string; alpha: number };
 }
 
-/* Night: a pale sea-green light, low in chroma so it sits with the warm dark tokens. */
+/* Night: teal-tinted shafts and motes, to go with the teal water. */
 export const UNDERWATER_NIGHT: UnderwaterPalette = {
-  light: [204, 224, 204],
-  shaftAlpha: [0.03, 0.055],
-  mote: "206,226,210",
+  light: [150, 205, 198],
+  shaftAlpha: [0.035, 0.065],
+  mote: "190,226,220",
   moteAlpha: [0.2, 0.42],
   moteSize: 1,
 };
 
-/* Day: shallow, sunlit water. Warm white shafts, and small bubbles with a soft sea-green rim. */
+/* Day: the clear lagoon. White shafts, and small bubbles with a turquoise rim. */
 export const UNDERWATER_DAY: UnderwaterPalette = {
-  light: [255, 252, 240],
-  shaftAlpha: [0.18, 0.26],
-  mote: "253,252,246",
-  moteHalo: "78,124,112,0.45",
+  light: [255, 255, 250],
+  shaftAlpha: [0.22, 0.32],
+  mote: "253,255,253",
+  moteHalo: "48,150,160,0.42",
   moteAlpha: [0.45, 0.75],
   moteSize: 2.2,
 };
+
+/* Sea bed: the same water over sand. Faint moonlit ripples by night, sunlit ones by day. */
+export const SEA_BED_NIGHT: UnderwaterPalette = { ...UNDERWATER_NIGHT, sand: { rgb: "176,166,136", alpha: 0.32 } };
+export const SEA_BED_DAY: UnderwaterPalette = { ...UNDERWATER_DAY, sand: { rgb: "255,252,240", alpha: 1 } };
 
 interface Mote {
   x: number;
@@ -79,6 +90,8 @@ export function createUnderwater(palette: UnderwaterPalette = UNDERWATER_NIGHT, 
 
   return {
     maxDpr,
+
+    paintStatic: palette.sand ? (ctx, size) => paintSand(ctx, size, palette.sand!) : undefined,
 
     layout(size: Size) {
       const rnd = makeRng(seed);
@@ -134,6 +147,31 @@ export function createUnderwater(palette: UnderwaterPalette = UNDERWATER_NIGHT, 
       ctx.drawImage(s.img, left, 0, s.width, shaftH);
     }
     ctx.globalAlpha = 1;
+  }
+}
+
+/** Ripple lines on the sand in the bottom fifth: wavy strokes, a little stronger toward the bottom. Seeded, so a still frame matches. */
+function paintSand(ctx: CanvasRenderingContext2D, size: Size, sand: { rgb: string; alpha: number }): void {
+  const rnd = makeRng(9);
+  const top = size.h * 0.8;
+  const LINES = 22;
+  ctx.lineCap = "round";
+  for (let i = 0; i < LINES; i++) {
+    const y0 = top + (size.h - top) * (i / LINES) + rnd() * 6;
+    const amp = 2 + rnd() * 3;
+    const k = (2 * Math.PI) / (90 + rnd() * 70);
+    const ph = rnd() * Math.PI * 2;
+    const x0 = rnd() * size.w * 0.2 - 60;
+    const x1 = x0 + size.w * (0.5 + rnd() * 0.7);
+    ctx.strokeStyle = `rgba(${sand.rgb},${(0.18 + 0.22 * (i / LINES)) * sand.alpha})`;
+    ctx.lineWidth = 1.2 + rnd() * 1.6;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 12) {
+      const y = y0 + amp * Math.sin(x * k + ph);
+      if (x === x0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
 }
 

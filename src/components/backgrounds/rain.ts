@@ -12,6 +12,10 @@
  *  - warm colors: a warm grey-white at night, sepia slate by day;
  *  - the wind from the other side: down and to the right, as in the mockup.
  * Drawn as 3 layers x 3 strengths = 9 paths and strokes a frame.
+ *
+ * Round 7 (NOTES.md, "Ray's picks", A · Brighter): Ray found the rain too
+ * subtle, so both palettes are about twice as strong and streaks are 1.2
+ * times as wide. Drop counts, lengths and speeds are unchanged.
  */
 import { countFor, makeRng, type SceneRenderer, type Size } from "./engine";
 
@@ -22,12 +26,14 @@ export interface RainPalette {
   alpha: [number, number, number];
   /** Multiplies the drop count per layer. */
   density: number;
+  /** Multiplies every streak's width. */
+  width: number;
 }
 
-/* Night: a warm grey-white well below dark --ink. */
-export const RAIN_NIGHT: RainPalette = { streak: "222,212,196", alpha: [0.09, 0.13, 0.17], density: 1 };
-/* Day: a sepia slate, darker than light --soft, at enough alpha to read on cream. */
-export const RAIN_DAY: RainPalette = { streak: "108,96,80", alpha: [0.15, 0.22, 0.29], density: 1.4 };
+/* Night: a warm grey-white, still below dark --ink (before round 7: 222,212,196 at 0.09 to 0.17). */
+export const RAIN_NIGHT: RainPalette = { streak: "230,222,208", alpha: [0.19, 0.27, 0.36], density: 1, width: 1.2 };
+/* Day: a sepia slate (before round 7: 108,96,80 at 0.15 to 0.29), strong enough to notice on cream. */
+export const RAIN_DAY: RainPalette = { streak: "100,88,72", alpha: [0.32, 0.46, 0.6], density: 1.4, width: 1.2 };
 
 interface Layer {
   perMp: number;
@@ -92,7 +98,7 @@ export function createRain(palette: RainPalette, seed = 37): SceneRenderer {
         const L = LAYERS[i]!;
         STRENGTH.forEach((k, si) => {
           ctx.strokeStyle = `rgba(${palette.streak},${(palette.alpha[i] ?? 0.1) * k})`;
-          ctx.lineWidth = L.width * (0.8 + 0.2 * si);
+          ctx.lineWidth = L.width * palette.width * (0.8 + 0.2 * si);
           ctx.beginPath();
           for (const d of drops) {
             if (d.s !== si) continue;
