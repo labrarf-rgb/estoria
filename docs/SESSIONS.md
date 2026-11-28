@@ -6797,3 +6797,34 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
     detail window over a panel and the Delete chapter confirm over the
     chapter sit alone over the scene, and closing each returns to the layer
     below. No app console errors. Not committed.
+
+### 2026-11-28 — Toolbar on narrow windows (branch `claude/toolbar-narrow`)
+
+- **Problem (Ray):** on his portrait monitor (about 1080px) the toolbar ran
+  off the right edge: File cut off, Settings unreachable. Cause: the bar
+  scrolled sideways with a hidden scrollbar. Measured one-row widths: book
+  board 1169, timeline 1094, series map 1114, series book board 1248, series
+  with long names 1539, anthology 942, single piece 759; footer 993 with
+  Ray's Drive lines.
+- **Gate 1:** mockup `docs/toolbar/mockup/` (untracked) with three
+  approaches. Ray picked C (icons first, then fold) with his own order: File
+  and Settings fold first, then Characters / World / Notes.
+- **Built:** `lib/toolbarFit.ts` (11 tests) decides icons / what folds from
+  an inert measurer copy of every control; `Toolbar` rebuilt around shared
+  control definitions, a More menu with File › and Settings › pages, and
+  `aria-pressed` on toggles; `Popover` clamps to the window, closes on
+  Escape, and has a keyboard-first mode; footer items shrink and truncate.
+  Wide screens unchanged (version chip now capped at 190px).
+- **Review (fresh subagent) fixes:** the rename input could be wider than
+  the measured name (now reserved while renaming); Escape closed the
+  version menu behind its delete confirm (now ignored while a confirm is
+  up); focus dropped to the page after a More toggle (now back on More); two
+  open popovers both closed on one Escape (now only the newest).
+- **Verified:** typecheck, tests 431, build. In the in-app browser at 1440,
+  1080, 900 and 768: book board and timeline, a chapter open, series map in
+  both views, series book board and timeline with long names, anthology,
+  single piece; nothing clips, no sideways scroll. More by keyboard, File /
+  Settings / version menus on screen with Escape and focus return, light and
+  dark, Starry night at 88%, footer at 768 with long Drive lines. Not
+  committed.
+

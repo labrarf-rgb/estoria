@@ -107,7 +107,10 @@ function HintCorner({ hint }: { hint: string }) {
     "col-start-1 row-start-1 min-w-0 truncate text-right motion-safe:transition-opacity motion-safe:duration-500";
   return (
     <span
-      className="hidden max-w-[46vw] shrink-0 grid-cols-[minmax(0,1fr)] md:grid"
+      // Gives way first when the footer runs short (a narrow window with long
+      // Drive status lines), truncating rather than pushing anything off.
+      className="hidden min-w-0 max-w-[46vw] shrink-[10] grid-cols-[minmax(0,1fr)] md:grid"
+      title={hint}
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -522,7 +525,7 @@ export function Footer() {
   return (
     <div className="scene-bar scene-hide-under-modal flex items-center gap-3 border-t border-rule bg-panel px-4 py-[6px] text-[11px] font-medium text-faint">
       <span
-        className="flex shrink-0 items-center gap-[6px]"
+        className="flex min-w-0 shrink items-center gap-[6px]"
         style={
           failed || driveWarn || storageFull
             ? { color: "var(--but)" }
@@ -532,15 +535,17 @@ export function Footer() {
         }
       >
         <span
-          className="h-[6px] w-[6px] rounded-full"
+          className="h-[6px] w-[6px] shrink-0 rounded-full"
           style={{ background: failed ? "var(--but)" : "var(--therefore)" }}
         />
-        {saveText}
+        <span className="truncate" title={saveText}>
+          {saveText}
+        </span>
       </span>
 
       {/* Cross-app Sync with the Estoria folder (shared with the Android app) */}
       {syncVisible && (
-        <span className="flex shrink-0 items-center gap-[5px]">
+        <span className="flex min-w-0 shrink-[3] items-center gap-[5px] [&>button]:shrink-0">
           {needsReconnect && (
             <button
               onClick={() => startDriveConnect()}
@@ -604,7 +609,8 @@ export function Footer() {
           </button>
           {msg && (
             <span
-              className="max-w-[340px] truncate"
+              className="min-w-0 max-w-[340px] truncate"
+              title={msg.text}
               style={msg.error ? { color: "var(--but)" } : undefined}
             >
               {msg.text}
