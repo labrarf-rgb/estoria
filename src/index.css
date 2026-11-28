@@ -225,9 +225,33 @@ body {
 :root[data-scene] .scene-pop {
   background-color: color-mix(in oklab, var(--card) var(--scene-bar-a), transparent);
 }
-:root[data-scene] .scene-solid-panel,
-:root[data-scene] [data-scrim="center"] > * {
+:root[data-scene] .scene-solid-panel {
   background-color: color-mix(in oklab, var(--panel) var(--scene-solid-a), transparent);
+}
+/*
+ * A small dialog under a scene (Ray, 2026-11-28, after a lab of five options):
+ * the layer you were in stays behind it, blurred, instead of a bare scene.
+ * When a centred layer (a confirm, an alert, a tile's detail window, Welcome,
+ * Recovery) is on top, the layer directly under it (`data-under`), or the app
+ * itself when nothing else is open, comes back, and the dialog's backdrop
+ * blurs everything behind it at 5px with no dim. The scene is paused on its
+ * current frame meanwhile (ui/Overlay.tsx), so the blur is of a still image.
+ * Deeper layers stay hidden. Full-window layers (the chapter, a panel) are
+ * unchanged: clear, with what is behind them hidden. The frame is 88%, like
+ * the menus, so its text reads over the blurred layer (light --soft about 4.1
+ * at the worst stop of Above water's teal sky, against 2.77 at 40%).
+ */
+:root[data-scene]:has([data-scrim="center"]:not([data-covered])) [data-scrim][data-under],
+:root[data-scene]:has([data-scrim="center"]:not([data-covered])):not(:has([data-scrim][data-covered])) .scene-hide-under-modal:not(.contents):not(:has([data-scrim]:not([data-covered]))),
+:root[data-scene]:has([data-scrim="center"]:not([data-covered])):not(:has([data-scrim][data-covered])) .scene-hide-under-modal.contents > * {
+  visibility: visible;
+}
+:root[data-scene] [data-scrim="center"]:not([data-covered]) {
+  -webkit-backdrop-filter: blur(5px) !important;
+  backdrop-filter: blur(5px) !important;
+}
+:root[data-scene] [data-scrim="center"] > * {
+  background-color: color-mix(in oklab, var(--panel) var(--scene-bar-a), transparent);
 }
 
 /* Plain's paper texture (components/backgrounds/paper.ts), under the dot grid. */

@@ -5,7 +5,7 @@
  * reduced motion, the still-frame refresh and the devicePixelRatio refit.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runScene, type SceneRenderer } from "./engine";
+import { getScenePace, runScene, setScenePace, type SceneRenderer } from "./engine";
 
 /** A 2D context whose every method is a no-op. */
 function fakeContext(): CanvasRenderingContext2D {
@@ -87,6 +87,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setScenePace(30);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -248,6 +249,44 @@ describe("runScene", () => {
     invalidate();
     expect(r.frames).toHaveLength(1);
     runner.stop();
+  });
+
+  it("pauses on the current frame while a dialog sets the pace to 0, and carries on with no jump", () => {
+    const r = renderer();
+    const runner = runScene(fakeCanvas(), fakeCanvas(), r);
+    fire(34);
+    fire(68);
+    const before = r.frames.length;
+    const tBefore = r.frames[r.frames.length - 1]!;
+
+    setScenePace(0);
+    expect(getScenePace()).toBe(0);
+    expect(rafs.size).toBe(0); // no loop: the last frame stays on screen
+    expect(r.frames.length).toBe(before); // and nothing was cleared or repainted
+
+    now = 5000; // a long pause
+    setScenePace(30);
+    expect(rafs.size).toBe(1);
+    fire(5034);
+    const tAfter = r.frames[r.frames.length - 1]!;
+    // Time picks up where it stopped, one frame on, not 5 s later.
+    expect(tAfter - tBefore).toBeGreaterThan(0);
+    expect(tAfter - tBefore).toBeLessThan(0.1);
+
+    runner.stop();
+    setScenePace(0);
+    setScenePace(30);
+    expect(rafs.size).toBe(0); // a stopped runner no longer follows the pace
+  });
+
+  it("starts paused if a dialog is already open", () => {
+    setScenePace(0);
+    const r = renderer();
+    runScene(fakeCanvas(), fakeCanvas(), r);
+    expect(r.frames).toHaveLength(1); // the first frame is still drawn
+    expect(rafs.size).toBe(0);
+    setScenePace(30);
+    expect(rafs.size).toBe(1);
   });
 
   it("does nothing without a canvas context", () => {

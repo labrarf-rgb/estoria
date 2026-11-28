@@ -6877,3 +6877,36 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
 - **Committed** c954427 after Ray's local test, with main (round 7 scenes)
   merged in. Not deployed.
 
+### 2026-11-28 — Small dialogs show the layer behind them, blurred (branch `claude/blur-behind`)
+
+- **Ray, on prod build 122:** with a scene on, a confirm (Delete scene 22?,
+  deleting a character or note) sat over a bare scene, because every layer
+  below the top one was hidden. He wanted the layer he was in to show,
+  blurred, and the blur-over-a-moving-scene cost revisited.
+- **A lab first** (a `?lab` panel in a dev build, removed again): five modes
+  (hide; blur the layer with `filter`; the same with the scene paused;
+  backdrop blur with the scene paused; backdrop blur at 4 fps), blur radius,
+  dim and dialog opacity. Measured in headless Chrome 158 on an M3 at 2x,
+  over the busy sample board and over a chapter, Above water dark and light
+  and Rainy night: every mode held 60 fps; GPU process time was about 65 to
+  100 ms/s with the scene running (today, and blurring the layer), about 8
+  with it paused, about 23 at 4 fps. Light `--soft` on a small dialog at the
+  worst stop of Above water's teal sky: 2.77 at 40% (prod), 3.3 over a
+  blurred layer, about 4.1 at 88%. A dim lowered it. Blurring the board
+  behind the chapter window ("every layer") put drifting colour behind the
+  canvas, so the scope is small dialogs only.
+- **Ray's pick:** the recommendation (backdrop blur, scene paused, small
+  dialogs only, frames at 88%, no dim) with the blur at 5px instead of 8.
+- **Built:** `index.css` keeps the layer directly under a centred dialog
+  (`data-under`, new in `ui/Overlay.tsx`'s layer stack) or the app visible
+  and gives the dialog's backdrop `blur(5px)`; centred frames at 88%.
+  `engine.ts` has a global pace (`setScenePace`; 0 pauses on the current
+  frame, resuming carries on with no jump), set by the layer stack whenever
+  the top layer changes. Plain unchanged.
+- **Verified:** typecheck, tests (2 new in `engine.test.ts`: pause and
+  resume, and starting paused), build. In the in-app browser at 1440x900:
+  on Above water and Rainy night a confirm over the board and over a chapter
+  shows the layer blurred at 5px with an 88% frame, the scene's canvas stops
+  changing while it is open and moves again after; a chapter alone keeps the
+  scene running with the board hidden; Plain still dims and blurs 2px with
+  solid frames. Not committed.

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from "react";
 import { topLayer } from "@/lib/layers";
+import { setScenePace } from "@/components/backgrounds/engine";
 
 /*
  * The overlay layers open now: every backdrop (`Scrim`, the tile's
@@ -22,38 +23,76 @@ function zOf(el: HTMLElement): number {
   return Number.isFinite(v) ? v : 0;
 }
 
-function currentTop(): symbol | undefined {
-  const items: { id: symbol; el: HTMLElement }[] = [];
+// a follows b in the document, or sits inside it.
+const follows = (a: { el: HTMLElement }, b: { el: HTMLElement }) =>
+  (b.el.compareDocumentPosition(a.el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** The open layers' ids from the top down (z-index, then document order). */
+function stackFromTop(): symbol[] {
+  return orderedFromTop().map((x) => x.id);
+}
+
+/** The open layers from the top down, with their elements. */
+function orderedFromTop(): { id: symbol; el: HTMLElement }[] {
+  let items: { id: symbol; el: HTMLElement }[] = [];
   layers.forEach((ref, id) => {
     if (ref.current) items.push({ id, el: ref.current });
   });
-  return topLayer(
-    items,
-    (x) => zOf(x.el),
-    // a follows b in the document, or sits inside it.
-    (a, b) => (b.el.compareDocumentPosition(a.el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-  )?.id;
+  const out: { id: symbol; el: HTMLElement }[] = [];
+  while (items.length) {
+    const top = topLayer(items, (x) => zOf(x.el), follows)!;
+    out.push(top);
+    items = items.filter((x) => x !== top);
+  }
+  return out;
 }
 
-/** Registers an open overlay layer by its element; true while another layer is painted above it. */
-export function useOverlayLayer(ref: RefObject<HTMLElement | null>): boolean {
+/**
+ * A small dialog on top (a centred layer: a confirm, an alert, a tile's
+ * detail window, Welcome, Recovery) pauses the background scene, so the
+ * backdrop blur behind it (index.css) blurs a still frame; anything else on
+ * top, or nothing, lets it run. Ray, 2026-11-28.
+ */
+function syncScenePace(): void {
+  const top = orderedFromTop()[0];
+  setScenePace(top?.el.dataset.scrim === "center" ? 0 : 30);
+}
+
+/**
+ * Where a layer sits: the top one, the one directly under it (shown, blurred,
+ * behind a small dialog under a scene), or deeper.
+ */
+export type LayerPlace = "top" | "under" | "deep";
+
+/** Registers an open overlay layer by its element; its place in the stack. */
+export function useLayerPlace(ref: RefObject<HTMLElement | null>): LayerPlace {
   const [id] = useState(() => Symbol("layer"));
-  const [covered, setCovered] = useState(false);
+  const [place, setPlace] = useState<LayerPlace>("top");
   // Layout effect, so the attribute is right before the first paint. Every
   // layer re-checks whenever one opens or closes, so the answer is right once
   // a whole update has committed, whichever effect ran first.
   useLayoutEffect(() => {
     layers.set(id, ref);
-    const update = () => setCovered(currentTop() !== id);
+    const update = () => {
+      const i = stackFromTop().indexOf(id);
+      setPlace(i <= 0 ? "top" : i === 1 ? "under" : "deep");
+    };
     layerListeners.add(update);
     layerListeners.forEach((fn) => fn());
+    syncScenePace();
     return () => {
       layers.delete(id);
       layerListeners.delete(update);
       layerListeners.forEach((fn) => fn());
+      syncScenePace();
     };
   }, [id, ref]);
-  return covered;
+  return place;
+}
+
+/** Registers an open overlay layer by its element; true while another layer is painted above it. */
+export function useOverlayLayer(ref: RefObject<HTMLElement | null>): boolean {
+  return useLayerPlace(ref) !== "top";
 }
 
 /**
@@ -63,8 +102,16 @@ export function useOverlayLayer(ref: RefObject<HTMLElement | null>): boolean {
  */
 export function OverlayLayer({ kind, ...rest }: { kind: "fill" | "center" | "plain" } & HTMLAttributes<HTMLDivElement>) {
   const ref = useRef<HTMLDivElement>(null);
-  const covered = useOverlayLayer(ref);
-  return <div {...rest} ref={ref} data-scrim={kind} data-covered={covered ? "" : undefined} />;
+  const place = useLayerPlace(ref);
+  return (
+    <div
+      {...rest}
+      ref={ref}
+      data-scrim={kind}
+      data-covered={place !== "top" ? "" : undefined}
+      data-under={place === "under" ? "" : undefined}
+    />
+  );
 }
 
 /** Dimmed full-screen backdrop. Clicking it calls onClose. */

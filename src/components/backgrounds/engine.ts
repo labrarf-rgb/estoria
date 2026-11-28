@@ -74,6 +74,24 @@ export function getSceneStats(): SceneStats {
 }
 
 const FRAME_MS = 1000 / 30;
+
+/*
+ * A global pace for every running scene. A small dialog pauses the scene on
+ * its current frame while it is open (ui/Overlay.tsx), so the blur behind the
+ * dialog blurs a still image: about a tenth of the GPU time of a running scene
+ * (docs/SPECS.md, "Background scenes"). 30 is normal; 0 pauses without
+ * clearing, and resuming carries on with no jump. A slower pace still works.
+ */
+let paceFps = 30;
+const paceListeners = new Set<() => void>();
+export function setScenePace(fps: number): void {
+  if (fps === paceFps) return;
+  paceFps = fps;
+  paceListeners.forEach((fn) => fn());
+}
+export function getScenePace(): number {
+  return paceFps;
+}
 /** A still frame shows the scene as if it had run this long, so particles are spread out. */
 const STILL_T = 40;
 
@@ -148,8 +166,10 @@ export function runScene(
   function tick(now: number): void {
     raf = requestAnimationFrame(tick);
     const elapsed = now - last;
-    // Skip display frames until a 30 fps slot is due (with a little slack for 60 Hz jitter).
-    if (elapsed < FRAME_MS - 2) return;
+    // Skip display frames until a slot is due (30 fps normally, with a little
+    // slack for 60 Hz jitter; slower while a dialog has lowered the pace).
+    const frameMs = paceFps >= 30 ? FRAME_MS : 1000 / Math.max(1, paceFps);
+    if (elapsed < frameMs - 2) return;
     // After a long gap (a stall, a debugger) don't let particles jump.
     const dt = Math.min(elapsed, 100) / 1000;
     last = now;
@@ -159,6 +179,8 @@ export function runScene(
 
   function start(): void {
     if (stopped || raf || refresh || document.hidden) return;
+    // Paused (pace 0): keep the current frame on screen, run no loop.
+    if (paceFps <= 0 && !still()) return;
     if (still()) {
       paint(0);
       if (renderer.stillRefreshMs) refresh = window.setInterval(() => paint(0), renderer.stillRefreshMs);
@@ -217,6 +239,12 @@ export function runScene(
   document.addEventListener("visibilitychange", onVisibility);
   motionQuery?.addEventListener("change", onMotionChange);
   watchDpr();
+  // Follow the global pace (halt on pause, restart with the new slot length).
+  const onPace = () => {
+    halt();
+    start();
+  };
+  paceListeners.add(onPace);
 
   return {
     stop() {
@@ -227,6 +255,7 @@ export function runScene(
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
       motionQuery?.removeEventListener("change", onMotionChange);
+      paceListeners.delete(onPace);
       dprQuery?.removeEventListener("change", onDprChange);
       dprQuery = null;
       // Free the backing stores now rather than whenever GC gets to them.
