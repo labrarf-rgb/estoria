@@ -6736,6 +6736,25 @@ detail-card restyle and card rearranging (branch rebased onto `8084767`).
   story's page is a single 40% sheet on Map and Write. No app console
   errors. Not committed.
 
+### 2026-11-27 — Fresh starts open on an arranged board (commit 5a5f381)
+
+- **The gap:** the sample story is also the store's default document, which
+  is what shows behind the Welcome screen, during a slow load, and after a
+  failed load's "Continue without saving". None of those run Explore the
+  sample's own arrange, so they showed the sample's authored two-row zigzag
+  and needed a press of Auto-arrange.
+- **The change:** `data/sampleStory.ts` ships the sample already laid out on
+  Auto-arrange's first pass at a fixed 4 columns. It is arranged in place, so
+  the store still recognises the untouched default by identity
+  (`docHasContent`), and before the Alt ending is forked from it, so both
+  versions share positions. Explore the sample still re-arranges to fit the
+  window (`useSample`, comment updated).
+- **Unchanged:** saved layouts are never rearranged (a stored project loads
+  as its own object), and the `.estoria.json` format is untouched: only the
+  sample's positions moved.
+- **Verified:** `lib/sampleArrange.test.ts` (6 tests); full suite 420 on main
+  after the merge.
+
 ### 2026-11-27 — See-through cards under a scene (branch `claude/see-through-solids`)
 
 - **An experiment Ray kept.** Under a scene, the surfaces that were still
